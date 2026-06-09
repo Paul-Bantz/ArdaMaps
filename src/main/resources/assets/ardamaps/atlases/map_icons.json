@@ -1,0 +1,10 @@
+{
+  "sources": [
+    {
+      "type": "minecraft:directory",
+      "source": "icons-sprites",
+      "prefix": "icons/"
+    }
+  ]
+}
+
