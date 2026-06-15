@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "ardamaps",
+  "version": "${version}",
+  "name": "ArdaMaps",
+  "description": "A mapping mod for Ardacraft",
+  "authors": [
+    "Duom"
+  ],
+  "contact": {
+    "website": "com.duom.dev",
+    "repo": "https://github.com/"
+  },
+  "license": "CCBY-NC-SA-4.0",
+  "icon": "assets/ardamaps/ardamaps_icon_96px.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "com.duom.ardamaps.ArdaMapsClient"
+    ],
+    "main": [
+      "com.duom.ardamaps.ArdaMaps"
+    ],
+    "arda-regions:api": [
+      "com.duom.ardamaps.core.consumers.ArdaRegionsHook"
+    ],
+    "ardapaths:api": [
+      "com.duom.ardamaps.core.consumers.ArdaPathsHook"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  },
+  "custom": {
+    "ardamaps:api_entrypoint": "com.duom.ardamaps.api.ArdaMapsApiEntrypoint"
+  }
+}
