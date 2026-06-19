@@ -71,7 +71,7 @@ dependencies {
 
     // Arda regions - https://modrinth.com/mod/ardaregions
     modApi("maven.modrinth:ardaregions:${project.ardaregions_version}")
-    modApi(files("build/libs/ArdaPaths-1.3.0-SNAPSHOT.jar"))
+    modApi("maven.modrinth:arda-paths:${project.ardapaths_version}")
 
     // DevAuth - Dev/Debug authentication support
     modRuntimeOnly("me.djtheredstoner:DevAuth-fabric:${project.devauth_version}")
