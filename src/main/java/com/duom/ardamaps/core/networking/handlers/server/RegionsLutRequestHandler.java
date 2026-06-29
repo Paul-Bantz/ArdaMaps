@@ -75,6 +75,11 @@ public class RegionsLutRequestHandler extends RespondablePacketHandler<RegionsLu
 
         Date lastClientUpdate = packet.date();
         RegionLookupTexture serverRegionLut = ArdaMaps.CONFIG.getRegionLookupTexture();
+
+        // Return an empty packet if the server has no LUT
+        if (serverRegionLut == null || serverRegionLut.lastUpdate() == null)
+            return RegionsLutResponsePacket.EMPTY;
+
         Date locationsLastServerUpdate = serverRegionLut.lastUpdate();
         RegionsLutResponsePacket responsePacket;
 
