@@ -525,6 +525,16 @@ public class SidePanelWidget implements Element {
      */
     private void renderButtons(DrawContext context, int usableWidth, int x, int y, int mouseX, int mouseY) {
 
+        // Check that the teleport and set waypoint dont lead to world origin
+        if (displayedLocation.getPosition() != null) {
+
+            if (displayedLocation.getPosition().x == 0
+                    && displayedLocation.getPosition().y == 0
+                    && displayedLocation.getPosition().z == 0)
+
+                return;
+        }
+
         var buttonWidth = (usableWidth - ELEMENT_SPACING) / 2;
 
         if (!displayedLocation.isRevealed() || !displayedLocation.isVisited()) {

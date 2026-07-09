@@ -36,6 +36,10 @@ import org.jetbrains.annotations.NotNull;
 public class DistanceUnitConverter {
 
     public static final float KM_TO_MILES = 0.621371f;
+    public static final double METRIC_UNIT_SWITCH_THRESHOLD = 1d;
+    public static final double IMPERIAL_UNIT_SWITCH_THRESHOLD = 0.5d;
+    public static final double KM_TO_METERS = 1000d;
+    public static final double MILES_TO_FEET = 5280d;
 
     /**
      * Converts in-game blocks to a string representation in real-world units (kilometers or miles)
@@ -49,8 +53,20 @@ public class DistanceUnitConverter {
 
         if(dimension == null) return "";
 
-        return ArdaMapsClient.CONFIG.getUnitSystem() == UnitSystem.IMPERIAL ?
-                String.format("%.1f miles", blocksToRealWorldUnits(dimension, nbBlocks)) : String.format("%.0f km", blocksToRealWorldUnits(dimension, nbBlocks));
+        double distance = blocksToRealWorldUnits(dimension, nbBlocks);
+
+        if (ArdaMapsClient.CONFIG.getUnitSystem() == UnitSystem.IMPERIAL) {
+
+            if (distance < IMPERIAL_UNIT_SWITCH_THRESHOLD)
+                return String.format("%.1f feet", distance * MILES_TO_FEET);
+
+            return String.format("%.1f miles", distance);
+        }
+
+        if (distance < METRIC_UNIT_SWITCH_THRESHOLD)
+            return String.format("%.0f meters", distance * KM_TO_METERS);
+
+        return String.format("%.0f km", distance);
     }
 
     /**
