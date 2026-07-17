@@ -100,7 +100,7 @@ public class PmTilesMapCamera extends TilesMapCamera {
         double maxWorldZ = worldZ + halfViePortHeight;
 
         int tilesBoundX = dimension.getWidth() / blocksPerTile;
-        int tilesBoundY = dimension.getWidth() / blocksPerTile;
+        int tilesBoundY = dimension.getHeight() / blocksPerTile;
 
         // Convert to tile coordinates
         int minTileX = (int) Math.floor((minWorldX - dimension.getXMin()) / blocksPerTile);
@@ -183,7 +183,8 @@ public class PmTilesMapCamera extends TilesMapCamera {
      */
     @Override
     public int numberOfBlocksPerTile(int zoom) {
-        return tileSize * (1 << ((int) identityZoom - zoom));
+        int exponent = (int) identityZoom - zoom;
+        return exponent >= 0 ? tileSize << exponent : Math.max(1, tileSize >> -exponent);
     }
 
     /**

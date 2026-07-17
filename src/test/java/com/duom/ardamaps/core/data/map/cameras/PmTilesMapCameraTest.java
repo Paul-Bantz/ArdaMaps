@@ -95,6 +95,34 @@ class PmTilesMapCameraTest {
     }
 
     /**
+     * PMTiles sources can contain finer tile zooms than the configured identity zoom.
+     * Each zoom step above identity halves the world area covered by a tile.
+     */
+    @Test
+    void numberOfBlocksPerTile_aboveIdentityZoom_halvesCoverage() {
+
+        camera.setIdentityZoom(3);
+
+        assertAll(
+                () -> assertEquals(128, camera.numberOfBlocksPerTile(4)),
+                () -> assertEquals(64, camera.numberOfBlocksPerTile(5)),
+                () -> assertEquals(32, camera.numberOfBlocksPerTile(6)),
+                () -> assertEquals(16, camera.numberOfBlocksPerTile(7))
+        );
+    }
+
+    /**
+     * Very fine tile zooms should never produce zero blocks per tile, because that value is used as a divisor.
+     */
+    @Test
+    void numberOfBlocksPerTile_farAboveIdentityZoom_neverReturnsZero() {
+
+        camera.setIdentityZoom(3);
+
+        assertEquals(1, camera.numberOfBlocksPerTile(16));
+    }
+
+    /**
      * At the coarsest tile zoom (2), each tile covers 256 * 2^(8-2) = 16 384 blocks.
      * This is the fallback tile level loaded when zoomed all the way out; a wrong value here causes coarse tiles to cover the wrong area.
      */
