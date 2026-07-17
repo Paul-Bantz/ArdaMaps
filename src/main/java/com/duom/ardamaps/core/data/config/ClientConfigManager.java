@@ -105,17 +105,13 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
     }
 
     /**
-     * Synchronizes the exploration progress of incoming locations with the client's progress. This is called whenever
-     * a location update is received with "raw" location data from the server.
-     * Sets the progression fields in each location and persist locally.
+     * Creates the default client progress.
      *
-     * @param locations the locations to synchronize
+     * @return A ClientProgress object with default settings.
      */
-    public void synchronizeAndUpdateLocationExplorationProgress(LocationConfig<LocationClient> locations) {
+    private ClientProgress createDefaultProgress() {
 
-        config.setLocationConfig(locations);
-        synchronizeLocationExplorationProgress();
-        saveProgress();
+        return new ClientProgress();
     }
 
     /**
@@ -150,27 +146,7 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
      */
     private void backupClientProgress() {
 
-        if (Files.exists(clientProgressFile)) {
-
-            try {
-
-                Files.copy(clientProgressFile, clientProgressFile.resolveSibling(clientProgressFile.getFileName() + ".bak"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-
-            } catch (IOException e) {
-
-                LOGGER.error("Failed to backup exploration progress", e);
-            }
-        }
-    }
-
-    /**
-     * Creates the default client progress.
-     *
-     * @return A ClientProgress object with default settings.
-     */
-    private ClientProgress createDefaultProgress() {
-
-        return new ClientProgress();
+        backupClientProgress(".bak");
     }
 
     /**
@@ -193,6 +169,40 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
             }
 
         }, ArdaMaps.IO_EXECUTOR);
+    }
+
+    /**
+     * Backups the client progress to a file with the provided suffix.
+     *
+     * @param suffix Suffix appended to the progress file name, e.g. ".backup".
+     */
+    public void backupClientProgress(String suffix) {
+
+        if (Files.exists(clientProgressFile)) {
+
+            try {
+
+                Files.copy(clientProgressFile, clientProgressFile.resolveSibling(clientProgressFile.getFileName() + suffix), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+            } catch (IOException e) {
+
+                LOGGER.error("Failed to backup exploration progress", e);
+            }
+        }
+    }
+
+    /**
+     * Synchronizes the exploration progress of incoming locations with the client's progress. This is called whenever
+     * a location update is received with "raw" location data from the server.
+     * Sets the progression fields in each location and persist locally.
+     *
+     * @param locations the locations to synchronize
+     */
+    public void synchronizeAndUpdateLocationExplorationProgress(LocationConfig<LocationClient> locations) {
+
+        config.setLocationConfig(locations);
+        synchronizeLocationExplorationProgress();
+        saveProgress();
     }
 
     /**

@@ -30,55 +30,54 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.network.PacketByteBuf;
 
 /**
- * Packet sent by the server to teleport the player to a specific location, optionally in a specific world.
+ * Packet sent by the server to teleport the player to a specific location in a given range, optionally in a specific world.
  *
- * @param x       The X coordinate to teleport to.
- * @param y       The Y coordinate to teleport to.
- * @param z       The Z coordinate to teleport to.
- * @param worldId The Identifier of the world to teleport to. If null, the current world is used.
+ * @param x             The X coordinate to teleport to.
+ * @param z             The Z coordinate to teleport to.
+ * @param worldId       The Identifier of the world to teleport to. If null, the current world is used.
+ * @param scanMinBoundY Y coordinate of the minimum Y in the range to scan for a valid position.
+ * @param scanMaxBoundY Y coordinate of the maximum Y in the range to scan for a valid position.
  */
-public record PlayerTeleportPacket(double x, double y, double z, String worldId) implements IPacket {
+public record PlayerRangedTeleportPacket(
+        double x,
+        double z,
+        String worldId,
+        double scanMinBoundY,
+        double scanMaxBoundY
+) implements IPacket {
 
     /**
-     * Constructs a PlayerTeleportPacket with only X and Z coordinates, setting Y to NaN.
-     *
-     * @param x       The X coordinate to teleport to.
-     * @param z       The Z coordinate to teleport to.
-     * @param worldId The Identifier of the world to teleport to.
-     */
-    public PlayerTeleportPacket(double x, double z, String worldId) {
-        this(x, Double.NaN, z, worldId);
-    }
-
-    /**
-     * Reads a PlayerTeleportPacket from the given PacketByteBuf.
+     * Deserializes a PlayerRangedTeleportPacket from the given PacketByteBuf.
      *
      * @param buf The PacketByteBuf to read from.
-     * @return A new PlayerTeleportPacket instance.
+     * @return A new PlayerRangedTeleportPacket instance with the deserialized data.
      */
-    public static PlayerTeleportPacket read(PacketByteBuf buf) {
+    public static PlayerRangedTeleportPacket read(PacketByteBuf buf) {
 
         final double x = buf.readDouble();
-        final double y = buf.readDouble();
         final double z = buf.readDouble();
         final String worldId = buf.readString();
+        final double scanMinBoundY = buf.readDouble();
+        final double scanMaxBoundY = buf.readDouble();
 
-        return new PlayerTeleportPacket(x, y, z, worldId);
+        return new PlayerRangedTeleportPacket(x, z, worldId, scanMinBoundY, scanMaxBoundY);
     }
 
     /**
-     * Builds the PacketByteBuf for this packet.
+     * Serializes this packet into a PacketByteBuf for transmission over the network.
      *
-     * @return The PacketByteBuf containing the packet data.
+     * @return A new PacketByteBuf containing the serialized packet data.
      */
     @Override
     public PacketByteBuf build() {
 
         PacketByteBuf buf = PacketByteBufs.create();
+
         buf.writeDouble(x);
-        buf.writeDouble(y);
         buf.writeDouble(z);
         buf.writeString(worldId);
+        buf.writeDouble(scanMinBoundY);
+        buf.writeDouble(scanMaxBoundY);
 
         return buf;
     }

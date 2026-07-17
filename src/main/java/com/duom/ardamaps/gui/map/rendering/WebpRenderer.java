@@ -26,6 +26,7 @@
 package com.duom.ardamaps.gui.map.rendering;
 
 import com.duom.ardamaps.ArdaMapsClient;
+import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.FlatMapCamera;
 import com.duom.ardamaps.core.data.map.providers.HttpImageProvider;
@@ -52,10 +53,11 @@ public class WebpRenderer extends MapRenderable {
      *
      * @param camera       The pre-built, dimension-aware camera for this renderer.
      * @param textRenderer The text renderer for displaying loading text or other information.
+     * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public WebpRenderer(FlatMapCamera camera, TextRenderer textRenderer) {
+    public WebpRenderer(FlatMapCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
 
-        super(camera, textRenderer);
+        super(camera, textRenderer, exploration);
         this.mapCamera = camera;
     }
 
@@ -71,6 +73,8 @@ public class WebpRenderer extends MapRenderable {
 
         mapCamera.setCameraZoomBounds(layer.minZoom(), layer.maxZoom());
         mapCamera.setIdentityZoom(layer.identityZoom());
+        mapCamera.setPreferredZoom(layer.preferredZoom());
+        mapCamera.updateZoom();
         mapCamera.setScale(layer.scale());
         mapCamera.setPreferredRenderScale(renderScale);
 

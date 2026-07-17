@@ -42,7 +42,7 @@ import static com.duom.ardamaps.core.data.ExplorationState.HIDDEN;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Test class for @{{@link PlayerExploration}}. Ensure edge-cases are covered, and out of bounds lookups are handled gracefully.
+ * Tests for {@link PlayerExploration} covering cell sizing, coordinate mapping, out-of-bounds safety, and region queries.
  */
 class PlayerExplorationTest {
 
@@ -61,15 +61,20 @@ class PlayerExplorationTest {
     private static final Dimension OFFSET_DIM =
             new Dimension("Offset", "test:offset", 1f, -1000, 1001, -500, 501, false);
 
-    /** Minecraft internal mocks */
+    /** Mocked image construction used to isolate fog-texture allocation from native resources. */
     private MockedConstruction<NativeImage> mockedNativeImage;
 
+    /** Mocked backed-texture construction used to avoid touching the real render thread. */
     private MockedConstruction<NativeImageBackedTexture> mockedNativeImageBackedTexture;
 
+    /** Mocked static accessor for {@link MinecraftClient} so tests can supply a fake texture manager. */
     private MockedStatic<MinecraftClient> mockedMinecraftClient;
 
+    /** Mocked texture manager used to verify dynamic texture registration. */
+    private TextureManager mockTextureManager;
+
     /**
-     * Setup - mock minecraft internals
+     * Installs the mocked Minecraft client environment required by exploration texture initialization.
      */
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @BeforeEach
@@ -79,7 +84,7 @@ class PlayerExplorationTest {
         mockedNativeImageBackedTexture = Mockito.mockConstruction(NativeImageBackedTexture.class);
 
         MinecraftClient mockClient = Mockito.mock(MinecraftClient.class);
-        TextureManager mockTextureManager = Mockito.mock(TextureManager.class);
+        mockTextureManager = Mockito.mock(TextureManager.class);
         Mockito.when(mockClient.getTextureManager()).thenReturn(mockTextureManager);
         Mockito.when(mockTextureManager.registerDynamicTexture(Mockito.any(), Mockito.any()))
                 .thenReturn(Identifier.of("ardamaps", "dummy"));
@@ -90,7 +95,7 @@ class PlayerExplorationTest {
     }
 
     /**
-     * Clear mocks after each pass
+     * Releases mocked constructions and restores static state after each test.
      */
     @AfterEach
     public void afterEach() {
@@ -110,6 +115,20 @@ class PlayerExplorationTest {
 
         assertEquals(128, pe.getCellSize(),
                 "Small worlds must use MIN_CELL_SIZE=128 to avoid an oversized fog array");
+    }
+
+    /**
+     * Range indices are valid identifier suffixes and must be appended without string sanitization.
+     * This protects the dynamic-texture naming contract used to keep ranged exploration layers distinct.
+     */
+    @Test
+    void create_rangeIndex_registersIndexedTextureName() {
+
+        PlayerExploration.create(SMALL_DIM, 6, null);
+
+        Mockito.verify(mockTextureManager).registerDynamicTexture(
+                Mockito.eq("fog_of_war_texture_test_small_6"),
+                Mockito.any());
     }
 
     /**
@@ -143,6 +162,7 @@ class PlayerExplorationTest {
     /**
      * The maximum world-X coordinate may be exactly one past the last valid cell.
      * This documents that toCellX() does NOT clamp - stateAt() handles OOB via inBounds().
+     * Keeping this behavior explicit prevents later "fixes" from hiding boundary handling bugs in callers.
      */
     @Test
     void toCellX_worldXAtDimensionMax_returnsLastCellOrJustBeyond() {
@@ -155,6 +175,7 @@ class PlayerExplorationTest {
     /**
      * The minimum world-Z coordinate must map to cell 0.
      * A negative result would cause stateAt() to hit the out-of-bounds guard and return HIDDEN
+     * This protects the Z-axis conversion path independently of the equivalent X-axis test.
      */
     @Test
     void toCellZ_worldZAtDimensionMin_returnsZero() {
@@ -203,6 +224,7 @@ class PlayerExplorationTest {
 
     /**
      * Validates that region explored returns true when a partial cell has been explored
+     * This guards the intersection logic so even small overlapping regions count as explored in the UI.
      */
     @Test
     void regionExplored_returnsTrueWhenAnyIntersectingCellIsRevealed() {
@@ -220,6 +242,7 @@ class PlayerExplorationTest {
 
     /**
      * Validates that region explored returns false when no intersecting cells have been explored
+     * This protects against false positives when the queried region is disjoint from every revealed fog cell.
      */
     @Test
     void regionExplored_returnsFalseWhenNoIntersectingCellIsRevealed() {

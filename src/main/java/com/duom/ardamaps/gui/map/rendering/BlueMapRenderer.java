@@ -25,6 +25,7 @@
 
 package com.duom.ardamaps.gui.map.rendering;
 
+import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.BlueMapCamera;
 import com.duom.ardamaps.core.data.map.providers.BlueMapTileProvider;
@@ -69,10 +70,11 @@ public class BlueMapRenderer extends MapRenderable {
      *
      * @param camera       The pre-built, dimension-aware camera for this renderer.
      * @param textRenderer TextRenderer instance for rendering loading text when tiles are not yet available.
+     * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public BlueMapRenderer(BlueMapCamera camera, TextRenderer textRenderer) {
+    public BlueMapRenderer(BlueMapCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
 
-        super(camera, textRenderer);
+        super(camera, textRenderer, exploration);
         this.mapCamera = camera;
     }
 
@@ -90,6 +92,8 @@ public class BlueMapRenderer extends MapRenderable {
 
         mapCamera.setCameraZoomBounds(layer.minZoom(), layer.maxZoom());
         mapCamera.setIdentityZoom(layer.identityZoom());
+        mapCamera.setPreferredZoom(layer.preferredZoom());
+        mapCamera.updateZoom();
         mapCamera.setScale(layer.scale());
         mapCamera.setTileSize(layer.tileSize());
         mapCamera.setLodFactor(layer.lodFactor());

@@ -23,62 +23,62 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.core.networking.packets.server;
+package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.network.PacketByteBuf;
 
 /**
- * Packet sent by the server to teleport the player to a specific location, optionally in a specific world.
+ * Response packet sent after a ranged teleport request has completed on the server thread.
  *
- * @param x       The X coordinate to teleport to.
- * @param y       The Y coordinate to teleport to.
- * @param z       The Z coordinate to teleport to.
- * @param worldId The Identifier of the world to teleport to. If null, the current world is used.
+ * @param success True when the player was teleported, false when no safe destination was found or the request failed.
+ * @param x The resolved destination X coordinate, or zero for failed responses.
+ * @param y The resolved destination Y coordinate, including fractional standing heights, or zero for failed responses.
+ * @param z The resolved destination Z coordinate, or zero for failed responses.
  */
-public record PlayerTeleportPacket(double x, double y, double z, String worldId) implements IPacket {
+public record PlayerTeleportResponsePacket(boolean success, double x, double y, double z) implements IPacket {
 
     /**
-     * Constructs a PlayerTeleportPacket with only X and Z coordinates, setting Y to NaN.
+     * Creates a failed teleport response with zeroed coordinates.
      *
-     * @param x       The X coordinate to teleport to.
-     * @param z       The Z coordinate to teleport to.
-     * @param worldId The Identifier of the world to teleport to.
+     * @return A response packet representing a failed ranged teleport request.
      */
-    public PlayerTeleportPacket(double x, double z, String worldId) {
-        this(x, Double.NaN, z, worldId);
+    public static PlayerTeleportResponsePacket failed() {
+
+        return new PlayerTeleportResponsePacket(false, 0.0D, 0.0D, 0.0D);
     }
 
     /**
-     * Reads a PlayerTeleportPacket from the given PacketByteBuf.
+     * Reads a PlayerTeleportResponsePacket from a PacketByteBuf.
      *
-     * @param buf The PacketByteBuf to read from.
-     * @return A new PlayerTeleportPacket instance.
+     * @param buf The PacketByteBuf to read from
+     * @return The PlayerTeleportResponsePacket read from the buffer
      */
-    public static PlayerTeleportPacket read(PacketByteBuf buf) {
+    public static PlayerTeleportResponsePacket read(PacketByteBuf buf) {
 
-        final double x = buf.readDouble();
-        final double y = buf.readDouble();
-        final double z = buf.readDouble();
-        final String worldId = buf.readString();
+        boolean packetSuccess = buf.readBoolean();
+        double packetX = buf.readDouble();
+        double packetY = buf.readDouble();
+        double packetZ = buf.readDouble();
 
-        return new PlayerTeleportPacket(x, y, z, worldId);
+        return new PlayerTeleportResponsePacket(packetSuccess, packetX, packetY, packetZ);
     }
 
     /**
-     * Builds the PacketByteBuf for this packet.
+     * Serializes this response packet to a PacketByteBuf.
      *
-     * @return The PacketByteBuf containing the packet data.
+     * @return A packet buffer containing the success flag and resolved destination coordinates.
      */
     @Override
     public PacketByteBuf build() {
 
         PacketByteBuf buf = PacketByteBufs.create();
+
+        buf.writeBoolean(success);
         buf.writeDouble(x);
         buf.writeDouble(y);
         buf.writeDouble(z);
-        buf.writeString(worldId);
 
         return buf;
     }

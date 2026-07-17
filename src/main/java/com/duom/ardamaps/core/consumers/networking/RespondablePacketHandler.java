@@ -37,10 +37,12 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -53,8 +55,11 @@ import java.util.function.Function;
  */
 public abstract class RespondablePacketHandler<T extends IPacket, U extends IPacket> extends PacketHandler implements IServerPacketHandler<T>, IClientPacketHandler {
 
-    /** Map to store response consumers keyed by their unique request IDs */
-    private final Map<UUID, Consumer<U>> responseConsumers = new HashMap<>();
+    /** Class logger for response delivery failures. */
+    private static final Logger LOGGER = LoggerFactory.getLogger(RespondablePacketHandler.class);
+
+    /** Thread-safe map storing response consumers keyed by their unique request IDs. */
+    private final Map<UUID, Consumer<U>> responseConsumers = new ConcurrentHashMap<>();
 
     /** A function that reads a packet of type T from a PacketByteBuf. This is used to deserialize incoming packets on the server side. */
     private final Function<PacketByteBuf, T> reader;
@@ -105,7 +110,7 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
     }
 
     /**
-     * Handles an incoming request packet on the server side. This method reads the request data from the PacketByteBuf using the provided reader function, processes the request by calling the abstract handle method, and then sends a response back to the client using the response channel. The response is serialized into a PacketByteBuf and sent with the same request ID to allow for matching responses to their corresponding requests on the client side.
+     * Handles an incoming request packet on the server side. This method reads the request data from the PacketByteBuf using the provided reader function, processes the request by calling the async-capable handle method, and sends an immediate response when one is returned. Implementations that return null must call the provided responder exactly once later.
      *
      * @param server  The MinecraftServer instance representing the server on which the packet was received.
      * @param player  The ServerPlayerEntity representing the player who sent the packet.
@@ -117,24 +122,67 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
     public void handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PacketByteBuf buf, PacketSender sender) {
         UUID requestId = buf.readUuid();
         T packet = reader.apply(buf);
-        U responsePacket = handle(server, player, handler, packet, sender);
-        PacketByteBuf responseBuf = PacketByteBufs.create().writeUuid(requestId);
-        PacketByteBuf responsePacketBuf = responsePacket.build();
-        responseBuf.writeBytes(responsePacketBuf);
-        sender.sendPacket(responseChannelId, responseBuf);
+        Consumer<U> responder = response -> respond(sender, requestId, response);
+        U immediate = handle(server, player, handler, packet, sender, responder);
+
+        if (immediate != null) responder.accept(immediate);
     }
 
     /**
-     * Abstract method to process the deserialized request packet of type T and generate a response packet of type U. Subclasses must implement this method to define the specific behaviour for handling the request on the server side and creating an appropriate response based on the request data.
+     * Serializes a response packet and sends it back on this handler's response channel for the supplied request ID.
+     *
+     * @param sender The packet sender used to deliver the response to the client.
+     * @param requestId The UUID read from the matching request packet.
+     * @param response The response packet to serialize and send.
+     */
+    protected void respond(PacketSender sender, UUID requestId, U response) {
+
+        try {
+            PacketByteBuf responseBuf = PacketByteBufs.create().writeUuid(requestId);
+            responseBuf.writeBytes(response.build());
+            sender.sendPacket(responseChannelId, responseBuf);
+        } catch (RuntimeException e) {
+            LOGGER.warn("Unable to send response packet on channel {}", responseChannelId, e);
+        }
+    }
+
+    /**
+     * Processes a deserialized request packet and produces a response packet synchronously.
+     * <p>
+     * Subclasses must override either this method or the async-capable overload with a responder callback.
      *
      * @param ignoredServer  The MinecraftServer instance representing the server on which the packet was received.
      * @param ignoredPlayer  The ServerPlayerEntity representing the player who sent the packet.
      * @param ignoredHandler The ServerPlayNetworkHandler responsible for managing the network connection for the player.
-     * @param packet         The deserialized request packet of type T that was read from the PacketByteBuf, which contains the data sent by the client and needs to be processed by the server to generate a response.
-     * @param ignoredSender  The PacketSender used to send responses back to the client if necessary, allowing for communication between the server and client based on the received request packet. This can be used within this method to send additional packets if needed while processing the request.
-     * @return A response packet of type U that will be sent back to the client in response to the original request. This packet should contain any necessary data or information that is relevant to the client's request and will be serialized and transmitted back over the network.
+     * @param packet         The deserialized request packet of type T that needs to be processed by the server.
+     * @param ignoredSender  The PacketSender used to send responses back to the client if necessary.
+     * @return A response packet to send immediately.
      */
-    public abstract U handle(MinecraftServer ignoredServer, ServerPlayerEntity ignoredPlayer, ServerPlayNetworkHandler ignoredHandler, T packet, PacketSender ignoredSender);
+    protected U handle(MinecraftServer ignoredServer, ServerPlayerEntity ignoredPlayer, ServerPlayNetworkHandler ignoredHandler, T packet, PacketSender ignoredSender) {
+
+        throw new UnsupportedOperationException("Subclasses must override one of the two handle overloads");
+    }
+
+    /**
+     * Processes a deserialized request packet and supports deferred responses.
+     * <p>
+     * Return a response packet to answer immediately, or return {@code null} and call {@code responder} exactly once
+     * later. Missing the responder call leaves a dangling client-side response consumer, and calling it more than once
+     * sends duplicate responses for the same request ID.
+     *
+     * @param server The MinecraftServer instance representing the server on which the packet was received.
+     * @param player The ServerPlayerEntity representing the player who sent the packet.
+     * @param handler The ServerPlayNetworkHandler responsible for managing the network connection for the player.
+     * @param packet The deserialized request packet of type T that needs to be processed by the server.
+     * @param sender The PacketSender used to send responses back to the client if necessary.
+     * @param responder Callback that sends the response for this request and must be called exactly once for deferred responses.
+     * @return A response packet to send immediately, or {@code null} when {@code responder} will be called later.
+     */
+    protected U handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler,
+                       T packet, PacketSender sender, Consumer<U> responder) {
+
+        return handle(server, player, handler, packet, sender);
+    }
 
     /**
      * Handles an incoming response packet on the client side. This method reads the response data from the PacketByteBuf using the provided responseReader function, retrieves the corresponding consumer for the original request using the request ID, and then calls the consumer with the deserialized response packet of type U. This allows for asynchronous processing of responses on the client side based on the original requests that were sent.

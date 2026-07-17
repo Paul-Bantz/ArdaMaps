@@ -93,16 +93,21 @@ public abstract class MapCamera {
     @Setter
     protected double scale;
 
+    /** Dimension definition for the current dimension, used for clamping camera position within world bounds. */
+    @Setter
+    @Getter
+    protected Dimension dimension;
+
     /** World coordinates of the zoom anchor point (world position under mouse when zoom was triggered) */
     private Vec2d zoomAnchorWorld;
 
     /** Screen coordinates of the zoom anchor point (mouse position when zoom was triggered) */
     private Vec2d zoomAnchorScreen;
 
-    /** Dimension definition for the current dimension, used for clamping camera position within world bounds. */
+    /** Preferred zoom level for displaying this map */
     @Setter
     @Getter
-    protected Dimension dimension;
+    private double preferredZoom;
 
     /**
      * Set the viewport size
@@ -207,18 +212,6 @@ public abstract class MapCamera {
     }
 
     /**
-     * Converts screen coordinates to world coordinates at the given zoom level
-     *
-     * @param screenX Screen X coordinate
-     * @param screenY Screen Y coordinate
-     * @param zoom    the zoom level for which to compute the world coordinates
-     * @return World coordinates as Vec2d
-     */
-    public final Vec2d screenToWorldCoordinates(double screenX, double screenY, double zoom) {
-        return screenToWorldCoordinates(screenX, screenY, viewportWidth, viewportHeight, zoom);
-    }
-
-    /**
      * Set camera centre X in world coordinates, clamped so WorldBounds edges never scroll past the viewport edge.
      *
      * @param worldX The world X coordinate to set the camera centre to
@@ -260,6 +253,26 @@ public abstract class MapCamera {
     public abstract Vec2d screenToWorldCoordinates(double screenX, double screenY, int screenW, int screenH);
 
     /**
+     * Get the visual pixels per block at the current zoom level.
+     * This is the true on-screen pixel size of one world block, used to match zoom levels across maps.
+     *
+     * @return Visual pixels per block
+     */
+    public abstract double getVisualPixelsPerBlock();
+
+    /**
+     * Converts screen coordinates to world coordinates at the given zoom level
+     *
+     * @param screenX Screen X coordinate
+     * @param screenY Screen Y coordinate
+     * @param zoom    the zoom level for which to compute the world coordinates
+     * @return World coordinates as Vec2d
+     */
+    public final Vec2d screenToWorldCoordinates(double screenX, double screenY, double zoom) {
+        return screenToWorldCoordinates(screenX, screenY, viewportWidth, viewportHeight, zoom);
+    }
+
+    /**
      * Convert screen coordinates to world coordinates at a given zoom level, given the viewport size. This is used for coordinate conversions before the viewport size is set.
      *
      * @param screenX Screen X coordinate
@@ -270,14 +283,6 @@ public abstract class MapCamera {
      * @return World coordinates as Vec2d
      */
     public abstract Vec2d screenToWorldCoordinates(double screenX, double screenY, int screenW, int screenH, double zoom);
-
-    /**
-     * Get the visual pixels per block at the current zoom level.
-     * This is the true on-screen pixel size of one world block, used to match zoom levels across maps.
-     *
-     * @return Visual pixels per block
-     */
-    public abstract double getVisualPixelsPerBlock();
 
     /**
      * Set camera zoom bounds. This is the allowed zoom range for the user.
@@ -335,6 +340,20 @@ public abstract class MapCamera {
     }
 
     /**
+     * Capture the world point under the mouse cursor as the zoom anchor.
+     * Call this before changing targetCameraZoom so the anchor is recorded at the pre-zoom scale.
+     *
+     * @param mouseX Mouse X coordinate
+     * @param mouseY Mouse Y coordinate
+     * @param width  Viewport width
+     * @param height Viewport height
+     */
+    protected void setZoomAnchor(double mouseX, double mouseY, int width, int height) {
+        zoomAnchorWorld = screenToWorldCoordinates(mouseX, mouseY, width, height);
+        zoomAnchorScreen = new Vec2d(mouseX, mouseY);
+    }
+
+    /**
      * Sets the zoom level
      *
      * @param amount Zoom amount (positive to zoom in, negative to zoom out)
@@ -358,24 +377,23 @@ public abstract class MapCamera {
         }
     }
 
+    /**
+     * Updates the camera zoom to the preferred zoom
+     */
+    public void updateZoom() {
+
+        updateZoom(preferredZoom);
+    }
+
+    /**
+     * Updates the current zoom to the given level
+     *
+     * @param zoom the zoom level to set
+     */
     public void updateZoom(double zoom) {
 
         this.zoom = snapZoom(zoom);
         this.targetCameraZoom = this.zoom;
-    }
-
-    /**
-     * Capture the world point under the mouse cursor as the zoom anchor.
-     * Call this before changing targetCameraZoom so the anchor is recorded at the pre-zoom scale.
-     *
-     * @param mouseX Mouse X coordinate
-     * @param mouseY Mouse Y coordinate
-     * @param width  Viewport width
-     * @param height Viewport height
-     */
-    protected void setZoomAnchor(double mouseX, double mouseY, int width, int height) {
-        zoomAnchorWorld = screenToWorldCoordinates(mouseX, mouseY, width, height);
-        zoomAnchorScreen = new Vec2d(mouseX, mouseY);
     }
 
     /**

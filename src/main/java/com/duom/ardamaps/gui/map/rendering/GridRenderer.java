@@ -25,6 +25,7 @@
 
 package com.duom.ardamaps.gui.map.rendering;
 
+import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.GridCamera;
@@ -45,10 +46,16 @@ public class GridRenderer extends MapRenderable {
     /** Minimum on-screen cell size in pixels before we switch to a coarser grid step. */
     private static final int MIN_CELL_PX = 40;
 
-    private static final int COLOR_GRID_LINE  = 0x60FFFFFF; // semi-transparent white
-    private static final int COLOR_BORDER_LINE = 0xCCFFFFFF; // brighter for world border
-    private static final int COLOR_BACKGROUND  = 0xFF1A1A2E; // dark blue background
+    /** Colour of ordinary grid lines inside the world bounds. */
+    private static final int COLOR_GRID_LINE = 0x60FFFFFF; // semi-transparent white
 
+    /** Colour of grid lines that coincide with the dimension border. */
+    private static final int COLOR_BORDER_LINE = 0xCCFFFFFF; // brighter for world border
+
+    /** Background fill colour shown behind the grid. */
+    private static final int COLOR_BACKGROUND = 0xFF1A1A2E; // dark blue background
+
+    /** Camera used to convert between world and screen coordinates for this renderer. */
     private final GridCamera camera;
 
     /**
@@ -58,12 +65,19 @@ public class GridRenderer extends MapRenderable {
      *
      * @param camera       The pre-built, dimension-aware camera for this renderer.
      * @param textRenderer The text renderer for loading / info text.
+     * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public GridRenderer(GridCamera camera, TextRenderer textRenderer) {
-        super(camera, textRenderer);
+    public GridRenderer(GridCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
+        super(camera, textRenderer, exploration);
         this.camera = camera;
     }
 
+    /**
+     * Configures zoom bounds and attempts to preserve the previous visual scale when switching to the grid layer.
+     *
+     * @param layer       The selected layer definition.
+     * @param renderScale Previously visible pixels-per-block, or {@link Double#NaN} when unavailable.
+     */
     @Override
     public void configure(MapLayerDefinition layer, double renderScale) {
 
@@ -72,6 +86,11 @@ public class GridRenderer extends MapRenderable {
         camera.setZoomToMatchVisualPixelsPerBlock();
     }
 
+    /**
+     * Renders the full grid layer: background, adaptive grid lines, then fog-of-war overlay.
+     *
+     * @param context The draw context for the current frame.
+     */
     @Override
     public void render(DrawContext context) {
         renderBackground(context);
@@ -102,12 +121,12 @@ public class GridRenderer extends MapRenderable {
         }
 
         // Compute visible world rectangle
-        Vec2d topLeft     = camera.screenToWorldCoordinates(0, 0);
+        Vec2d topLeft = camera.screenToWorldCoordinates(0, 0);
         Vec2d bottomRight = camera.screenToWorldCoordinates(camera.getViewportWidth(), camera.getViewportHeight());
 
-        double worldLeft   = topLeft.x();
-        double worldTop    = topLeft.y();
-        double worldRight  = bottomRight.x();
+        double worldLeft = topLeft.x();
+        double worldTop = topLeft.y();
+        double worldRight = bottomRight.x();
         double worldBottom = bottomRight.y();
 
         // Clamp to dimension bounds so we only draw within the world
@@ -116,20 +135,20 @@ public class GridRenderer extends MapRenderable {
         int dimZMin = getDimension().getZMin();
         int dimZMax = getDimension().getZMax();
 
-        double drawLeft   = Math.max(worldLeft,   dimXMin);
-        double drawRight  = Math.min(worldRight,  dimXMax);
-        double drawTop    = Math.max(worldTop,    dimZMin);
+        double drawLeft = Math.max(worldLeft, dimXMin);
+        double drawRight = Math.min(worldRight, dimXMax);
+        double drawTop = Math.max(worldTop, dimZMin);
         double drawBottom = Math.min(worldBottom, dimZMax);
 
         if (drawLeft >= drawRight || drawTop >= drawBottom) return;
 
         // First grid line X position (aligned to step)
-        long firstX = (long) Math.ceil(drawLeft  / step) * step;
-        long firstZ = (long) Math.ceil(drawTop   / step) * step;
+        long firstX = (long) Math.ceil(drawLeft / step) * step;
+        long firstZ = (long) Math.ceil(drawTop / step) * step;
 
         // Vertical grid lines
         for (long wx = firstX; wx <= drawRight; wx += step) {
-            Vec2d top    = camera.worldToScreenCoordinates(wx, drawTop);
+            Vec2d top = camera.worldToScreenCoordinates(wx, drawTop);
             Vec2d bottom = camera.worldToScreenCoordinates(wx, drawBottom);
             int sx = (int) Math.round(top.x());
             int sy0 = (int) Math.round(top.y());
@@ -140,7 +159,7 @@ public class GridRenderer extends MapRenderable {
 
         // Horizontal grid lines
         for (long wz = firstZ; wz <= drawBottom; wz += step) {
-            Vec2d left  = camera.worldToScreenCoordinates(drawLeft,  wz);
+            Vec2d left = camera.worldToScreenCoordinates(drawLeft, wz);
             Vec2d right = camera.worldToScreenCoordinates(drawRight, wz);
             int sy = (int) Math.round(left.y());
             int sx0 = (int) Math.round(left.x());

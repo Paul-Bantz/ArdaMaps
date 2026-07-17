@@ -121,3 +121,6 @@ run-server/
 # Ignore DevAuth tokens
 .devauth/microsoft_accounts.json
 /logs/*
+.gradle-local/*
+*.md
+!readme.md

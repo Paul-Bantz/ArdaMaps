@@ -95,6 +95,15 @@ public class SidePanelWidget implements Element {
     /** Text renderer for drawing text */
     private final TextRenderer textRenderer;
 
+    /** Renderer for the HTML content blocks */
+    private final TextContentBlockRenderer textContentBlockRenderer;
+
+    /** The camera offset when this location is focused */
+    private final Vec2d cameraFocusWorldPosition;
+
+    /** The camera zoom when this location is focused */
+    private final double cameraFocusZoom;
+
     /** The detailed information about the location */
     private LocationDetails locationDetails;
 
@@ -143,15 +152,6 @@ public class SidePanelWidget implements Element {
 
     /** Explore in depth button */
     private StyledButtonWidget exploreInDepthButton;
-
-    /** Renderer for the HTML content blocks */
-    private final TextContentBlockRenderer textContentBlockRenderer;
-
-    /** The camera offset when this location is focused */
-    private final Vec2d cameraFocusWorldPosition;
-
-    /** The camera zoom when this location is focused */
-    private final double cameraFocusZoom;
 
     /**
      * Constructs a SidePanelWidget.
@@ -212,62 +212,41 @@ public class SidePanelWidget implements Element {
     }
 
     /**
-     * Define the size of this panel
-     *
-     * @param width  the width of the panel
-     * @param height the height of the panel
-     */
-    public void setSize(int width, int height) {
-
-        this.width = width;
-        this.height = height;
-    }
-
-    /**
-     * Sets the position of this side panel on screen
-     * @param x the top left x coordinate
-     * @param y the top left y coordinate
-     */
-    public void setPosition(int x, int y) {
-
-        screenX1 = x;
-        screenY1 = y;
-        screenX2 = x + width;
-        screenY2 = y + height;
-    }
-
-    /**
      * Fetches location details from the server.
      */
     private void fetchLocationDetails() {
 
         if (!displayedLocation.isRevealed()) {
 
-            var placeholderText = Text.translatable("ardamaps.client.map.screen.side.panel.unexplored.description").getString();
-
-            locationDetails = new LocationDetails(Text.translatable("ardamaps.client.map.screen.side.panel.unexplored.location").getString());
-            descriptionBlocks = HtmlConverter.parseBlocks(placeholderText);
+            initPlaceholderLocation("ardamaps.client.map.screen.side.panel.unexplored.description", "ardamaps.client.map.screen.side.panel.unexplored.location");
 
         } else if (!displayedLocation.isVisited()) {
 
-            var placeholderText = Text.translatable("ardamaps.client.map.screen.side.panel.unvisited.description").getString();
-
-            locationDetails = new LocationDetails(Text.translatable("ardamaps.client.map.screen.side.panel.unvisited.location").getString());
-            descriptionBlocks = HtmlConverter.parseBlocks(placeholderText);
+            initPlaceholderLocation("ardamaps.client.map.screen.side.panel.unvisited.description", "ardamaps.client.map.screen.side.panel.unvisited.location");
 
         } else {
 
-            LocationDetailsRequestPacket packet = new LocationDetailsRequestPacket(displayedLocation.getName());
-            PacketRegistry.LOCATION_DETAILS_REQUEST.send(packet, locationDetailsResponsePacket -> {
+            fetchLocationDataFromRemote();
+        }
+    }
 
-                var details = locationDetailsResponsePacket.details();
+    /**
+     * Sends a teleport request to the server for the displayed location
+     */
+    private void requestTeleport() {
 
-                if (!details.description().isBlank()) {
+        var warp = displayedLocation.getWarp();
 
-                    locationDetails = locationDetailsResponsePacket.details();
-                    descriptionBlocks = HtmlConverter.parseBlocks(locationDetails.description());
-                }
-            });
+        if (warp != null && !warp.isEmpty()) {
+
+            PacketRegistry.PLAYER_WARP_REQUEST.send(new PlayerWarpPacket(warp));
+
+        } else {
+
+            PacketRegistry.PLAYER_TELEPORT_REQUEST.send(new PlayerTeleportPacket(
+                    displayedLocation.getPosition().x,
+                    displayedLocation.getPosition().z,
+                    displayedLocation.getWorld()));
         }
     }
 
@@ -295,23 +274,64 @@ public class SidePanelWidget implements Element {
     }
 
     /**
-     * Sends a teleport request to the server for the displayed location
+     * Initializes a placeholder location from a given translation title and text key
+     *
+     * @param placeholderDescriptionKey the panel description translation key
+     * @param placeholderTitleKey       the panel title translation key
      */
-    private void requestTeleport() {
+    private void initPlaceholderLocation(String placeholderDescriptionKey, String placeholderTitleKey) {
 
-        var warp = displayedLocation.getWarp();
+        var placeholderText = Text.translatable(placeholderDescriptionKey).getString();
 
-        if (warp != null && !warp.isEmpty()) {
+        locationDetails = new LocationDetails(Text.translatable(placeholderTitleKey).getString());
+        descriptionBlocks = HtmlConverter.parseBlocks(placeholderText);
+    }
 
-            PacketRegistry.PLAYER_WARP_REQUEST.send(new PlayerWarpPacket(warp));
+    /**
+     * Initializes the location data by querying the server
+     */
+    private void fetchLocationDataFromRemote() {
 
-        } else {
+        LocationDetailsRequestPacket packet = new LocationDetailsRequestPacket(displayedLocation.getName());
+        PacketRegistry.LOCATION_DETAILS_REQUEST.send(packet, locationDetailsResponsePacket -> {
 
-            PacketRegistry.PLAYER_TELEPORT_REQUEST.send(new PlayerTeleportPacket(
-                    displayedLocation.getPosition().x,
-                    displayedLocation.getPosition().z,
-                    displayedLocation.getWorld()));
-        }
+            var details = locationDetailsResponsePacket.details();
+
+            if (!details.description().isBlank()) {
+
+                locationDetails = locationDetailsResponsePacket.details();
+                descriptionBlocks = HtmlConverter.parseBlocks(locationDetails.description());
+            } else {
+
+                initPlaceholderLocation("ardamaps.client.map.screen.side.panel.location.in.progress.description", "ardamaps.client.map.screen.side.panel.unvisited.location");
+            }
+        });
+    }
+
+    /**
+     * Define the size of this panel
+     *
+     * @param width  the width of the panel
+     * @param height the height of the panel
+     */
+    public void setSize(int width, int height) {
+
+        this.width = width;
+        this.height = height;
+    }
+
+    /**
+     * Sets the position of this side panel on screen
+     *
+     * @param x the top left x coordinate
+     * @param y the top left y coordinate
+     */
+    public void setPosition(int x, int y) {
+
+        screenX1 = x;
+        screenY1 = y;
+        screenX2 = x + width;
+        screenY2 = y + height;
     }
 
     /**
@@ -423,38 +443,6 @@ public class SidePanelWidget implements Element {
     }
 
     /**
-     * Renders the explore in-depth button of the location if more information is available.
-     *
-     * @param context The drawing context
-     * @param centerX The centre X coordinate of the panel
-     * @param y       The Y coordinate for rendering the button
-     * @param mouseX  Current mouse X position
-     * @param mouseY  Current mouse Y position
-     * @return The height of the rendered button
-     */
-    private int renderExploreInDepth(DrawContext context, int centerX, int y, int mouseX, int mouseY) {
-
-        exploreInDepthButton.setPosition(centerX - ModConstants.BUTTON_WIDTH / 2, y);
-        exploreInDepthButton.render(context, mouseX, mouseY, 0);
-
-        return ModConstants.BUTTON_HEIGHT;
-    }
-
-    /**
-     * Checks if the mouse is over the title - used only if title is clickable (ie cameraFocusWorldPosition != null)
-     *
-     * @param mouseX the mouse x position
-     * @param mouseY the mouse y position
-     * @return true if the mouse is currently over the title
-     */
-    private boolean mouseOverTitle(int mouseX, int mouseY) {
-
-        return cameraFocusWorldPosition != null &&
-                mouseX >= titleX && mouseX <= titleX + titleWidth &&
-                mouseY >= titleY && mouseY <= titleY + titleHeight;
-    }
-
-    /**
      * Renders the description content blocks within the side panel. Handles hover tooltips
      * and link-click events (pan-and-select on internal location links).
      *
@@ -514,6 +502,24 @@ public class SidePanelWidget implements Element {
     }
 
     /**
+     * Renders the explore in-depth button of the location if more information is available.
+     *
+     * @param context The drawing context
+     * @param centerX The centre X coordinate of the panel
+     * @param y       The Y coordinate for rendering the button
+     * @param mouseX  Current mouse X position
+     * @param mouseY  Current mouse Y position
+     * @return The height of the rendered button
+     */
+    private int renderExploreInDepth(DrawContext context, int centerX, int y, int mouseX, int mouseY) {
+
+        exploreInDepthButton.setPosition(centerX - ModConstants.BUTTON_WIDTH / 2, y);
+        exploreInDepthButton.render(context, mouseX, mouseY, 0);
+
+        return ModConstants.BUTTON_HEIGHT;
+    }
+
+    /**
      * Renders the action buttons within the side panel.
      *
      * @param context     The drawing context
@@ -525,7 +531,7 @@ public class SidePanelWidget implements Element {
      */
     private void renderButtons(DrawContext context, int usableWidth, int x, int y, int mouseX, int mouseY) {
 
-        // Check that the teleport and set waypoint dont lead to world origin
+        // Check that the teleport and set waypoint doesn't lead to world origin
         if (displayedLocation.getPosition() != null) {
 
             if (displayedLocation.getPosition().x == 0
@@ -556,6 +562,20 @@ public class SidePanelWidget implements Element {
             teleportButton.setWidth(buttonWidth);
             teleportButton.render(context, mouseX, mouseY, 0f);
         }
+    }
+
+    /**
+     * Checks if the mouse is over the title - used only if title is clickable (ie cameraFocusWorldPosition != null)
+     *
+     * @param mouseX the mouse x position
+     * @param mouseY the mouse y position
+     * @return true if the mouse is currently over the title
+     */
+    private boolean mouseOverTitle(int mouseX, int mouseY) {
+
+        return cameraFocusWorldPosition != null &&
+                mouseX >= titleX && mouseX <= titleX + titleWidth &&
+                mouseY >= titleY && mouseY <= titleY + titleHeight;
     }
 
     /**

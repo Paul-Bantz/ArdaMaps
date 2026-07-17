@@ -76,6 +76,10 @@ public class PlayerExploration implements Serializable {
     @Getter
     private final String dimensionId;
 
+    /** Optional vertical range index this instance manages. Null for non-ranged dimensions. */
+    @Getter
+    private final Integer rangeIndex;
+
     /** Number of cells along the X axis (width) of the dimension. */
     @Getter
     private final int nbCellsX;
@@ -131,11 +135,13 @@ public class PlayerExploration implements Serializable {
      * visible to whatever holds the same reference (e.g.
      * {@link com.duom.ardamaps.core.data.config.client.ClientProgress}).</p>
      *
-     * @param dimension Dimension definition providing world extents
+     * @param dimension  Dimension definition providing world extents.
+     * @param rangeIndex Optional vertical range index, or null for non-ranged dimensions.
      */
-    private PlayerExploration(Dimension dimension) {
+    private PlayerExploration(Dimension dimension, Integer rangeIndex) {
 
         this.dimensionId = dimension.getId();
+        this.rangeIndex = rangeIndex;
         this.cellSize = computeCellSize(dimension.getWidth(), dimension.getHeight());
         this.nbCellsX = (int) Math.ceil((double) dimension.getWidth() / cellSize);
         this.nbCellsY = (int) Math.ceil((double) dimension.getHeight() / cellSize);
@@ -183,7 +189,20 @@ public class PlayerExploration implements Serializable {
      */
     public static PlayerExploration create(Dimension dimension, byte[] explorationData) {
 
-        PlayerExploration playerExploration = new PlayerExploration(dimension);
+        return create(dimension, null, explorationData);
+    }
+
+    /**
+     * Factory method to create a PlayerExploration instance for the given dimension, range and exploration data.
+     *
+     * @param dimension       Dimension definition providing world extents.
+     * @param rangeIndex      The vertical range index, or null for non-ranged dimensions.
+     * @param explorationData Backing array; length must equal nbCellsX * nbCellsY, or null to create an empty exploration.
+     * @return A new PlayerExploration instance initialized with the provided data and auto-generation flag.
+     */
+    public static PlayerExploration create(Dimension dimension, Integer rangeIndex, byte[] explorationData) {
+
+        PlayerExploration playerExploration = new PlayerExploration(dimension, rangeIndex);
 
         // Check if input data matches the computed cell-size. If not, we warn, ignore it and start fresh.
         int nbCells = (int) Math.ceil((double) dimension.getWidth() / playerExploration.getCellSize())
@@ -196,7 +215,7 @@ public class PlayerExploration implements Serializable {
 
         } else {
 
-            LOGGER.info("Initializing exploration with provided data of length {} for dimension '{}'.", explorationData.length, dimension.getId());
+            LOGGER.info("Initializing exploration with provided data of length {} for dimension '{}' range '{}'.", explorationData.length, dimension.getId(), rangeIndex);
             playerExploration.setExplorationData(explorationData);
         }
 
@@ -244,7 +263,7 @@ public class PlayerExploration implements Serializable {
         fogTexture = new NativeImageBackedTexture(fogMask);
         fogTextureId = MinecraftClient.getInstance()
                 .getTextureManager()
-                .registerDynamicTexture(TEXTURE_PREFIX + "_" + sanitizeDimensionId(dimensionId), fogTexture);
+                .registerDynamicTexture(textureName(), fogTexture);
     }
 
     /**
@@ -265,13 +284,13 @@ public class PlayerExploration implements Serializable {
     }
 
     /**
-     * Sanitizes the dimension ID to ensure it's a valid texture identifier suffix by replacing
-     *
-     * @param dimensionId The original dimension ID (e.g. "minecraft:overworld").
-     * @return A sanitized version of the dimension ID suitable for use in texture identifiers (e.g. "minecraft_overworld").
+     * @return The dynamic texture name for this exploration range.
      */
-    private String sanitizeDimensionId(String dimensionId) {
-        return dimensionId.replace(':', '_').replace('/', '_');
+    private String textureName() {
+
+        String name = TEXTURE_PREFIX + "_" + sanitizeIdentifierSuffix(dimensionId);
+        if (rangeIndex != null) name += "_" + rangeIndex;
+        return name;
     }
 
     /**
@@ -292,14 +311,31 @@ public class PlayerExploration implements Serializable {
     }
 
     /**
-     * Returns the exploration state at the given world position.
+     * Sanitizes the dimension ID to ensure it's a valid texture identifier suffix by replacing
      *
-     * @param worldX World X coordinate.
-     * @param worldZ World Z coordinate.
-     * @return The {@link ExplorationState}, or {@link ExplorationState#HIDDEN} if out of bounds.
+     * @param value The original dimension identifier (e.g. "minecraft:overworld").
+     * @return A sanitized version of the dimension ID suitable for use in texture identifiers (e.g. "minecraft_overworld").
      */
-    public ExplorationState stateAtWorldPos(double worldX, double worldZ) {
-        return stateAt(toCellX(worldX), toCellZ(worldZ));
+    private String sanitizeIdentifierSuffix(String value) {
+
+        StringBuilder sanitized = new StringBuilder(value.length());
+
+        for (int idx = 0; idx < value.length(); idx++) {
+            char c = Character.toLowerCase(value.charAt(idx));
+
+            if ((c >= 'a' && c <= 'z')
+                    || (c >= '0' && c <= '9')
+                    || c == '/'
+                    || c == '.'
+                    || c == '_'
+                    || c == '-') {
+                sanitized.append(c);
+            } else {
+                sanitized.append('_');
+            }
+        }
+
+        return sanitized.toString();
     }
 
     /**
@@ -313,26 +349,6 @@ public class PlayerExploration implements Serializable {
 
         if (!inBounds(cellX, cellY)) return ExplorationState.HIDDEN;
         return ExplorationState.fromValue(explorationData[index(cellX, cellY)]);
-    }
-
-    /**
-     * Converts a world X coordinate to the cell-X index.
-     *
-     * @param worldX World X coordinate.
-     * @return Cell X index (may be out of bounds).
-     */
-    public int toCellX(double worldX) {
-        return Math.floorDiv((int) Math.floor(worldX) - xMin, cellSize);
-    }
-
-    /**
-     * Converts a world Z coordinate to the cell-Y index.
-     *
-     * @param worldZ World Z coordinate.
-     * @return Cell Y index (may be out of bounds).
-     */
-    public int toCellZ(double worldZ) {
-        return Math.floorDiv((int) Math.floor(worldZ) - zMin, cellSize);
     }
 
     /**
@@ -356,6 +372,54 @@ public class PlayerExploration implements Serializable {
      */
     private int index(int cellX, int cellY) {
         return cellY * nbCellsX + cellX;
+    }
+
+    /**
+     * Factory method to create a PlayerExploration instance for a ranged dimension.
+     *
+     * @param dimensionId The ID of the dimension.
+     * @param rangeIndex  The vertical range index, or null for non-ranged dimensions.
+     * @return A new PlayerExploration instance, or null if the dimension is not found in the config.
+     */
+    public static @Nullable PlayerExploration create(String dimensionId, Integer rangeIndex) {
+
+        var dimension = ArdaMapsClient.CONFIG.getDimension(dimensionId);
+
+        if (dimension != null)
+            return create(dimension, rangeIndex, null);
+
+        return null;
+    }
+
+    /**
+     * Returns the exploration state at the given world position.
+     *
+     * @param worldX World X coordinate.
+     * @param worldZ World Z coordinate.
+     * @return The {@link ExplorationState}, or {@link ExplorationState#HIDDEN} if out of bounds.
+     */
+    public ExplorationState stateAtWorldPos(double worldX, double worldZ) {
+        return stateAt(toCellX(worldX), toCellZ(worldZ));
+    }
+
+    /**
+     * Converts a world X coordinate to the cell-X index.
+     *
+     * @param worldX World X coordinate.
+     * @return Cell X index (may be out of bounds).
+     */
+    public int toCellX(double worldX) {
+        return Math.floorDiv((int) Math.floor(worldX) - xMin, cellSize);
+    }
+
+    /**
+     * Converts a world Z coordinate to the cell-Y index.
+     *
+     * @param worldZ World Z coordinate.
+     * @return Cell Y index (may be out of bounds).
+     */
+    public int toCellZ(double worldZ) {
+        return Math.floorDiv((int) Math.floor(worldZ) - zMin, cellSize);
     }
 
     /**
@@ -510,7 +574,7 @@ public class PlayerExploration implements Serializable {
             fogMask = null;
         }
 
-        dirtyCells.clear();
+        if (dirtyCells != null) dirtyCells.clear();
     }
 
     /**

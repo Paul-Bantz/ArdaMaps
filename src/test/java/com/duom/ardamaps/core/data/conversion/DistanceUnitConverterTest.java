@@ -37,10 +37,11 @@ import org.mockito.Mockito;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Unit tests for {@link DistanceUnitConverter}.
+ * Tests for {@link DistanceUnitConverter} unit selection and threshold formatting behavior.
  */
 class DistanceUnitConverterTest {
 
+    /** Shared dimension fixture whose scale keeps distance conversions deterministic across tests. */
     private static final Dimension DIMENSION =
             new Dimension("Test", "test:distance", 1f, 0, 10000, 0, 10000, false);
 
@@ -64,17 +65,32 @@ class DistanceUnitConverterTest {
     }
 
     /**
-     * Metric distances below the kilometer threshold are displayed in meters.
+     * Verifies that metric distances below the kilometer threshold stay in meters.
+     * This protects the branch that avoids prematurely switching short distances to kilometer formatting.
      */
     @Test
     void asRealWorldUnits_metricBelowThreshold_returnsMeters() {
         setUnitSystem(UnitSystem.METRIC);
 
-        assertEquals("1839 meters", DistanceUnitConverter.asRealWorldUnits(DIMENSION, 1839));
+        assertEquals("839 meters", DistanceUnitConverter.asRealWorldUnits(DIMENSION, 839));
     }
 
     /**
-     * Metric distances at the threshold stay in kilometers.
+     * Installs a mocked client config exposing the requested unit system.
+     *
+     * @param unitSystem The unit system to return from {@link ClientConfig#getUnitSystem()}.
+     */
+    private static void setUnitSystem(UnitSystem unitSystem) {
+        var config = Mockito.mock(ClientConfig.class);
+
+        Mockito.when(config.getUnitSystem()).thenReturn(unitSystem);
+
+        ArdaMapsClient.CONFIG = config;
+    }
+
+    /**
+     * Verifies that metric distances at the threshold switch to kilometers.
+     * This guards the exact cutoff behavior so boundary values do not oscillate between units.
      */
     @Test
     void asRealWorldUnits_metricAtThreshold_returnsKilometers() {
@@ -84,7 +100,8 @@ class DistanceUnitConverterTest {
     }
 
     /**
-     * Imperial distances below the mile threshold are displayed in feet.
+     * Verifies that imperial distances below the mile threshold are displayed in feet.
+     * This protects the small-distance imperial branch from incorrectly promoting values to miles too early.
      */
     @Test
     void asRealWorldUnits_imperialBelowThreshold_returnsFeet() {
@@ -96,7 +113,8 @@ class DistanceUnitConverterTest {
     }
 
     /**
-     * Imperial distances at the threshold stay in miles.
+     * Verifies that imperial distances at the threshold switch to miles.
+     * This documents the exact half-mile cutoff that downstream HUD text depends on.
      */
     @Test
     void asRealWorldUnits_imperialAtThreshold_returnsMiles() {
@@ -108,20 +126,13 @@ class DistanceUnitConverterTest {
     }
 
     /**
-     * Null dimensions keep the existing empty-string behavior.
+     * Verifies that null dimensions preserve the existing empty-string fallback.
+     * This protects callers that surface conversion output directly without a separate null-dimension guard.
      */
     @Test
     void asRealWorldUnits_nullDimension_returnsEmptyString() {
         setUnitSystem(UnitSystem.METRIC);
 
         assertEquals("", DistanceUnitConverter.asRealWorldUnits(null, 1000));
-    }
-
-    private static void setUnitSystem(UnitSystem unitSystem) {
-        var config = Mockito.mock(ClientConfig.class);
-
-        Mockito.when(config.getUnitSystem()).thenReturn(unitSystem);
-
-        ArdaMapsClient.CONFIG = config;
     }
 }

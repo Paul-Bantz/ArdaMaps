@@ -244,31 +244,19 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
     @Override
     protected void renderExpandedDropdown(DrawContext context, List<T> items, int mouseX, int mouseY) {
 
-        var numOptions = Math.min(options.size(), maxVisibleOptions);
-
-        if (!allowNull) numOptions -= 1;
-
-        var computedHeight = Math.min(height, (numOptions * originalHeight));
-
-        boolean expandUp =
-                expandDirection.equals(ExpandDirection.UP_RIGHT) ||
-                        expandDirection.equals(ExpandDirection.UP_LEFT);
+        var dropdownItems = computeDropdownItems(items);
+        var visibleCount = getVisibleDropdownItemCount(dropdownItems);
+        var computedHeight = visibleCount * originalHeight;
 
         if (isSquareIconButton) {
 
             super.renderExpandedDropdown(context, items, mouseX, mouseY);
 
-            var y = getY();
             var buttonSize = iconSize + 2;
-            var visibleCount = Math.min(items.size(), maxVisibleOptions) - 1;
 
             for (int idx = 0; idx < visibleCount; idx++) {
 
-                if (expandUp) {
-                    y -= originalHeight;
-                } else {
-                    y += originalHeight;
-                }
+                var y = getDropdownItemY(idx, visibleCount);
 
                 var u = 288f;
 
@@ -284,20 +272,20 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
 
         } else {
 
-            var y = getY() + originalHeight;
+            var y = getDropdownListTopY(visibleCount);
 
-            if (expandUp) y = getY() - computedHeight;
-
-            context.drawNineSlicedTexture(ModConstants.MAP_GUI_ELEMENTS,
-                    getX(), y,
-                    width, computedHeight,
-                    16,
-                    16,
-                    16,
-                    16,
-                    64,
-                    64,
-                    16, 176);
+            if (visibleCount > 0) {
+                context.drawNineSlicedTexture(ModConstants.MAP_GUI_ELEMENTS,
+                        getX(), y,
+                        width, computedHeight,
+                        16,
+                        16,
+                        16,
+                        16,
+                        64,
+                        64,
+                        16, 176);
+            }
 
             super.renderExpandedDropdown(context, items, mouseX, mouseY);
         }
@@ -323,22 +311,13 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
 
             var topSliceHeight = 1;
             var bottomSliceHeight = 1;
-            var numOptions = Math.min(options.size(), maxVisibleOptions);
-            var computedHeight = Math.min(height, ((numOptions - 1) * originalHeight));
+            var dropdownItems = computeDropdownItems(computeItemList());
+            var visibleCount = getVisibleDropdownItemCount(dropdownItems);
+            var listTop = getDropdownListTopY(visibleCount);
+            var listBottom = listTop + (visibleCount - 1) * originalHeight;
 
-            boolean expandUp =
-                    expandDirection.equals(ExpandDirection.UP_RIGHT) ||
-                            expandDirection.equals(ExpandDirection.UP_LEFT);
-
-            if (expandUp) {
-
-                if (y == getY() - computedHeight) topSliceHeight = 16;
-                if (y == getY() - originalHeight) bottomSliceHeight = 16;
-            } else {
-
-                if (y == getY() + originalHeight) topSliceHeight = 16;
-                if (y == getY() + (maxVisibleOptions) * originalHeight) bottomSliceHeight = 16;
-            }
+            if (y == listTop) topSliceHeight = 16;
+            if (y == listBottom) bottomSliceHeight = 16;
 
             context.drawNineSlicedTexture(ModConstants.MAP_GUI_ELEMENTS,
                     x, y,

@@ -51,7 +51,7 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
      *
      * @param configPath              The path to the configuration file.
      * @param locationConfigPath      The path to the location configuration file.
-      *@param regionTextureLookupPath The path to the region texture lookup file.
+     * @param regionTextureLookupPath The path to the region texture lookup file.
      */
     public ServerConfigManager(String configPath, String locationConfigPath, String regionTextureLookupPath) {
 
@@ -59,10 +59,10 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
     }
 
     /**
-    * Creates the default server configuration.
-    *
-    * @return A ServerConfig object with default settings.
-    */
+     * Creates the default server configuration.
+     *
+     * @return A ServerConfig object with default settings.
+     */
     @Override
     protected ServerConfig createDefaultConfig() {
 
@@ -110,6 +110,8 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
      */
     public void validateDimensionConfiguration(MinecraftServer server) {
 
+        validateRangeConfiguration();
+
         if (!this.config.isAutoGenerateMissingDimensions()) return;
 
         var worlds = server.getWorlds();
@@ -129,30 +131,87 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
                 var border = world.getWorldBorder();
                 Dimension defaultDimension = new Dimension(dimensionId.getPath(), dimensionId.toString(),
                         1,
-                        (int)border.getBoundWest(),
-                        (int)border.getBoundEast(),
-                        (int)border.getBoundNorth(),
-                        (int)border.getBoundSouth(),
+                        (int) border.getBoundWest(),
+                        (int) border.getBoundEast(),
+                        (int) border.getBoundNorth(),
+                        (int) border.getBoundSouth(),
                         false,
                         true);
 
-                MapLayerDefinition defaultLayer = new MapLayerDefinition(dimensionId.getPath(),
-                        MapLayerSource.GRID,
-                        false,
-                        8,
-                        1,
-                        1,
-                        3,
-                        14,
-                        1,
-                        256,
-                        1,
-                        "", "");
-
-                defaultDimension.getMapLayers().add(defaultLayer);
+                defaultDimension.getMapLayers().add(MapLayerDefinition.DEFAULT_GRID_LAYER);
 
                 this.config.getDimensions().add(defaultDimension);
             }
         }
+    }
+
+    /**
+     * Logs warnings for range configuration shapes that are valid but likely surprising.
+     */
+    private void validateRangeConfiguration() {
+
+        for (Dimension dimension : this.config.getDimensions()) {
+            dimension.getMapLayers().stream()
+                    .filter(layer -> !layer.hasRanges())
+                    .filter(layer -> layer.type() != MapLayerSource.GRID)
+                    .filter(layer -> layer.path() == null || layer.path().isBlank())
+                    .forEach(layer -> LOGGER.warn(
+                            "Dimension {} layer '{}' has no path and no ranges. Layer path is only optional when ranges are defined.",
+                            dimension.getId(),
+                            layer.layer()));
+
+            dimension.getMapLayers().stream()
+                    .filter(MapLayerDefinition::hasRanges)
+                    .flatMap(layer -> layer.ranges().stream())
+                    .filter(range -> range.path() == null || range.path().isBlank())
+                    .forEach(range -> LOGGER.warn(
+                            "Dimension {} range {} has no path. Ranged layers require a path on every range.",
+                            dimension.getId(),
+                            range.index()));
+
+            if (!dimension.hasRanges()) continue;
+
+            List<MapLayerRange> canonicalRanges = dimension.getExplorationRanges();
+            boolean hasFlatLayer = dimension.getMapLayers().stream().anyMatch(layer -> !layer.hasRanges());
+
+            if (hasFlatLayer) {
+                LOGGER.warn("Dimension {} mixes ranged and non-ranged map layers. Non-ranged layers will use the canonical range set for exploration.", dimension.getId());
+            }
+
+            dimension.getMapLayers().stream()
+                    .filter(MapLayerDefinition::hasRanges)
+                    .skip(1)
+                    .filter(layer -> !sameRanges(canonicalRanges, layer.ranges()))
+                    .forEach(layer -> LOGGER.warn(
+                            "Dimension {} layer '{}' declares ranges that differ from the canonical first ranged layer. Exploration uses the first ranged layer only.",
+                            dimension.getId(),
+                            layer.layer()));
+        }
+    }
+
+    /**
+     * Compares range indices and Y bounds in order.
+     *
+     * @param expected The canonical range list.
+     * @param actual   The range list to compare against the canonical list.
+     * @return True when both lists have the same indices and Y bounds in the same order.
+     */
+    private boolean sameRanges(List<MapLayerRange> expected, List<MapLayerRange> actual) {
+
+        if (expected == null || actual == null) return expected == actual;
+        if (expected.size() != actual.size()) return false;
+
+        for (int i = 0; i < expected.size(); i++) {
+            MapLayerRange left = expected.get(i);
+            MapLayerRange right = actual.get(i);
+
+            if (left.index() != right.index()
+                    || left.rangeMinY() != right.rangeMinY()
+                    || left.rangeMaxY() != right.rangeMaxY()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

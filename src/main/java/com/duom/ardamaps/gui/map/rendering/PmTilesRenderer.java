@@ -26,6 +26,7 @@
 package com.duom.ardamaps.gui.map.rendering;
 
 import com.duom.ardamaps.ArdaMapsClient;
+import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.PmTilesMapCamera;
 import com.duom.ardamaps.core.data.map.providers.PMTilesFileTileProvider;
@@ -53,7 +54,7 @@ public class PmTilesRenderer extends MapRenderable {
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(PmTilesRenderer.class);
-    
+
     /** The camera used to determine which tiles are visible and how they should be rendered based on the current view. */
     private final PmTilesMapCamera mapCamera;
 
@@ -67,10 +68,11 @@ public class PmTilesRenderer extends MapRenderable {
      *
      * @param camera       The pre-built, dimension-aware camera for this renderer.
      * @param textRenderer The text renderer for displaying loading text or other information.
+     * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public PmTilesRenderer(PmTilesMapCamera camera, TextRenderer textRenderer) {
+    public PmTilesRenderer(PmTilesMapCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
 
-        super(camera, textRenderer);
+        super(camera, textRenderer, exploration);
         this.mapCamera = camera;
     }
 
@@ -94,6 +96,8 @@ public class PmTilesRenderer extends MapRenderable {
             mapCamera.setTilesZoomBounds(tileProvider.getMinZoom(), tileProvider.getMaxZoom());
             mapCamera.setCameraZoomBounds(layer.minZoom(), layer.maxZoom());
             mapCamera.setIdentityZoom(layer.identityZoom());
+            mapCamera.setPreferredZoom(layer.preferredZoom());
+            mapCamera.updateZoom();
             mapCamera.setScale(layer.scale());
             mapCamera.setTileSize(layer.tileSize());
             mapCamera.setPreferredRenderScale(renderScale);

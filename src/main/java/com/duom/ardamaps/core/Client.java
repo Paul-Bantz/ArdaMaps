@@ -54,14 +54,8 @@ public class Client {
     private static Dimension cachedCurrentDimension = null;
 
     /**
-     * @return The client's world, or null if not available
-     */
-    public static @Nullable ClientWorld world() {
-        return mc().world;
-    }
-
-    /**
      * This method will only return null when the player is not connected to a world or the world is not loaded yet.
+     *
      * @return The registry key of the current dimension, or null if world is not available
      */
     public static @Nullable String currentDimensionId() {
@@ -73,8 +67,27 @@ public class Client {
         return world.getRegistryKey().getValue().toString();
     }
 
-   /**
-    * This method will only return null when the player is not connected to a world or the world is not loaded yet.
+    /**
+     * @return The client's world, or null if not available
+     */
+    public static @Nullable ClientWorld world() {
+        return mc().world;
+    }
+
+    /**
+     * Gets the Minecraft client instance. We annotate this with
+     * {@link NotNull} because utility methods should only be
+     * invoked after the client has been initialized.
+     *
+     * @return The Minecraft client instance
+     */
+    public static @NotNull MinecraftClient mc() {
+        return MinecraftClient.getInstance();
+    }
+
+    /**
+     * This method will only return null when the player is not connected to a world or the world is not loaded yet.
+     *
      * @return The registry key of the current dimension, or null if world is not available
      */
     public static @Nullable Dimension currentDimension() {
@@ -99,17 +112,6 @@ public class Client {
     }
 
     /**
-     * Gets the Minecraft client instance. We annotate this with
-     * {@link NotNull} because utility methods should only be
-     * invoked after the client has been initialized.
-     *
-     * @return The Minecraft client instance
-     */
-    public static @NotNull MinecraftClient mc() {
-        return MinecraftClient.getInstance();
-    }
-
-    /**
      * @return The player's position as a 2D vector (X, Z), or (0,0) if player is not available
      */
     public static @NotNull Vec2d playerPosition2d() {
@@ -126,6 +128,17 @@ public class Client {
      */
     public static @Nullable ClientPlayerEntity player() {
         return mc().player;
+    }
+
+    /**
+     * @return The player's Y position, or null if player is not available.
+     */
+    public static @Nullable Double playerPositionY() {
+
+        ClientPlayerEntity player = player();
+        if (player != null) return player.getY();
+
+        return null;
     }
 
     /**

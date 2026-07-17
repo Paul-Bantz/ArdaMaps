@@ -28,7 +28,6 @@ package com.duom.ardamaps.core.networking.handlers.server;
 import com.duom.ardamaps.core.consumers.networking.ServerPacketHandler;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.minecraft.block.BlockState;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -37,6 +36,8 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.Heightmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.OptionalDouble;
 
 /**
  * Handler for the PlayerTeleportPacket, responsible for teleporting the player to the specified coordinates,
@@ -91,20 +92,25 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
 
                     if (Double.isNaN(packet.y())) {
 
-                        BlockPos pos = findSafeY(serverWorld, (int) packet.x(), (int) packet.z());
+                        double x = SafeTeleportScanner.blockCenter(packet.x());
+                        double z = SafeTeleportScanner.blockCenter(packet.z());
+                        OptionalDouble safeY = findSafeY(serverWorld, player, x, z);
+                        double teleportY;
 
-                        if (pos == null) {
+                        if (safeY.isEmpty()) {
 
-                            pos = serverWorld.getTopPosition(
+                            BlockPos pos = serverWorld.getTopPosition(
                                     Heightmap.Type.MOTION_BLOCKING_NO_LEAVES,
-                                    new BlockPos((int) Math.ceil(packet.x()), 0, (int) Math.ceil(packet.z()))
+                                    BlockPos.ofFloored(x, 0, z)
                             );
+                            teleportY = pos.getY() + 1;
                         } else {
 
-                            LOGGER.info("Safe position found at: {}", pos);
+                            teleportY = safeY.getAsDouble();
+                            LOGGER.info("Safe position found at: {}, {}, {}", x, teleportY, z);
                         }
 
-                        player.teleport(serverWorld, packet.x(), pos.getY() + 1, packet.z(), player.getYaw(), player.getPitch());
+                        player.teleport(serverWorld, x, teleportY, z, player.getYaw(), player.getPitch());
                     } else {
 
                         player.teleport(serverWorld, packet.x(), packet.y(), packet.z(), player.getYaw(), player.getPitch());
@@ -120,52 +126,25 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
     }
 
     /**
-     * Finds a safe Y coordinate for teleportation at the given X and Z coordinates in the specified world.
+     * Finds a safe standing Y coordinate for teleportation at the given X and Z coordinates in the specified world.
      *
      * @param world The world to search in.
-     * @param x     The X coordinate to check.
-     * @param z     The Z coordinate to check.
-     * @return A BlockPos representing the safe Y coordinate, or null if no safe position is found.
+     * @param player The player whose standing dimensions are being placed.
+     * @param x     The snapped X coordinate to check.
+     * @param z     The snapped Z coordinate to check.
+     * @return The exact standing Y coordinate, or empty if no safe position is found.
      */
-    public static BlockPos findSafeY(ServerWorld world, int x, int z) {
+    public static OptionalDouble findSafeY(ServerWorld world, ServerPlayerEntity player, double x, double z) {
         int topY = world.getTopY();
         int bottomY = world.getBottomY();
 
-        for (int y = topY; y > bottomY; y--) {
-            BlockPos feet = new BlockPos(x, y, z);
-            BlockPos head = feet.up();
-            BlockPos ground = feet.down();
+        for (int y = topY - 2; y >= bottomY; y--) {
+            OptionalDouble safeY = SafeTeleportScanner.standingHeightAt(world, player, x, y, z);
 
-            if (isAir(world, feet)
-                    && isAir(world, head)
-                    && isSolid(world, ground)) {
-                return feet;
-            }
+            if (safeY.isPresent()) return safeY;
         }
 
-        return null;
+        return OptionalDouble.empty();
     }
 
-    /**
-     * Checks if the block at the given position in the world is air.
-     *
-     * @param world The world to check in.
-     * @param pos   The position to check.
-     * @return True if the block is air, false otherwise.
-     */
-    private static boolean isAir(ServerWorld world, BlockPos pos) {
-        return world.getBlockState(pos).isAir();
-    }
-
-    /**
-     * Checks if the block at the given position in the world is solid.
-     *
-     * @param world The world to check in.
-     * @param pos   The position to check.
-     * @return True if the block is solid, false otherwise.
-     */
-    private static boolean isSolid(ServerWorld world, BlockPos pos) {
-        BlockState state = world.getBlockState(pos);
-        return state.isSolidBlock(world, pos);
-    }
 }

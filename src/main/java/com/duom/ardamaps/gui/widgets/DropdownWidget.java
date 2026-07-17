@@ -56,14 +56,8 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     /** Margin around text inside the dropdown items */
     protected static final int TEXT_MARGIN = 4;
 
-    /** Scrollbar */
-    private final ScrollbarWidget scrollbar = new ScrollbarWidget(2, 8, 0x445D4D35, 0xFF5D4D35, 1);
-
     /** Original height of the Dropdown - ie the height of the button */
     protected final int originalHeight;
-
-    /** Original width of the Dropdown - ie the width of the button */
-    protected int originalWidth;
 
     /** Maximum number of visible options before scrolling */
     protected final int maxVisibleOptions;
@@ -101,6 +95,12 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     /** Whether to show icons for each dropdown item */
     protected final boolean displayIcons;
 
+    /** Scrollbar */
+    private final ScrollbarWidget scrollbar = new ScrollbarWidget(2, 8, 0x445D4D35, 0xFF5D4D35, 1);
+
+    /** Original width of the Dropdown - ie the width of the button */
+    protected int originalWidth;
+
     /** Padding inside the dropdown button for text and icons */
     protected int buttonPadding;
 
@@ -113,7 +113,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     /** True if the dropdown is currently expanded. */
     @Getter
     protected boolean expanded;
-
 
     /**
      * Creates a new dropdown widget with full customization options.
@@ -225,40 +224,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     }
 
     /**
-     * Builds the complete list of items including null option if allowed.
-     *
-     * @return List of all items to display
-     */
-    private List<T> computeItemList() {
-
-        List<T> allItems = new ArrayList<>();
-
-        if (allowNull) allItems.add(null);
-
-        allItems.addAll(options);
-
-        allItems.sort((a, b) -> {
-            // selection always first
-            if (Objects.equals(a, selected)) return -1;
-            if (Objects.equals(b, selected)) return 1;
-
-            // null handling
-            if (a == null) return -1; // null before others
-            if (b == null) return 1;
-
-            E itemPairA = optionDisplay.apply(a);
-            E itemPairB = optionDisplay.apply(a);
-            String textA = itemPairA.text().getString();
-            String textB = itemPairB.text().getString();
-
-            // alphabetical by name()
-            return textA.compareToIgnoreCase(textB);
-        });
-
-        return allItems;
-    }
-
-    /**
      * Renders the expanded dropdown list with all visible options.
      *
      * @param context The drawing context
@@ -268,58 +233,74 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
      */
     protected void renderExpandedDropdown(DrawContext context, List<T> items, int mouseX, int mouseY) {
 
-        var dropDownItems = new ArrayList<>(items);
-        dropDownItems.remove(selected);
+        var dropDownItems = computeDropdownItems(items);
+        int visibleCount = getVisibleDropdownItemCount(dropDownItems);
 
-        int visibleCount = Math.min(dropDownItems.size(), maxVisibleOptions);
+        if (visibleCount <= 0) return;
 
         // Dynamically adjust height based on visible items when expanded
         this.height = originalHeight + visibleCount * originalHeight;
 
-        // Start at index 1 to skip rendering the main button area again, as it's already rendered in renderButton()
         for (int i = 0; i < visibleCount; i++) {
 
             // Calculate the actual index in the full item list based on scroll offset
             int actualIndex = scrollbar.getScrollOffset() + i;
 
+            if (actualIndex >= dropDownItems.size()) break;
+
             T dropdownItem = dropDownItems.get(actualIndex);
 
-            int y = computeDropdownItemPositionY(i) + originalHeight;
+            int y = getDropdownItemY(i, visibleCount);
 
             boolean isHovered = isMouseOverItem(mouseX, mouseY, y);
             boolean isSelected = isItemSelected(dropdownItem);
 
             renderDropdownItem(context, getX(), y, dropdownItem, isHovered, isSelected);
-
-            // Stop rendering if we've reached the last item in the list to avoid overdrawing
-            if (actualIndex + 1 >= dropDownItems.size()) break;
         }
 
         // Render scrollbar if needed
-        if (items.size() > maxVisibleOptions) {
+        if (dropDownItems.size() > visibleCount) {
             int trackX = getX() + originalWidth - 2 - 4;
-            int trackY = computeDropdownItemPositionY(1) + 12;
-            int trackHeight = (visibleCount - 1) * originalHeight;
-            int maxOffset = (items.size() - 1) - maxVisibleOptions;
+            int trackY = getDropdownListTopY(visibleCount) + 4;
+            int trackHeight = Math.max(0, visibleCount * originalHeight - 8);
+            int maxOffset = dropDownItems.size() - visibleCount;
             scrollbar.setMaxOffset(maxOffset);
-            scrollbar.render(context, trackX, trackY, trackHeight, maxVisibleOptions - 1, items.size() - 1);
+            scrollbar.render(context, trackX, trackY, trackHeight, visibleCount, dropDownItems.size());
         }
     }
 
     /**
-     * Computes the Y position of a dropdown item based on its index.
+     * Gets the Y coordinate for a visible expanded-list item.
      *
-     * @param index The index of the item in the visible list
-     * @return Y coordinate for the item
+     * @param visibleIndex Visible index in the expanded list.
+     * @param visibleCount Number of visible expanded-list items.
+     * @return Top Y coordinate for the visible item.
      */
-    protected int computeDropdownItemPositionY(int index) {
-        int indexOffset = (index * originalHeight );
-        boolean expandUpwards = expandDirection.equals(ExpandDirection.UP_LEFT) ||
-                expandDirection.equals(ExpandDirection.UP_RIGHT);
+    protected int getDropdownItemY(int visibleIndex, int visibleCount) {
 
-        return expandUpwards
-                ? getDropDownTopY(maxVisibleOptions) + indexOffset
-                : getY() + indexOffset;
+        return getDropdownListTopY(visibleCount) + visibleIndex * originalHeight;
+    }
+
+    /**
+     * Gets the top Y coordinate of the expanded list area.
+     *
+     * @param visibleCount Number of visible expanded-list items.
+     * @return Top Y coordinate of the expanded list.
+     */
+    protected int getDropdownListTopY(int visibleCount) {
+
+        return expandsUp()
+                ? getY() - visibleCount * originalHeight
+                : getY() + originalHeight;
+    }
+
+    /**
+     * @return True if this dropdown expands upward.
+     */
+    protected boolean expandsUp() {
+
+        return expandDirection.equals(ExpandDirection.UP_LEFT) ||
+                expandDirection.equals(ExpandDirection.UP_RIGHT);
     }
 
     /**
@@ -344,6 +325,36 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     private boolean isItemSelected(T item) {
 
         return (item == null && selected == null) || (item != null && item.equals(selected));
+    }
+
+    /**
+     * Gets the top Y coordinate of the dropdown list.
+     *
+     * @param totalItems Total number of items in the dropdown
+     * @return Top Y coordinate
+     */
+    public int getDropDownTopY(int totalItems) {
+        int visibleCount = Math.min(totalItems, maxVisibleOptions);
+        return getDropdownListTopY(visibleCount);
+    }
+
+    @Override
+    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {
+
+        TextRenderer textRenderer = Client.mc().textRenderer;
+        int x = getX();
+        int y = getY();
+
+        boolean isHovered =
+                mouseX >= x && mouseX <= x + originalWidth &&
+                        mouseY >= y && mouseY <= y + originalHeight;
+
+        // Render the main button area as a dropdown item
+        renderDropdownItem(context, x, y, selected, isHovered, false);
+
+        if (displayArrows) {
+            renderExpandArrow(context, textRenderer, x, y);
+        }
     }
 
     /**
@@ -394,66 +405,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
         }
     }
 
-
-    /**
-     * Gets the top Y coordinate of the dropdown list.
-     *
-     * @param totalItems Total number of items in the dropdown
-     * @return Top Y coordinate
-     */
-    public int getDropDownTopY(int totalItems) {
-        int visibleCount = Math.min(totalItems, maxVisibleOptions);
-
-        return switch (expandDirection) {
-            case UP_LEFT, UP_RIGHT -> getDropdownListOrigin() - Math.min(visibleCount, options.size()) * originalHeight;
-            case DOWN_RIGHT -> getDropdownListOrigin();
-        };
-    }
-
-    protected void drawListSlice(DrawContext context, int x, int y, boolean isHovered, boolean isSelected) {
-
-        int v = 46;
-
-        if (isHovered) v += 40;
-        else if (isSelected) v += 20;
-
-        context.drawNineSlicedTexture(WIDGETS_TEXTURE, x, y,
-                originalWidth, originalHeight,
-                20,
-                4,
-                200,
-                20,
-                0, v);
-    }
-
-    /**
-     * Computes the origin point of the dropdown list based on expansion direction.
-     *
-     * @return Y coordinate of the dropdown list origin
-     */
-    private int getDropdownListOrigin() {
-        return getY();
-    }
-
-    @Override
-    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {
-
-        TextRenderer textRenderer = Client.mc().textRenderer;
-        int x = getX();
-        int y = getY();
-
-        boolean isHovered =
-                mouseX >= x && mouseX <= x + originalWidth &&
-                        mouseY >= y && mouseY <= y + originalHeight;
-
-        // Render the main button area as a dropdown item
-        renderDropdownItem(context, x, y, selected, isHovered, false);
-
-        if (displayArrows) {
-            renderExpandArrow(context, textRenderer, x, y);
-        }
-    }
-
     /**
      * Renders the expand/collapse arrow indicator.
      *
@@ -474,6 +425,32 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
         context.drawTextWithShadow(textRenderer, Text.literal(arrow), arrowX, arrowY, ModConstants.COLOR_WHITE);
     }
 
+    protected void drawListSlice(DrawContext context, int x, int y, boolean isHovered, boolean isSelected) {
+
+        int v = 46;
+
+        if (isHovered) v += 40;
+        else if (isSelected) v += 20;
+
+        context.drawNineSlicedTexture(WIDGETS_TEXTURE, x, y,
+                originalWidth, originalHeight,
+                20,
+                4,
+                200,
+                20,
+                0, v);
+    }
+
+    /**
+     * Gets the colour used for text labels in the dropdown items.
+     *
+     * @return The colour value for label text
+     */
+    protected int getLabelColor() {
+
+        return ModConstants.COLOR_WHITE;
+    }
+
     @Override
     public void onClick(double mouseX, double mouseY) {
         if (!expanded) {
@@ -491,13 +468,14 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     private void expand() {
 
         List<T> allItems = computeItemList();
+        List<T> dropdownItems = computeDropdownItems(allItems);
 
-        if (allItems.isEmpty() || allItems.size() == 1) return;
+        if (dropdownItems.isEmpty()) return;
 
         expanded = true;
         scrollbar.resetOffset();
 
-        int visibleCount = Math.min(allItems.size(), maxVisibleOptions);
+        int visibleCount = getVisibleDropdownItemCount(dropdownItems);
         this.height = originalHeight + visibleCount * originalHeight;
     }
 
@@ -509,61 +487,21 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
      */
     private void selectItemAtMousePosition(double mouseX, double mouseY) {
         List<T> allItems = computeItemList();
+        List<T> dropdownItems = computeDropdownItems(allItems);
+        int visibleCount = getVisibleDropdownItemCount(dropdownItems);
 
-        if (isMouseOver(mouseX, mouseY)) {
-            int clickedIndex = (int) ((mouseY - getDropDownTopY(allItems.size())) / originalHeight);
+        if (visibleCount > 0 && isMouseOver(mouseX, mouseY)) {
+            int clickedIndex = (int) ((mouseY - getDropdownListTopY(visibleCount)) / originalHeight);
             int actualIndex = scrollbar.getScrollOffset() + clickedIndex;
 
-            if (actualIndex < allItems.size()) {
-                T item = allItems.get(actualIndex);
+            if (clickedIndex >= 0 && clickedIndex < visibleCount && actualIndex < dropdownItems.size()) {
+                T item = dropdownItems.get(actualIndex);
                 selected = item;
                 if (onSelect != null) {
                     onSelect.accept(item);
                 }
             }
         }
-    }
-
-    /**
-     * Collapses the dropdown to hide options.
-     */
-    private void collapse() {
-        expanded = false;
-        height = originalHeight;
-    }
-
-    /**
-     * Checks if the mouse is over the dropdown widget or its expanded area.
-     *
-     * @param mouseX The x-coordinate of the mouse cursor
-     * @param mouseY The y-coordinate of the mouse cursor
-     * @return true if the mouse is over the dropdown or its expanded area, false otherwise
-     */
-    @Override
-    public boolean isMouseOver(double mouseX, double mouseY) {
-
-        // Check if mouse is over the main button area
-        boolean mouseOver = mouseX >= getX() && mouseY >= getY()
-                && mouseX <= getX() + originalWidth
-                && mouseY <= getY() + originalHeight;
-
-        if (!mouseOver && expanded) {
-            mouseOver = mouseX >= getX() && mouseX <= getX() + width;
-            mouseOver = switch (expandDirection) {
-                case UP_LEFT -> mouseOver
-                        && mouseY <= getY() && mouseY >= getY() - height;
-                case UP_RIGHT -> mouseX >= getX()
-                        && mouseY <= getY() + height
-                        && mouseX <= getX() + width
-                        && mouseY < getY() + height;
-                case DOWN_RIGHT -> mouseX >= getX()
-                        && mouseY >= getY()
-                        && mouseX <= getX() + width
-                        && mouseY <= getY() + height;
-            };
-        }
-
-        return mouseOver;
     }
 
     /**
@@ -588,6 +526,105 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     }
 
     /**
+     * Checks if the mouse is over the dropdown widget or its expanded area.
+     *
+     * @param mouseX The x-coordinate of the mouse cursor
+     * @param mouseY The y-coordinate of the mouse cursor
+     * @return true if the mouse is over the dropdown or its expanded area, false otherwise
+     */
+    @Override
+    public boolean isMouseOver(double mouseX, double mouseY) {
+
+        // Check if mouse is over the main button area
+        boolean mouseOver = mouseX >= getX() && mouseY >= getY()
+                && mouseX <= getX() + originalWidth
+                && mouseY <= getY() + originalHeight;
+
+        if (!mouseOver && expanded) {
+            List<T> dropdownItems = computeDropdownItems(computeItemList());
+            int visibleCount = getVisibleDropdownItemCount(dropdownItems);
+            int listTop = getDropdownListTopY(visibleCount);
+            int listBottom = listTop + visibleCount * originalHeight;
+
+            mouseOver = visibleCount > 0
+                    && mouseX >= getX()
+                    && mouseX <= getX() + originalWidth
+                    && mouseY >= listTop
+                    && mouseY <= listBottom;
+        }
+
+        return mouseOver;
+    }
+
+    /**
+     * Collapses the dropdown to hide options.
+     */
+    private void collapse() {
+        expanded = false;
+        height = originalHeight;
+    }
+
+    /**
+     * Builds the list of options actually rendered in the expanded dropdown.
+     * The selected value is displayed on the button, so it is excluded from the list.
+     *
+     * @param items All logical dropdown items.
+     * @return Items rendered in the expanded list.
+     */
+    protected List<T> computeDropdownItems(List<T> items) {
+
+        var dropdownItems = new ArrayList<>(items);
+        dropdownItems.remove(selected);
+
+        return dropdownItems;
+    }
+
+    /**
+     * Builds the complete list of items including null option if allowed.
+     *
+     * @return List of all items to display
+     */
+    protected List<T> computeItemList() {
+
+        List<T> allItems = new ArrayList<>();
+
+        if (allowNull) allItems.add(null);
+
+        allItems.addAll(options);
+
+        allItems.sort((a, b) -> {
+            // selection always first
+            if (Objects.equals(a, selected)) return -1;
+            if (Objects.equals(b, selected)) return 1;
+
+            // null handling
+            if (a == null) return -1; // null before others
+            if (b == null) return 1;
+
+            E itemPairA = optionDisplay.apply(a);
+            E itemPairB = optionDisplay.apply(b);
+            String textA = itemPairA.text().getString();
+            String textB = itemPairB.text().getString();
+
+            // alphabetical by name()
+            return textA.compareToIgnoreCase(textB);
+        });
+
+        return allItems;
+    }
+
+    /**
+     * Computes how many expanded-list items are visible before scrolling is needed.
+     *
+     * @param dropdownItems Items rendered in the expanded list.
+     * @return Visible expanded item count.
+     */
+    protected int getVisibleDropdownItemCount(List<T> dropdownItems) {
+
+        return Math.min(dropdownItems.size(), Math.max(0, maxVisibleOptions));
+    }
+
+    /**
      * Appends narration messages for accessibility, including the default narrations for the dropdown widget.
      *
      * @param builder The narration message builder to which narration messages should be appended
@@ -608,10 +645,11 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
         if (expanded) {
-            List<T> allItems = computeItemList();
+            List<T> dropdownItems = computeDropdownItems(computeItemList());
+            int visibleCount = getVisibleDropdownItemCount(dropdownItems);
 
-            if (allItems.size() > maxVisibleOptions) {
-                scrollbar.setMaxOffset(allItems.size() - maxVisibleOptions);
+            if (dropdownItems.size() > visibleCount) {
+                scrollbar.setMaxOffset(dropdownItems.size() - visibleCount);
                 return scrollbar.scroll(amount);
             }
         }
@@ -653,15 +691,5 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
          * Expands downward and to the right
          */
         DOWN_RIGHT
-    }
-
-    /**
-     * Gets the colour used for text labels in the dropdown items.
-     *
-     * @return The colour value for label text
-     */
-    protected int getLabelColor() {
-
-        return ModConstants.COLOR_WHITE;
     }
 }

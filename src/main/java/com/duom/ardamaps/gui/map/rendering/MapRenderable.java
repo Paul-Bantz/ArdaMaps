@@ -55,6 +55,8 @@ public abstract class MapRenderable {
     @Getter
     protected final MapCamera camera;
 
+    /** Fog-of-war exploration state rendered over this map layer. */
+    @Getter
     protected final PlayerExploration exploration;
 
     /**
@@ -64,12 +66,13 @@ public abstract class MapRenderable {
      *
      * @param camera       The pre-built, fully configured camera for this renderable.
      * @param textRenderer The text renderer for drawing the placeholder text.
+     * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public MapRenderable(MapCamera camera, TextRenderer textRenderer) {
+    public MapRenderable(MapCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
 
         this.camera = camera;
         this.textRenderer = textRenderer;
-        this.exploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(camera.getDimension().getId(), true);
+        this.exploration = exploration;
     }
 
     /**
@@ -100,15 +103,6 @@ public abstract class MapRenderable {
                 camera.getViewportWidth() / 2,
                 camera.getViewportHeight() / 2,
                 ModConstants.COLOR_WHITE);
-    }
-
-    /**
-     * Convenience accessor so subclasses do not need to dereference through the camera.
-     *
-     * @return The Dimension associated with this renderable's map layer.
-     */
-    protected Dimension getDimension() {
-        return camera.getDimension();
     }
 
     /**
@@ -163,5 +157,14 @@ public abstract class MapRenderable {
         BufferRenderer.drawWithGlobalProgram(buffer.end());
 
         RenderSystem.disableBlend();
+    }
+
+    /**
+     * Convenience accessor so subclasses do not need to dereference through the camera.
+     *
+     * @return The Dimension associated with this renderable's map layer.
+     */
+    protected Dimension getDimension() {
+        return camera.getDimension();
     }
 }

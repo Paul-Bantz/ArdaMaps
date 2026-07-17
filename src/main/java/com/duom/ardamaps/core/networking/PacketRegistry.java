@@ -46,14 +46,15 @@ public class PacketRegistry {
     private static final Logger LOGGER = LoggerFactory.getLogger(PacketRegistry.class);
 
     /** Server-bound packet handlers */
-    public static final GuidebookRequestHandler         GUIDEBOOK_REQUEST_HANDLER  = register(new GuidebookRequestHandler());
-    public static final MapSourcesRequestHandler        MAP_SOURCES_REQUEST        = register(new MapSourcesRequestHandler());
-    public static final LocationsRequestHandler         LOCATIONS_UPDATE_REQUEST   = register(new LocationsRequestHandler());
-    public static final RegionsLutRequestHandler        REGION_LUT_UPDATE_REQUEST  = register(new RegionsLutRequestHandler());
-    public static final PlayerTeleportHandler           PLAYER_TELEPORT_REQUEST    = register(new PlayerTeleportHandler());
-    public static final PlayerWarpHandler               PLAYER_WARP_REQUEST        = register(new PlayerWarpHandler());
-    public static final LocationDetailsRequestHandler   LOCATION_DETAILS_REQUEST   = register(new LocationDetailsRequestHandler());
-    public static final PlayerExplorationEventHandler   PLAYER_EXPLORATION_EVENT   = registerClient(new PlayerExplorationEventHandler());
+    public static final GuidebookRequestHandler         GUIDEBOOK_REQUEST_HANDLER      = register(new GuidebookRequestHandler());
+    public static final MapSourcesRequestHandler        MAP_SOURCES_REQUEST            = register(new MapSourcesRequestHandler());
+    public static final LocationsRequestHandler         LOCATIONS_UPDATE_REQUEST       = register(new LocationsRequestHandler());
+    public static final RegionsLutRequestHandler        REGION_LUT_UPDATE_REQUEST      = register(new RegionsLutRequestHandler());
+    public static final PlayerTeleportHandler           PLAYER_TELEPORT_REQUEST        = register(new PlayerTeleportHandler());
+    public static final PlayerRangedTeleportHandler     PLAYER_RANGED_TELEPORT_REQUEST = register(new PlayerRangedTeleportHandler());
+    public static final PlayerWarpHandler               PLAYER_WARP_REQUEST            = register(new PlayerWarpHandler());
+    public static final LocationDetailsRequestHandler   LOCATION_DETAILS_REQUEST       = register(new LocationDetailsRequestHandler());
+    public static final PlayerExplorationEventHandler   PLAYER_EXPLORATION_EVENT       = registerClient(new PlayerExplorationEventHandler());
 
     /** Class cannot be instantiated. */
     private PacketRegistry() {

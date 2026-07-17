@@ -28,6 +28,7 @@ package com.duom.ardamaps.core.networking.packets.client;
 import com.duom.ardamaps.core.consumers.networking.IPacket;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
+import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.config.MapLayerSource;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.network.PacketByteBuf;
@@ -37,8 +38,10 @@ import java.util.List;
 
 /**
  * A packet sent from the server to the client containing the map source configuration in JSON format.
+ * @param dimensions the list of dimensions to transfer
  */
 public record MapSourceResponsePacket(List<Dimension> dimensions) implements IPacket {
+
     /**
      * Reads a MapSourceResponsePacket - ie a maps layer configuration from the given PacketByteBuf.
      *
@@ -71,6 +74,7 @@ public record MapSourceResponsePacket(List<Dimension> dimensions) implements IPa
                 var type = MapLayerSource.valueOf(buf.readString());
                 var remote = buf.readBoolean();
                 var identityZoom = buf.readInt();
+                var preferredZoom = buf.readDouble();
                 var lodFactor = buf.readDouble();
                 var minLod = buf.readInt();
                 var maxLod = buf.readInt();
@@ -78,10 +82,25 @@ public record MapSourceResponsePacket(List<Dimension> dimensions) implements IPa
                 var maxZoom = buf.readInt();
                 var tileSize = buf.readInt();
                 var scale = buf.readDouble();
-                var path = buf.readString();
+                var path = buf.readBoolean() ? buf.readString() : null;
                 var icon = buf.readString();
 
-                MapLayerDefinition layer = new MapLayerDefinition(layerName, type, remote, identityZoom, lodFactor, minLod, maxLod, minZoom, maxZoom, tileSize, scale, path, icon);
+                var rangesCount = buf.readInt();
+                List<MapLayerRange> ranges = null;
+
+                if (rangesCount > 0) {
+                    ranges = new ArrayList<>(rangesCount);
+
+                    for (int kdx = 0; kdx < rangesCount; kdx++) {
+                        ranges.add(new MapLayerRange(
+                                buf.readInt(),
+                                buf.readString(),
+                                buf.readInt(),
+                                buf.readInt()));
+                    }
+                }
+
+                MapLayerDefinition layer = new MapLayerDefinition(layerName, type, remote, identityZoom, preferredZoom, lodFactor, minLod, maxLod, minZoom, maxZoom, tileSize, scale, path, icon, ranges);
                 dimension.getMapLayers().add(layer);
             }
 
@@ -128,6 +147,7 @@ public record MapSourceResponsePacket(List<Dimension> dimensions) implements IPa
                 buf.writeString(layer.type().name());
                 buf.writeBoolean(layer.remote());
                 buf.writeInt(layer.identityZoom());
+                buf.writeDouble(layer.preferredZoom());
                 buf.writeDouble(layer.lodFactor());
                 buf.writeInt(layer.minLod());
                 buf.writeInt(layer.maxLod());
@@ -135,8 +155,21 @@ public record MapSourceResponsePacket(List<Dimension> dimensions) implements IPa
                 buf.writeInt(layer.maxZoom());
                 buf.writeInt(layer.tileSize());
                 buf.writeDouble(layer.scale());
-                buf.writeString(layer.path());
+                buf.writeBoolean(layer.path() != null);
+                if (layer.path() != null) buf.writeString(layer.path());
                 buf.writeString(layer.icon());
+
+                var ranges = layer.ranges();
+                var rangesCount = ranges == null || ranges.isEmpty() ? 0 : ranges.size();
+                buf.writeInt(rangesCount);
+
+                for (int kdx = 0; kdx < rangesCount; kdx++) {
+                    var range = ranges.get(kdx);
+                    buf.writeInt(range.index());
+                    buf.writeString(range.path());
+                    buf.writeInt(range.rangeMinY());
+                    buf.writeInt(range.rangeMaxY());
+                }
             }
         }
 

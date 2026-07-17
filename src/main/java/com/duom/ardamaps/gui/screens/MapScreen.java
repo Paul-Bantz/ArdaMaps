@@ -33,20 +33,25 @@ import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
+import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.map.Waypoint;
-import com.duom.ardamaps.core.data.map.cameras.*;
+import com.duom.ardamaps.core.data.map.cameras.MapCamera;
 import com.duom.ardamaps.core.data.map.markers.MarkersManager;
 import com.duom.ardamaps.core.networking.PacketRegistry;
+import com.duom.ardamaps.core.networking.packets.server.PlayerRangedTeleportPacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
 import com.duom.ardamaps.gui.ModConstants;
-import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
-import com.duom.ardamaps.gui.map.PlayerIcon;
-import com.duom.ardamaps.gui.map.rendering.*;
+import com.duom.ardamaps.gui.map.rendering.MapRenderable;
+import com.duom.ardamaps.gui.screens.map.LocationNavigationHistory;
+import com.duom.ardamaps.gui.screens.map.MapCameraAnimation;
+import com.duom.ardamaps.gui.screens.map.MapLayerLoader;
 import com.duom.ardamaps.gui.screens.rendering.BackgroundRenderer;
 import com.duom.ardamaps.gui.screens.rendering.MapFrameRenderer;
+import com.duom.ardamaps.gui.screens.rendering.MapMarkerRenderer;
 import com.duom.ardamaps.gui.widgets.*;
 import com.duom.ardamaps.gui.widgets.builders.MapDropdownBuilder;
+import com.duom.ardamaps.gui.widgets.builders.RangeSelectionWidgetBuilder;
 import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.api.EnvType;
@@ -55,15 +60,11 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.texture.MissingSprite;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.Pair;
 import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,27 +86,6 @@ public class MapScreen extends ArdaMapsScreen {
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(MapScreen.class);
 
-    /** Rendered player marker scale factor */
-    private static final float PLAYER_MARKER_SCALE = .25f;
-
-    /** Rendered map marker scale factor */
-    private static final float MARKER_SCALE = .6f;
-
-    /** Rendered map marker size in pixels */
-    private static final int MARKER_BACKGROUND_SIZE = (int) (MarkersManager.get().mapMarkerBackgroundSize() * MARKER_SCALE);
-
-    /** Precalculated half size of the marker background, used for centering */
-    private static final int HALF_MARKER_SIZE = MARKER_BACKGROUND_SIZE / 2;
-
-    /** Rendered map marker icon size in pixels */
-    private static final int MARKER_ICON_SIZE = (int) (MarkersManager.get().mapMarkerIconSize() * MARKER_SCALE);
-
-    /** Precalculated x offset to position the marker icon within the marker background */
-    private static final int MARKER_ICON_X_OFFSET = (int) (MarkersManager.get().mapMarkerIconXOffset() * MARKER_SCALE);
-
-    /** Precalculated y offset to position the marker icon within the marker background */
-    private static final int MARKER_ICON_Y_OFFSET = (int) (MarkersManager.get().mapMarkerIconYOffset() * MARKER_SCALE);
-
     /** Precalculated half size of the Ardacraft logo, used for centering the placeholder */
     private static final int ARDACRAFT_LOGO_HALF_SIZE_WITH_SPACING = ARDACRAFT_LOGO_HALF_SIZE + Client.mc().textRenderer.fontHeight;
 
@@ -115,41 +95,23 @@ public class MapScreen extends ArdaMapsScreen {
     /** Padding from the edges of the map frame for map rendering and interactions */
     private static final int MAP_FRAME_PADDING = 10;
 
-    /** Total duration of the pan-to-player animation in milliseconds */
-    private static final long ANIMATION_DURATION_MS = 1000L;
-
     /** Renderer for map frame and decorations */
     private final MapFrameRenderer mapFrameRenderer = new MapFrameRenderer();
 
+    /** Renderer for map markers, player marker, and waypoints */
+    private final MapMarkerRenderer markerRenderer = new MapMarkerRenderer();
+
+    /** Builds map renderables when the selected layer changes */
+    private final MapLayerLoader mapLayerLoader = new MapLayerLoader();
+
+    /** Smooth camera animation helper */
+    private final MapCameraAnimation animation = new MapCameraAnimation();
+
+    /** Side-panel location navigation history */
+    private final LocationNavigationHistory locationHistory = new LocationNavigationHistory();
+
     /** Cached text for unknown region tooltip to avoid repeated translations and allocations */
     private final String unknownRegionText = Text.translatable("ardamaps.client.map.screen.unknown.region").getString();
-
-    /** Ordered history of locations displayed in the side panel (max 10 entries) */
-    private final List<LocationClient> locationHistory = new ArrayList<>();
-
-    /** Flag indicating whether the map is currently panning / animating to the player's position */
-    private boolean animatingToPlayer = false;
-
-    /** Animation start time in milliseconds, used for tracking animation progress when panning to player */
-    private long animationStartMs;
-
-    /** Starting X coordinate of the map camera when beginning a pan-to-player animation */
-    private double animStartX;
-
-    /** Starting Z coordinate of the map camera when beginning a pan-to-player animation */
-    private double animStartZ;
-
-    /** Target X coordinate of the map camera when panning to player */
-    private double animTargetX;
-
-    /** Target Z coordinate of the map camera when panning to player */
-    private double animTargetZ;
-
-    /** Initial zoom level when panning and zooming to player or location */
-    private double animStartZoom;
-
-    /** Target zoom level when panning and zooming to player or location */
-    private double animTargetZoom;
 
     /** The map layer selection dropdown */
     private MapDropdownWidget<MapLayerDefinition, TextIdentifierPairItem> layerSelectionDropdown;
@@ -157,11 +119,11 @@ public class MapScreen extends ArdaMapsScreen {
     /** Dimension selection dropdown */
     private MapDropdownWidget<Dimension, TextIdentifierPairItem> dimensionSelectionDropdown;
 
-    /** The currently hovered location, used for displaying context menu and side panel */
-    private LocationClient mouseOverLocation = null;
+    /** Range selection dropdown for ranged map layers */
+    private RangeSelectionWidget rangeSelectionWidget;
 
-    /** The currently hovered waypoint, used for displaying context menu entries */
-    private Waypoint mouseOverWaypoint = null;
+    /** The currently displayed vertical range, or null when the active layer has no ranges */
+    private MapLayerRange selectedRange;
 
     /** Markers filtering dropdown */
     private MapDropdownWidget<MarkerInfo, TextIdentifierPairItem> markersSelectionDropdown;
@@ -180,9 +142,6 @@ public class MapScreen extends ArdaMapsScreen {
 
     /** Side panel for location context */
     private SidePanelWidget locationContextPanel;
-
-    /** Index into {@link #locationHistory} pointing at the currently displayed entry (-1 = no history) */
-    private int historyIndex = -1;
 
     /** Cached region name under the mouse cursor (null = no region / outside map) */
     @Nullable
@@ -203,9 +162,15 @@ public class MapScreen extends ArdaMapsScreen {
     /** The exploration state for the given rendered map */
     private PlayerExploration explorationState;
 
+    /** Last X coordinate emitted to the coordinates button. */
+    private int lastCoordinatesButtonX = Integer.MIN_VALUE;
+
+    /** Last Z coordinate emitted to the coordinates button. */
+    private int lastCoordinatesButtonZ = Integer.MIN_VALUE;
+
     /**
      * The dimension selected in the UI dropdown. Tracks which dimension the user has chosen so that
-     * {@link #loadMapLayer} can pre-build the correct camera. Once a layer is loaded, the authoritative
+     * {@link #buildLayerLoaderInput} can pre-build the correct camera. Once a layer is loaded, the authoritative
      * dimension is {@code getCamera().getDimension()} - this field is only the UI-selection staging area.
      */
     private Dimension selectedDimension;
@@ -235,6 +200,7 @@ public class MapScreen extends ArdaMapsScreen {
         configureCoordinatesButton();
         configureDimensionSelectionDropDown();
         configureMapLayerSelectionDropDown();
+        configureRangeSelectionWidget();
         configureMarkersDisplayDropdown();
 
         var camera = getCamera();
@@ -258,6 +224,8 @@ public class MapScreen extends ArdaMapsScreen {
                 .setOnClick(this::panCameraToPlayer)
                 .build();
         coordinatesButton.visible = getCamera() != null;
+        lastCoordinatesButtonX = Integer.MIN_VALUE;
+        lastCoordinatesButtonZ = Integer.MIN_VALUE;
 
         updateMapButtonPositions();
 
@@ -328,10 +296,11 @@ public class MapScreen extends ArdaMapsScreen {
             mapLayers = selectedDimension.getMapLayers();
 
         var provider = ArdaMapsClient.getHttpImageProvider();
+        Double playerY = Client.playerPositionY();
 
         // Preload icons
         for (MapLayerDefinition layer : mapLayers)
-            provider.loadImage(layer.icon());
+            provider.loadImage(layer.effectiveIcon(playerY));
 
         // Provide a default grid layer if no layers are defined for the dimension to ensure the map is minimally functional
         if (mapLayers.isEmpty()) mapLayers.add(MapLayerDefinition.DEFAULT_GRID_LAYER);
@@ -340,7 +309,7 @@ public class MapScreen extends ArdaMapsScreen {
 
         // Preserve selection if not null
         if (layerSelectionDropdown != null)
-            previousSelection = mapLayers.contains(layerSelectionDropdown.getSelected()) ?  layerSelectionDropdown.getSelected() : null;
+            previousSelection = mapLayers.contains(layerSelectionDropdown.getSelected()) ? layerSelectionDropdown.getSelected() : null;
 
         layerSelectionDropdown = MapDropdownBuilder.<MapLayerDefinition, TextIdentifierPairItem>create()
                 .setSize(ModConstants.SMALL_SQUARED_BUTTON_SIZE, ModConstants.SMALL_SQUARED_BUTTON_SIZE)
@@ -348,7 +317,7 @@ public class MapScreen extends ArdaMapsScreen {
                 .setOptionDisplay(item ->
                         item == null ?
                                 new TextIdentifierPairItem(Text.translatable("ardamaps.client.map.screen.layer.dropdown.empty"), null) :
-                                new TextIdentifierPairItem(item.layer(), provider.getTexture(item.icon()))
+                                new TextIdentifierPairItem(item.layer(), provider.getTexture(item.effectiveIcon(Client.playerPositionY())))
                 )
                 .setOnSelect(this::mapLayerSelectionChanged)
                 .setDisplayIcons(true)
@@ -367,6 +336,43 @@ public class MapScreen extends ArdaMapsScreen {
                 && (previousSelection == null
                 || !Objects.equals(previousSelection, layerSelectionDropdown.getSelected())))
             mapLayerSelectionChanged(layerSelectionDropdown.getSelected());
+    }
+
+    /**
+     * Configure the vertical range selection widget for the currently selected ranged layer.
+     */
+    private void configureRangeSelectionWidget() {
+
+        rangeSelectionWidget = RangeSelectionWidgetBuilder.create()
+                .setSize(100, 15)
+                .setLabel(Text.translatable("ardamaps.client.map.screen.range.label"))
+                .setItemWidth(15)
+                .setOnSelect(this::rangeSelectionChanged)
+                .build();
+
+        addDrawableChild(rangeSelectionWidget);
+        refreshRangeSelection();
+    }
+
+    /**
+     * Refreshes the vertical range selector for the currently selected map layer.
+     */
+    private void refreshRangeSelection() {
+
+        if (rangeSelectionWidget == null) return;
+
+        MapLayerDefinition selectedLayer = layerSelectionDropdown == null ? null : layerSelectionDropdown.getSelected();
+        List<MapLayerRange> ranges = selectedLayer != null && selectedLayer.hasRanges()
+                ? new ArrayList<>(selectedLayer.ranges())
+                : new ArrayList<>();
+
+        if (!ranges.isEmpty() && (selectedRange == null || !ranges.contains(selectedRange)))
+            selectedRange = ranges.get(0);
+
+        rangeSelectionWidget.setRanges(ranges);
+        rangeSelectionWidget.setSelected(selectedRange);
+        rangeSelectionWidget.visible = !ranges.isEmpty();
+        updateMapButtonPositions();
     }
 
     /**
@@ -420,7 +426,8 @@ public class MapScreen extends ArdaMapsScreen {
 
         if (getCamera() == null) return;
 
-        panCameraToMapCoordinates(Client.playerPosition2d(), getCamera().getIdentityZoom());
+        switchToLayerContaining(Client.playerPositionY());
+        panCameraToMapCoordinates(Client.playerPosition2d(), getCamera().getPreferredZoom());
     }
 
     /**
@@ -433,91 +440,24 @@ public class MapScreen extends ArdaMapsScreen {
         // Reset side-panel state when switching layers/dimensions
         locationContextPanel = null;
         locationHistory.clear();
-        historyIndex = -1;
 
-        // Capture the current visual pixels-per-block so we can match zoom on the new map
-        final double capturedRenderScale = (getCamera() != null) ? getCamera().getVisualPixelsPerBlock() : Double.NaN;
-
-        CompletableFuture.supplyAsync(() -> loadMapLayer(mapLayerDefinition, capturedRenderScale), ArdaMaps.IO_EXECUTOR)
-                .thenAcceptAsync(this::layerLoaded)
-                .whenComplete((result, ex) -> {
-                    if (ex != null)
-                        LOGGER.error("Failed to load map layer", ex);
-                });
+        selectedRange = mapLayerDefinition.hasRanges() ? defaultRangeForLayer(mapLayerDefinition) : null;
+        refreshRangeSelection();
+        reloadSelectedLayer();
     }
 
     /**
-     * Callback for when a new map layer has finished loading. Sets the new map renderable and updates the camera and GUI state accordingly.
+     * Selects the range matching the player's current Y, falling back to the first configured range.
      *
-     * @param mapRenderable The loaded MapRenderable, or null if loading failed
+     * @param layer The ranged layer to inspect.
+     * @return The default range for the layer, or null when the layer has no ranges.
      */
-    private void layerLoaded(@Nullable MapRenderable mapRenderable) {
+    private @Nullable MapLayerRange defaultRangeForLayer(MapLayerDefinition layer) {
 
-        LOGGER.info("Map layer loaded: {}", mapRenderable != null ? "success" : "failed");
+        if (!layer.hasRanges()) return null;
 
-        if (mapRenderable != null) {
-
-            mapRenderer = mapRenderable;
-            explorationState = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(mapRenderable.getCamera().getDimension().getId(), true);
-
-            updateMapButtonPositions();
-            coordinatesButton.visible = true;
-        }
-    }
-
-    /**
-     * Load the map renderable for the selected map layer definition. This runs in a background thread to avoid blocking the UI.
-     *
-     * @param mapLayerDefinition  The map layer definition to load
-     * @param capturedRenderScale The visual pixels-per-block of the previous map, used to set the zoom level of the new map for a seamless transition
-     * @return The loaded MapRenderable, or null if loading failed
-     */
-    private @Nullable MapRenderable loadMapLayer(@NonNull MapLayerDefinition mapLayerDefinition, double capturedRenderScale) {
-
-        var cameraPosition = Client.playerPosition2d();
-        MapRenderable mapRenderable = null;
-
-        if (!Objects.equals(selectedDimension, Client.currentDimension()))
-            cameraPosition = new Vec2d(0, 0);
-
-        int cx = (int) cameraPosition.x();
-        int cy = (int) cameraPosition.y();
-
-        if (getCamera() != null) {
-
-            cx = (int) getCamera().getWorldX();
-            cy = (int) getCamera().getWorldZ();
-        }
-
-        switch (mapLayerDefinition.type()) {
-
-            case BLUEMAP -> {
-                var camera = new BlueMapCamera(width, height, cx, cy);
-                camera.setDimension(selectedDimension);
-                mapRenderable = new BlueMapRenderer(camera, textRenderer);
-                mapRenderable.configure(mapLayerDefinition, capturedRenderScale);
-            }
-            case PMTILES -> {
-                var camera = new PmTilesMapCamera(width, height, cx, cy);
-                camera.setDimension(selectedDimension);
-                mapRenderable = new PmTilesRenderer(camera, textRenderer);
-                mapRenderable.configure(mapLayerDefinition, capturedRenderScale);
-            }
-            case WEBP -> {
-                var camera = new FlatMapCamera(width, height, cx, cy);
-                camera.setDimension(selectedDimension);
-                mapRenderable = new WebpRenderer(camera, textRenderer);
-                mapRenderable.configure(mapLayerDefinition, capturedRenderScale);
-            }
-            case GRID -> {
-                var camera = new GridCamera(width, height, cx, cy);
-                camera.setDimension(selectedDimension);
-                mapRenderable = new GridRenderer(camera, textRenderer);
-                mapRenderable.configure(mapLayerDefinition, capturedRenderScale);
-            }
-        }
-
-        return mapRenderable;
+        Double playerY = Client.playerPositionY();
+        return playerY == null ? layer.ranges().get(0) : layer.rangeForY(playerY);
     }
 
     /**
@@ -533,9 +473,6 @@ public class MapScreen extends ArdaMapsScreen {
 
         // Client should not be null here
         assert client != null;
-
-        // Reset marker mouseover
-        mouseOverLocation = null;
 
         renderBackground(context);
 
@@ -558,7 +495,7 @@ public class MapScreen extends ArdaMapsScreen {
 
                 // Drive zoom/pan damping every render frame so the animation
                 // is truly frame-rate independent and does not jump on frame skips.
-                if (!animatingToPlayer)
+                if (!animation.isRunning())
                     mapCamera.update(client.getLastFrameDuration(), contentArea.topLeftX(), contentArea.topLeftY());
 
                 // Clear background with dark colour - will display if some areas of the map are not covered by tiles
@@ -574,11 +511,24 @@ public class MapScreen extends ArdaMapsScreen {
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
 
-            renderMarkers(context, mouseX, mouseY);
-            renderPlayerMarker(context);
-            renderWaypoint(context, mouseX, mouseY);
+            var selectedLocationType = markersSelectionDropdown.getSelected();
+            var focusedLocationPosition = locationContextPanel == null
+                    ? null
+                    : locationContextPanel.getDisplayedLocationPosition();
+            markerRenderer.render(
+                    context,
+                    textRenderer,
+                    mapCamera,
+                    mapFrameRenderer,
+                    selectedRange,
+                    focusedLocationPosition,
+                    selectedLocationType != null ? selectedLocationType.key : null,
+                    mouseOverMapWidgets(mouseX, mouseY),
+                    MAP_FRAME_PADDING,
+                    mouseX,
+                    mouseY);
 
-            RenderSystem.disableScissor();
+            context.disableScissor();
 
             mapFrameRenderer.render(context, contentArea);
 
@@ -618,188 +568,20 @@ public class MapScreen extends ArdaMapsScreen {
     }
 
     /**
-     * Render points of interest on the map
+     * Check if the mouse is over any GUI elements
      *
-     * @param context The draw context
-     * @param mouseX  The mouse x position
-     * @param mouseY  The mouse y position
+     * @param mouseX The mouse x position
+     * @param mouseY The mouse y position
+     * @return True if the mouse is over GUI elements
      */
-    private void renderMarkers(DrawContext context, int mouseX, int mouseY) {
+    private boolean mouseOverMapWidgets(double mouseX, double mouseY) {
 
-        var mapCamera = getCamera();
-        if (mapCamera == null) return;
-
-        var selectedLocationType = markersSelectionDropdown.getSelected();
-        var locations = ArdaMapsClient.CONFIG.getLocations(
-                mapCamera.getDimension().getId(),
-                selectedLocationType != null ? selectedLocationType.key : null);
-
-        boolean revealAll = ArdaMapsClient.CONFIG.isMapRevealAll();
-
-        Pair<Vec2d, LocationClient> focused = null;
-        List<Pair<Vec2d, LocationClient>> mouseOver = new ArrayList<>();
-
-        for (var location : locations) {
-
-            // Early exit for invalid positions
-            if (location.getPosition().x == 0 && location.getPosition().z == 0) continue;
-
-            // Skip locations that are not explored
-            if (!revealAll && !location.isVisible()) continue;
-
-            var landmarkScreenPos = mapCamera.worldToScreenCoordinates(
-                    location.getPosition().x, location.getPosition().z);
-
-            int screenX = (int) landmarkScreenPos.x();
-            int screenY = (int) landmarkScreenPos.y();
-
-            // Skip if outside viewport
-            if (!mapFrameRenderer.coordinatesInFrame(screenX, screenY, -MARKER_BACKGROUND_SIZE)) continue;
-
-            var xPos = screenX - HALF_MARKER_SIZE;
-            var yPos = screenY - MARKER_BACKGROUND_SIZE;
-
-            var isMouseOver = mouseX > xPos && mouseX < xPos + MARKER_BACKGROUND_SIZE
-                    && mouseY > yPos && mouseY < yPos + MARKER_BACKGROUND_SIZE
-                    && !mouseOverMapWidgets(mouseX, mouseY);
-
-            var isFocused = locationContextPanel != null
-                    && Objects.equals(location.getPosition(), locationContextPanel.getDisplayedLocationPosition());
-
-            if (mouseOverLocation == null && isMouseOver)
-                    mouseOverLocation = location;
-
-            // Defer rendering of mouse over and focused markers to avoid overlaps
-            if (isMouseOver)    mouseOver.add(new Pair<>(new Vec2d(xPos, yPos), location));
-            else if (isFocused) focused    = new Pair<>(new Vec2d(xPos, yPos), location);
-            else renderMarker(context, location, xPos, yPos, false);
-        }
-
-        // Render mouseover marker on top of focused marker, if any
-        if (focused != null)
-            renderMarker(context, focused.getRight(), (int) focused.getLeft().x(), (int) focused.getLeft().y(), true);
-
-        // Multiple locations can be mouse-overed at the same time - last one wins
-        for (int idx = 0; idx < mouseOver.size(); idx++) {
-
-            var mouseOveredLocation = mouseOver.get(idx);
-            var location = mouseOveredLocation.getRight();
-            var pos = mouseOveredLocation.getLeft();
-
-            renderMarker(context,
-                    location,
-                    (int) pos.x(),
-                    (int) pos.y(),
-                    false);
-
-            if (idx == mouseOver.size() - 1) {
-                mouseOverLocation = location;
-
-                renderMarker(context,
-                        location,
-                        (int) pos.x(),
-                        (int) pos.y(),
-                        true);
-            }
-        }
-    }
-
-    /**
-     * Render the player marker at the centre of the map
-     *
-     * @param context The draw context
-     */
-    private void renderPlayerMarker(DrawContext context) {
-
-        var mapCamera = getCamera();
-        if (mapCamera == null) return;
-
-        if (!Objects.equals(mapCamera.getDimension(), Client.currentDimension())) return;
-
-        var iconImage = PlayerIcon.getPlayerIcon();
-        if (iconImage == null) return;
-
-        var clientPos = Client.playerPosition2d();
-        var clientScreenPos = mapCamera.worldToScreenCoordinates(clientPos);
-
-        var iconSize = (int) (PlayerIcon.ICON_SIZE * PLAYER_MARKER_SCALE);
-        int halfIconSize = iconSize / 2;
-
-        int screenX = (int) clientScreenPos.x() - halfIconSize;
-        int screenZ = (int) clientScreenPos.y() - halfIconSize;
-
-        // Do not render if outside of viewport
-        if (!mapFrameRenderer.coordinatesInFrame(screenX, screenZ, MAP_FRAME_PADDING)) {
-            return;
-        }
-
-        context.fill(screenX, screenZ, screenX + iconSize, screenZ + iconSize, ModConstants.COLOR_DARK_BROWN);
-        context.drawTexture(iconImage,
-                screenX,
-                screenZ,
-                iconSize, iconSize,
-                PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE,
-                PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE,
-                PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE
-        );
-    }
-
-    /**
-     * Render the waypoint marker on the map
-     *
-     * @param context The draw context
-     * @param mouseX  The mouse x position
-     * @param mouseY  The mouse y position
-     */
-    private void renderWaypoint(DrawContext context, int mouseX, int mouseY) {
-
-        var mapCamera = getCamera();
-        if (mapCamera == null) return;
-
-        mouseOverWaypoint = null;
-
-        var waypoints = ArdaMapsClient.CONFIG.getWaypoints(mapCamera.getDimension().getId());
-
-        for (var waypoint : waypoints) {
-
-            var waypointScreenPos = mapCamera.worldToScreenCoordinates(waypoint.getPosition());
-
-            int halfIconSize = MARKER_ICON_SIZE / 2;
-
-            int screenX = (int) waypointScreenPos.x() - halfIconSize;
-            int screenY = (int) waypointScreenPos.y() - halfIconSize;
-
-            if (mouseOverWaypoint == null
-                    && mouseX >= screenX
-                    && mouseX <= screenX + MARKER_ICON_SIZE
-                    && mouseY >= screenY
-                    && mouseY <= screenY + MARKER_ICON_SIZE) {
-
-                mouseOverWaypoint = waypoint;
-                context.drawTooltip(textRenderer, Text.literal(waypoint.text()), mouseX, mouseY);
-            }
-
-            // Do not render if outside of viewport
-            if (mapFrameRenderer.coordinatesInFrame(screenX, screenY, MAP_FRAME_PADDING) && waypoint.icon() != null) {
-
-                var icon = IconSpriteAtlas.retrieveSprite(waypoint.icon());
-
-                RenderSystem.setShaderColor(waypoint.r(), waypoint.g(), waypoint.b(), 1.0f);
-
-                if (icon != null
-                        && icon.getContents() != null
-                        && !Objects.equals(icon.getContents().getId(), MissingSprite.getMissingSpriteId())) {
-
-                    context.drawSprite(screenX, screenY, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, icon);
-
-                } else {
-
-                    context.drawTexture(waypoint.icon(), screenX, screenY, 0, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE);
-                }
-
-                RenderSystem.setShaderColor(1f, 1f, 1f, 1.0f);
-            }
-        }
+        return isMouseOverWidget(mouseX, mouseY, locationContextPanel) ||
+                isMouseOverWidget(mouseX, mouseY, layerSelectionDropdown) ||
+                isMouseOverWidget(mouseX, mouseY, dimensionSelectionDropdown) ||
+                isMouseOverWidget(mouseX, mouseY, rangeSelectionWidget) ||
+                isMouseOverWidget(mouseX, mouseY, markersSelectionDropdown) ||
+                isMouseOverWidget(mouseX, mouseY, locationContextPanel);
     }
 
     /**
@@ -819,9 +601,13 @@ public class MapScreen extends ArdaMapsScreen {
         if (mapFrameRenderer.coordinatesInFrame(mouseX, mouseY, MAP_FRAME_PADDING))
             worldCoordinates = mapCamera.screenToWorldCoordinates(mouseX, mouseY);
 
-        var coordinatesText = String.format("X:%d, Z:%d", (int) worldCoordinates.x(), (int) worldCoordinates.y());
+        int x = (int) worldCoordinates.x();
+        int z = (int) worldCoordinates.y();
+        if (x == lastCoordinatesButtonX && z == lastCoordinatesButtonZ) return;
 
-        coordinatesButton.setMessage(Text.literal(coordinatesText));
+        lastCoordinatesButtonX = x;
+        lastCoordinatesButtonZ = z;
+        coordinatesButton.setMessage(Text.literal(String.format("X:%d, Z:%d", x, z)));
     }
 
     /**
@@ -944,77 +730,6 @@ public class MapScreen extends ArdaMapsScreen {
     }
 
     /**
-     * Render a single location marker on the map
-     *
-     * @param context  The draw context
-     * @param location The location to render
-     * @param xPos  The screen x position
-     * @param yPos  The screen y position
-     */
-    private void renderMarker(DrawContext context, LocationClient location,
-                              int xPos, int yPos, boolean focused) {
-
-        var iconXPos = xPos + MARKER_ICON_X_OFFSET;
-        var iconYPos = yPos + MARKER_ICON_Y_OFFSET;
-
-        Identifier icon = location.getIcon();
-        int color = location.getColor();
-        int highlightColor = location.getHighlightColor();
-
-        // Enable blend once
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
-
-        if (focused) {
-
-            var screenX = xPos + HALF_MARKER_SIZE;
-            var screenY = yPos + MARKER_BACKGROUND_SIZE;
-
-            context.fill(xPos + 4, yPos + 4, xPos + MARKER_BACKGROUND_SIZE - 4, yPos + MARKER_BACKGROUND_SIZE - 4, highlightColor);
-
-            var text = location.getName();
-            var textX = screenX - textRenderer.getWidth(text) / 2;
-            context.drawText(
-                    textRenderer,
-                    text,
-                    textX,
-                    screenY + textRenderer.fontHeight / 2,
-                    ModConstants.COLOR_WHITE,
-                    false);
-
-        } else {
-
-            context.fill(xPos + 4, yPos + 4, xPos + MARKER_BACKGROUND_SIZE - 4, yPos + MARKER_BACKGROUND_SIZE - 4, color);
-        }
-
-        if (location.isVisited())
-            context.drawSprite(xPos, yPos, 0, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_VISITED_ICON));
-        else
-            context.drawSprite(xPos, yPos, 0, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_ICON));
-
-        context.drawSprite(iconXPos, iconYPos, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, IconSpriteAtlas.retrieveSprite(icon));
-
-        RenderSystem.disableBlend();
-    }
-
-    /**
-     * Check if the mouse is over any GUI elements
-     *
-     * @param mouseX The mouse x position
-     * @param mouseY The mouse y position
-     * @return True if the mouse is over GUI elements
-     */
-    private boolean mouseOverMapWidgets(double mouseX, double mouseY) {
-
-        return isMouseOverWidget(mouseX, mouseY, locationContextPanel) ||
-                isMouseOverWidget(mouseX, mouseY, layerSelectionDropdown) ||
-                isMouseOverWidget(mouseX, mouseY, dimensionSelectionDropdown) ||
-                isMouseOverWidget(mouseX, mouseY, markersSelectionDropdown) ||
-                isMouseOverWidget(mouseX, mouseY, locationContextPanel);
-    }
-
-    /**
      * Helper method to check if the mouse is over a specific widget, with null check
      *
      * @param mouseX The mouse x position
@@ -1038,28 +753,9 @@ public class MapScreen extends ArdaMapsScreen {
 
             var contentArea = getPaddedContentArea();
 
-            if (animatingToPlayer) {
-
-                mapCamera.resetZoomAnchor();
-
-                // Hide context menu
+            if (animation.isRunning()) {
                 mapContextMenu = null;
-
-                long elapsed = System.currentTimeMillis() - animationStartMs;
-                float time = Math.min(1f, (float) elapsed / ANIMATION_DURATION_MS);
-
-                float ease = (float) (1 - Math.pow(1 - time, 5));
-
-                double currentX = animStartX + (animTargetX - animStartX) * ease;
-                double currentZ = animStartZ + (animTargetZ - animStartZ) * ease;
-
-                double currentZoom = animStartZoom + (animTargetZoom - animStartZoom) * ease;
-
-                mapCamera.updateZoom(currentZoom);
-                mapCamera.setWorldX(currentX, contentArea.topLeftX());
-                mapCamera.setWorldZ(currentZ, contentArea.topLeftY());
-
-                if (time >= 1f) animatingToPlayer = false;
+                animation.apply(mapCamera, contentArea.topLeftX(), contentArea.topLeftY());
             }
 
             // Update context menu position if open
@@ -1102,6 +798,44 @@ public class MapScreen extends ArdaMapsScreen {
     }
 
     /**
+     * Update the position of the coordinates button to be centered at the bottom of the screen
+     */
+    private void updateMapButtonPositions() {
+
+        BackgroundRenderer.GuiLayout contentArea = getPaddedContentArea();
+
+        int frameOffset = 2;
+        int centerX = width / 2 - ModConstants.BUTTON_WIDTH / 2;
+        int rightX = contentArea.topLeftX() + contentArea.guiWidth() - ModConstants.SMALL_SQUARED_BUTTON_SIZE - 4;
+        int leftX = contentArea.topLeftX() + 4;
+        int rangeRightX = centerX + ModConstants.BUTTON_WIDTH;
+
+        int bottomLeftY = contentArea.topLeftY() + contentArea.guiHeight();
+        int topY = contentArea.topLeftY() - frameOffset - ModConstants.BUTTON_HEIGHT / 2;
+        int bottomY = bottomLeftY + frameOffset - ModConstants.BUTTON_HEIGHT / 2;
+        int layerDropdownY = bottomLeftY - ModConstants.SMALL_SQUARED_BUTTON_SIZE - 4;
+
+        if (coordinatesButton != null)
+            coordinatesButton.setPosition(centerX, bottomY);
+
+        if (markersSelectionDropdown != null)
+            markersSelectionDropdown.setPosition(centerX, topY);
+
+        if (layerSelectionDropdown != null) {
+            if (rangeSelectionWidget != null) layerDropdownY -= rangeSelectionWidget.getHeight() - 1;
+            layerSelectionDropdown.setPosition(rightX, layerDropdownY);
+        }
+
+        if (dimensionSelectionDropdown != null)
+            dimensionSelectionDropdown.setPosition(leftX, bottomY);
+
+        if (rangeSelectionWidget != null) {
+            rangeSelectionWidget.setWidth((contentArea.guiWidth() / 2) - ModConstants.BUTTON_WIDTH / 2);
+            rangeSelectionWidget.setPosition(rangeRightX, bottomLeftY - rangeSelectionWidget.getHeight() - 1);
+        }
+    }
+
+    /**
      * Repositions the current side panel on screen
      */
     private void positionSidePanel() {
@@ -1127,35 +861,6 @@ public class MapScreen extends ArdaMapsScreen {
 
         var contentArea = getContentArea();
         return (contentArea.guiWidth() / 3) + 32;
-    }
-
-    /**
-     * Update the position of the coordinates button to be centered at the bottom of the screen
-     */
-    private void updateMapButtonPositions() {
-
-        BackgroundRenderer.GuiLayout contentArea = getPaddedContentArea();
-
-        int frameOffset = 2;
-        int centerX = width / 2 - ModConstants.BUTTON_WIDTH / 2;
-        int rightX = contentArea.topLeftX() + contentArea.guiWidth() - ModConstants.SMALL_SQUARED_BUTTON_SIZE - 4;
-        int leftX = contentArea.topLeftX() + 4;
-
-        int topY = contentArea.topLeftY() - frameOffset - ModConstants.BUTTON_HEIGHT / 2;
-        int bottomY = contentArea.topLeftY() + contentArea.guiHeight() + frameOffset - ModConstants.BUTTON_HEIGHT / 2;
-        int frameBottomY = contentArea.topLeftY() + contentArea.guiHeight() - ModConstants.SMALL_SQUARED_BUTTON_SIZE - 4;
-
-        if (coordinatesButton != null)
-            coordinatesButton.setPosition(centerX, bottomY);
-
-        if (markersSelectionDropdown != null)
-            markersSelectionDropdown.setPosition(centerX, topY);
-
-        if (layerSelectionDropdown != null)
-            layerSelectionDropdown.setPosition(rightX, frameBottomY);
-
-        if (dimensionSelectionDropdown != null)
-            dimensionSelectionDropdown.setPosition(leftX, bottomY);
     }
 
     /**
@@ -1188,9 +893,9 @@ public class MapScreen extends ArdaMapsScreen {
 
         // Mouse side-button navigation through location history
         if (button == GLFW.GLFW_MOUSE_BUTTON_4) { // Back
-            if (historyIndex > 0) {
-                historyIndex--;
-                applySidePanel(locationHistory.get(historyIndex), false);
+            var previousLocation = locationHistory.back();
+            if (previousLocation != null) {
+                applySidePanel(previousLocation, false);
             } else {
                 locationContextPanel = null;
             }
@@ -1198,9 +903,9 @@ public class MapScreen extends ArdaMapsScreen {
         }
 
         if (button == GLFW.GLFW_MOUSE_BUTTON_5) { // Forward
-            if (historyIndex < locationHistory.size() - 1) {
-                historyIndex++;
-                applySidePanel(locationHistory.get(historyIndex), false);
+            var nextLocation = locationHistory.forward();
+            if (nextLocation != null) {
+                applySidePanel(nextLocation, false);
                 return true;
             }
             return false;
@@ -1209,7 +914,7 @@ public class MapScreen extends ArdaMapsScreen {
         // Register drag start
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && mouseInMapArea) {
             dragging = true;
-            animatingToPlayer = false;
+            animation.cancel();
             clickStartX = mouseX;
             clickStartY = mouseY;
         }
@@ -1249,7 +954,7 @@ public class MapScreen extends ArdaMapsScreen {
         Vec3d locationPosition = location.getPosition();
 
         var targetZoom = mapCamera.getZoom();
-        var focusedZoom = mapCamera.getIdentityZoom();
+        var focusedZoom = mapCamera.getPreferredZoom();
         var cameraOffsetWorldPos = getSidePanelFocusedCameraWorldOffset(mapCamera, locationPosition, targetZoom);
         var focusedCameraOffsetWorldPosition = getSidePanelFocusedCameraWorldOffset(mapCamera, locationPosition, focusedZoom);
 
@@ -1264,33 +969,6 @@ public class MapScreen extends ArdaMapsScreen {
                 focused ? focusedCameraOffsetWorldPosition : cameraOffsetWorldPos,
                 focused ? focusedZoom : targetZoom
         );
-    }
-
-    /**
-     * Returns the camera position so that the left part of the screen is centered on locationPosition when a side
-     * panel is displayed.
-     *
-     * @param mapCamera        the underlying camera
-     * @param locationPosition the location's position
-     * @param zoom             the zoom level at which to calculate the offset
-     * @return the camera offset
-     */
-    private @Nullable Vec2d getSidePanelFocusedCameraWorldOffset(MapCamera mapCamera, Vec3d locationPosition, double zoom) {
-
-        if (locationPosition.x == 0 && locationPosition.z == 0) return null;
-
-        // Centre left part of the viewport on location
-        var paddedContentArea = getPaddedContentArea();
-        var screenLeftCenterX = paddedContentArea.topLeftX() + (paddedContentArea.guiWidth() - getSidePanelWidth()) / 2;
-        var screenLeftCenterY = height / 2;
-
-        var worldLeftCenter = mapCamera.screenToWorldCoordinates(screenLeftCenterX, screenLeftCenterY, zoom);
-        var worldViewportCenter = mapCamera.screenToWorldCoordinates(paddedContentArea.topLeftX() + paddedContentArea.guiWidth() / 2f, screenLeftCenterY);
-
-        var translationX = worldLeftCenter.x() - worldViewportCenter.x();
-        var translationY = worldLeftCenter.y() - worldViewportCenter.y();
-
-        return new Vec2d(locationPosition.x - translationX, locationPosition.z - translationY);
     }
 
     /**
@@ -1317,13 +995,27 @@ public class MapScreen extends ArdaMapsScreen {
 
             mapContextMenu = null;
 
-            PacketRegistry.PLAYER_TELEPORT_REQUEST.send(new PlayerTeleportPacket(contextPos.x(), contextPos.y(), mapCamera.getDimension().getId()));
+            if (selectedRange != null) {
+                PacketRegistry.PLAYER_RANGED_TELEPORT_REQUEST.send(new PlayerRangedTeleportPacket(
+                        contextPos.x(),
+                        contextPos.y(),
+                        mapCamera.getDimension().getId(),
+                        selectedRange.rangeMinY(),
+                        selectedRange.rangeMaxY()), response -> {
+
+                    if (response.success())
+                        switchToLayerContaining(response.y());
+                });
+            } else {
+                PacketRegistry.PLAYER_TELEPORT_REQUEST.send(new PlayerTeleportPacket(contextPos.x(), contextPos.y(), mapCamera.getDimension().getId()));
+            }
         });
 
         var itemList = new ArrayList<ContextMenu.Entry>();
 
         if (!outsideExploredArea) itemList.add(teleportToEntry);
 
+        var mouseOverWaypoint = markerRenderer.getMouseOverWaypoint();
         if (mouseOverWaypoint != null) {
 
             // Create a deep copy - mouseOverWaypoint is dynamically updated
@@ -1374,6 +1066,33 @@ public class MapScreen extends ArdaMapsScreen {
     }
 
     /**
+     * Returns the camera position so that the left part of the screen is centered on locationPosition when a side
+     * panel is displayed.
+     *
+     * @param mapCamera        the underlying camera
+     * @param locationPosition the location's position
+     * @param zoom             the zoom level at which to calculate the offset
+     * @return the camera offset
+     */
+    private @Nullable Vec2d getSidePanelFocusedCameraWorldOffset(MapCamera mapCamera, Vec3d locationPosition, double zoom) {
+
+        if (locationPosition.x == 0 && locationPosition.z == 0) return null;
+
+        // Centre left part of the viewport on location
+        var paddedContentArea = getPaddedContentArea();
+        var screenLeftCenterX = paddedContentArea.topLeftX() + (paddedContentArea.guiWidth() - getSidePanelWidth()) / 2;
+        var screenLeftCenterY = height / 2;
+
+        var worldLeftCenter = mapCamera.screenToWorldCoordinates(screenLeftCenterX, screenLeftCenterY, zoom);
+        var worldViewportCenter = mapCamera.screenToWorldCoordinates(paddedContentArea.topLeftX() + paddedContentArea.guiWidth() / 2f, screenLeftCenterY);
+
+        var translationX = worldLeftCenter.x() - worldViewportCenter.x();
+        var translationY = worldLeftCenter.y() - worldViewportCenter.y();
+
+        return new Vec2d(locationPosition.x - translationX, locationPosition.z - translationY);
+    }
+
+    /**
      * Smoothly move the map camera to the specified world coordinates
      *
      * @param worldPos The target world coordinates to pan to
@@ -1386,15 +1105,7 @@ public class MapScreen extends ArdaMapsScreen {
         var mapCamera = getCamera();
         if (mapCamera == null) return;
 
-        animTargetX = worldPos.x();
-        animTargetZ = worldPos.y();
-        animStartX = mapCamera.getWorldX();
-        animStartZ = mapCamera.getWorldZ();
-        animStartZoom = mapCamera.getZoom();
-        animTargetZoom = targetZoom;
-
-        animationStartMs = System.currentTimeMillis();
-        animatingToPlayer = true;
+        animation.start(worldPos, mapCamera, targetZoom);
     }
 
     /**
@@ -1408,18 +1119,27 @@ public class MapScreen extends ArdaMapsScreen {
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
 
+        // Children must get the release first: the parent dispatch is what drives widget
+        // onRelease, and returning early here would swallow it for every left-button release.
+        boolean handledByChild = super.mouseReleased(mouseX, mouseY, button);
+
+        // The parent dispatch only reaches the hovered element, so a strip drag that ends
+        // off the widget would otherwise leave it stuck tracking a press.
+        if (!handledByChild && rangeSelectionWidget != null && rangeSelectionWidget.isDragging())
+            handledByChild = rangeSelectionWidget.mouseReleased(mouseX, mouseY, button);
+
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
             dragging = false;
 
             // Check if mouse barely moved (single click, not drag)
             double distanceSquared = Math.pow(mouseX - clickStartX, 2) + Math.pow(mouseY - clickStartY, 2);
 
-            if (distanceSquared < CLICK_THRESHOLD_SQUARED) handleMapMarkerClick();
+            if (!handledByChild && distanceSquared < CLICK_THRESHOLD_SQUARED) handleMapMarkerClick();
 
             return true;
         }
 
-        return super.mouseReleased(mouseX, mouseY, button);
+        return handledByChild;
     }
 
     /**
@@ -1431,8 +1151,10 @@ public class MapScreen extends ArdaMapsScreen {
 
         var anyLocationClicked = false;
 
+        var mouseOverLocation = markerRenderer.getMouseOverLocation();
         if (mouseOverLocation != null) {
 
+            switchToLayerContaining(mouseOverLocation.getPosition().y);
             panAndSelectLocation(mouseOverLocation, false);
 
             anyLocationClicked = true;
@@ -1440,6 +1162,29 @@ public class MapScreen extends ArdaMapsScreen {
 
         if (!anyLocationClicked)
             locationContextPanel = null;
+    }
+
+    /**
+     * Switch to the layer having the given Y position in range
+     *
+     * @param y the y position to select the correct layer
+     */
+    private void switchToLayerContaining(Double y) {
+
+        if (y == null) return;
+
+        var layer = layerSelectionDropdown != null ? layerSelectionDropdown.getSelected() : null;
+
+        if (layer != null && layer.hasRanges()) {
+
+            MapLayerRange target = layer.rangeForY(y);
+
+            if (target != null && !Objects.equals(target, selectedRange)) {
+
+                if (rangeSelectionWidget != null) rangeSelectionWidget.setSelected(target);
+                rangeSelectionChanged(target);
+            }
+        }
     }
 
     /**
@@ -1453,18 +1198,91 @@ public class MapScreen extends ArdaMapsScreen {
 
         if (location == null) return;
 
-        // Truncate any forward history beyond the current cursor
-        if (historyIndex < locationHistory.size() - 1)
-            locationHistory.subList(historyIndex + 1, locationHistory.size()).clear();
-
-        // Cap at 10 entries by evicting the oldest
-        if (locationHistory.size() >= 10)
-            locationHistory.remove(0);
-
-        locationHistory.add(location);
-        historyIndex = locationHistory.size() - 1;
-
+        locationHistory.push(location);
         applySidePanel(location, focused);
+    }
+
+    /**
+     * Callback for when the range selection changes.
+     *
+     * @param range The selected vertical range.
+     */
+    private void rangeSelectionChanged(@NotNull MapLayerRange range) {
+
+        selectedRange = range;
+        reloadSelectedLayer();
+    }
+
+    /**
+     * Reloads the currently selected map layer using the active range selection.
+     */
+    private void reloadSelectedLayer() {
+
+        if (layerSelectionDropdown == null || layerSelectionDropdown.getSelected() == null) return;
+
+        // Capture the current visual pixels-per-block so we can match zoom on the new map
+        final double capturedRenderScale = (getCamera() != null) ? getCamera().getVisualPixelsPerBlock() : Double.NaN;
+        MapLayerDefinition layer = layerSelectionDropdown.getSelected();
+        MapLayerLoader.Input input = buildLayerLoaderInput(layer, capturedRenderScale);
+
+        CompletableFuture.supplyAsync(() -> mapLayerLoader.load(input), ArdaMaps.IO_EXECUTOR)
+                .thenAcceptAsync(this::layerLoaded)
+                .whenComplete((result, ex) -> {
+                    if (ex != null)
+                        LOGGER.error("Failed to load map layer", ex);
+                });
+    }
+
+    /**
+     * Captures the screen state needed to build a map layer on the IO executor.
+     */
+    private MapLayerLoader.Input buildLayerLoaderInput(MapLayerDefinition mapLayerDefinition, double capturedRenderScale) {
+
+        var cameraPosition = Client.playerPosition2d();
+        Double playerY = Client.playerPositionY();
+
+        if (!Objects.equals(selectedDimension, Client.currentDimension()))
+            cameraPosition = new Vec2d(0, 0);
+
+        int cx = (int) cameraPosition.x();
+        int cy = (int) cameraPosition.y();
+
+        if (getCamera() != null) {
+
+            cx = (int) getCamera().getWorldX();
+            cy = (int) getCamera().getWorldZ();
+        }
+
+        return new MapLayerLoader.Input(
+                selectedDimension,
+                selectedRange,
+                mapLayerDefinition,
+                capturedRenderScale,
+                width,
+                height,
+                cx,
+                cy,
+                playerY,
+                textRenderer);
+    }
+
+    /**
+     * Callback for when a new map layer has finished loading. Sets the new map renderable and updates the camera and GUI state accordingly.
+     *
+     * @param mapRenderable The loaded MapRenderable, or null if loading failed
+     */
+    private void layerLoaded(@Nullable MapRenderable mapRenderable) {
+
+        LOGGER.info("Map layer loaded: {}", mapRenderable != null ? "success" : "failed");
+
+        if (mapRenderable != null) {
+
+            mapRenderer = mapRenderable;
+            explorationState = mapRenderable.getExploration();
+
+            updateMapButtonPositions();
+            coordinatesButton.visible = true;
+        }
     }
 
     /**
@@ -1481,7 +1299,7 @@ public class MapScreen extends ArdaMapsScreen {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
 
         var mapCamera = getCamera();
-        if (mapCamera != null && dragging) {
+        if (mapCamera != null && dragging && !mouseOverMapWidgets(mouseX, mouseY)) {
 
             mapCamera.resetZoomAnchor();
 
@@ -1495,6 +1313,7 @@ public class MapScreen extends ArdaMapsScreen {
 
             return true;
         }
+
         return super.mouseDragged(mouseX, mouseY, button, dx, dy);
     }
 
@@ -1519,7 +1338,7 @@ public class MapScreen extends ArdaMapsScreen {
 
         var cam = getCamera();
         if (cam != null) {
-            animatingToPlayer = false;
+            animation.cancel();
             cam.setZoom(mouseX, mouseY, width, height, amount * 0.5);
         }
 
@@ -1641,4 +1460,3 @@ public class MapScreen extends ArdaMapsScreen {
     private record MarkerInfo(String key, String displayName, Identifier icon, int color, int highlightColor) {
     }
 }
-

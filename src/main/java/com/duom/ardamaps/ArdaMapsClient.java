@@ -95,23 +95,20 @@ import java.util.concurrent.Executors;
  */
 public class ArdaMapsClient implements ClientModInitializer {
 
-    /** Logger instance for the mod. */
-    private static final Logger LOGGER = LoggerFactory.getLogger(ArdaMapsClient.class);
-
     /** Executor for asynchronous processing */
     public static final ExecutorService IMAGE_EXECUTOR =
             Executors.newFixedThreadPool(
                     Math.max(2, Runtime.getRuntime().availableProcessors() / 2)
             );
 
-    /** HTTP image provider instance */
-    private static HttpImageProvider HTTP_IMAGE_PROVIDER;
-
     /** How long (ms) the near-locations cache is valid before refreshing. */
     public static final long LOCATION_CACHE_MS = 100L;
 
     /** Minimum squared distance to discover a location */
     public static final double LOCATION_NEAR_DISTANCE = 625d;
+
+    /** Logger instance for the mod. */
+    private static final Logger LOGGER = LoggerFactory.getLogger(ArdaMapsClient.class);
 
     /** Maximum number of toasts that may be queued at once. Excess toasts are silently dropped. */
     private static final int MAX_TOAST_QUEUE_SIZE = 5;
@@ -141,6 +138,9 @@ public class ArdaMapsClient implements ClientModInitializer {
      * Set by {@link com.duom.ardamaps.core.commands.ClientCommands} and consumed in {@link #clientTick}.
      */
     public static volatile Screen pendingScreen = null;
+
+    /** HTTP image provider instance */
+    private static HttpImageProvider HTTP_IMAGE_PROVIDER;
 
     /** Timestamp of the last {@link #NEAR_LOCATIONS} refresh. */
     private static long lastNearLocationsUpdate = 0L;
@@ -193,30 +193,6 @@ public class ArdaMapsClient implements ClientModInitializer {
         this.registerChatProcessor();
 
         ClientCommands.register();
-    }
-
-    /**
-     * Registers the chat processing callbacks
-     */
-    private void registerChatProcessor() {
-
-        // Style guide deep-links in incoming chat and system messages
-        ClientReceiveMessageEvents.MODIFY_GAME.register(
-                (message, overlay) -> ArdaMapsChatLinkProcessor.process(message));
-
-        // Player-sent chat cannot be modified directly; intercept, cancel,
-        // and re-add the styled version to ChatHud.
-        ClientReceiveMessageEvents.ALLOW_CHAT.register((message, signedMessage, sender, params, receptionTimestamp) -> {
-
-            Text processed = ArdaMapsChatLinkProcessor.process(message);
-
-            if (processed == message) return true; // nothing to restyle
-
-            MinecraftClient mc = MinecraftClient.getInstance();
-            mc.execute(() -> mc.inGameHud.getChatHud().addMessage(processed));
-
-            return false; // cancel the unstyled original
-        });
     }
 
     /**
@@ -364,6 +340,30 @@ public class ArdaMapsClient implements ClientModInitializer {
     }
 
     /**
+     * Registers the chat processing callbacks
+     */
+    private void registerChatProcessor() {
+
+        // Style guide deep-links in incoming chat and system messages
+        ClientReceiveMessageEvents.MODIFY_GAME.register(
+                (message, overlay) -> ArdaMapsChatLinkProcessor.process(message));
+
+        // Player-sent chat cannot be modified directly; intercept, cancel,
+        // and re-add the styled version to ChatHud.
+        ClientReceiveMessageEvents.ALLOW_CHAT.register((message, signedMessage, sender, params, receptionTimestamp) -> {
+
+            Text processed = ArdaMapsChatLinkProcessor.process(message);
+
+            if (processed == message) return true; // nothing to restyle
+
+            MinecraftClient mc = MinecraftClient.getInstance();
+            mc.execute(() -> mc.inGameHud.getChatHud().addMessage(processed));
+
+            return false; // cancel the unstyled original
+        });
+    }
+
+    /**
      * Refreshes the location data from the server.
      */
     public static void refreshLocations() {
@@ -414,7 +414,13 @@ public class ArdaMapsClient implements ClientModInitializer {
                 // Invalidate cached dimension to ensure it is re-resolved with the updated dimension data on next access.
                 Client.invalidateCachedDimension();
 
+                var progress = ArdaMapsClient.CONFIG.getClientProgress();
+                if (progress.migrateRangedExploration(dimensions)) {
+                    ArdaMapsClient.CONFIG_MANAGER.backupClientProgress(".backup");
+                }
+
                 ArdaMapsClient.CONFIG.getClientProgress().reset(true);
+                ArdaMapsClient.CONFIG_MANAGER.saveProgress();
                 LOGGER.info("Per-dimension exploration instances initialised ({} dimension(s)).",
                         dimensions.size());
             });
@@ -499,8 +505,16 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         // Get the dimension ID the player is currently in.
         String dimensionId = Client.currentDimensionId();
+        Dimension dimension = Client.currentDimension();
 
-        PlayerExploration exploration = progress.getExplorationState(dimensionId, true);
+        PlayerExploration exploration;
+
+        if (dimension != null && dimension.hasRanges()) {
+            var range = dimension.rangeForY(player.getY());
+            exploration = progress.getExplorationState(dimensionId, range == null ? null : range.index(), true);
+        } else {
+            exploration = progress.getExplorationState(dimensionId, true);
+        }
 
         /*
          If exploration is null, the client might have not received the dimension data from the server yet,
@@ -613,6 +627,13 @@ public class ArdaMapsClient implements ClientModInitializer {
     }
 
     /**
+     * @return The HTTP image provider instance
+     */
+    public static HttpImageProvider getHttpImageProvider() {
+        return HTTP_IMAGE_PROVIDER;
+    }
+
+    /**
      * Enqueues a {@link ToastWidget} for display. If the queue is already at {@link #MAX_TOAST_QUEUE_SIZE}
      * the new toast is silently dropped to prevent flooding the screen.
      *
@@ -706,12 +727,5 @@ public class ArdaMapsClient implements ClientModInitializer {
         public void reload(ResourceManager manager) {
             GuideImageCache.clear();
         }
-    }
-
-    /**
-     * @return The HTTP image provider instance
-     */
-    public static HttpImageProvider getHttpImageProvider() {
-        return HTTP_IMAGE_PROVIDER;
     }
 }
