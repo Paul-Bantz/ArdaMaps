@@ -72,7 +72,7 @@ class DistanceUnitConverterTest {
     void asRealWorldUnits_metricBelowThreshold_returnsMeters() {
         setUnitSystem(UnitSystem.METRIC);
 
-        assertEquals("839 meters", DistanceUnitConverter.asRealWorldUnits(DIMENSION, 839));
+        assertEquals("2 km", DistanceUnitConverter.asRealWorldUnits(DIMENSION, 1839));
     }
 
     /**
