@@ -23,33 +23,23 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.api.locations;
+package com.duom.ardamaps.core.integration;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.network.ServerPlayerEntity;
 
 /**
- * API Contract for interacting with ArdaMaps locations.
+ * First-party bridge for optional warp integrations.
  */
-@SuppressWarnings("unused")
-public interface ILocationsApi {
+public interface WarpService {
 
     /**
-     * Registers a {@link CompletableFuture} that ArdaMaps will use to fetch location data.
+     * Warps a player to a named location, or runs the fallback when no usable warp is available.
      *
-     * <p>Only one source is active at runtime. Calling this method a second time (e.g. from a
-     * different mod) replaces the previous registration — last caller wins. A warning is logged
-     * whenever an existing source is replaced so the conflict is visible in the server log.</p>
-     *
-     * @param source The location source to register. Must not be {@code null}.
-     * @throws IllegalArgumentException if {@code source} is {@code null}.
+     * @param server    the server that owns the destination world
+     * @param player    the player to move
+     * @param warpName  the configured warp name
+     * @param onFailure fallback action for missing or invalid warp targets
      */
-    void setLocationSource(Supplier<CompletableFuture<List<ApiLocation>>> source);
-
-    /**
-     * @return an optional location source to fetch location data from, if one has been registered
-     */
-    Optional<Supplier<CompletableFuture<List<ApiLocation>>>> getLocationSource();
+    void warpTo(MinecraftServer server, ServerPlayerEntity player, String warpName, Runnable onFailure);
 }

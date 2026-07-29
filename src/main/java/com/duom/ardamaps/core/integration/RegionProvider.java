@@ -23,38 +23,22 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.core.consumers;
+package com.duom.ardamaps.core.integration;
 
-import space.ajcool.ardapaths.api.ArdaPathsApi;
-import space.ajcool.ardapaths.api.ArdaPathsApiEntrypoint;
+import com.duom.ardamaps.core.data.map.RegionLookupTexture;
+
+import java.util.function.Consumer;
 
 /**
- * Consumer for the Arda Paths API
+ * First-party bridge for optional region providers.
  */
-public class ArdaPathsHook implements ArdaPathsApiEntrypoint {
-
-    /** Indicates whether the API is ready to be queried or not */
-    private static ArdaPathsApi INSTANCE;
+public interface RegionProvider {
 
     /**
-     * Called when ArdaPath API is ready to be queried
-     * @param ardaPathsApi the ArdaPaths api instance
+     * Generates the lookup texture for the given dimension.
+     *
+     * @param dimensionId the dimension id
+     * @param callback    callback receiving the generated texture, or null when no data exists
      */
-    @Override
-    public void onApiReady(ArdaPathsApi ardaPathsApi) {
-        INSTANCE = ardaPathsApi;
-    }
-
-    /**
-     * Selects a Pathfinder path and chapter
-     * @param pathId the path identifier
-     * @param chapterId the chapter identifier
-     * @param teleport whether to teleport the player to the chapter's starting location or not
-     */
-    public static void selectPathfinderPathAndChapter(String pathId, String chapterId, boolean teleport) {
-
-        if (INSTANCE == null) return;
-
-        INSTANCE.selectPathAndChapter(pathId, chapterId, true, teleport);
-    }
+    void generateRegionLookup(String dimensionId, Consumer<RegionLookupTexture> callback);
 }

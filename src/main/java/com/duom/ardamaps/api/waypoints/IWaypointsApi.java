@@ -25,7 +25,6 @@
 
 package com.duom.ardamaps.api.waypoints;
 
-import com.duom.ardamaps.core.data.map.Waypoint;
 import net.minecraft.util.Identifier;
 
 /**
@@ -61,7 +60,7 @@ public interface IWaypointsApi {
      *
      * @param waypoint the waypoint to add
      */
-    void addWaypoint(Waypoint waypoint);
+    void addWaypoint(ApiWaypoint waypoint);
 
     /**
      * Removes a waypoint at a set position for the given client dimension
@@ -86,7 +85,7 @@ public interface IWaypointsApi {
      *
      * @param waypoint the waypoint to remove
      */
-    void removeWaypoint(Waypoint waypoint);
+    void removeWaypoint(ApiWaypoint waypoint);
 
     /**
      * Removes all the waypoints associated with the given identifier

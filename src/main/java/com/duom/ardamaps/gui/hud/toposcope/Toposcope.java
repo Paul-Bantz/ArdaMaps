@@ -220,7 +220,8 @@ public class Toposcope {
 
         if (hoveredLocation != null && hoveredLocation.isVisited()) {
 
-            if (hoveredLocation.getWarp() != null && !hoveredLocation.getWarp().isEmpty()) {
+            if (hoveredLocation.getWarp() != null && !hoveredLocation.getWarp().isEmpty()
+                    && ArdaMapsClient.CONFIG.isWarpsAvailable()) {
 
                 var packet = new PlayerWarpPacket(hoveredLocation.getWarp());
                 PacketRegistry.PLAYER_WARP_REQUEST.send(packet);

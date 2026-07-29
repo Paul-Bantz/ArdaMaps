@@ -26,11 +26,11 @@
 package com.duom.ardamaps.core.commands;
 
 import com.duom.ardamaps.ArdaMaps;
-import com.duom.ardamaps.core.consumers.ArdaRegionsHook;
 import com.duom.ardamaps.core.data.config.LocationConfig;
 import com.duom.ardamaps.core.data.location.ExternalLocationSource;
 import com.duom.ardamaps.core.data.location.LocationServer;
 import com.duom.ardamaps.core.data.map.RegionLookupTexture;
+import com.duom.ardamaps.core.integration.Regions;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
@@ -119,6 +119,12 @@ public class ServerCommands {
     private static int refreshRegionLookupData(CommandContext<ServerCommandSource> ignoredCommandSource) {
 
         LOGGER.info("Refreshing region lookup texture data");
+
+        if (!Regions.isAvailable()) {
+            LOGGER.warn("Region provider unavailable, skipping region lookup texture generation");
+            return Command.SINGLE_SUCCESS;
+        }
+
         var count = 0;
 
         for (var entry : ArdaMaps.CONFIG.getDimensions()) {
@@ -128,7 +134,7 @@ public class ServerCommands {
 
             LOGGER.info("Generating region lookup texture for dimension {}", entry.getId());
 
-            ArdaRegionsHook.generateRegionLookup(entry.getId(), (RegionLookupTexture regionLookup) -> {
+            Regions.generateRegionLookup(entry.getId(), (RegionLookupTexture regionLookup) -> {
 
                 if (regionLookup == null) {
                     LOGGER.info("No region data found for dimension {}", entry.getId());

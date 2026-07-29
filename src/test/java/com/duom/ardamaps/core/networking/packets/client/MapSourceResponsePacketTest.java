@@ -33,8 +33,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for {@link MapSourceResponsePacket} serialization of flat and ranged layer definitions.
@@ -51,8 +50,10 @@ class MapSourceResponsePacketTest {
         Dimension dimension = dimension();
         dimension.getMapLayers().add(layer(null));
 
-        MapSourceResponsePacket parsed = roundTrip(new MapSourceResponsePacket(List.of(dimension)));
+        MapSourceResponsePacket parsed = roundTrip(new MapSourceResponsePacket(true, false, List.of(dimension)));
 
+        assertTrue(parsed.warpsAvailable());
+        assertFalse(parsed.ardaRegionsAvailable());
         assertEquals(1, parsed.dimensions().size());
         assertEquals(layer(null), parsed.dimensions().get(0).getMapLayers().get(0));
         assertNull(parsed.dimensions().get(0).getMapLayers().get(0).ranges());
@@ -106,8 +107,10 @@ class MapSourceResponsePacketTest {
         Dimension dimension = dimension();
         dimension.getMapLayers().add(layer(ranges));
 
-        MapSourceResponsePacket parsed = roundTrip(new MapSourceResponsePacket(List.of(dimension)));
+        MapSourceResponsePacket parsed = roundTrip(new MapSourceResponsePacket(false, true, List.of(dimension)));
 
+        assertFalse(parsed.warpsAvailable());
+        assertTrue(parsed.ardaRegionsAvailable());
         assertEquals(ranges, parsed.dimensions().get(0).getMapLayers().get(0).ranges());
         assertNull(parsed.dimensions().get(0).getMapLayers().get(0).path());
         assertEquals(layer(ranges), parsed.dimensions().get(0).getMapLayers().get(0));

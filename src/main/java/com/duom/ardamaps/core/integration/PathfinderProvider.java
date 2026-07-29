@@ -23,33 +23,19 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.api.locations;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
+package com.duom.ardamaps.core.integration;
 
 /**
- * API Contract for interacting with ArdaMaps locations.
+ * First-party bridge for optional pathfinder integrations.
  */
-@SuppressWarnings("unused")
-public interface ILocationsApi {
+public interface PathfinderProvider {
 
     /**
-     * Registers a {@link CompletableFuture} that ArdaMaps will use to fetch location data.
+     * Selects a pathfinder path and chapter.
      *
-     * <p>Only one source is active at runtime. Calling this method a second time (e.g. from a
-     * different mod) replaces the previous registration — last caller wins. A warning is logged
-     * whenever an existing source is replaced so the conflict is visible in the server log.</p>
-     *
-     * @param source The location source to register. Must not be {@code null}.
-     * @throws IllegalArgumentException if {@code source} is {@code null}.
+     * @param pathId    the path identifier
+     * @param chapterId the chapter identifier
+     * @param teleport  whether the provider should teleport to the chapter start
      */
-    void setLocationSource(Supplier<CompletableFuture<List<ApiLocation>>> source);
-
-    /**
-     * @return an optional location source to fetch location data from, if one has been registered
-     */
-    Optional<Supplier<CompletableFuture<List<ApiLocation>>>> getLocationSource();
+    void selectPathAndChapter(String pathId, String chapterId, boolean teleport);
 }

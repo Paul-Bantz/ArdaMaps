@@ -36,7 +36,7 @@ import java.util.Date;
 import java.util.Objects;
 
 /**
- * Result of {@link com.duom.ardamaps.core.consumers.ArdaRegionsHook#generateRegionLookup}.
+ * Result of {@link com.duom.ardamaps.core.integration.RegionProvider#generateRegionLookup}.
  *
  * <p>Each element of {@code pixels} holds a 1-based index into {@code regions}
  * (0 = no region). With fewer than 128 regions a {@code byte[]} is 4× smaller

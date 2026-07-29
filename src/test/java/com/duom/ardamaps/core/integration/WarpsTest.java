@@ -23,33 +23,24 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.api.locations;
+package com.duom.ardamaps.core.integration;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
+import org.junit.jupiter.api.Test;
 
-/**
- * API Contract for interacting with ArdaMaps locations.
- */
-@SuppressWarnings("unused")
-public interface ILocationsApi {
+import java.util.concurrent.atomic.AtomicBoolean;
 
-    /**
-     * Registers a {@link CompletableFuture} that ArdaMaps will use to fetch location data.
-     *
-     * <p>Only one source is active at runtime. Calling this method a second time (e.g. from a
-     * different mod) replaces the previous registration — last caller wins. A warning is logged
-     * whenever an existing source is replaced so the conflict is visible in the server log.</p>
-     *
-     * @param source The location source to register. Must not be {@code null}.
-     * @throws IllegalArgumentException if {@code source} is {@code null}.
-     */
-    void setLocationSource(Supplier<CompletableFuture<List<ApiLocation>>> source);
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-    /**
-     * @return an optional location source to fetch location data from, if one has been registered
-     */
-    Optional<Supplier<CompletableFuture<List<ApiLocation>>>> getLocationSource();
+class WarpsTest {
+
+    @Test
+    void unavailableWhenHuskHomesIsAbsentAndRunsFallback() {
+        AtomicBoolean fallbackRan = new AtomicBoolean(false);
+
+        assertFalse(Warps.isAvailable());
+        Warps.warpTo(null, null, "missing", () -> fallbackRan.set(true));
+
+        assertTrue(fallbackRan.get());
+    }
 }

@@ -22,16 +22,21 @@
       "com.duom.ardamaps.ArdaMaps"
     ],
     "arda-regions:api": [
-      "com.duom.ardamaps.core.consumers.ArdaRegionsHook"
+      "com.duom.ardamaps.core.consumers.ArdaRegionsConsumer"
     ],
     "ardapaths:api": [
-      "com.duom.ardamaps.core.consumers.ArdaPathsHook"
+      "com.duom.ardamaps.core.consumers.ArdaPathsConsumer"
     ]
   },
   "depends": {
     "fabricloader": ">=${loader_version}",
     "fabric": "*",
     "minecraft": "${minecraft_version}"
+  },
+  "suggests": {
+    "arda-regions": "*",
+    "ardapaths": "*",
+    "huskhomes": "*"
   },
   "custom": {
     "ardamaps:api_entrypoint": "com.duom.ardamaps.api.ArdaMapsApiEntrypoint"

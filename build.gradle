@@ -66,12 +66,11 @@ dependencies {
     include("org.jsoup:jsoup:${project.jsoup_version}")
     include("com.cronutils:cron-utils:${project.cron_utils_version}")
 
-    // Warp  commands api - HuskHomes (fabric v4.7 [1.20.1]) - huskhomes_version
-    compileOnly("curse.maven:huskhomes-849217:5468607")
-
-    // Arda regions - https://modrinth.com/mod/ardaregions
-    modApi("maven.modrinth:ardaregions:${project.ardaregions_version}")
-    modApi("maven.modrinth:arda-paths:${project.ardapaths_version}")
+    // Optional integrations - compile against them, never require them at runtime.
+    modCompileOnly("curse.maven:huskhomes-849217:5468607")
+    modCompileOnly("maven.modrinth:ardaregions:${project.ardaregions_version}")
+    //modCompileOnly("maven.modrinth:arda-paths:${project.ardapaths_version}")
+    modCompileOnly(files("build/external-libs/ArdaPaths-1.4.0-SNAPSHOT.jar"))
 
     // DevAuth - Dev/Debug authentication support
     modRuntimeOnly("me.djtheredstoner:DevAuth-fabric:${project.devauth_version}")
@@ -170,7 +169,8 @@ tasks.register('setupDevEnv') {
         // Runtime mods declaration
         def mods = [
                 [name: 'HuskHomes-Fabric', version: "${project.huskhomes_version}", url: "https://cdn.modrinth.com/data/J6U9o3JG/versions/cA0nmJeA/HuskHomes-Fabric-${project.huskhomes_version}.jar", runtimeEnv: "server"],
-                [name: 'arda-regions', version: "${project.ardaregions_version}", url: "https://cdn.modrinth.com/data/m9rs3JWq/versions/PHlYomKX/arda-regions-${project.ardaregions_version}.jar", runtimeEnv: "both"]
+                [name: 'arda-regions', version: "${project.ardaregions_version}", url: "https://cdn.modrinth.com/data/m9rs3JWq/versions/PHlYomKX/arda-regions-${project.ardaregions_version}.jar", runtimeEnv: "both"],
+                [name: 'arda-paths', version: "${project.ardapaths_version}", url: "https://api.modrinth.com/maven/maven/modrinth/arda-paths/${project.ardapaths_version}/arda-paths-${project.ardapaths_version}.jar", runtimeEnv: "both"]
         ]
 
         mods.each { mod ->

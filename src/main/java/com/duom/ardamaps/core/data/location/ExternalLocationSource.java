@@ -25,7 +25,8 @@
 
 package com.duom.ardamaps.core.data.location;
 
-import com.duom.ardamaps.api.ArdaMapsApi;
+import com.duom.ardamaps.core.api.ArdaMapsApiImpl;
+import com.duom.ardamaps.core.api.locations.LocationsApiImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +48,7 @@ public class ExternalLocationSource {
      */
     public static CompletableFuture<List<LocationServer>> fetchLocations() {
 
-        var apiInstance = ArdaMapsApi.getInstance();
+        var apiInstance = ArdaMapsApiImpl.getInstance();
 
         var locationSource = apiInstance.getLocationsApi().getLocationSource();
 
@@ -60,6 +61,9 @@ public class ExternalLocationSource {
 
         var locationSupplier = locationSource.get();
 
-        return locationSupplier.get();
+        return locationSupplier.get()
+                .thenApply(locations -> locations.stream()
+                        .map(LocationsApiImpl::toLocationServer)
+                        .toList());
     }
 }

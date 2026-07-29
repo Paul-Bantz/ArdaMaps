@@ -23,16 +23,18 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.core.consumers;
+package com.duom.ardamaps.core.integration;
 
-import net.william278.huskhomes.api.FabricHuskHomesAPI;
+import org.junit.jupiter.api.Test;
 
-/** Hook to access the HuskHomes API */
-public class HuskHomesApiHook {
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
-    /** Get the HuskHomes API instance */
-    public static FabricHuskHomesAPI getInstance() {
+class PathfindersTest {
 
-        return FabricHuskHomesAPI.getInstance();
+    @Test
+    void noProviderIsUnavailableAndNoOp() {
+        assertFalse(Pathfinders.isAvailable());
+        assertDoesNotThrow(() -> Pathfinders.selectPathAndChapter("path", "chapter", false));
     }
 }

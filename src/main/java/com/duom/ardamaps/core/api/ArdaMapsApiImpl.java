@@ -23,65 +23,48 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.api;
+package com.duom.ardamaps.core.api;
 
+import com.duom.ardamaps.api.ArdaMapsApi;
 import com.duom.ardamaps.api.locations.ILocationsApi;
-import com.duom.ardamaps.api.locations.LocationsApiImpl;
 import com.duom.ardamaps.api.waypoints.IWaypointsApi;
-import com.duom.ardamaps.api.waypoints.WaypointsApiImpl;
+import com.duom.ardamaps.core.api.locations.LocationsApiImpl;
+import com.duom.ardamaps.core.api.waypoints.WaypointsApiImpl;
 import lombok.Getter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * Public API for the ArdaMaps mod.
- *
- * <p>Other mods interact with ArdaMaps through the static methods on this class.</p>
+ * Internal implementation of the ArdaMaps public API.
  */
 @SuppressWarnings("unused")
 public final class ArdaMapsApiImpl implements ArdaMapsApi {
 
-    /** Class logger */
-    private static final Logger LOGGER = LoggerFactory.getLogger(ArdaMapsApiImpl.class);
-
-    /** API Instance */
+    /** API instance. */
     @Getter
     private static ArdaMapsApiImpl instance;
 
-    /** Waypoints API Handle */
+    /** Waypoints API handle. */
     private final IWaypointsApi waypointsApi = new WaypointsApiImpl();
 
-    /** Locations API Handle */
+    /** Locations API handle. */
     private final ILocationsApi locationsApi = new LocationsApiImpl();
 
     private ArdaMapsApiImpl() { /* Not instantiable */ }
 
     /**
-     * Initializes the API
+     * Initializes the API.
      */
     public static void initialize() {
-
         if (instance == null)
             instance = new ArdaMapsApiImpl();
     }
 
-    /**
-     * @return an instance of the Waypoints API
-     */
     @Override
     public IWaypointsApi getWaypointsApi() {
-
         return waypointsApi;
     }
 
-    /**
-     * @return an instance of the Locations API
-     */
     @Override
     public ILocationsApi getLocationsApi() {
-
         return locationsApi;
     }
 }
-
-

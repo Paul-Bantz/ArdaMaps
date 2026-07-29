@@ -23,33 +23,35 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.api.locations;
+package com.duom.ardamaps.core.consumers;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
+import com.duom.ardamaps.core.integration.PathfinderProvider;
+import com.duom.ardamaps.core.integration.Pathfinders;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.loader.api.FabricLoader;
+import space.ajcool.ardapaths.api.ArdaPathsApi;
+import space.ajcool.ardapaths.api.ArdaPathsApiEntrypoint;
 
 /**
- * API Contract for interacting with ArdaMaps locations.
+ * Consumer for the Arda Paths API.
  */
-@SuppressWarnings("unused")
-public interface ILocationsApi {
+public class ArdaPathsConsumer implements ArdaPathsApiEntrypoint, PathfinderProvider {
 
-    /**
-     * Registers a {@link CompletableFuture} that ArdaMaps will use to fetch location data.
-     *
-     * <p>Only one source is active at runtime. Calling this method a second time (e.g. from a
-     * different mod) replaces the previous registration — last caller wins. A warning is logged
-     * whenever an existing source is replaced so the conflict is visible in the server log.</p>
-     *
-     * @param source The location source to register. Must not be {@code null}.
-     * @throws IllegalArgumentException if {@code source} is {@code null}.
-     */
-    void setLocationSource(Supplier<CompletableFuture<List<ApiLocation>>> source);
+    /** ArdaPaths API instance, set when the API is ready. */
+    private ArdaPathsApi api;
 
-    /**
-     * @return an optional location source to fetch location data from, if one has been registered
-     */
-    Optional<Supplier<CompletableFuture<List<ApiLocation>>>> getLocationSource();
+    @Override
+    public void onApiReady(ArdaPathsApi ardaPathsApi) {
+        if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) return;
+
+        api = ardaPathsApi;
+        Pathfinders.register(this);
+    }
+
+    @Override
+    public void selectPathAndChapter(String pathId, String chapterId, boolean teleport) {
+        if (api == null) return;
+
+        api.selectPathAndChapter(pathId, chapterId, true, teleport);
+    }
 }

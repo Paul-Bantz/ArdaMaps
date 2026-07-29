@@ -27,6 +27,8 @@ package com.duom.ardamaps.core.networking.handlers.server;
 
 import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.core.consumers.networking.RespondablePacketHandler;
+import com.duom.ardamaps.core.integration.Regions;
+import com.duom.ardamaps.core.integration.Warps;
 import com.duom.ardamaps.core.networking.packets.EmptyPacket;
 import com.duom.ardamaps.core.networking.packets.client.MapSourceResponsePacket;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
@@ -66,6 +68,6 @@ public class MapSourcesRequestHandler extends RespondablePacketHandler<EmptyPack
     @Override
     public MapSourceResponsePacket handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, EmptyPacket packet, PacketSender sender) {
 
-        return new MapSourceResponsePacket(ArdaMaps.CONFIG.getDimensions());
+        return new MapSourceResponsePacket(Warps.isAvailable(), Regions.isAvailable(), ArdaMaps.CONFIG.getDimensions());
     }
 }

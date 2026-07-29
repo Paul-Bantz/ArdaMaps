@@ -25,31 +25,35 @@
 
 package com.duom.ardamaps.api.locations;
 
+import net.minecraft.util.math.Vec3d;
+
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
 
 /**
- * API Contract for interacting with ArdaMaps locations.
+ * Public location DTO for external mods.
+ *
+ * @param id          the location id
+ * @param name        the location display name
+ * @param world       the dimension id
+ * @param types       location type/category names
+ * @param warp        optional warp name
+ * @param position    world position
+ * @param pathfinder  optional pathfinder path/chapter reference
+ * @param status      project status
+ * @param regions     region names containing this location
+ * @param canon       whether the location is canon
+ * @param description location details text
+ * @param externalUrl external details URL
  */
-@SuppressWarnings("unused")
-public interface ILocationsApi {
-
-    /**
-     * Registers a {@link CompletableFuture} that ArdaMaps will use to fetch location data.
-     *
-     * <p>Only one source is active at runtime. Calling this method a second time (e.g. from a
-     * different mod) replaces the previous registration — last caller wins. A warning is logged
-     * whenever an existing source is replaced so the conflict is visible in the server log.</p>
-     *
-     * @param source The location source to register. Must not be {@code null}.
-     * @throws IllegalArgumentException if {@code source} is {@code null}.
-     */
-    void setLocationSource(Supplier<CompletableFuture<List<ApiLocation>>> source);
-
-    /**
-     * @return an optional location source to fetch location data from, if one has been registered
-     */
-    Optional<Supplier<CompletableFuture<List<ApiLocation>>>> getLocationSource();
-}
+public record ApiLocation(String id,
+                          String name,
+                          String world,
+                          List<String> types,
+                          String warp,
+                          Vec3d position,
+                          String pathfinder,
+                          String status,
+                          List<String> regions,
+                          boolean canon,
+                          String description,
+                          String externalUrl) {}

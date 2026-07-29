@@ -28,7 +28,7 @@ package com.duom.ardamaps;
 import com.cronutils.model.Cron;
 import com.duom.ardamaps.api.ArdaMapsApi;
 import com.duom.ardamaps.api.ArdaMapsApiEntrypoint;
-import com.duom.ardamaps.api.ArdaMapsApiImpl;
+import com.duom.ardamaps.core.api.ArdaMapsApiImpl;
 import com.duom.ardamaps.core.commands.ServerCommands;
 import com.duom.ardamaps.core.data.config.ServerConfigManager;
 import com.duom.ardamaps.core.data.config.server.ServerConfig;
@@ -154,12 +154,12 @@ public class ArdaMaps implements ModInitializer {
     /**
      * Queries Fabric for all mods that registered an {@code ardamaps:api} entrypoint and
      * calls {@link ArdaMapsApiEntrypoint#onApiReady(ArdaMapsApi)} on each of them.
-     * Invoked once from {@link #onServerStarted(MinecraftServer)} so the API is fully
+     * Invoked once from {@link #onInitialize()} so the API is fully
      * initialized before consumers receive the callback.
      */
     private void invokeApiEntrypoints() {
 
-        ArdaMapsApi api = ArdaMapsApi.getInstance();
+        ArdaMapsApi api = ArdaMapsApiImpl.getInstance();
 
         for (EntrypointContainer<ArdaMapsApiEntrypoint> container :
                 FabricLoader.getInstance().getEntrypointContainers(MOD_ID + ":api", ArdaMapsApiEntrypoint.class)) {
@@ -168,7 +168,7 @@ public class ArdaMaps implements ModInitializer {
             try {
                 LOGGER.info("[ArdaMaps] Invoking ardamaps:api entrypoint for mod '{}'", modId);
                 container.getEntrypoint().onApiReady(api);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 LOGGER.error("[ArdaMaps] Exception in ardamaps:api entrypoint of mod '{}': {}", modId, e.getMessage(), e);
             }
         }

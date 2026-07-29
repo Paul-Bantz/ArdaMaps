@@ -35,21 +35,6 @@ import com.duom.ardamaps.api.waypoints.IWaypointsApi;
 public interface ArdaMapsApi {
 
     /**
-     * Get the current initialized instance of the API
-     * @return a valid instance of the API
-     */
-    static ArdaMapsApi getInstance() {
-
-        ArdaMapsApiImpl instance = ArdaMapsApiImpl.getInstance();
-
-        if (instance == null) {
-            throw new IllegalStateException("ArdaPaths API has not been initialized. Ensure the mod is loaded.");
-        }
-
-        return instance;
-    }
-
-    /**
      * @return an instance of the Waypoints API
      */
     IWaypointsApi getWaypointsApi();

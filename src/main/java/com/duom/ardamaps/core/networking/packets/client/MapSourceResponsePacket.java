@@ -38,9 +38,13 @@ import java.util.List;
 
 /**
  * A packet sent from the server to the client containing the map source configuration in JSON format.
- * @param dimensions the list of dimensions to transfer
+ * @param warpsAvailable       whether server-side warps are available
+ * @param ardaRegionsAvailable whether server-side ArdaRegions is available
+ * @param dimensions           the list of dimensions to transfer
  */
-public record MapSourceResponsePacket(List<Dimension> dimensions) implements IPacket {
+public record MapSourceResponsePacket(boolean warpsAvailable,
+                                      boolean ardaRegionsAvailable,
+                                      List<Dimension> dimensions) implements IPacket {
 
     /**
      * Reads a MapSourceResponsePacket - ie a maps layer configuration from the given PacketByteBuf.
@@ -50,6 +54,8 @@ public record MapSourceResponsePacket(List<Dimension> dimensions) implements IPa
      */
     public static MapSourceResponsePacket read(PacketByteBuf buf) {
 
+        var warpsAvailable = buf.readBoolean();
+        var ardaRegionsAvailable = buf.readBoolean();
         var dimensionsCount = buf.readInt();
         var dimensions = new ArrayList<Dimension>(dimensionsCount);
 
@@ -107,7 +113,7 @@ public record MapSourceResponsePacket(List<Dimension> dimensions) implements IPa
             dimensions.add(dimension);
         }
 
-        return new MapSourceResponsePacket(dimensions);
+        return new MapSourceResponsePacket(warpsAvailable, ardaRegionsAvailable, dimensions);
     }
 
     /**
@@ -119,6 +125,9 @@ public record MapSourceResponsePacket(List<Dimension> dimensions) implements IPa
     public PacketByteBuf build() {
 
         PacketByteBuf buf = PacketByteBufs.create();
+
+        buf.writeBoolean(warpsAvailable);
+        buf.writeBoolean(ardaRegionsAvailable);
 
         var dimensionsCount = dimensions == null || dimensions.isEmpty() ? 0 : dimensions.size();
         buf.writeInt(dimensionsCount);

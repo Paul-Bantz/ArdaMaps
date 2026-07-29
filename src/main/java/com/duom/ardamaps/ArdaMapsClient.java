@@ -409,6 +409,8 @@ public class ArdaMapsClient implements ClientModInitializer {
             MinecraftClient.getInstance().execute(() -> {
 
                 LOGGER.info("Received Dimension Data from server: {} dimension(s) found.", dimensions.size());
+                ArdaMapsClient.CONFIG.setWarpsAvailable(response.warpsAvailable());
+                ArdaMapsClient.CONFIG.setArdaRegionsAvailable(response.ardaRegionsAvailable());
                 ArdaMapsClient.CONFIG.setDimensions(dimensions);
 
                 // Invalidate cached dimension to ensure it is re-resolved with the updated dimension data on next access.

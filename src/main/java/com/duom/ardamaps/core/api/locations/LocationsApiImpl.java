@@ -23,8 +23,10 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.api.locations;
+package com.duom.ardamaps.core.api.locations;
 
+import com.duom.ardamaps.api.locations.ApiLocation;
+import com.duom.ardamaps.api.locations.ILocationsApi;
 import com.duom.ardamaps.core.data.location.LocationServer;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -36,30 +38,19 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 /**
- * Locations API contract definition for interacting with ArdaMaps locations.
+ * Internal implementation of the locations API.
  */
 @SuppressWarnings("unused")
 public class LocationsApiImpl implements ILocationsApi {
 
-    /** Class logger */
+    /** Class logger. */
     private static final Logger LOGGER = LoggerFactory.getLogger(LocationsApiImpl.class);
 
-    /** The source for the locations data */
-    private @Nullable Supplier<CompletableFuture<List<LocationServer>>> locationSource;
+    /** The source for the locations data. */
+    private @Nullable Supplier<CompletableFuture<List<ApiLocation>>> locationSource;
 
-    /**
-     * Registers a CompletableFuture that ArdaMaps will use to fetch location data.
-     *
-     * <p>Only one source is active at runtime. Calling this method a second time (e.g. from a
-     * different mod) replaces the previous registration — last caller wins. A warning is logged
-     * whenever an existing source is replaced so the conflict is visible in the server log.</p>
-     *
-     * @param source The location source to register. Must not be {@code null}.
-     * @throws IllegalArgumentException if {@code source} is {@code null}.
-     */
     @Override
-    public void setLocationSource(Supplier<CompletableFuture<List<LocationServer>>> source) {
-
+    public void setLocationSource(Supplier<CompletableFuture<List<ApiLocation>>> source) {
         if (source == null) throw new IllegalArgumentException("LocationSource must not be null");
 
         if (locationSource != null) {
@@ -74,12 +65,31 @@ public class LocationsApiImpl implements ILocationsApi {
         locationSource = source;
     }
 
-    /**
-     * @return the registered location source if present
-     */
     @Override
-    public Optional<Supplier<CompletableFuture<List<LocationServer>>>> getLocationSource() {
-
+    public Optional<Supplier<CompletableFuture<List<ApiLocation>>>> getLocationSource() {
         return Optional.ofNullable(locationSource);
+    }
+
+    /**
+     * Converts a public location DTO into the internal model.
+     *
+     * @param location the public location
+     * @return the internal location
+     */
+    public static LocationServer toLocationServer(ApiLocation location) {
+        LocationServer server = new LocationServer();
+        server.setId(location.id());
+        server.setName(location.name());
+        server.setWorld(location.world());
+        server.setTypes(location.types());
+        server.setWarp(location.warp());
+        server.setPosition(location.position());
+        server.setPathfinder(location.pathfinder());
+        server.setStatus(location.status());
+        server.setRegions(location.regions());
+        server.setCanon(location.canon());
+        server.setDescription(location.description());
+        server.setExternalUrl(location.externalUrl());
+        return server;
     }
 }

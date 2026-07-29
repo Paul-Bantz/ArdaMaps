@@ -100,6 +100,16 @@ public class ClientConfig extends Configuration<LocationClient> {
     @Getter
     private transient List<Dimension> dimensions;
 
+    /** Whether the connected server has a usable warp integration. */
+    @Setter
+    @Getter
+    private transient boolean warpsAvailable;
+
+    /** Whether the connected server has a usable ArdaRegions integration. */
+    @Setter
+    @Getter
+    private transient boolean ardaRegionsAvailable;
+
     /** Waypoints coordinates - not persisted */
     private final transient HashMap<String, Set<Waypoint>> waypoints = new HashMap<>();
 

@@ -27,12 +27,12 @@ package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.Client;
-import com.duom.ardamaps.core.consumers.ArdaPathsHook;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.conversion.ContentBlock;
 import com.duom.ardamaps.core.data.conversion.HtmlConverter;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.location.LocationDetails;
+import com.duom.ardamaps.core.integration.Pathfinders;
 import com.duom.ardamaps.core.networking.PacketRegistry;
 import com.duom.ardamaps.core.networking.packets.server.LocationDetailsRequestPacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
@@ -237,7 +237,7 @@ public class SidePanelWidget implements Element {
 
         var warp = displayedLocation.getWarp();
 
-        if (warp != null && !warp.isEmpty()) {
+        if (warp != null && !warp.isEmpty() && ArdaMapsClient.CONFIG.isWarpsAvailable()) {
 
             PacketRegistry.PLAYER_WARP_REQUEST.send(new PlayerWarpPacket(warp));
 
@@ -268,7 +268,7 @@ public class SidePanelWidget implements Element {
         if (pathfinderData.length == 2) {
 
             // Select path and chapter in the pathfinder
-            ArdaPathsHook.selectPathfinderPathAndChapter(pathfinderData[0], pathfinderData[1], false);
+            Pathfinders.selectPathAndChapter(pathfinderData[0], pathfinderData[1], false);
             requestTeleport();
         }
     }
@@ -385,7 +385,9 @@ public class SidePanelWidget implements Element {
         var y = screenY1 + ELEMENT_SPACING + PADDING;
         var usableWidth = screenX2 - screenX1 - 2 * PADDING;
         var halfUsableWidth = usableWidth / 2;
-        boolean hasProjectInfo = displayedLocation.getPathfinder() != null && !displayedLocation.getPathfinder().isEmpty();
+        boolean hasProjectInfo = Pathfinders.isAvailable()
+                && displayedLocation.getPathfinder() != null
+                && !displayedLocation.getPathfinder().isEmpty();
 
         y += renderTitle(context, centerX, y, mouseX, mouseY) + ELEMENT_SPACING * 3;
         y += ScreenRenderingUtils.renderSeparator(context, usableWidth, screenX1 + PADDING, y) + ELEMENT_SPACING * 3;

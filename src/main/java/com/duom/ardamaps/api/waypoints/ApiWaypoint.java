@@ -23,33 +23,35 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.api.locations;
+package com.duom.ardamaps.api.waypoints;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
+import net.minecraft.util.Identifier;
 
 /**
- * API Contract for interacting with ArdaMaps locations.
+ * Public waypoint DTO for external mods.
+ *
+ * @param x          the X coordinate of the waypoint
+ * @param z          the Z coordinate of the waypoint
+ * @param text       the waypoint display text
+ * @param r          the red component of the waypoint colour
+ * @param g          the green component of the waypoint colour
+ * @param b          the blue component of the waypoint colour
+ * @param identifier the waypoint owner's identifier
+ * @param dimension  the waypoint dimension
+ * @param showToast  whether to show a toast notification on hit
+ * @param icon       the waypoint icon identifier
  */
-@SuppressWarnings("unused")
-public interface ILocationsApi {
+public record ApiWaypoint(int x, int z,
+                          String text,
+                          float r, float g, float b,
+                          String identifier, String dimension,
+                          boolean showToast,
+                          Identifier icon) {
 
     /**
-     * Registers a {@link CompletableFuture} that ArdaMaps will use to fetch location data.
-     *
-     * <p>Only one source is active at runtime. Calling this method a second time (e.g. from a
-     * different mod) replaces the previous registration — last caller wins. A warning is logged
-     * whenever an existing source is replaced so the conflict is visible in the server log.</p>
-     *
-     * @param source The location source to register. Must not be {@code null}.
-     * @throws IllegalArgumentException if {@code source} is {@code null}.
+     * Creates a waypoint that uses ArdaMaps' default toast and icon handling.
      */
-    void setLocationSource(Supplier<CompletableFuture<List<ApiLocation>>> source);
-
-    /**
-     * @return an optional location source to fetch location data from, if one has been registered
-     */
-    Optional<Supplier<CompletableFuture<List<ApiLocation>>>> getLocationSource();
+    public ApiWaypoint(int x, int z, String text, float r, float g, float b, String identifier, String dimension) {
+        this(x, z, text, r, g, b, identifier, dimension, true, null);
+    }
 }

@@ -25,23 +25,23 @@
 
 package com.duom.ardamaps.core.networking.handlers.server;
 
-import com.duom.ardamaps.core.consumers.HuskHomesApiHook;
 import com.duom.ardamaps.core.consumers.networking.ServerPacketHandler;
+import com.duom.ardamaps.core.integration.Warps;
 import com.duom.ardamaps.core.networking.packets.server.PlayerWarpPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.World;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handler for the PlayerWarpPacket, responsible for warping the player to the specified warp location.
  */
 public class PlayerWarpHandler extends ServerPacketHandler<PlayerWarpPacket> {
+
+    /** Class logger. */
+    private static final Logger LOGGER = LoggerFactory.getLogger(PlayerWarpHandler.class);
 
     /** The channel identifier for the PlayerWarpPacket. */
     private static final String REQ_CHANNEL = "player_warp";
@@ -65,13 +65,7 @@ public class PlayerWarpHandler extends ServerPacketHandler<PlayerWarpPacket> {
     @Override
     protected void handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PlayerWarpPacket packet, PacketSender sender) {
 
-        server.execute(() -> HuskHomesApiHook.getInstance().getWarp(packet.warpName()).thenAccept((warpOpt) -> warpOpt.ifPresent(warp -> {
-
-            Identifier dimensionId = new Identifier(warp.getWorld().getName());
-            RegistryKey<World> key = RegistryKey.of(RegistryKeys.WORLD, dimensionId);
-
-            ServerWorld serverWorld = server.getWorld(key);
-            player.teleport(serverWorld, warp.getX(), warp.getY(), warp.getZ(), player.getYaw(), player.getPitch());
-        })));
+        server.execute(() -> Warps.warpTo(server, player, packet.warpName(),
+                () -> LOGGER.warn("Unable to warp player {} to '{}'", player.getUuidAsString(), packet.warpName())));
     }
 }
