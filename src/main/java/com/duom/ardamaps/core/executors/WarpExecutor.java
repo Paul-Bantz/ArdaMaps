@@ -26,18 +26,9 @@
 package com.duom.ardamaps.core.executors;
 
 import com.duom.ardamaps.core.integration.WarpService;
-import com.duom.ardamaps.gui.ModConstants;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Relative;
-import net.minecraft.world.level.Level;
 import net.william278.huskhomes.api.FabricHuskHomesAPI;
-
-import java.util.Set;
 
 /**
  * HuskHomes-backed warp executor. This class is only loaded after HuskHomes is known to be present.
@@ -46,28 +37,28 @@ public class WarpExecutor implements WarpService {
 
     @Override
     public void warpTo(MinecraftServer server, ServerPlayer player, String warpName, Runnable onFailure) {
-        FabricHuskHomesAPI.getInstance().getWarp(warpName).thenAccept(warpOpt -> {
-            if (warpOpt.isEmpty()) {
-                onFailure.run();
+        FabricHuskHomesAPI api;
+        try {
+            api = FabricHuskHomesAPI.getInstance();
+        } catch (RuntimeException exception) {
+            onFailure.run();
+            return;
+        }
+
+        api.getWarp(warpName).whenComplete((warpOpt, throwable) -> {
+            if (throwable != null || warpOpt.isEmpty()) {
+                server.execute(onFailure);
                 return;
             }
 
-            var warp = warpOpt.get();
-            Identifier dimensionId = Identifier.tryParse(warp.getWorld().getName());
-            if (dimensionId == null) {
-                onFailure.run();
-                return;
-            }
-
-            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, dimensionId);
-
-            ServerLevel serverWorld = server.getLevel(key);
-            if (serverWorld == null) {
-                onFailure.run();
-                return;
-            }
-
-            player.teleportTo(serverWorld, warp.getX(), warp.getY(), warp.getZ(), Set.<Relative>of(), player.getYRot(), player.getXRot(), true);
+            server.execute(() -> {
+                try {
+                    //noinspection DataFlowIssue
+                    player.teleport(api.getTeleportTarget(warpOpt.get()));
+                } catch (RuntimeException exception) {
+                    onFailure.run();
+                }
+            });
         });
     }
 }
