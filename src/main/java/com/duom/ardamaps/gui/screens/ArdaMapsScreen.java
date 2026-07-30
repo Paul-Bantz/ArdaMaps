@@ -34,16 +34,17 @@ import com.duom.ardamaps.gui.widgets.BookmarkButtonType;
 import com.duom.ardamaps.gui.widgets.BookmarkButtonWidget;
 import com.duom.ardamaps.gui.widgets.SearchWidget;
 import com.duom.ardamaps.gui.widgets.builders.BookmarkButtonBuilder;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 import java.util.function.Function;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
 
 /**
  * The ArdaMapsScreen class serves as a base for all screens in the ArdaMaps mod, providing common functionality such as background rendering and static button management.
@@ -153,8 +154,6 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureExitButton() {
 
-        assert minecraft != null;
-
         this.exitButton = BookmarkButtonBuilder.create()
                 .setButtonStyle(BookmarkButtonType.BOOKMARK_CLOSE)
                 .setOnClick(() -> {
@@ -173,8 +172,6 @@ public abstract class ArdaMapsScreen extends Screen {
      * Configures the map button, which opens the MapScreen when clicked.
      */
     private void configureMapButton() {
-
-        assert minecraft != null;
 
         this.mapButton = BookmarkButtonBuilder.create()
                 .setButtonStyle(BookmarkButtonType.BOOKMARK_MAP)
@@ -196,8 +193,6 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureConfigurationButton() {
 
-        assert minecraft != null;
-
         this.configurationButton = BookmarkButtonBuilder.create()
                 .setButtonStyle(BookmarkButtonType.BOOKMARK_CONFIGURATION)
                 .setOnClick(() -> {
@@ -216,8 +211,6 @@ public abstract class ArdaMapsScreen extends Screen {
      * Configures the guide button, opens ArdaCraft in game guide restoring the last sub-page.
      */
     private void configureGuideButton() {
-
-        assert minecraft != null;
 
         this.guideButton = BookmarkButtonBuilder.create()
                 .setButtonStyle(BookmarkButtonType.BOOKMARK_GUIDE)
@@ -247,7 +240,7 @@ public abstract class ArdaMapsScreen extends Screen {
      * @param context The DrawContext used for rendering the background.
      */
     @Override
-    public void extractBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    public void extractBackground(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         super.extractBackground(context, mouseX, mouseY, delta);
         extractModBackground(context);

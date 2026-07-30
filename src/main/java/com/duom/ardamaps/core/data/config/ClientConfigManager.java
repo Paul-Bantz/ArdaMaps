@@ -135,7 +135,7 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
             if (explorationData != null) {
 
                 var position = location.getPosition();
-                explored = explorationData.stateAtWorldPos(position.x, position.z);
+                explored = explorationData.stateAtWorldPos(position.x(), position.z());
             }
 
             location.synchronizeProgress(explored, visited);

@@ -189,7 +189,7 @@ public class ToposcopeRenderer {
             if (!ArdaMapsClient.CONFIG.isMapRevealAll()) {
 
                 // Skip if location is hidden in exploration
-                var explorationState = exploration.stateAtWorldPos(location.getPosition().x, location.getPosition().z);
+                var explorationState = exploration.stateAtWorldPos(location.getPosition().x(), location.getPosition().z());
                 if (explorationState == ExplorationState.HIDDEN) continue;
             }
 
@@ -223,8 +223,8 @@ public class ToposcopeRenderer {
         for (var group : groups) {
 
             // Stable sort by world position so the render order never changes between frames
-            group.sort(Comparator.comparingDouble((ScreenMappedLocation loc) -> loc.location.getPosition().x)
-                    .thenComparingDouble(loc -> loc.location.getPosition().z));
+            group.sort(Comparator.comparingDouble((ScreenMappedLocation loc) -> loc.location.getPosition().x())
+                    .thenComparingDouble(loc -> loc.location.getPosition().z()));
 
             // Compute the average screen position of all group members as a stable anchor
             float sumX = 0, sumY = 0;
@@ -407,7 +407,7 @@ public class ToposcopeRenderer {
      */
     public static Optional<Waypoint> getLocationActiveWaypoint(LocationClient location) {
 
-        return ArdaMapsClient.CONFIG.getWaypointAtCoordinates(Client.currentDimensionId(), location.getPosition().x, location.getPosition().z, 5);
+        return ArdaMapsClient.CONFIG.getWaypointAtCoordinates(Client.currentDimensionId(), location.getPosition().x(), location.getPosition().z(), 5);
     }
 
     /**

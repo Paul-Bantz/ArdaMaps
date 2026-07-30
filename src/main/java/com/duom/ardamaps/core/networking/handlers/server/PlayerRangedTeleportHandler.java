@@ -38,7 +38,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import net.minecraft.world.entity.Relative;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,7 +113,7 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
 
             if (candidateY.isPresent()) {
                 double y = candidateY.getAsDouble();
-                player.teleportTo(serverWorld, x, y, z, Set.<Relative>of(), player.getYRot(), player.getXRot(), true);
+                player.teleportTo(serverWorld, x, y, z, Set.of(), player.getYRot(), player.getXRot(), true);
                 responder.accept(new PlayerTeleportResponsePacket(true, x, y, z));
                 return;
             }

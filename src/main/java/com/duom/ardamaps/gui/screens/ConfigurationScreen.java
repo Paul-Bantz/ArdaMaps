@@ -36,21 +36,22 @@ import com.duom.ardamaps.gui.widgets.builders.CheckboxBuilder;
 import com.duom.ardamaps.gui.widgets.builders.DropdownBuilder;
 import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.util.Util;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Tuple;
+import net.minecraft.util.Util;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Arrays;
 import java.util.List;
@@ -185,8 +186,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         super.init();
 
-        assert minecraft != null;
-
         configureUnitSystemDropdown();
         configureCompassOpacitySlider();
         configureExplorationToggle();
@@ -285,8 +284,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     private void configureUnitSystemDropdown() {
 
-        assert minecraft != null;
-
         unitSystemDropdown = DropdownBuilder.<UnitSystem, TextIdentifierPairItem>create()
                 .setSize(BUTTON_WIDTH, BUTTON_HEIGHT)
                 .setOptions(Arrays.asList(UnitSystem.values()))
@@ -306,8 +303,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * Configure the slider for the compass opacity option, including its initial value, its display message and its onValueChanged behaviour to update the configuration.
      */
     private void configureCompassOpacitySlider() {
-
-        assert minecraft != null;
 
         var currentOpacity = ArdaMapsClient.CONFIG.getCompassOpacity();
         compassOpacitySlider = new AbstractSliderButton(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT, CommonComponents.EMPTY, currentOpacity) {
@@ -340,8 +335,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     private void configureExplorationToggle() {
 
-        assert minecraft != null;
-
         revealAllCheckbox = CheckboxBuilder.create()
                 .setSize(BUTTON_WIDTH, BUTTON_HEIGHT)
                 .setChecked(ArdaMapsClient.CONFIG.isMapRevealAll())
@@ -362,8 +355,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     private void configureOpenConfigurationDirectoryButton() {
 
-        assert minecraft != null;
-
         configDirectoryButton = Button.builder(
                         Component.translatable("ardamaps.client.generic.open"),
                         button -> Util.getPlatform().openFile(FabricLoader.getInstance().getConfigDir().resolve("arda-maps").toFile()))
@@ -376,8 +367,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * Configure the button for resetting exploration progress, including its onClick behaviour to display the confirmation dialog when clicked.
      */
     private void configureResetExplorationData() {
-
-        assert minecraft != null;
 
         resetExplorationButton = Button.builder(
                         Component.translatable("ardamaps.client.map.screen.configuration.reset_exploration"),
@@ -493,7 +482,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
                                                               double currentDrawDistance,
                                                               int minValue,
                                                               int maxValue) {
-        assert minecraft != null;
 
         var baseSliderValue = Mth.clamp((currentDrawDistance - minValue) / (maxValue - minValue), 0, 1);
 
@@ -529,7 +517,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param delta   the time delta since the last render call
      */
     @Override
-    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         renderConfigurationUi(context, mouseX, mouseY, delta);
 
@@ -817,15 +805,11 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * Handle mouse clicks for the configuration screen, including clicks on the options widgets and the confirmation dialog buttons.
      * When a confirmation dialog is displayed, only the buttons in the dialog are clickable.
      *
-     * @param mouseX the x position of the mouse cursor
-     * @param mouseY the y position of the mouse cursor
-     * @param button the mouse button that was clicked
+     * @param event the initiator event
      * @return true if the click was handled by the configuration screen, false otherwise
      */
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        double mouseX = event.x();
-        double mouseY = event.y();
+    public boolean mouseClicked(@NonNull MouseButtonEvent event, boolean doubleClick) {
 
         if (isDisplayingConfirmationDialog()) {
 

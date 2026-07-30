@@ -60,14 +60,15 @@ import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -263,7 +264,7 @@ public class MapScreen extends ArdaMapsScreen {
         var defaultSelection = selectedDimension != null ? selectedDimension : Client.currentDimension();
 
         // Default may be null if the dimension was not configured server-side. Handle gracefully.
-        if (defaultSelection == null && !dimensions.isEmpty()) defaultSelection = dimensions.get(0);
+        if (defaultSelection == null && !dimensions.isEmpty()) defaultSelection = dimensions.getFirst();
 
         dimensionSelectionDropdown = MapDropdownBuilder.<Dimension, TextIdentifierPairItem>create()
                 .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
@@ -336,7 +337,7 @@ public class MapScreen extends ArdaMapsScreen {
                 .setOnSelect(this::mapLayerSelectionChanged)
                 .setDisplayIcons(true)
                 .setDisplayLabels(false)
-                .setSelected(previousSelection != null ? previousSelection : mapLayers.get(0))
+                .setSelected(previousSelection != null ? previousSelection : mapLayers.getFirst())
                 .setDisplayArrows(false)
                 .setExpandDirection(DropdownWidget.ExpandDirection.UP_LEFT)
                 .build();
@@ -383,7 +384,7 @@ public class MapScreen extends ArdaMapsScreen {
                 : new ArrayList<>();
 
         if (!ranges.isEmpty() && (selectedRange == null || !ranges.contains(selectedRange)))
-            selectedRange = ranges.get(0);
+            selectedRange = ranges.getFirst();
 
         rangeSelectionWidget.setRanges(ranges);
         rangeSelectionWidget.setSelected(selectedRange);
@@ -475,7 +476,7 @@ public class MapScreen extends ArdaMapsScreen {
         if (!layer.hasRanges()) return null;
 
         Double playerY = Client.playerPositionY();
-        return playerY == null ? layer.ranges().get(0) : layer.rangeForY(playerY);
+        return playerY == null ? layer.ranges().getFirst() : layer.rangeForY(playerY);
     }
 
     /**
@@ -487,10 +488,7 @@ public class MapScreen extends ArdaMapsScreen {
      * @param delta   The time since last frame
      */
     @Override
-    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-
-        // Client should not be null here
-        assert minecraft != null;
+    public void extractRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         if (mapRenderer != null) {
 
@@ -715,6 +713,8 @@ public class MapScreen extends ArdaMapsScreen {
 
         if (getCamera() == null) return;
 
+        if (regionNameUnderMouse == null) return;
+
         var textWidth = font.width(regionNameUnderMouse);
         var labelWidth = textWidth + 32;
         var labelHeight = font.lineHeight + 24;
@@ -760,7 +760,7 @@ public class MapScreen extends ArdaMapsScreen {
     @Override
     public void tick() {
         var mapCamera = getCamera();
-        if (minecraft != null && mapCamera != null) {
+        if (mapCamera != null) {
 
             var contentArea = getPaddedContentArea();
 
@@ -1090,7 +1090,7 @@ public class MapScreen extends ArdaMapsScreen {
      */
     private @Nullable Vec2d getSidePanelFocusedCameraWorldOffset(MapCamera mapCamera, Vec3d locationPosition, double zoom) {
 
-        if (locationPosition.x == 0 && locationPosition.z == 0) return null;
+        if (locationPosition.x() == 0 && locationPosition.z() == 0) return null;
 
         // Centre left part of the viewport on location
         var paddedContentArea = getPaddedContentArea();
@@ -1103,7 +1103,7 @@ public class MapScreen extends ArdaMapsScreen {
         var translationX = worldLeftCenter.x() - worldViewportCenter.x();
         var translationY = worldLeftCenter.y() - worldViewportCenter.y();
 
-        return new Vec2d(locationPosition.x - translationX, locationPosition.z - translationY);
+        return new Vec2d(locationPosition.x() - translationX, locationPosition.z() - translationY);
     }
 
     /**
@@ -1171,7 +1171,7 @@ public class MapScreen extends ArdaMapsScreen {
         var mouseOverLocation = markerRenderer.getMouseOverLocation();
         if (mouseOverLocation != null) {
 
-            switchToLayerContaining(mouseOverLocation.getPosition().y);
+            switchToLayerContaining(mouseOverLocation.getPosition().y());
             panAndSelectLocation(mouseOverLocation, false);
 
             anyLocationClicked = true;

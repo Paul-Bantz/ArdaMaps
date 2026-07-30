@@ -35,6 +35,7 @@ import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2f;
+import org.jspecify.annotations.NonNull;
 
 /**
  * GUI render state for a single BlueMap tile shader pass.
@@ -90,7 +91,7 @@ public record BlueMapTileRenderState(
     }
 
     @Override
-    public void buildVertices(VertexConsumer vertexConsumer) {
+    public void buildVertices(@NonNull VertexConsumer vertexConsumer) {
 
         vertex(vertexConsumer, x0, y0, 0.0F, 0.0F);
         vertex(vertexConsumer, x0, y1, 0.0F, vMax);
@@ -99,13 +100,13 @@ public record BlueMapTileRenderState(
     }
 
     @Override
-    public RenderPipeline pipeline() {
+    public @NonNull RenderPipeline pipeline() {
 
         return BlueMapTileShader.blueMapTile();
     }
 
     @Override
-    public TextureSetup textureSetup() {
+    public @NonNull TextureSetup textureSetup() {
 
         var textureView = Minecraft.getInstance().getTextureManager().getTexture(texture).getTextureView();
         return TextureSetup.singleTexture(textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));

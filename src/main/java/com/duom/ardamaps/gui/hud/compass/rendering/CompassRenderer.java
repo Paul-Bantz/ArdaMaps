@@ -341,7 +341,7 @@ public class CompassRenderer {
             if (!ArdaMapsClient.CONFIG.isMapRevealAll()) {
 
                 // Do not project hidden locations - they should not appear on the compass at all
-                var explorationState = exploration.stateAtWorldPos(location.getPosition().x, location.getPosition().z);
+                var explorationState = exploration.stateAtWorldPos(location.getPosition().x(), location.getPosition().z());
                 if (explorationState == ExplorationState.HIDDEN) continue;
             }
 

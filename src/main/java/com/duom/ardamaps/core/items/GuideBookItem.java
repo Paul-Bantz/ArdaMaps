@@ -54,7 +54,7 @@ public class GuideBookItem extends Item {
      * @return The styled display name of the item.
      */
     @Override
-    public @NonNull Component getName(ItemStack stack) {
+    public @NonNull Component getName(@NonNull ItemStack stack) {
         return Component.translatable("ardamaps.mod.item.name")
                 .setStyle(Style.EMPTY.withColor(0xD4A017).withItalic(false));
     }

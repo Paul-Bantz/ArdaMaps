@@ -36,6 +36,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,7 +151,7 @@ public record RegionsLutResponsePacket(UUID requestId, RegionLookupTexture data)
     }
 
     @Override
-    public CustomPacketPayload.Type<RegionsLutResponsePacket> type() {
+    public CustomPacketPayload.@NonNull Type<RegionsLutResponsePacket> type() {
         return TYPE;
     }
 

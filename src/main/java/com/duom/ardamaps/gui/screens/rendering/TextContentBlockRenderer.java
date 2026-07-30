@@ -364,9 +364,9 @@ public final class TextContentBlockRenderer {
 
                 renderBlockquoteLayout(context, blockquoteLayout, topX, topY, startY, bottomY, mouseX, mouseY, renderResult);
 
-            } else if (layout instanceof LineBreakLayout lineBreakLayout) {
+            } else if (layout instanceof LineBreakLayout(int height)) {
 
-                renderResult.totalHeight += lineBreakLayout.height();
+                renderResult.totalHeight += height;
             } else if (layout instanceof TitleLayout titleLayout) {
 
                 renderTitleLayout(context, titleLayout, topX, topY, startY, bottomY, renderResult);

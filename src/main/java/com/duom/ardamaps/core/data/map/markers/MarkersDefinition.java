@@ -34,6 +34,10 @@ import com.duom.ardamaps.gui.ModConstants;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.SerializedName;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,10 +47,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.resources.Resource;
-import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
  * Defines the configuration for map markers, including visual properties and available marker types.
@@ -145,7 +145,7 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
 
             MarkerType markerType = getMarkerType(location.getTypes().isEmpty() ?
                     null :
-                    location.getTypes().get(0).toUpperCase());
+                    location.getTypes().getFirst().toUpperCase());
 
             location.setIcon(ModConstants.id(markerType.icon()));
             location.setColor(markerType.color());

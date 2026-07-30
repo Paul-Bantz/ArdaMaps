@@ -47,9 +47,9 @@ public class Vec3dTypeAdapter implements JsonSerializer<Vec3d>, JsonDeserializer
     @Override
     public JsonElement serialize(Vec3d src, Type typeOfSrc, JsonSerializationContext context) {
         JsonObject obj = new JsonObject();
-        obj.addProperty("x", src.x);
-        obj.addProperty("y", src.y);
-        obj.addProperty("z", src.z);
+        obj.addProperty("x", src.x());
+        obj.addProperty("y", src.y());
+        obj.addProperty("z", src.z());
         return obj;
     }
 

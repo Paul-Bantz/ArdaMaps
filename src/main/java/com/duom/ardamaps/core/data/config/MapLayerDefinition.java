@@ -175,7 +175,7 @@ public record MapLayerDefinition(@SerializedName("layer") String layer, @Seriali
 
         if (!hasRanges()) return path();
 
-        MapLayerRange range = y == null ? ranges.get(0) : rangeForY(y);
+        MapLayerRange range = y == null ? ranges.getFirst() : rangeForY(y);
         return range == null ? path() : range.path();
     }
 
@@ -252,6 +252,7 @@ public record MapLayerDefinition(@SerializedName("layer") String layer, @Seriali
      * @param o The object to compare with.
      * @return true if the objects are equal, false otherwise.
      */
+    @SuppressWarnings("DeconstructionCanBeUsed")
     @Override
     public boolean equals(Object o) {
 

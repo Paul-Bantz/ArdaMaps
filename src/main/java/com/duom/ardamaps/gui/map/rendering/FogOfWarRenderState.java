@@ -35,6 +35,7 @@ import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2f;
+import org.jspecify.annotations.NonNull;
 
 /**
  * GUI render state for the fog-of-war parchment/mask shader pass.
@@ -86,7 +87,7 @@ public record FogOfWarRenderState(
     }
 
     @Override
-    public void buildVertices(VertexConsumer vertexConsumer) {
+    public void buildVertices(@NonNull VertexConsumer vertexConsumer) {
 
         vertex(vertexConsumer, x0, y0, 0.0F, 0.0F, paperU0, paperV0);
         vertex(vertexConsumer, x0, y1, 0.0F, 1.0F, paperU0, paperV1);
@@ -95,13 +96,13 @@ public record FogOfWarRenderState(
     }
 
     @Override
-    public RenderPipeline pipeline() {
+    public @NonNull RenderPipeline pipeline() {
 
         return FogOfWarShader.fogOfWar();
     }
 
     @Override
-    public TextureSetup textureSetup() {
+    public @NonNull TextureSetup textureSetup() {
 
         var textureManager = Minecraft.getInstance().getTextureManager();
         var paperView = textureManager.getTexture(paperTexture).getTextureView();

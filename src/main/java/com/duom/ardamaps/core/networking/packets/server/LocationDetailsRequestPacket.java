@@ -33,6 +33,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 
 import java.util.UUID;
 
@@ -67,7 +68,7 @@ public record LocationDetailsRequestPacket(UUID requestId, String locationIdenti
     }
 
     @Override
-    public CustomPacketPayload.Type<LocationDetailsRequestPacket> type() {
+    public CustomPacketPayload.@NonNull Type<LocationDetailsRequestPacket> type() {
         return TYPE;
     }
 }

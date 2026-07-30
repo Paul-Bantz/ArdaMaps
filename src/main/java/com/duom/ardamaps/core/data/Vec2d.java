@@ -51,8 +51,8 @@ public record Vec2d(double x, double y) {
      * @return The distance between the two vectors.
      */
     public double distanceTo(Vec3d vec) {
-        double d = vec.x - this.x;
-        double e = vec.z - this.y;
+        double d = vec.x() - this.x;
+        double e = vec.z() - this.y;
         return Math.sqrt(d * d + e * e);
     }
 

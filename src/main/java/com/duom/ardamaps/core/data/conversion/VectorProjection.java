@@ -51,9 +51,9 @@ public class VectorProjection {
         // Calculate the position relative to the camera
         net.minecraft.world.phys.Vec3 cameraPosition = camera.position();
         net.minecraft.world.phys.Vec3 relativePosition = new net.minecraft.world.phys.Vec3(
-                worldPos.x - cameraPosition.x,
-                worldPos.y - cameraPosition.y,
-                worldPos.z - cameraPosition.z
+                worldPos.x() - cameraPosition.x,
+                worldPos.y() - cameraPosition.y,
+                worldPos.z() - cameraPosition.z
         );
 
         // Project through the camera's live view-rotation-projection matrix.
@@ -95,7 +95,7 @@ public class VectorProjection {
      */
     public static float projectToHorizontalAngle(Vec3d worldPos) {
 
-        return projectToHorizontalAngle(worldPos.x, worldPos.z);
+        return projectToHorizontalAngle(worldPos.x(), worldPos.z());
     }
 
     /**

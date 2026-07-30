@@ -35,13 +35,6 @@ import com.duom.ardamaps.gui.screens.rendering.TextContentBlockRenderer;
 import com.duom.ardamaps.gui.widgets.ScrollbarWidget;
 import com.duom.ardamaps.gui.widgets.StyledButtonWidget;
 import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
-import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Function;
-import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -52,6 +45,14 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
+import net.minecraft.util.Util;
+import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.lwjgl.glfw.GLFW;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
 
 /**
  * Displays the ArdaMaps in-game guide loaded from {@code assets/ardamaps/guide/guide.json}.
@@ -314,7 +315,7 @@ public class GuideScreen extends ArdaMapsScreen {
         // Load guide.html in parallel with the book – shown on right page in PAGE_LIST state
         GuideLoader.loadHtml("guide.html").thenAccept(html -> {
             List<ContentBlock> parsed = html.isBlank() ? null : HtmlConverter.parseBlocks(html);
-            assert minecraft != null;
+
             minecraft.execute(() -> {
                 landingContent = parsed;
                 loadingLanding = false;
@@ -327,7 +328,6 @@ public class GuideScreen extends ArdaMapsScreen {
 
             GuideSearchIndex.preloadIfNeeded(book);
 
-            assert minecraft != null;
             minecraft.execute(() -> {
 
                 rebuildPageButtons();
@@ -437,7 +437,7 @@ public class GuideScreen extends ArdaMapsScreen {
         if (guideBook != null && pageIndex >= 0 && pageIndex < guideBook.getPages().size()) {
             var entries = guideBook.getPages().get(pageIndex).getEntries();
             if (!entries.isEmpty()) {
-                selectEntry(entries.get(0), 0);
+                selectEntry(entries.getFirst(), 0);
             }
         }
     }
@@ -477,7 +477,6 @@ public class GuideScreen extends ArdaMapsScreen {
                     ? List.of(new ContentBlock.TextBlock(Component.literal("(no content)")))
                     : HtmlConverter.parseBlocks(html);
 
-            assert minecraft != null;
             minecraft.execute(() -> {
                 currentContent = parsed;
                 loadingEntry = false;
@@ -611,7 +610,7 @@ public class GuideScreen extends ArdaMapsScreen {
      * the standard Minecraft overlay elements (tooltips, etc.).</p>
      */
     @Override
-    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         renderGuideUi(context, mouseX, mouseY, delta);
         super.extractRenderState(context, mouseX, mouseY, delta);
     }
@@ -974,8 +973,8 @@ public class GuideScreen extends ArdaMapsScreen {
             }
 
             ClickEvent clickEvent = lastHoveredContentStyle.getClickEvent();
-            if (clickEvent instanceof ClickEvent.OpenUrl openUrl) {
-                String url = openUrl.uri().toString();
+            if (clickEvent instanceof ClickEvent.OpenUrl(java.net.URI uri)) {
+                String url = uri.toString();
                 if (!url.isBlank()) {
                     Minecraft mc = Minecraft.getInstance();
                     mc.setScreen(new ConfirmLinkScreen(confirmed -> {

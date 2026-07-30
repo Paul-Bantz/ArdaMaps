@@ -158,11 +158,11 @@ public class MapMarkerRenderer {
 
         for (var location : locations) {
 
-            if (location.getPosition().x == 0 && location.getPosition().z == 0) continue;
+            if (location.getPosition().x() == 0 && location.getPosition().z() == 0) continue;
             if (!revealAll && !location.isVisible()) continue;
 
             var landmarkScreenPos = mapCamera.worldToScreenCoordinates(
-                    location.getPosition().x, location.getPosition().z);
+                    location.getPosition().x(), location.getPosition().z());
 
             int screenX = (int) landmarkScreenPos.x();
             int screenY = (int) landmarkScreenPos.y();
@@ -177,7 +177,7 @@ public class MapMarkerRenderer {
                     && !mouseOverWidgets;
 
             var isFocused = Objects.equals(location.getPosition(), focusedLocationPosition);
-            var outOfRange = selectedRange != null && !selectedRange.containsY(location.getPosition().y);
+            var outOfRange = selectedRange != null && !selectedRange.containsY(location.getPosition().y());
 
             if (mouseOverLocation == null && isMouseOver)
                 mouseOverLocation = location;
@@ -201,7 +201,7 @@ public class MapMarkerRenderer {
                     mouseOveredMarker.x(),
                     mouseOveredMarker.y(),
                     false,
-                    selectedRange != null && !selectedRange.containsY(location.getPosition().y));
+                    selectedRange != null && !selectedRange.containsY(location.getPosition().y()));
 
             if (idx == mouseOverMarkers.size() - 1) {
                 mouseOverLocation = location;

@@ -354,7 +354,7 @@ class RangeSelectionWidgetTest {
         List<MapLayerRange> ranges = ranges(10);
         RangeSelectionWidget widget = widget(ranges, selected, true);
 
-        widget.setSelected(ranges.get(0));
+        widget.setSelected(ranges.getFirst());
 
         assertTrue(widget.mouseScrolled(50, 10, 0, -1));
         assertEquals(0, widget.getSelectedIndex());
@@ -428,7 +428,7 @@ class RangeSelectionWidgetTest {
         widget.onRelease(mouse(widget.stripX() + widget.viewportWidth() - 1, 10));
 
         assertEquals(9, widget.getSelectedIndex());
-        assertEquals(9, selected.get(0).index());
+        assertEquals(9, selected.getFirst().index());
 
         widget.centerOn(4);
         widget.onClick(mouse(widget.stripX() + widget.viewportWidth() - 1, 10), false);
@@ -509,6 +509,7 @@ class RangeSelectionWidgetTest {
          * @param onSelect    callback invoked when a range is selected
          * @param controlDown whether the control key should be reported as pressed
          */
+        @SuppressWarnings("SameParameterValue")
         TestRangeSelectionWidget(int x, int y, int width, int height, Component label, List<MapLayerRange> ranges,
                                  int itemWidth, java.util.function.Consumer<MapLayerRange> onSelect,
                                  boolean controlDown) {
@@ -529,6 +530,7 @@ class RangeSelectionWidgetTest {
         }
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static MouseButtonEvent mouse(double x, double y) {
         return new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0));
     }

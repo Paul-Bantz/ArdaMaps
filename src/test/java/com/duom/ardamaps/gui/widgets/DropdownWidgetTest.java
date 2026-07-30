@@ -25,9 +25,9 @@
 
 package com.duom.ardamaps.gui.widgets;
 
-import net.minecraft.network.chat.Component;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.MouseButtonInfo;
+import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -118,6 +118,7 @@ class DropdownWidgetTest {
         assertEquals("c", widget.getSelected());
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static MouseButtonEvent mouse(double x, double y) {
         return new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0));
     }

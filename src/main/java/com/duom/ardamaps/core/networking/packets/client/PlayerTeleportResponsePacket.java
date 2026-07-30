@@ -33,6 +33,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 
 import java.util.UUID;
 
@@ -104,7 +105,7 @@ public record PlayerTeleportResponsePacket(UUID requestId, boolean success, doub
     }
 
     @Override
-    public CustomPacketPayload.Type<PlayerTeleportResponsePacket> type() {
+    public CustomPacketPayload.@NonNull Type<PlayerTeleportResponsePacket> type() {
         return TYPE;
     }
 }

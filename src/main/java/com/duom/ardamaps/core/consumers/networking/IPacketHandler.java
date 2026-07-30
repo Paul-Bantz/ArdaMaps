@@ -25,10 +25,10 @@
 
 package com.duom.ardamaps.core.consumers.networking;
 
-import net.minecraft.resources.Identifier;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /**
  * Interface for handling network packets.
@@ -38,6 +38,7 @@ public interface IPacketHandler {
     /**
      * Get the channel ID for this packet handler.
      */
+    @SuppressWarnings("unused")
     Identifier getChannelId();
 
     /**

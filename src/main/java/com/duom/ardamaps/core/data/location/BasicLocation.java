@@ -84,9 +84,9 @@ public class BasicLocation implements Serializable {
         stream.writeObject(pathfinder);
 
         if (position != null) {
-            stream.writeDouble(position.x);
-            stream.writeDouble(position.y);
-            stream.writeDouble(position.z);
+            stream.writeDouble(position.x());
+            stream.writeDouble(position.y());
+            stream.writeDouble(position.z());
         } else {
             stream.writeDouble(Double.NaN);
             stream.writeDouble(Double.NaN);

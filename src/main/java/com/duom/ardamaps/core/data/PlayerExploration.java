@@ -152,6 +152,7 @@ public class PlayerExploration implements Serializable {
      * @param dimensionId The ID of the dimension (e.g. "minecraft:overworld").
      * @return A new PlayerExploration instance for the specified dimension, or null if the dimension is not found in the config.
      */
+    @SuppressWarnings("unused")
     public static @Nullable PlayerExploration create(String dimensionId) {
 
         var dimension = ArdaMapsClient.CONFIG.getDimension(dimensionId);

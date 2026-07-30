@@ -52,9 +52,9 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.navigation.FocusNavigationEvent;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
@@ -188,7 +188,7 @@ public class SidePanelWidget implements GuiEventListener {
 
         setWaypointButton = StyledButtonBuilder.create()
                 .setText(Component.translatable("ardamaps.client.generic.set.waypoint"))
-                .setOnClick(() -> ArdaMapsClient.CONFIG.setWaypoint(displayedLocation.getPosition().x, displayedLocation.getPosition().z, displayedLocation.getWorld()))
+                .setOnClick(() -> ArdaMapsClient.CONFIG.setWaypoint(displayedLocation.getPosition().x(), displayedLocation.getPosition().z(), displayedLocation.getWorld()))
                 .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
                 .build();
 
@@ -247,8 +247,8 @@ public class SidePanelWidget implements GuiEventListener {
         } else {
 
             PacketRegistry.PLAYER_TELEPORT_REQUEST.send(new PlayerTeleportPacket(
-                    displayedLocation.getPosition().x,
-                    displayedLocation.getPosition().z,
+                    displayedLocation.getPosition().x(),
+                    displayedLocation.getPosition().z(),
                     displayedLocation.getWorld()));
         }
     }
@@ -487,7 +487,6 @@ public class SidePanelWidget implements GuiEventListener {
         // Handle hover tooltip and click events
         Style hoveredStyle = result.hoveredStyle;
         if (hoveredStyle != null) {
-            if (hoveredStyle.getHoverEvent() != null)
 
             if (clicked && hoveredStyle.getClickEvent() instanceof ClickEvent.OpenUrl) {
                 handleLinkClick(hoveredStyle.getClickEvent());
@@ -530,9 +529,9 @@ public class SidePanelWidget implements GuiEventListener {
         // Check that the teleport and set waypoint doesn't lead to world origin
         if (displayedLocation.getPosition() != null) {
 
-            if (displayedLocation.getPosition().x == 0
-                    && displayedLocation.getPosition().y == 0
-                    && displayedLocation.getPosition().z == 0)
+            if (displayedLocation.getPosition().x() == 0
+                    && displayedLocation.getPosition().y() == 0
+                    && displayedLocation.getPosition().z() == 0)
 
                 return;
         }
@@ -581,9 +580,9 @@ public class SidePanelWidget implements GuiEventListener {
      */
     private void handleLinkClick(ClickEvent clickEvent) {
 
-        if (parent instanceof MapScreen && clickEvent instanceof ClickEvent.OpenUrl openUrl) {
+        if (parent instanceof MapScreen && clickEvent instanceof ClickEvent.OpenUrl(java.net.URI uri)) {
 
-            ((MapScreen) parent).panAndSelectLocation(ArdaMapsClient.CONFIG.getLocation(openUrl.uri().toString()), false);
+            ((MapScreen) parent).panAndSelectLocation(ArdaMapsClient.CONFIG.getLocation(uri.toString()), false);
         }
     }
 
@@ -627,7 +626,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @return False as the event is not handled
      */
     @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
+    public boolean mouseReleased(@NonNull MouseButtonEvent event) {
         return false;
     }
 
@@ -642,7 +641,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @return False as the event is not handled
      */
     @Override
-    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+    public boolean mouseDragged(@NonNull MouseButtonEvent event, double deltaX, double deltaY) {
         return false;
     }
 
@@ -684,7 +683,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @return False as the event is not handled
      */
     @Override
-    public boolean keyPressed(KeyEvent event) {
+    public boolean keyPressed(@NonNull KeyEvent event) {
         return false;
     }
 
@@ -697,18 +696,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @return False as the event is not handled
      */
     @Override
-    public boolean keyReleased(KeyEvent event) {
-        return false;
-    }
-
-    /**
-     * Handles character typing events for the side panel. Unimplemented as keyboard interaction is not required.
-     *
-     * @param chr       The character that was typed
-     * @param modifiers Any modifier keys that were held during typing
-     * @return False as the event is not handled
-     */
-    public boolean charTyped(char chr, int modifiers) {
+    public boolean keyReleased(@NonNull KeyEvent event) {
         return false;
     }
 
@@ -719,7 +707,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @return Null as navigation paths are not implemented
      */
     @Override
-    public @Nullable ComponentPath nextFocusPath(FocusNavigationEvent navigation) {
+    public @Nullable ComponentPath nextFocusPath(@NonNull FocusNavigationEvent navigation) {
         return null;
     }
 

@@ -343,8 +343,7 @@ public class ClientCommands {
                 Files.createDirectories(dir);
 
                 Path output = dir.resolve("fov_dump.png");
-                if (texture.getPixels() != null) texture.getPixels().writeToFile(output);
-                else LOGGER.error("FoW texture image is null");
+                texture.getPixels().writeToFile(output);
 
             } catch (IOException e) {
                 LOGGER.error("Failed to dump FoW texture", e);

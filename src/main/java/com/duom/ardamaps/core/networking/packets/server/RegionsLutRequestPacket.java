@@ -33,6 +33,8 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
+
 import java.util.Date;
 import java.util.UUID;
 
@@ -88,7 +90,7 @@ public record RegionsLutRequestPacket(UUID requestId, Date date) implements IRes
     }
 
     @Override
-    public CustomPacketPayload.Type<RegionsLutRequestPacket> type() {
+    public CustomPacketPayload.@NonNull Type<RegionsLutRequestPacket> type() {
         return TYPE;
     }
 }

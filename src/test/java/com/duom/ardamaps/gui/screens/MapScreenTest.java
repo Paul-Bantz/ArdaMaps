@@ -66,7 +66,7 @@ class MapScreenTest {
         List<MapLayerDefinition> dropdownLayers = MapLayerDropdownOptions.forDimension(dimension);
 
         assertEquals(List.of(layer), dropdownLayers);
-        assertSame(layer, dropdownLayers.get(0));
+        assertSame(layer, dropdownLayers.getFirst());
         assertNotSame(dimension.getMapLayers(), dropdownLayers);
     }
 

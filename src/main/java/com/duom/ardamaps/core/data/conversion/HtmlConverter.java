@@ -238,7 +238,7 @@ public class HtmlConverter {
 
             if (!buf.hasContent && !blocks.isEmpty()) {
 
-                var previousBlock = blocks.get(blocks.size()-1);
+                var previousBlock = blocks.getLast();
 
                 // If we are following a line break, strip leading whitespaces
                 if (previousBlock instanceof ContentBlock.LineBreakBlock) {
@@ -333,7 +333,7 @@ public class HtmlConverter {
                     itemBuf.flushTo(ignored);
 
                     for (ContentBlock b : ignored) {
-                        if (b instanceof ContentBlock.TextBlock tb) itemText.append(tb.text());
+                        if (b instanceof ContentBlock.TextBlock(MutableComponent text)) itemText.append(text);
                     }
                 }
                 items.add(itemText);
@@ -499,8 +499,8 @@ public class HtmlConverter {
         bqBuf.flushTo(bqBlocks);
 
         for (ContentBlock b : bqBlocks) {
-            if (b instanceof ContentBlock.TextBlock tb) {
-                blocks.add(new ContentBlock.BlockquoteBlock(tb.text()));
+            if (b instanceof ContentBlock.TextBlock(MutableComponent text)) {
+                blocks.add(new ContentBlock.BlockquoteBlock(text));
             } else if (b instanceof ContentBlock.LineBreakBlock) {
                 blocks.add(new ContentBlock.BlockquoteBlock(Component.literal("\n")));
             } else {
@@ -639,7 +639,7 @@ public class HtmlConverter {
 
                     var exploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState().get(resolvedLocation.getWorld());
 
-                    if (exploration != null && exploration.isWorldPosExplored(locationPosition.x, locationPosition.z, 0)) {
+                    if (exploration != null && exploration.isWorldPosExplored(locationPosition.x(), locationPosition.z(), 0)) {
 
                         if (resolvedLocation.isVisited()) {
 

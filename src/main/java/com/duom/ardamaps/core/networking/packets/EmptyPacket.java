@@ -31,6 +31,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A packet with no data.
@@ -46,6 +47,7 @@ public record EmptyPacket() implements IPacket {
      * @param buf The PacketByteBuf to read from (ignored)
      * @return A new instance of EmptyPacket
      */
+    @SuppressWarnings("unused")
     public static EmptyPacket read(@SuppressWarnings("unused") FriendlyByteBuf buf) {
         return new EmptyPacket();
     }
@@ -61,7 +63,7 @@ public record EmptyPacket() implements IPacket {
     }
 
     @Override
-    public CustomPacketPayload.Type<EmptyPacket> type() {
+    public CustomPacketPayload.@NonNull Type<EmptyPacket> type() {
         return TYPE;
     }
 }

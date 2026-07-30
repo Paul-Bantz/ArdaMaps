@@ -76,6 +76,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -561,7 +562,7 @@ public class ArdaMapsClient implements ClientModInitializer {
                     .filter(location -> location.getExplorationState().ordinal() < ExplorationState.REVEALED.ordinal())
                     .filter(location -> {
                         Vec3d pos = location.getPosition();
-                        return pos != null && exploration.isWorldPosExplored(pos.x, pos.z, 0);
+                        return pos != null && exploration.isWorldPosExplored(pos.x(), pos.z(), 0);
                     })
                     .forEach(location -> location.updateExplorationState(ExplorationState.REVEALED));
 
@@ -676,13 +677,13 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         /** The identifier for this resource reload listener, used to distinguish it from other listeners. */
         @Override
-        public Identifier getFabricId() {
+        public @NonNull Identifier getFabricId() {
             return ModConstants.modId("markers_loader");
         }
 
         /** Loads all custom shaders when client resources are reloaded. */
         @Override
-        public void onResourceManagerReload(ResourceManager manager) {
+        public void onResourceManagerReload(@NonNull ResourceManager manager) {
 
             MarkersManager.reload();
         }
@@ -695,12 +696,12 @@ public class ArdaMapsClient implements ClientModInitializer {
     private static class GuideImageCacheReloadListener implements SimpleSynchronousResourceReloadListener {
 
         @Override
-        public Identifier getFabricId() {
+        public @NonNull Identifier getFabricId() {
             return ModConstants.modId("guide_image_cache");
         }
 
         @Override
-        public void onResourceManagerReload(ResourceManager manager) {
+        public void onResourceManagerReload(@NonNull ResourceManager manager) {
             GuideImageCache.clear();
         }
     }

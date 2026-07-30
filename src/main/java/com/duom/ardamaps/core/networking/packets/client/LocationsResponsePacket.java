@@ -38,6 +38,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -154,7 +155,7 @@ public record LocationsResponsePacket(UUID requestId, LocationConfig<LocationCli
     }
 
     @Override
-    public CustomPacketPayload.Type<LocationsResponsePacket> type() {
+    public CustomPacketPayload.@NonNull Type<LocationsResponsePacket> type() {
         return TYPE;
     }
 

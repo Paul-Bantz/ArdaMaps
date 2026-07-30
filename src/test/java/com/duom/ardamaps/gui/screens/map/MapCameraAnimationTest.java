@@ -128,6 +128,7 @@ class MapCameraAnimationTest {
          *
          * @param now The initial mocked time in milliseconds.
          */
+        @SuppressWarnings("SameParameterValue")
         private MutableClock(long now) {
             this.now = now;
         }
@@ -161,6 +162,7 @@ class MapCameraAnimationTest {
          * @param worldZ Initial world Z.
          * @param zoom   Initial zoom.
          */
+        @SuppressWarnings("SameParameterValue")
         private FakeCamera(double worldX, double worldZ, double zoom) {
             this.worldX = worldX;
             this.worldZ = worldZ;

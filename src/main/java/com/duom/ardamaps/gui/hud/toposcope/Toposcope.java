@@ -188,7 +188,7 @@ public class Toposcope {
                 ArdaMapsClient.CONFIG.removeWaypoint(activeWaypoint.get());
             } else {
                 var pos = location.getPosition();
-                ArdaMapsClient.CONFIG.setWaypoint(pos.x, pos.z, location.getWorld());
+                ArdaMapsClient.CONFIG.setWaypoint(pos.x(), pos.z(), location.getWorld());
             }
         }
 
@@ -228,9 +228,9 @@ public class Toposcope {
 
             } else {
 
-                PlayerTeleportPacket packet = new PlayerTeleportPacket(hoveredLocation.getPosition().x,
-                        hoveredLocation.getPosition().y,
-                        hoveredLocation.getPosition().z,
+                PlayerTeleportPacket packet = new PlayerTeleportPacket(hoveredLocation.getPosition().x(),
+                        hoveredLocation.getPosition().y(),
+                        hoveredLocation.getPosition().z(),
                         Client.currentDimensionId());
 
                 PacketRegistry.PLAYER_TELEPORT_REQUEST.send(packet);

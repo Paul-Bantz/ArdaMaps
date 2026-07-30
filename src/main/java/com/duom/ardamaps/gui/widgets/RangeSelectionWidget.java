@@ -288,7 +288,7 @@ public class RangeSelectionWidget extends AbstractWidget {
      * @param delta   The frame delta.
      */
     @Override
-    protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    protected void extractWidgetRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         if (!visible) return;
 
@@ -494,7 +494,7 @@ public class RangeSelectionWidget extends AbstractWidget {
      * @param mouseY The mouse Y coordinate where the press was released.
      */
     @Override
-    public void onRelease(MouseButtonEvent event) {
+    public void onRelease(@NonNull MouseButtonEvent event) {
 
         if (!dragMoved) selectIndex(indexAt(event.x(), event.y()));
         dragging = false;
@@ -587,7 +587,7 @@ public class RangeSelectionWidget extends AbstractWidget {
      * @param builder The narration message builder.
      */
     @Override
-    protected void updateWidgetNarration(NarrationElementOutput builder) {
+    protected void updateWidgetNarration(@NonNull NarrationElementOutput builder) {
 
         defaultButtonNarrationText(builder);
     }
@@ -781,6 +781,7 @@ public class RangeSelectionWidget extends AbstractWidget {
      * @param max   The maximum allowed coordinate.
      * @return The clamped coordinate.
      */
+    @SuppressWarnings("SameParameterValue")
     static int clampToScreen(int value, int min, int max) {
 
         if (max < min) return min;

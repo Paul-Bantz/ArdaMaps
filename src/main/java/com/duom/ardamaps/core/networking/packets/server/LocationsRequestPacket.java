@@ -33,6 +33,8 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
+
 import java.util.Date;
 import java.util.UUID;
 
@@ -85,7 +87,7 @@ public record LocationsRequestPacket(UUID requestId, Date date) implements IResp
     }
 
     @Override
-    public CustomPacketPayload.Type<LocationsRequestPacket> type() {
+    public CustomPacketPayload.@NonNull Type<LocationsRequestPacket> type() {
         return TYPE;
     }
 }

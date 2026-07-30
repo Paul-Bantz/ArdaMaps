@@ -32,6 +32,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Packet sent by the server to teleport the player to a specific location, optionally in a specific world.
@@ -90,7 +91,7 @@ public record PlayerTeleportPacket(double x, double y, double z, String worldId)
     }
 
     @Override
-    public CustomPacketPayload.Type<PlayerTeleportPacket> type() {
+    public CustomPacketPayload.@NonNull Type<PlayerTeleportPacket> type() {
         return TYPE;
     }
 }

@@ -29,15 +29,15 @@ import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 
 /**
  * A custom dropdown widget for the map GUI that supports displaying options with both text and icons.
@@ -217,7 +217,7 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
             }
         }
 
-        if (displayLabels) {
+        if (displayLabels && label != null) {
 
             int textX = x + (getWidth() - textRenderer.width(label)) / 2;
 

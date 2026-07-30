@@ -26,8 +26,8 @@
 package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.data.Vec3d;
-import com.duom.ardamaps.core.data.location.BasicLocation;
 import com.duom.ardamaps.core.data.config.LocationConfig;
+import com.duom.ardamaps.core.data.location.BasicLocation;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import net.minecraft.network.FriendlyByteBuf;
@@ -68,7 +68,7 @@ class LocationsResponsePacketTest {
         assertNotNull(parsed.data());
         assertEquals(config.getLastUpdate(), parsed.data().getLastUpdate());
         assertEquals(1, parsed.data().getLocations().size());
-        LocationClient parsedLocation = parsed.data().getLocations().get(0);
+        LocationClient parsedLocation = parsed.data().getLocations().getFirst();
         assertEquals(location.getId(), parsedLocation.getId());
         assertEquals(locationName(location), locationName(parsedLocation));
         assertEquals(location.getWorld(), parsedLocation.getWorld());

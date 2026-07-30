@@ -36,7 +36,8 @@ import java.util.List;
 import java.util.OptionalDouble;
 import java.util.function.IntFunction;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link PlayerRangedTeleportHandler} teleport candidate search order.
@@ -80,8 +81,8 @@ class PlayerRangedTeleportHandlerTest {
     @Test
     void helpersReturnEmptyForEmptyOrInvalidIntervals() {
 
-        assertTrue(PlayerRangedTeleportHandler.scanUpward(4, 3, y -> OptionalDouble.of(y)).isEmpty());
-        assertTrue(PlayerRangedTeleportHandler.scanDownward(4, 3, y -> OptionalDouble.of(y)).isEmpty());
+        assertTrue(PlayerRangedTeleportHandler.scanUpward(4, 3, OptionalDouble::of).isEmpty());
+        assertTrue(PlayerRangedTeleportHandler.scanDownward(4, 3, OptionalDouble::of).isEmpty());
         assertTrue(PlayerRangedTeleportHandler.scanUpward(4, 4, y -> OptionalDouble.empty()).isEmpty());
         assertTrue(PlayerRangedTeleportHandler.scanDownward(4, 4, y -> OptionalDouble.empty()).isEmpty());
     }
@@ -213,9 +214,9 @@ class PlayerRangedTeleportHandlerTest {
         var bounds = new PlayerRangedTeleportHandler.VerticalBounds(0, 10);
 
         assertTrue(PlayerRangedTeleportHandler.findTeleportCandidate(4, 6, bounds, y -> OptionalDouble.empty()).isEmpty());
-        assertTrue(PlayerRangedTeleportHandler.findTeleportCandidate(20, 30, bounds, y -> OptionalDouble.of(y)).isEmpty());
+        assertTrue(PlayerRangedTeleportHandler.findTeleportCandidate(20, 30, bounds, OptionalDouble::of).isEmpty());
         assertTrue(PlayerRangedTeleportHandler.findTeleportCandidate(4, 6,
-                new PlayerRangedTeleportHandler.VerticalBounds(10, 0), y -> OptionalDouble.of(y)).isEmpty());
+                new PlayerRangedTeleportHandler.VerticalBounds(10, 0), OptionalDouble::of).isEmpty());
     }
 
     /**

@@ -39,6 +39,7 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -189,7 +190,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
     }
 
     @Override
-    protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    protected void extractWidgetRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         renderMainButton(context, mouseX, mouseY);
 
@@ -486,13 +487,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
     }
 
     /**
-     * Overrides the default click behaviour to toggle dropdown expansion and handle item selection.
-     *
-     * @param mouseX The x-coordinate of the mouse click event
-     * @param mouseY The y-coordinate of the mouse click event
-     * @return true if the click was handled, false otherwise
-     */
-    /**
      * Checks if the mouse is over the dropdown widget or its expanded area.
      *
      * @param mouseX The x-coordinate of the mouse cursor
@@ -597,7 +591,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      * @param builder The narration message builder to which narration messages should be appended
      */
     @Override
-    protected void updateWidgetNarration(NarrationElementOutput builder) {
+    protected void updateWidgetNarration(@NonNull NarrationElementOutput builder) {
         defaultButtonNarrationText(builder);
     }
 

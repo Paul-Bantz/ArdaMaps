@@ -34,6 +34,7 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A styled button widget that displays an image.
@@ -104,7 +105,7 @@ public class BookmarkButtonWidget extends AbstractWidget {
      * @param delta   time delta (in seconds) since the last render call
      */
     @Override
-    protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    protected void extractWidgetRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         if (!visible) return;
 
@@ -246,7 +247,7 @@ public class BookmarkButtonWidget extends AbstractWidget {
      * @param mouseY current y position of the mouse cursor in screen pixels
      */
     @Override
-    public void onClick(MouseButtonEvent event, boolean doubleClick) {
+    public void onClick(@NonNull MouseButtonEvent event, boolean doubleClick) {
 
         if (!visible) return;
 
@@ -263,7 +264,7 @@ public class BookmarkButtonWidget extends AbstractWidget {
      * @param builder the {@link NarrationElementOutput} to append messages to
      */
     @Override
-    protected void updateWidgetNarration(NarrationElementOutput builder) {
+    protected void updateWidgetNarration(@NonNull NarrationElementOutput builder) {
         defaultButtonNarrationText(builder);
     }
 }

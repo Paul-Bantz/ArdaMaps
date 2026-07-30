@@ -33,6 +33,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -215,7 +216,7 @@ public record PlayerExplorationPacket(String dimensionId,
     }
 
     @Override
-    public CustomPacketPayload.Type<PlayerExplorationPacket> type() {
+    public CustomPacketPayload.@NonNull Type<PlayerExplorationPacket> type() {
         return TYPE;
     }
 
@@ -234,11 +235,13 @@ public record PlayerExplorationPacket(String dimensionId,
     @Override
     public boolean equals(Object obj) {
 
-        if (!(obj instanceof PlayerExplorationPacket that)) return false;
+        if (!(obj instanceof PlayerExplorationPacket(
+                String id, String regionId1, List<List<Vec2d>> polygon, List<List<Vec2d>> regionPolygon1
+        ))) return false;
 
-        return Objects.equals(dimensionId, that.dimensionId) &&
-                Objects.equals(regionId, that.regionId) &&
-                Objects.equals(parentRegionPolygon, that.parentRegionPolygon) &&
-                Objects.equals(regionPolygon, that.regionPolygon);
+        return Objects.equals(dimensionId, id) &&
+                Objects.equals(regionId, regionId1) &&
+                Objects.equals(parentRegionPolygon, polygon) &&
+                Objects.equals(regionPolygon, regionPolygon1);
     }
 }

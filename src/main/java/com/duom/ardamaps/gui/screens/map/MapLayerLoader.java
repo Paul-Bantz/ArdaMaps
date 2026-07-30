@@ -114,7 +114,7 @@ public class MapLayerLoader {
         if (selectedDimension == null || !selectedDimension.hasRanges()) return null;
 
         return playerY == null
-                ? selectedDimension.getExplorationRanges().get(0)
+                ? selectedDimension.getExplorationRanges().getFirst()
                 : selectedDimension.rangeForY(playerY);
     }
 

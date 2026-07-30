@@ -34,12 +34,11 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.entity.Relative;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Set;
 import java.util.OptionalDouble;
+import java.util.Set;
 
 /**
  * Handler for the PlayerTeleportPacket, responsible for teleporting the player to the specified coordinates,
@@ -112,10 +111,10 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
                             LOGGER.info("Safe position found at: {}, {}, {}", x, teleportY, z);
                         }
 
-                        player.teleportTo(serverWorld, x, teleportY, z, Set.<Relative>of(), player.getYRot(), player.getXRot(), true);
+                        player.teleportTo(serverWorld, x, teleportY, z, Set.of(), player.getYRot(), player.getXRot(), true);
                     } else {
 
-                        player.teleportTo(serverWorld, packet.x(), packet.y(), packet.z(), Set.<Relative>of(), player.getYRot(), player.getXRot(), true);
+                        player.teleportTo(serverWorld, packet.x(), packet.y(), packet.z(), Set.of(), player.getYRot(), player.getXRot(), true);
                     }
 
                     return;

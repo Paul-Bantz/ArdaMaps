@@ -57,8 +57,8 @@ class MapSourceResponsePacketTest {
         assertTrue(parsed.warpsAvailable());
         assertFalse(parsed.ardaRegionsAvailable());
         assertEquals(1, parsed.dimensions().size());
-        assertEquals(layer(null), parsed.dimensions().get(0).getMapLayers().get(0));
-        assertNull(parsed.dimensions().get(0).getMapLayers().get(0).ranges());
+        assertEquals(layer(null), parsed.dimensions().getFirst().getMapLayers().getFirst());
+        assertNull(parsed.dimensions().getFirst().getMapLayers().getFirst().ranges());
     }
 
     /**
@@ -113,9 +113,9 @@ class MapSourceResponsePacketTest {
 
         assertFalse(parsed.warpsAvailable());
         assertTrue(parsed.ardaRegionsAvailable());
-        assertEquals(ranges, parsed.dimensions().get(0).getMapLayers().get(0).ranges());
-        assertNull(parsed.dimensions().get(0).getMapLayers().get(0).path());
-        assertEquals(layer(ranges), parsed.dimensions().get(0).getMapLayers().get(0));
+        assertEquals(ranges, parsed.dimensions().getFirst().getMapLayers().getFirst().ranges());
+        assertNull(parsed.dimensions().getFirst().getMapLayers().getFirst().path());
+        assertEquals(layer(ranges), parsed.dimensions().getFirst().getMapLayers().getFirst());
     }
 
     /**
@@ -137,7 +137,7 @@ class MapSourceResponsePacketTest {
         MapSourceResponsePacket parsed = MapSourceResponsePacket.read(buf);
 
         assertEquals(1, parsed.dimensions().size());
-        assertTrue(parsed.dimensions().get(0).getMapLayers().isEmpty());
+        assertTrue(parsed.dimensions().getFirst().getMapLayers().isEmpty());
     }
 
     /**

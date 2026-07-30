@@ -32,6 +32,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Packet sent by the server to warp the player to a specific location
@@ -65,7 +66,7 @@ public record PlayerWarpPacket(String warpName) implements IPacket {
     }
 
     @Override
-    public CustomPacketPayload.Type<PlayerWarpPacket> type() {
+    public CustomPacketPayload.@NonNull Type<PlayerWarpPacket> type() {
         return TYPE;
     }
 }

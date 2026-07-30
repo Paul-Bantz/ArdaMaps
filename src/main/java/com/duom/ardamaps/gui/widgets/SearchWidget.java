@@ -39,6 +39,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.FormattedCharSequence;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.*;
@@ -274,7 +275,7 @@ public class SearchWidget extends Screen {
 
         if (keyCode == GLFW.GLFW_KEY_ENTER
                 && !searchResults.isEmpty()
-                && searchResults.get(0) instanceof Button buttonWidget) {
+                && searchResults.getFirst() instanceof Button buttonWidget) {
 
             buttonWidget.onPress(event);
             return true;
@@ -304,7 +305,6 @@ public class SearchWidget extends Screen {
     @Override
     public void onClose() {
 
-        assert this.minecraft != null;
         this.minecraft.setScreen(parent);
     }
 
@@ -332,7 +332,7 @@ public class SearchWidget extends Screen {
      * @param delta   frame delta time
      */
     @Override
-    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         // Render this screen as an overlay - force mouse position to -1 so that mouse events don't interact
         if (parent != null) {
