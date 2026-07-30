@@ -55,6 +55,7 @@ public class PMTilesHttpTileProvider extends PMTilesProvider {
 
         HttpRangeReader rangeReader = HttpRangeReader.builder()
                 .uri(URI.create(uri))
+                .httpClient(DelegatingHttpClient.create())
                 .build();
 
         RangeReader diskCached = DiskCachingRangeReader.builder(rangeReader)

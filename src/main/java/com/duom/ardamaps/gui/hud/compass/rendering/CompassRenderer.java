@@ -195,7 +195,6 @@ public class CompassRenderer {
 
         projectLocations(ArdaMapsClient.NEAR_LOCATIONS, exploration);
 
-        int zOffset = 0;
         for (var entry : projectedLocations) {
 
             float x = angleToScreenX(playerYaw, entry.angle(), centerX);
@@ -209,11 +208,9 @@ public class CompassRenderer {
                 alpha = Math.min(alpha, globalAlpha);
 
                 if (entry.location().isRevealed())
-                    drawLocationIcon(context, alpha, x, entry.location().getIcon(), zOffset);
+                    drawLocationIcon(context, alpha, x, entry.location().getIcon());
                 else
-                    drawUnknownLocationSprite(context, alpha, x, zOffset);
-
-                zOffset++;
+                    drawUnknownLocationSprite(context, alpha, x);
             }
         }
     }
@@ -298,6 +295,7 @@ public class CompassRenderer {
      * @param centerX      the centre of the screen
      * @param globalAlpha  the transparency of the compass
      */
+    @SuppressWarnings("SuspiciousNameCombination")
     private static void renderCardinals(GuiGraphicsExtractor context, float yaw, int centerX, float globalAlpha) {
 
         for (Cardinal cardinal : CARDINALS) {
@@ -435,9 +433,8 @@ public class CompassRenderer {
      * @param alpha         the alpha value
      * @param x             the x position on the screen
      * @param textureToDraw the texture to draw
-     * @param zOffset       the z offset on which to draw the icon
      */
-    private static void drawLocationIcon(GuiGraphicsExtractor context, float alpha, float x, Identifier textureToDraw, int zOffset) {
+    private static void drawLocationIcon(GuiGraphicsExtractor context, float alpha, float x, Identifier textureToDraw) {
 
         if (textureToDraw == null) return;
 
@@ -457,9 +454,8 @@ public class CompassRenderer {
      * @param context the draw context
      * @param alpha   the alpha value
      * @param x       the x position on the screen
-     * @param zOffset the z offset on which to draw the icon
      */
-    private static void drawUnknownLocationSprite(GuiGraphicsExtractor context, float alpha, float x, int zOffset) {
+    private static void drawUnknownLocationSprite(GuiGraphicsExtractor context, float alpha, float x) {
 
         context.pose().pushMatrix();
         context.pose().translate(x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET);

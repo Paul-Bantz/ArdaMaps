@@ -277,7 +277,7 @@ public class MapMarkerRenderer {
      * @param mouseX           The current mouse X coordinate.
      * @param mouseY           The current mouse Y coordinate.
      */
-    @SuppressWarnings({"ConstantValue", "resource"})
+    @SuppressWarnings({"ConstantValue"})
     private void renderWaypoint(GuiGraphicsExtractor context, Font textRenderer, MapCamera mapCamera, MapFrameRenderer mapFrameRenderer,
                                 int framePadding, int mouseX, int mouseY) {
 

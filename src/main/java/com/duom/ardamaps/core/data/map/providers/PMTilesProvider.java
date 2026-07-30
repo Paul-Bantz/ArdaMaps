@@ -132,9 +132,13 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
 
         if (reader != null) {
             try {
+
                 reader.close();
+
             } catch (IOException e) {
+
                 LOGGER.warn("Failed to close PMTiles reader", e);
+
             } finally {
                 reader = null;
             }

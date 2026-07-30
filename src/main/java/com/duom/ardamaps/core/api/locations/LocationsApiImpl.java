@@ -46,7 +46,7 @@ public class LocationsApiImpl implements ILocationsApi {
     /** Class logger. */
     private static final Logger LOGGER = LoggerFactory.getLogger(LocationsApiImpl.class);
 
-    /** The source for the locations data. */
+    /** The source for the location data. */
     private @Nullable Supplier<CompletableFuture<List<ApiLocation>>> locationSource;
 
     @Override
