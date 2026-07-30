@@ -43,10 +43,18 @@ import java.util.UUID;
  *
  * @param details The LocationDetails object containing the information about the location.
  */
-public record LocationDetailsResponsePacket(UUID requestId, LocationDetails details) implements IRespondablePacket<LocationDetailsResponsePacket> {
+public record LocationDetailsResponsePacket(UUID requestId,
+                                            LocationDetails details) implements IRespondablePacket<LocationDetailsResponsePacket> {
+
     public static final CustomPacketPayload.Type<LocationDetailsResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_details_response"));
+
     public static final StreamCodec<RegistryFriendlyByteBuf, LocationDetailsResponsePacket> CODEC = IPacket.codec(LocationDetailsResponsePacket::read);
 
+    /**
+     * Constructs a LocationDetailsResponsePacket with location details.
+     *
+     * @param details The location details to include in the response.
+     */
     public LocationDetailsResponsePacket(LocationDetails details) {
         this(new UUID(0L, 0L), details);
     }
@@ -59,11 +67,11 @@ public record LocationDetailsResponsePacket(UUID requestId, LocationDetails deta
      */
     public static LocationDetailsResponsePacket read(FriendlyByteBuf buf) {
 
-        return new LocationDetailsResponsePacket(buf.readUUID(), new LocationDetails(buf.readUtf(),  buf.readBoolean(), buf.readUtf(), buf.readUtf()));
+        return new LocationDetailsResponsePacket(buf.readUUID(), new LocationDetails(buf.readUtf(), buf.readBoolean(), buf.readUtf(), buf.readUtf()));
     }
 
     /**
-     * Builds a PacketByteBuf from this LocationDetailsResponsePacket.
+     * Serializes this packet into a PacketByteBuf for transmission over the network.
      *
      * @return A PacketByteBuf representing this LocationDetailsResponsePacket.
      */
@@ -81,6 +89,12 @@ public record LocationDetailsResponsePacket(UUID requestId, LocationDetails deta
         return buf;
     }
 
+    /**
+     * Creates a new LocationDetailsResponsePacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this response.
+     * @return A new LocationDetailsResponsePacket with the updated request identifier.
+     */
     @Override
     public LocationDetailsResponsePacket withRequestId(UUID requestId) {
         return new LocationDetailsResponsePacket(requestId, details);

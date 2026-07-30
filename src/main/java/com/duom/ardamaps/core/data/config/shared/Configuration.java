@@ -58,6 +58,7 @@ public abstract class Configuration<T extends BasicLocation> {
 
     /**
      * Get the given location from its id
+     *
      * @param locationId the identifier of the location to get
      * @return the location
      */

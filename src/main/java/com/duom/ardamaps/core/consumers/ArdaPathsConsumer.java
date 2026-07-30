@@ -40,6 +40,11 @@ public class ArdaPathsConsumer implements ArdaPathsApiEntrypoint, PathfinderProv
     /** ArdaPaths API instance, set when the API is ready. */
     private ArdaPathsApi api;
 
+    /**
+     * Initializes this consumer when the ArdaPaths API becomes ready on the client.
+     *
+     * @param ardaPathsApi the ArdaPaths API instance
+     */
     @Override
     public void onApiReady(ArdaPathsApi ardaPathsApi) {
         if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) return;
@@ -48,6 +53,13 @@ public class ArdaPathsConsumer implements ArdaPathsApiEntrypoint, PathfinderProv
         Pathfinders.register(this);
     }
 
+    /**
+     * Selects a pathfinder path and chapter through the ArdaPaths API if available.
+     *
+     * @param pathId    the path identifier
+     * @param chapterId the chapter identifier
+     * @param teleport  whether to teleport to the chapter start
+     */
     @Override
     public void selectPathAndChapter(String pathId, String chapterId, boolean teleport) {
         if (api == null) return;

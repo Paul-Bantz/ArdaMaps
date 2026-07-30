@@ -43,8 +43,9 @@ public class ExternalLocationSource {
     private static final Logger LOGGER = LoggerFactory.getLogger(ExternalLocationSource.class);
 
     /**
-     * Fetches a list of locations from an external source and returns a completable future
-     * @return a CompletableFuture that will complete with a list of LocationServer objects, or complete exceptionally if no source is registered
+     * Fetches a list of locations from a registered external location source.
+     *
+     * @return A future that completes with the list of server-side location data, or completes exceptionally if no source is registered.
      */
     public static CompletableFuture<List<LocationServer>> fetchLocations() {
 

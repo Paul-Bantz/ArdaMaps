@@ -46,11 +46,11 @@ import java.io.InputStream;
  */
 public class PlayerIcon {
 
-    /** Class logger */
-    private static final Logger LOGGER = LoggerFactory.getLogger(PlayerIcon.class);
-    
     /** The size of the player icon in pixels */
     public static final int ICON_SIZE = 48;
+
+    /** Class logger */
+    private static final Logger LOGGER = LoggerFactory.getLogger(PlayerIcon.class);
 
     /** The player's head icon as a BufferedImage */
     private static Identifier playerIcon;

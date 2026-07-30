@@ -51,14 +51,14 @@ public class CheckboxWidget extends AbstractButton {
     /** Size of the checkbox square (the actual box that is checked/unchecked) */
     private final int size;
 
-    /** Whether the checkbox is currently checked or not */
-    private boolean checked;
-
     /** Whether the checkbox is enabled or not. If false, the checkbox will be rendered in a disabled state and cannot be interacted with. */
     private final boolean enabled;
 
     /** Callback function that is called when the checkbox state changes. The new state of the checkbox (true for checked, false for unchecked) is passed as an argument to the callback. */
     private final Consumer<Boolean> onChange;
+
+    /** Whether the checkbox is currently checked or not */
+    private boolean checked;
 
     /**
      * Creates a new CheckboxWidget with the specified parameters.

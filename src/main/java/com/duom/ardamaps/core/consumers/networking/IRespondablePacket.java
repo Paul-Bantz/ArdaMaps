@@ -33,6 +33,7 @@ import java.util.UUID;
  * @param <T> The concrete packet type.
  */
 public interface IRespondablePacket<T extends IRespondablePacket<T>> extends IPacket {
+
     /**
      * @return The request id correlating a response to a request.
      */

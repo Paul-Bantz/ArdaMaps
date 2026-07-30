@@ -100,20 +100,6 @@ public class ToastWidget {
     }
 
     /**
-     * Creates a new toast with an immediate start time.
-     *
-     * @param message the text to display
-     * @param icon    optional icon identifier (nullable)
-     * @param r          red component of the icon tint (0.0-1.0)
-     * @param g          green component of the icon tint (0.0-1.0)
-     * @param b          blue component of the icon tint (0.0-1).
-     */
-    public ToastWidget(Component message, @Nullable Identifier icon, float r, float g, float b) {
-
-        this(message, icon, System.currentTimeMillis(),  r, g, b);
-    }
-
-    /**
      * Creates a new toast with a specified start time.
      *
      * @param message     the text to display
@@ -130,9 +116,9 @@ public class ToastWidget {
      * @param message     the text to display
      * @param icon        optional icon identifier (nullable)
      * @param startTimeMs the toast display start time
-     * @param r          red component of the icon tint (0.0-1.0)
-     * @param g          green component of the icon tint (0.0-1.0)
-     * @param b          blue component of the icon tint (0.0-1).
+     * @param r           red component of the icon tint (0.0-1.0)
+     * @param g           green component of the icon tint (0.0-1.0)
+     * @param b           blue component of the icon tint (0.0-1).
      */
     public ToastWidget(Component message, @Nullable Identifier icon, long startTimeMs, float r, float g, float b) {
         this.message = message;
@@ -141,6 +127,20 @@ public class ToastWidget {
         this.iconR = r;
         this.iconG = g;
         this.iconB = b;
+    }
+
+    /**
+     * Creates a new toast with an immediate start time.
+     *
+     * @param message the text to display
+     * @param icon    optional icon identifier (nullable)
+     * @param r       red component of the icon tint (0.0-1.0)
+     * @param g       green component of the icon tint (0.0-1.0)
+     * @param b       blue component of the icon tint (0.0-1).
+     */
+    public ToastWidget(Component message, @Nullable Identifier icon, float r, float g, float b) {
+
+        this(message, icon, System.currentTimeMillis(), r, g, b);
     }
 
     /**
@@ -173,7 +173,6 @@ public class ToastWidget {
 
         int x = screenW - toastWidth;
         int y = screenH * 2 / 3;
-
 
         int contentX = x + PADDING;
         int iconY = y + PADDING;

@@ -26,8 +26,9 @@
 package com.duom.ardamaps.gui.widgets.builders;
 
 import com.duom.ardamaps.gui.widgets.CheckboxWidget;
-import java.util.function.Consumer;
 import net.minecraft.network.chat.Component;
+
+import java.util.function.Consumer;
 
 /**
  * Builder class for creating CheckboxWidget instances with a fluent interface.

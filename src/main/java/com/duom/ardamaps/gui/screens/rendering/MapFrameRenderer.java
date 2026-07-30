@@ -94,8 +94,6 @@ public class MapFrameRenderer {
 
         updateIfDirty(layout);
 
-
-
         drawMapFrameTopEdge(context, topLeft, topRight);
         drawMapFrameBottomEdge(context, bottomLeft, bottomRight);
         drawMapFrameLeftEdge(context, topLeft, bottomLeft);

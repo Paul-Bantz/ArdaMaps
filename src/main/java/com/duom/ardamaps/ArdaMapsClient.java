@@ -194,6 +194,23 @@ public class ArdaMapsClient implements ClientModInitializer {
     }
 
     /**
+     * Suppresses warnings from Tileverse's HttpClient close attempts on JDK 25.
+     * <p>
+     * Tileverse 1.4.0 closes its HttpClient via reflection into jdk.internal.net.http, which the JPMS blocks.
+     * The close still succeeds, but warnings are logged and filtered here.
+     */
+    private static void suppressTileverseHttpClientCloseWarning() {
+
+        // tileverse 1.4.0 closes its HttpClient by reflecting into jdk.internal.net.http, which JPMS
+        // blocks on JDK 25. The close still succeeds; only the reflective shutdown path is skipped.
+        java.util.logging.Logger.getLogger("io.tileverse.rangereader.http.HttpRangeReader")
+                .setFilter(record -> {
+                    String message = record.getMessage();
+                    return message == null || !message.startsWith("Error shutting down HttpClient");
+                });
+    }
+
+    /**
      * Registers mod items such as the toposcope and compass.
      */
     private void registerModItems() {
@@ -210,17 +227,6 @@ public class ArdaMapsClient implements ClientModInitializer {
         ResourceLoader loader = ResourceLoader.get(PackType.CLIENT_RESOURCES);
         loader.registerReloadListener(ModConstants.modId("markers_loader"), new MarkersLoaderReloadListener());
         loader.registerReloadListener(ModConstants.modId("guide_image_cache"), new GuideImageCacheReloadListener());
-    }
-
-    private static void suppressTileverseHttpClientCloseWarning() {
-
-        // tileverse 1.4.0 closes its HttpClient by reflecting into jdk.internal.net.http, which JPMS
-        // blocks on JDK 25. The close still succeeds; only the reflective shutdown path is skipped.
-        java.util.logging.Logger.getLogger("io.tileverse.rangereader.http.HttpRangeReader")
-                .setFilter(record -> {
-                    String message = record.getMessage();
-                    return message == null || !message.startsWith("Error shutting down HttpClient");
-                });
     }
 
     /**
@@ -366,11 +372,11 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         // Style guide deep-links in incoming chat and system messages
         ClientReceiveMessageEvents.MODIFY_GAME.register(
-                (message, overlay) -> ArdaMapsChatLinkProcessor.process(message));
+                (message, _) -> ArdaMapsChatLinkProcessor.process(message));
 
         // Player-sent chat cannot be modified directly; intercept, cancel,
         // and re-add the styled version to ChatHud.
-        ClientReceiveMessageEvents.ALLOW_CHAT.register((message, signedMessage, sender, params, receptionTimestamp) -> {
+        ClientReceiveMessageEvents.ALLOW_CHAT.register((message, _, _, _, _) -> {
 
             Component processed = ArdaMapsChatLinkProcessor.process(message);
 

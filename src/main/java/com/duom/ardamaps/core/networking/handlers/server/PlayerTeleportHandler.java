@@ -125,10 +125,10 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
     /**
      * Finds a safe standing Y coordinate for teleportation at the given X and Z coordinates in the specified world.
      *
-     * @param world The world to search in.
+     * @param world  The world to search in.
      * @param player The player whose standing dimensions are being placed.
-     * @param x     The snapped X coordinate to check.
-     * @param z     The snapped Z coordinate to check.
+     * @param x      The snapped X coordinate to check.
+     * @param z      The snapped Z coordinate to check.
      * @return The exact standing Y coordinate, or empty if no safe position is found.
      */
     public static OptionalDouble findSafeY(ServerLevel world, ServerPlayer player, double x, double z) {

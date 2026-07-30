@@ -121,7 +121,6 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
      * @param context The DrawContext used for rendering the button.
      * @param mouseX  The current x-coordinate of the mouse cursor, used for hover detection.
      * @param mouseY  The current y-coordinate of the mouse cursor, used for hover detection.
-     * @param delta   The time delta since the last render call, which can be used for animations or other time-based effects.
      */
     @Override
     protected void renderMainButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {

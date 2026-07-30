@@ -37,14 +37,47 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.UUID;
 
-public record LocationDetailsRequestPacket(UUID requestId, String locationIdentifier) implements IRespondablePacket<LocationDetailsRequestPacket> {
+/**
+ * A packet sent from the client to the server requesting details about a specific location.
+ *
+ * @param requestId          The unique request identifier for tracking the response.
+ * @param locationIdentifier The identifier of the location to request details for.
+ */
+public record LocationDetailsRequestPacket(UUID requestId,
+                                           String locationIdentifier) implements IRespondablePacket<LocationDetailsRequestPacket> {
+
     public static final CustomPacketPayload.Type<LocationDetailsRequestPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_details_request"));
+
     public static final StreamCodec<RegistryFriendlyByteBuf, LocationDetailsRequestPacket> CODEC = IPacket.codec(LocationDetailsRequestPacket::read);
 
+    /**
+     * Constructs a LocationDetailsRequestPacket with the given location identifier.
+     *
+     * @param locationIdentifier The identifier of the location to request details for.
+     */
     public LocationDetailsRequestPacket(String locationIdentifier) {
         this(new UUID(0L, 0L), locationIdentifier);
     }
 
+    /**
+     * Reads a LocationDetailsRequestPacket from the given PacketByteBuf.
+     *
+     * @param buf The PacketByteBuf to read from.
+     * @return A new LocationDetailsRequestPacket instance.
+     */
+    public static LocationDetailsRequestPacket read(FriendlyByteBuf buf) {
+
+        var requestId = buf.readUUID();
+        var location = buf.readUtf();
+
+        return new LocationDetailsRequestPacket(requestId, location);
+    }
+
+    /**
+     * Serializes this packet into a PacketByteBuf for transmission over the network.
+     *
+     * @return A new PacketByteBuf containing the serialized packet data.
+     */
     @Override
     public FriendlyByteBuf build() {
 
@@ -54,14 +87,12 @@ public record LocationDetailsRequestPacket(UUID requestId, String locationIdenti
         return buf;
     }
 
-    public static LocationDetailsRequestPacket read(FriendlyByteBuf buf) {
-
-        var requestId = buf.readUUID();
-        var location = buf.readUtf();
-
-        return new LocationDetailsRequestPacket(requestId, location);
-    }
-
+    /**
+     * Creates a new LocationDetailsRequestPacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this request.
+     * @return A new LocationDetailsRequestPacket with the updated request identifier.
+     */
     @Override
     public LocationDetailsRequestPacket withRequestId(UUID requestId) {
         return new LocationDetailsRequestPacket(requestId, locationIdentifier);

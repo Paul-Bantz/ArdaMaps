@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
- * Tests for {@link DropdownWidget} dropdown layout and click selection behavior.
+ * Tests for {@link DropdownWidget} dropdown layout and click selection behaviour.
  */
 class DropdownWidgetTest {
 
@@ -118,6 +118,13 @@ class DropdownWidgetTest {
         assertEquals("c", widget.getSelected());
     }
 
+    /**
+     * Creates a mouse button event at the supplied screen coordinates.
+     *
+     * @param x The screen X coordinate.
+     * @param y The screen Y coordinate.
+     * @return A mouse button event fixture.
+     */
     @SuppressWarnings("SameParameterValue")
     private static MouseButtonEvent mouse(double x, double y) {
         return new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0));

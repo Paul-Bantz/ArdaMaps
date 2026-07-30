@@ -53,8 +53,11 @@ public class GuidePage {
     @SerializedName("entries")
     private List<GuideEntry> entries;
 
-    /** No-arg constructor required by Gson. */
-    public GuidePage() {}
+    /**
+     * No-arg constructor required by Gson deserialization.
+     */
+    public GuidePage() {
+    }
 
     /**
      * @return an unmodifiable view of the entries in this page; never {@code null}

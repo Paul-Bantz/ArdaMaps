@@ -38,7 +38,7 @@ class LocationNavigationHistoryTest {
 
     /**
      * Verifies that back and forward navigation walk the stored history in order and keep the current cursor coherent.
-     * This protects the basic browser-style navigation behavior used by the map side panel.
+     * This protects the basic browser-style navigation behaviour used by the map side panel.
      */
     @Test
     void pushBackForward_roundTrip() {
@@ -96,7 +96,7 @@ class LocationNavigationHistoryTest {
 
     /**
      * Verifies that history retains only the newest ten entries and evicts the oldest once the cap is exceeded.
-     * This protects the intended bounded-memory behavior and the documented ten-entry limit.
+     * This protects the intended bounded-memory behaviour and the documented ten-entry limit.
      */
     @Test
     void push_overTenEntries_evictsOldest() {

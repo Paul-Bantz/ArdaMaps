@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PlayerExplorationPacketTest {
 
     /**
-     * Negative polygon counts are rejected by the parser and surfaced as an empty packet.
+     * Verifies that negative polygon counts are rejected by the parser and surfaced as an empty packet.
      */
     @Test
     void read_negativePolygonCount_returnsEmptyPacket() {
@@ -51,7 +51,7 @@ class PlayerExplorationPacketTest {
     }
 
     /**
-     * Oversized polygon counts are rejected by the parser and surfaced as an empty packet.
+     * Verifies that oversized polygon counts are rejected by the parser and surfaced as an empty packet.
      */
     @Test
     void read_oversizedPolygonCount_returnsEmptyPacket() {

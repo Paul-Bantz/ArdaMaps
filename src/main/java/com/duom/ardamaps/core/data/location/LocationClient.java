@@ -76,22 +76,20 @@ public class LocationClient extends BasicLocation implements Serializable {
     private transient boolean visited;
 
     /**
-     * The current exploration state for this location. This field is hydrated when client progress is loaded. */
+     * The current exploration state for this location. This field is hydrated when client progress is loaded.
+     */
     @Setter
     @Getter
     private transient ExplorationState explorationState;
 
-    /** Default constructor */
+    /**
+     * Gets the marker colour for this location.
+     *
+     * @return The marker colour in ARGB format; uses unknown type colour if not revealed.
+     */
     public int getColor() {
 
         return isRevealed() ? color : MarkersManager.get().unknownType().color();
-    }
-
-    /**
-     * @return The identifier for the marker icon texture.  Depending on the exploration state of the location
-     */
-    public Identifier getIcon() {
-        return (isRevealed() || isVisited()) ? icon : ModConstants.id(MarkersManager.get().unknownType().icon());
     }
 
     /**
@@ -105,49 +103,6 @@ public class LocationClient extends BasicLocation implements Serializable {
         }
 
         return ArdaMapsClient.CONFIG.isMapRevealAll() || explorationState.ordinal() > ExplorationState.VISIBLE.ordinal();
-    }
-
-    /**
-     * @return Whether the location is visible - i.e., the area's fog of war is partially uncovered
-     */
-    public boolean isVisible(){
-
-        return ArdaMapsClient.CONFIG.isMapRevealAll() || explorationState != ExplorationState.HIDDEN;
-    }
-
-    /**
-     * @return the name of the location or a translatable placeholder for the given location depending on the
-     *  exploration state of the location
-     */
-    @Override
-    public String getName() {
-
-        if (isVisited() || ArdaMapsClient.CONFIG.isMapRevealAll()) return super.getName();
-
-        return explorationState.ordinal() > ExplorationState.VISIBLE.ordinal() ?
-                super.getName() : Component.translatable("ardamaps.location.unknown").getString();
-    }
-
-    /**
-     * Updates the exploration status of this location. Only if its current state is lower than the new state.
-     * Progress is persisted in {@link com.duom.ardamaps.core.data.config.client.ClientProgress} as such progress is
-     * updated in parallel.
-     *
-     * @param state The exploration state to set for this location
-     */
-    public void updateExplorationState(ExplorationState state) {
-
-        if (explorationState != null && state.ordinal() > explorationState.ordinal())
-            this.explorationState = state;
-        else if (explorationState ==  null)
-            this.explorationState = state;
-    }
-
-    /**
-     * @return the highlight colour
-     */
-    public int getHighlightColor() {
-        return isRevealed() ? highlightColor : MarkersManager.get().unknownType().highlightColor();
     }
 
     /**
@@ -175,13 +130,65 @@ public class LocationClient extends BasicLocation implements Serializable {
     }
 
     /**
+     * Gets the marker icon texture identifier for this location.
+     *
+     * @return The icon identifier based on the location's exploration state; unknown type icon if hidden.
+     */
+    public Identifier getIcon() {
+        return (isRevealed() || isVisited()) ? icon : ModConstants.id(MarkersManager.get().unknownType().icon());
+    }
+
+    /**
+     * @return Whether the location is visible - i.e., the area's fog of war is partially uncovered
+     */
+    public boolean isVisible() {
+
+        return ArdaMapsClient.CONFIG.isMapRevealAll() || explorationState != ExplorationState.HIDDEN;
+    }
+
+    /**
+     * @return the name of the location or a translatable placeholder for the given location depending on the
+     * exploration state of the location
+     */
+    @Override
+    public String getName() {
+
+        if (isVisited() || ArdaMapsClient.CONFIG.isMapRevealAll()) return super.getName();
+
+        return explorationState.ordinal() > ExplorationState.VISIBLE.ordinal() ?
+                super.getName() : Component.translatable("ardamaps.location.unknown").getString();
+    }
+
+    /**
+     * Updates the exploration status of this location. Only if its current state is lower than the new state.
+     * Progress is persisted in {@link com.duom.ardamaps.core.data.config.client.ClientProgress} as such progress is
+     * updated in parallel.
+     *
+     * @param state The exploration state to set for this location
+     */
+    public void updateExplorationState(ExplorationState state) {
+
+        if (explorationState != null && state.ordinal() > explorationState.ordinal())
+            this.explorationState = state;
+        else if (explorationState == null)
+            this.explorationState = state;
+    }
+
+    /**
+     * @return the highlight colour
+     */
+    public int getHighlightColor() {
+        return isRevealed() ? highlightColor : MarkersManager.get().unknownType().highlightColor();
+    }
+
+    /**
      * Synchronize the current exploration (state and visited flag) for this Location. This method is only supposed
      * to be called when client configuration s loaded and {@link com.duom.ardamaps.core.data.config.client.ClientProgress}
      * has been set.
      * It bypasses the client progress update in the setters.
      *
      * @param state   the exploration state for this location
-     * @param visited  whether this location has been visited
+     * @param visited whether this location has been visited
      */
     public void synchronizeProgress(ExplorationState state, boolean visited) {
 

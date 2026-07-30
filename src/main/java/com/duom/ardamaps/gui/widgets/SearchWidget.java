@@ -62,6 +62,15 @@ public class SearchWidget extends Screen {
     /** Maximum tooltip width before wrapping to multiple lines. */
     private static final int TOOLTIP_MAX_WIDTH = 220;
 
+    /** Rendered result elements currently attached to this screen. */
+    private final List<GuiEventListener> searchResults;
+
+    /** Tooltip text associated with each rendered result button. */
+    private final Map<Button, Component> resultTooltips;
+
+    /** Parent screen rendered underneath this overlay. */
+    private final ArdaMapsScreen parent;
+
     /** Maps a result object to the label shown in the results list. */
     private Function<Object, String> elementAsString;
 
@@ -78,15 +87,6 @@ public class SearchWidget extends Screen {
 
     /** Editable text field used to enter the search query. */
     private SimpleTextFieldWidget searchField;
-
-    /** Rendered result elements currently attached to this screen. */
-    private final List<GuiEventListener> searchResults;
-
-    /** Tooltip text associated with each rendered result button. */
-    private final Map<Button, Component> resultTooltips;
-
-    /** Parent screen rendered underneath this overlay. */
-    private final ArdaMapsScreen parent;
 
     /** Last query processed, used to avoid redundant recalculation. */
     private String cachedSearchString;
@@ -121,7 +121,7 @@ public class SearchWidget extends Screen {
         this.searchField.setResponder(this::onSearchChanged);
 
         addRenderableWidget(Button.builder(Component.literal("X"),
-                        (buttonWidget) -> onClose())
+                        (_) -> onClose())
                 .size(ModConstants.SMALL_SQUARED_BUTTON_SIZE, ModConstants.SMALL_SQUARED_BUTTON_SIZE)
                 .pos(width - ModConstants.SMALL_SQUARED_BUTTON_SIZE - 10, 10)
                 .build());
@@ -200,6 +200,15 @@ public class SearchWidget extends Screen {
     }
 
     /**
+     * Closes this overlay and restores the parent screen.
+     */
+    @Override
+    public void onClose() {
+
+        this.minecraft.setScreen(parent);
+    }
+
+    /**
      * Returns a substring of {@code source} centered around the first occurrence
      * of {@code searchString} (case-insensitive), fitting within {@code maxChars}
      * characters, with "…" ellipses appended/prepended as needed.
@@ -228,6 +237,35 @@ public class SearchWidget extends Screen {
     }
 
     /**
+     * Builds text where each occurrence of {@code searchString} in {@code source}
+     * is highlighted with the provided colour.
+     */
+    @SuppressWarnings("SameParameterValue")
+    private static MutableComponent buildHighlightedText(String source, String searchString, int highlightColor) {
+        String safeSource = source == null ? "" : source;
+        if (searchString == null || searchString.isEmpty()) {
+            return Component.literal(safeSource);
+        }
+
+        String lowerSource = safeSource.toLowerCase();
+        String lowerSearch = searchString.toLowerCase();
+
+        MutableComponent text = Component.empty();
+        int start = 0;
+        int index;
+
+        while ((index = lowerSource.indexOf(lowerSearch, start)) != -1) {
+            text.append(Component.literal(safeSource.substring(start, index)));
+            text.append(Component.literal(safeSource.substring(index, index + searchString.length()))
+                    .withStyle(style -> style.withColor(highlightColor)));
+            start = index + searchString.length();
+        }
+
+        text.append(Component.literal(safeSource.substring(start)));
+        return text;
+    }
+
+    /**
      * Builds a clickable button entry for a search result.
      *
      * @param result      rendered label text for the result
@@ -241,7 +279,7 @@ public class SearchWidget extends Screen {
 
         return Button.builder(
                         result,
-                        button -> this.resultSelected(element))
+                        _ -> this.resultSelected(element))
                 .size(ModConstants.BUTTON_WIDTH * 2, height)
                 .pos(searchField.getX(), searchField.getY() + 5 + resultIndex * height)
                 .build();
@@ -264,9 +302,7 @@ public class SearchWidget extends Screen {
      * Handles key press events for the side panel. Handle ENTER key press when results are displayed. First element is
      * selected.
      *
-     * @param keyCode   The code of the key that was pressed
-     * @param scanCode  The scan code of the key that was pressed
-     * @param modifiers Any modifier keys that were held during the key press
+     * @param event the initiating key event
      * @return True if event was consumed
      */
     @Override
@@ -300,18 +336,8 @@ public class SearchWidget extends Screen {
     }
 
     /**
-     * Closes this overlay and restores the parent screen.
-     */
-    @Override
-    public void onClose() {
-
-        this.minecraft.setScreen(parent);
-    }
-
-    /**
      * Resizes the parent and overlay screens when the window size changes.
      *
-     * @param client current Minecraft client instance
      * @param width  new window width
      * @param height new window height
      */
@@ -369,35 +395,6 @@ public class SearchWidget extends Screen {
      */
     public void setResultTooltipFunction(Function<Object, String> elementAsTooltip) {
         this.elementAsTooltip = elementAsTooltip;
-    }
-
-    /**
-     * Builds text where each occurrence of {@code searchString} in {@code source}
-     * is highlighted with the provided colour.
-     */
-    @SuppressWarnings("SameParameterValue")
-    private static MutableComponent buildHighlightedText(String source, String searchString, int highlightColor) {
-        String safeSource = source == null ? "" : source;
-        if (searchString == null || searchString.isEmpty()) {
-            return Component.literal(safeSource);
-        }
-
-        String lowerSource = safeSource.toLowerCase();
-        String lowerSearch = searchString.toLowerCase();
-
-        MutableComponent text = Component.empty();
-        int start = 0;
-        int index;
-
-        while ((index = lowerSource.indexOf(lowerSearch, start)) != -1) {
-            text.append(Component.literal(safeSource.substring(start, index)));
-            text.append(Component.literal(safeSource.substring(index, index + searchString.length()))
-                    .withStyle(style -> style.withColor(highlightColor)));
-            start = index + searchString.length();
-        }
-
-        text.append(Component.literal(safeSource.substring(start)));
-        return text;
     }
 
 }

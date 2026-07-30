@@ -33,7 +33,7 @@ import java.net.URI;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Tests for HTTP image color packing helpers.
+ * Tests for HTTP image colour packing helpers.
  */
 class HttpImageProviderTest {
 

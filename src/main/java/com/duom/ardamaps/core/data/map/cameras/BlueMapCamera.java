@@ -48,7 +48,6 @@ public class BlueMapCamera extends TilesMapCamera {
     @Setter
     private double lodFactor;
 
-
     /**
      * Constructor for BlueMapCamera.
      *
@@ -59,7 +58,7 @@ public class BlueMapCamera extends TilesMapCamera {
      */
     public BlueMapCamera(int viewportWidth, int viewPortHeight, int centerX, int centerY) {
 
-        super(3,1);
+        super(3, 1);
 
         // Fixed at 501px as defined by BlueMap
         this.tileSize = 501;
@@ -80,38 +79,6 @@ public class BlueMapCamera extends TilesMapCamera {
 
         this.viewportWidth = viewportWidth;
         this.viewportHeight = viewPortHeight;
-    }
-
-    /**
-     * Get the current scale factor based on the zoom level.
-     * The scale is calculated using the formula: scale = lodFactor^(identityZoom - zoom).
-     *
-     * @return The current scale factor for rendering, which determines how many pixels correspond to one block in the world.
-     */
-    @Override
-    public double scale() {
-        return scale(zoom);
-    }
-
-    /**
-     * pixels per block: at identityZoom scale=1, zooming out (higher zoom value) reduces scale
-     *
-     * @param zoom Zoom level to calculate scale for
-     * @return Scale factor for the given zoom level, calculated as lodFactor^(identityZoom - zoom)
-     */
-    private double scale(double zoom) {
-
-        return Math.pow(lodFactor, identityZoom - zoom);
-    }
-
-    /**
-     * For BlueMap, the render scale is the same as the camera scale, as tiles are rendered at their displayed size in pixels.
-     *
-     * @return The scale factor for rendering, which is the same as the camera scale in this case.
-     */
-    @Override
-    public double renderScale() {
-        return scale();
     }
 
     /**
@@ -190,19 +157,6 @@ public class BlueMapCamera extends TilesMapCamera {
     }
 
     /**
-     * Get number of blocks per tile for a given LOD level
-     * LOD world footprint: tileSize * lodFactor^(lod-1)
-     *
-     * @param lod LOD level (zoom level of the tile source)
-     * @return Number of blocks per tile for the given LOD level
-     */
-    @Override
-    protected int numberOfBlocksPerTile(int lod) {
-
-        return (int) Math.round(tileSize * Math.pow(lodFactor, lod - 1));
-    }
-
-    /**
      * Convert world coordinates to screen coordinates, taking into account the current camera position and zoom level.
      *
      * @param objWorldX X coordinate in the world
@@ -216,6 +170,28 @@ public class BlueMapCamera extends TilesMapCamera {
                 (objWorldX - worldX) * scale() + viewportWidth / 2.0,
                 (objWorldZ - worldZ) * scale() + viewportHeight / 2.0
         );
+    }
+
+    /**
+     * Get the current scale factor based on the zoom level.
+     * The scale is calculated using the formula: scale = lodFactor^(identityZoom - zoom).
+     *
+     * @return The current scale factor for rendering, which determines how many pixels correspond to one block in the world.
+     */
+    @Override
+    public double scale() {
+        return scale(zoom);
+    }
+
+    /**
+     * pixels per block: at identityZoom scale=1, zooming out (higher zoom value) reduces scale
+     *
+     * @param zoom Zoom level to calculate scale for
+     * @return Scale factor for the given zoom level, calculated as lodFactor^(identityZoom - zoom)
+     */
+    private double scale(double zoom) {
+
+        return Math.pow(lodFactor, identityZoom - zoom);
     }
 
     /**
@@ -261,6 +237,16 @@ public class BlueMapCamera extends TilesMapCamera {
     @Override
     public double getVisualPixelsPerBlock() {
         return this.renderScale();
+    }
+
+    /**
+     * For BlueMap, the render scale is the same as the camera scale, as tiles are rendered at their displayed size in pixels.
+     *
+     * @return The scale factor for rendering, which is the same as the camera scale in this case.
+     */
+    @Override
+    public double renderScale() {
+        return scale();
     }
 
     /**
@@ -341,6 +327,19 @@ public class BlueMapCamera extends TilesMapCamera {
         double screenY = ((tileWorldZ - worldZ) * scale() + viewportHeight / 2.0);
 
         return new Vec2d(screenX, screenY);
+    }
+
+    /**
+     * Get number of blocks per tile for a given LOD level
+     * LOD world footprint: tileSize * lodFactor^(lod-1)
+     *
+     * @param lod LOD level (zoom level of the tile source)
+     * @return Number of blocks per tile for the given LOD level
+     */
+    @Override
+    protected int numberOfBlocksPerTile(int lod) {
+
+        return (int) Math.round(tileSize * Math.pow(lodFactor, lod - 1));
     }
 
     /**

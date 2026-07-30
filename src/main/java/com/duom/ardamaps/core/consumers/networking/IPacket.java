@@ -37,6 +37,7 @@ import java.util.function.Function;
  * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
 public interface IPacket extends CustomPacketPayload {
+
     /**
      * Convert the packet to an instance of the object.
      *
@@ -48,19 +49,21 @@ public interface IPacket extends CustomPacketPayload {
     }
 
     /**
-     * Build the packet.
-     */
-    FriendlyByteBuf build();
-
-    /**
      * Creates a simple payload codec backed by the packet's legacy read/build methods.
      *
      * @param reader The packet reader.
+     * @param <T>    The packet type.
      * @return A StreamCodec for play-phase payload registration.
-     * @param <T> The packet type.
      */
     static <T extends IPacket> StreamCodec<RegistryFriendlyByteBuf, T> codec(Function<FriendlyByteBuf, T> reader) {
 
         return StreamCodec.of((buf, packet) -> buf.writeBytes(packet.build()), reader::apply);
     }
+
+    /**
+     * Builds this packet into a serialized byte buffer.
+     *
+     * @return the packet data encoded in a byte buffer
+     */
+    FriendlyByteBuf build();
 }

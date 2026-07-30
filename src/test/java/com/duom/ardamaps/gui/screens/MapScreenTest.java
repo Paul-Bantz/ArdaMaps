@@ -70,6 +70,12 @@ class MapScreenTest {
         assertNotSame(dimension.getMapLayers(), dropdownLayers);
     }
 
+    /**
+     * Creates a layer fixture with the supplied name.
+     *
+     * @param name The name to assign to the layer.
+     * @return A map layer definition for test setup.
+     */
     @SuppressWarnings("SameParameterValue")
     private static MapLayerDefinition layer(String name) {
 

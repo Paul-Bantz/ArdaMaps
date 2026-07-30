@@ -26,10 +26,17 @@
 package com.duom.ardamaps.core.data.map.tiles;
 
 /**
- * Represents a unique key for a map tile identified by its zoom level (z) and x, y coordinates.
+ * Represents a unique key for a PMTiles map tile identified by its zoom level (z) and x, y coordinates.
  */
 public class PmTileKey extends TileKey {
 
+    /**
+     * Constructs a PmTileKey with the specified zoom level and coordinates.
+     *
+     * @param z The zoom level of the tile.
+     * @param x The x coordinate of the tile.
+     * @param y The y coordinate of the tile.
+     */
     public PmTileKey(int z, int x, int y) {
         super(z, x, y);
     }

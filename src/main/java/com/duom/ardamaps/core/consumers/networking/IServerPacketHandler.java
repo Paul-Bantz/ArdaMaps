@@ -34,6 +34,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
  *            <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
 public interface IServerPacketHandler<T extends IPacket> extends IPacketHandler {
+
     /**
      * Send a packet to the server.
      *

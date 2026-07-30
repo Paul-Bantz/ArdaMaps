@@ -45,8 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PlayerRangedTeleportHandlerTest {
 
     /**
-     * Tests that scanUpward returns the first passable level encountered and respects interval boundaries.
-     * This protects the lowest-to-highest primitive used by the higher-level candidate search phases.
+     * Verifies that scanUpward returns the first passable level encountered and respects interval boundaries.
      */
     @Test
     void scanUpward_returnsFirstPassableLevelAndIncludesEndpoints() {
@@ -60,8 +59,7 @@ class PlayerRangedTeleportHandlerTest {
     }
 
     /**
-     * Tests that scanDownward returns the first passable level encountered (high to low) and respects interval boundaries.
-     * This protects the top-down primitive so fallback searches preserve their intended priority order.
+     * Verifies that scanDownward returns the first passable level encountered (high to low) and respects interval boundaries.
      */
     @Test
     void scanDownward_returnsFirstPassableLevelAndIncludesEndpoints() {
@@ -75,21 +73,19 @@ class PlayerRangedTeleportHandlerTest {
     }
 
     /**
-     * Tests that scanUpward and scanDownward return empty for invalid ranges (minY > maxY) and when no passable level exists.
-     * This documents the helpers' failure contract so callers can safely compose them without extra guards.
+     * Verifies that scanUpward and scanDownward return empty for invalid ranges (minY > maxY) and when no passable level exists.
      */
     @Test
     void helpersReturnEmptyForEmptyOrInvalidIntervals() {
 
         assertTrue(PlayerRangedTeleportHandler.scanUpward(4, 3, OptionalDouble::of).isEmpty());
         assertTrue(PlayerRangedTeleportHandler.scanDownward(4, 3, OptionalDouble::of).isEmpty());
-        assertTrue(PlayerRangedTeleportHandler.scanUpward(4, 4, y -> OptionalDouble.empty()).isEmpty());
-        assertTrue(PlayerRangedTeleportHandler.scanDownward(4, 4, y -> OptionalDouble.empty()).isEmpty());
+        assertTrue(PlayerRangedTeleportHandler.scanUpward(4, 4, _ -> OptionalDouble.empty()).isEmpty());
+        assertTrue(PlayerRangedTeleportHandler.scanDownward(4, 4, _ -> OptionalDouble.empty()).isEmpty());
     }
 
     /**
-     * Tests that findTeleportCandidate prioritizes positions within the selected band over those outside it.
-     * This protects the primary user expectation that the requested range is searched before any broader fallback.
+     * Verifies that findTeleportCandidate prioritizes positions within the selected band over those outside it.
      */
     @Test
     void selectedBandScanningWinsOverValidPositionsBelowOrAboveIt() {
@@ -103,8 +99,24 @@ class PlayerRangedTeleportHandlerTest {
     }
 
     /**
-     * Tests that findTeleportCandidate prioritizes positions below the selected band over those above it.
-     * This documents the asymmetric fallback order the handler uses when the selected band has no safe position.
+     * Creates a resolver that returns a fractional standing Y for configured integer feet candidates.
+     *
+     * @param safeYs Integer feet Y candidates that should resolve successfully.
+     * @return A resolver suitable for candidate-search tests.
+     */
+    private static IntFunction<OptionalDouble> resolvedAt(int... safeYs) {
+
+        return y -> {
+            for (int safeY : safeYs) {
+                if (safeY == y) return OptionalDouble.of(y + 0.25D);
+            }
+
+            return OptionalDouble.empty();
+        };
+    }
+
+    /**
+     * Verifies that findTeleportCandidate prioritizes positions below the selected band over those above it.
      */
     @Test
     void belowBandScanningWinsOverAboveBandMatch() {
@@ -118,8 +130,7 @@ class PlayerRangedTeleportHandlerTest {
     }
 
     /**
-     * Tests that findTeleportCandidate only scans above the selected band when in-band and below-band searches fail.
-     * This protects the final fallback phase from being evaluated too early and changing teleport outcomes.
+     * Verifies that findTeleportCandidate only scans above the selected band when in-band and below-band searches fail.
      */
     @Test
     void aboveBandScanningIsUsedOnlyAfterFirstTwoPhasesFail() {
@@ -133,8 +144,7 @@ class PlayerRangedTeleportHandlerTest {
     }
 
     /**
-     * Tests that reversed selected bounds and reversed configured range bounds are normalized correctly.
-     * This guards against malformed or reversed inputs producing empty searches or inverted world bounds.
+     * Verifies that reversed selected bounds and reversed configured range bounds are normalized correctly.
      */
     @Test
     void reversedSelectedBoundsAndConfiguredRangeBoundsAreNormalized() {
@@ -167,8 +177,7 @@ class PlayerRangedTeleportHandlerTest {
     }
 
     /**
-     * Tests that effectiveOverallBounds correctly derives bounds from multiple configured ranges and clamps to build height.
-     * This protects the handler from scanning outside the legal build range even when config ranges extend beyond it.
+     * Verifies that effectiveOverallBounds correctly derives bounds from multiple configured ranges and clamps to build height.
      */
     @Test
     void overallBoundsAreDerivedAcrossMultipleConfiguredRangesAndClampedToBuildHeight() {
@@ -184,8 +193,7 @@ class PlayerRangedTeleportHandlerTest {
     }
 
     /**
-     * Tests that findTeleportCandidate evaluates boundary levels exactly once and covers all three search phases.
-     * This prevents duplicate checks at phase seams, which would skew ordering and waste block-safety probes.
+     * Verifies that findTeleportCandidate evaluates boundary levels exactly once and covers all three search phases.
      */
     @Test
     void boundaryLevelsAreEvaluatedOnceIncludingSelectedEdgesAndWorldSafeUpperFeetLevel() {
@@ -205,34 +213,16 @@ class PlayerRangedTeleportHandlerTest {
     }
 
     /**
-     * Tests that findTeleportCandidate returns empty when: no positions pass the predicate, selection exceeds bounds, or bounds are empty.
-     * This protects the no-candidate contract so callers can reliably surface failure instead of teleporting unpredictably.
+     * Verifies that findTeleportCandidate returns empty when: no positions pass the predicate, selection exceeds bounds, or bounds are empty.
      */
     @Test
     void noMatchBehaviorProducesNoTeleportCandidate() {
 
         var bounds = new PlayerRangedTeleportHandler.VerticalBounds(0, 10);
 
-        assertTrue(PlayerRangedTeleportHandler.findTeleportCandidate(4, 6, bounds, y -> OptionalDouble.empty()).isEmpty());
+        assertTrue(PlayerRangedTeleportHandler.findTeleportCandidate(4, 6, bounds, _ -> OptionalDouble.empty()).isEmpty());
         assertTrue(PlayerRangedTeleportHandler.findTeleportCandidate(20, 30, bounds, OptionalDouble::of).isEmpty());
         assertTrue(PlayerRangedTeleportHandler.findTeleportCandidate(4, 6,
                 new PlayerRangedTeleportHandler.VerticalBounds(10, 0), OptionalDouble::of).isEmpty());
-    }
-
-    /**
-     * Creates a resolver that returns a fractional standing Y for configured integer feet candidates.
-     *
-     * @param safeYs Integer feet Y candidates that should resolve successfully.
-     * @return A resolver suitable for candidate-search tests.
-     */
-    private static IntFunction<OptionalDouble> resolvedAt(int... safeYs) {
-
-        return y -> {
-            for (int safeY : safeYs) {
-                if (safeY == y) return OptionalDouble.of(y + 0.25D);
-            }
-
-            return OptionalDouble.empty();
-        };
     }
 }

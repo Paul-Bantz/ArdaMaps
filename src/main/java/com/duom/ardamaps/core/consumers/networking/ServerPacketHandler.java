@@ -38,11 +38,13 @@ import net.minecraft.server.level.ServerPlayer;
  *            <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
 public abstract class ServerPacketHandler<T extends IPacket> extends PacketHandler<T> implements IServerPacketHandler<T> {
+
     /**
      * Constructs a new ServerPacketHandler with the specified channel name and packet reader function.
      *
      * @param channel The name of the packet channel, which will be combined with the mod ID to create a unique Identifier.
-     * @param reader  A function that takes a PacketByteBuf and returns an instance of T, used to read incoming packets on the server side.
+     * @param type    The packet type
+     * @param codec   THe codec
      */
     public ServerPacketHandler(final String channel, final CustomPacketPayload.Type<T> type,
                                final StreamCodec<RegistryFriendlyByteBuf, T> codec) {

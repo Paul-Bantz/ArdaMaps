@@ -526,6 +526,39 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
     }
 
     /**
+     * Appends narration messages for accessibility, including the default narrations for the dropdown widget.
+     *
+     * @param builder The narration message builder to which narration messages should be appended
+     */
+    @Override
+    protected void updateWidgetNarration(@NonNull NarrationElementOutput builder) {
+        defaultButtonNarrationText(builder);
+    }
+
+    /**
+     * Overrides the default mouse scroll behaviour to allow scrolling through dropdown options when expanded.
+     *
+     * @param mouseX           The x-coordinate of the mouse cursor
+     * @param mouseY           The y-coordinate of the mouse cursor
+     * @param horizontalAmount The amount of horizontal scroll (positive for scroll up, negative for scroll down)
+     * @param verticalAmount   The amount of vertical scroll (positive for scroll up, negative for scroll down)
+     * @return true if the scroll event was handled (i.e., if the dropdown is expanded and has more items than visible), false otherwise
+     */
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (expanded) {
+            List<T> dropdownItems = computeDropdownItems(computeItemList());
+            int visibleCount = getVisibleDropdownItemCount(dropdownItems);
+
+            if (dropdownItems.size() > visibleCount) {
+                scrollbar.setMaxOffset(dropdownItems.size() - visibleCount);
+                return scrollbar.scroll(verticalAmount);
+            }
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    /**
      * Builds the list of options actually rendered in the expanded dropdown.
      * The selected value is displayed on the button, so it is excluded from the list.
      *
@@ -583,38 +616,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
     protected int getVisibleDropdownItemCount(List<T> dropdownItems) {
 
         return Math.min(dropdownItems.size(), Math.max(0, maxVisibleOptions));
-    }
-
-    /**
-     * Appends narration messages for accessibility, including the default narrations for the dropdown widget.
-     *
-     * @param builder The narration message builder to which narration messages should be appended
-     */
-    @Override
-    protected void updateWidgetNarration(@NonNull NarrationElementOutput builder) {
-        defaultButtonNarrationText(builder);
-    }
-
-    /**
-     * Overrides the default mouse scroll behaviour to allow scrolling through dropdown options when expanded.
-     *
-     * @param mouseX The x-coordinate of the mouse cursor
-     * @param mouseY The y-coordinate of the mouse cursor
-     * @param amount The amount of scroll (positive for scroll up, negative for scroll down)
-     * @return true if the scroll event was handled (i.e., if the dropdown is expanded and has more items than visible), false otherwise
-     */
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (expanded) {
-            List<T> dropdownItems = computeDropdownItems(computeItemList());
-            int visibleCount = getVisibleDropdownItemCount(dropdownItems);
-
-            if (dropdownItems.size() > visibleCount) {
-                scrollbar.setMaxOffset(dropdownItems.size() - visibleCount);
-                return scrollbar.scroll(verticalAmount);
-            }
-        }
-        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     /**

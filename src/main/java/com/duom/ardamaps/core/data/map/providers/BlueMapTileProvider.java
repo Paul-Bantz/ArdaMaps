@@ -46,7 +46,7 @@ public class BlueMapTileProvider extends TileProvider<TileKey> {
     /**
      * Constructs a BlueMapTileProvider with the specified root path.
      *
-     * @param path The root path for BlueMap tiles.
+     * @param path   The root path for BlueMap tiles.
      * @param minLod The minimum level of detail (LOD) to load.
      * @param maxLod The maximum level of detail (LOD) to load.
      */

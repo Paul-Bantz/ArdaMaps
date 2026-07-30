@@ -31,8 +31,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+/**
+ * Tests for {@link Regions} graceful degradation when no provider is available.
+ */
 class RegionsTest {
 
+    /**
+     * Verifies that region lookup methods are unavailable and callback-less when no provider is installed.
+     */
     @Test
     void noProviderIsUnavailableAndNoOp() {
         AtomicBoolean callbackRan = new AtomicBoolean(false);

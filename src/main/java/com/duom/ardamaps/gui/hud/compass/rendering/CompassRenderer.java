@@ -102,7 +102,7 @@ public class CompassRenderer {
     /** Minimum alpha value for fading **/
     private static final float MIN_ALPHA = 0.1f;
 
-    /** Max compass draw distance in real world units*/
+    /** Max compass draw distance in real world units */
     private static double rawMaxCompassRenderDistance;
 
     /** Tracks dimension for dimension change cache invalidation */
@@ -131,7 +131,7 @@ public class CompassRenderer {
 
         if (rawMaxCompassRenderDistance != ArdaMapsClient.CONFIG.getCompassDrawDistance()
                 || maxCompassRenderDistanceSquared == 0
-                || !Objects.equals(Client.currentDimensionId(),(cachedDimensionId))) {
+                || !Objects.equals(Client.currentDimensionId(), (cachedDimensionId))) {
 
             rawMaxCompassRenderDistance = ArdaMapsClient.CONFIG.getCompassDrawDistance();
 
@@ -140,7 +140,6 @@ public class CompassRenderer {
             var blockCompassRenderDistance = ArdaMapsClient.CONFIG.getCompassDrawDistanceBlocks(Client.currentDimension());
             maxCompassRenderDistanceSquared = blockCompassRenderDistance * blockCompassRenderDistance;
         }
-
 
         var textRenderer = Client.mc().font;
         var playerPos = new Vec3d(player.getX(), player.getY(), player.getZ());
@@ -276,7 +275,7 @@ public class CompassRenderer {
                         GuiTextures.argb(waypoint.r(), waypoint.g(), waypoint.b(), globalAlpha));
             }
 
-            context.text(textRenderer, realWorldUnits, (LANDMARK_ICON_SIZE / 2)-(textRenderer.width(realWorldUnits) / 2), LANDMARK_ICON_SIZE + 15, ModConstants.COLOR_WHITE, false);
+            context.text(textRenderer, realWorldUnits, (LANDMARK_ICON_SIZE / 2) - (textRenderer.width(realWorldUnits) / 2), LANDMARK_ICON_SIZE + 15, ModConstants.COLOR_WHITE, false);
 
             context.pose().popMatrix();
         }
@@ -290,10 +289,10 @@ public class CompassRenderer {
     /**
      * Render the cardinal directions on the compass
      *
-     * @param context      the draw context
-     * @param yaw          the player yaw
-     * @param centerX      the centre of the screen
-     * @param globalAlpha  the transparency of the compass
+     * @param context     the draw context
+     * @param yaw         the player yaw
+     * @param centerX     the centre of the screen
+     * @param globalAlpha the transparency of the compass
      */
     @SuppressWarnings("SuspiciousNameCombination")
     private static void renderCardinals(GuiGraphicsExtractor context, float yaw, int centerX, float globalAlpha) {
@@ -404,9 +403,6 @@ public class CompassRenderer {
         return (float) Math.max(alphaFactor, 0.1);
     }
 
-    private record ProjectedLocation(float angle, LocationClient location) {
-    }
-
     /**
      * Calculate alpha based on distance to centre
      *
@@ -467,7 +463,23 @@ public class CompassRenderer {
         context.pose().popMatrix();
     }
 
-    /** Cardinal directions **/
+    /**
+     * A location projected to a bearing angle relative to the player's facing direction.
+     *
+     * @param angle    The projected bearing angle in degrees from the player's perspective.
+     * @param location The location being projected.
+     */
+    private record ProjectedLocation(float angle, LocationClient location) {
+
+    }
+
+    /**
+     * Represents a cardinal direction on the compass with its label and bearing.
+     *
+     * @param label The cardinal direction label (N, E, S, or W).
+     * @param yaw   The yaw angle in degrees for this cardinal direction.
+     */
     record Cardinal(String label, float yaw) {
+
     }
 }

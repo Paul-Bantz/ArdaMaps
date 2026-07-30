@@ -44,7 +44,7 @@ public class PmTilesMapCamera extends TilesMapCamera {
      */
     public PmTilesMapCamera(int viewportWidth, int viewPortHeight, int centerX, int centerY) {
 
-        super(2,8);
+        super(2, 8);
 
         this.tileSize = 256;
 
@@ -117,29 +117,6 @@ public class PmTilesMapCamera extends TilesMapCamera {
     }
 
     /**
-     * Check whether a tile is at least partially explored. If current exploration is null, return true.
-     *
-     * @param exploration   the exploration state to check against
-     * @param tileX         the tile X coordinate
-     * @param tileY         the tile Y coordinate
-     * @param blocksPerTile the number of blocks per tile at the tile's zoom level
-     * @return whether the tile is at least partially explored
-     */
-    @Override
-    protected boolean tileExplored(PlayerExploration exploration, int tileX, int tileY, int blocksPerTile) {
-
-        if (exploration == null)
-            return true;
-
-        // Tile indices from PmTilesMapCamera are dimension-relative, so add the dimension origin back
-        double tileWorldX = dimension.getXMin() + tileX * (double) blocksPerTile;
-        double tileWorldZ = dimension.getZMin() + tileY * (double) blocksPerTile;
-
-        // Add a buffer around the region to consider it explored if the player has explored just outside the tile boundaries
-        return exploration.regionExplored(tileWorldX, tileWorldZ, blocksPerTile, blocksPerTile, 2);
-    }
-
-    /**
      * Get current zoom level clamped allowed by the tiles source configuration
      * Zoom levels outside this range are possible by scaling the underlying tiles,
      *
@@ -158,15 +135,6 @@ public class PmTilesMapCamera extends TilesMapCamera {
     @Override
     public double renderScale() {
         return scale() * this.scale;
-    }
-
-    /**
-     * Get render scale (pixels per world unit) at the given zoom level
-     * This is scale adjusted by tile scale factor, this affects
-     * the size of rendered tiles on screen and the coordinates conversion
-     */
-    private double renderScale(double zoom) {
-        return scale(zoom) * this.scale;
     }
 
     /**
@@ -197,11 +165,35 @@ public class PmTilesMapCamera extends TilesMapCamera {
 
     /**
      * Get current scale factor at the given zoom (pixels per world unit)
+     *
      * @param zoom the zoom level to get the scale for
      */
     private double scale(double zoom) {
 
         return Math.pow(2.0, zoom - identityZoom);
+    }
+
+    /**
+     * Check whether a tile is at least partially explored. If current exploration is null, return true.
+     *
+     * @param exploration   the exploration state to check against
+     * @param tileX         the tile X coordinate
+     * @param tileY         the tile Y coordinate
+     * @param blocksPerTile the number of blocks per tile at the tile's zoom level
+     * @return whether the tile is at least partially explored
+     */
+    @Override
+    protected boolean tileExplored(PlayerExploration exploration, int tileX, int tileY, int blocksPerTile) {
+
+        if (exploration == null)
+            return true;
+
+        // Tile indices from PmTilesMapCamera are dimension-relative, so add the dimension origin back
+        double tileWorldX = dimension.getXMin() + tileX * (double) blocksPerTile;
+        double tileWorldZ = dimension.getZMin() + tileY * (double) blocksPerTile;
+
+        // Add a buffer around the region to consider it explored if the player has explored just outside the tile boundaries
+        return exploration.regionExplored(tileWorldX, tileWorldZ, blocksPerTile, blocksPerTile, 2);
     }
 
     /**
@@ -230,12 +222,21 @@ public class PmTilesMapCamera extends TilesMapCamera {
      * @return World coordinates as Vec2d
      */
     @Override
-    public Vec2d screenToWorldCoordinates(double screenX, double screenY, int screenW, int screenH, double zoom){
+    public Vec2d screenToWorldCoordinates(double screenX, double screenY, int screenW, int screenH, double zoom) {
 
         double wx = worldX + (screenX - screenW / 2.0) / renderScale(zoom);
         double wz = worldZ + (screenY - screenH / 2.0) / renderScale(zoom);
 
         return new Vec2d(wx, wz);
+    }
+
+    /**
+     * Get render scale (pixels per world unit) at the given zoom level
+     * This is scale adjusted by tile scale factor, this affects
+     * the size of rendered tiles on screen and the coordinates conversion
+     */
+    private double renderScale(double zoom) {
+        return scale(zoom) * this.scale;
     }
 
     /**

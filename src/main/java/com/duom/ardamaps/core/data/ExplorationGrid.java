@@ -69,6 +69,26 @@ public class ExplorationGrid implements Serializable {
     private final byte[] explorationData;
 
     /**
+     * Private constructor for internal use by factory methods.
+     *
+     * @param xMin            World X coordinate of cell (0,0).
+     * @param zMin            World Z coordinate of cell (0,0).
+     * @param cellSize        Size of each cell in world units.
+     * @param nbCellsX        Number of cells along X axis.
+     * @param nbCellsY        Number of cells along Z axis.
+     * @param explorationData Backing exploration state array.
+     */
+    private ExplorationGrid(int xMin, int zMin, int cellSize, int nbCellsX, int nbCellsY, byte[] explorationData) {
+
+        this.xMin = xMin;
+        this.zMin = zMin;
+        this.cellSize = cellSize;
+        this.nbCellsX = nbCellsX;
+        this.nbCellsY = nbCellsY;
+        this.explorationData = explorationData;
+    }
+
+    /**
      * Creates a grid from a dimension and optional backing data.
      *
      * @param dimension       Dimension definition providing world extents.
@@ -82,6 +102,20 @@ public class ExplorationGrid implements Serializable {
         int nbCellsY = (int) Math.ceil((double) dimension.getHeight() / cellSize);
 
         return create(dimension.getXMin(), dimension.getZMin(), cellSize, nbCellsX, nbCellsY, explorationData);
+    }
+
+    /**
+     * Computes the cell size for the given world dimensions, ensuring neither axis exceeds
+     * {@value #MAX_CELLS_PER_AXIS} cells while staying at or above {@value #MIN_CELL_SIZE}.
+     *
+     * @param width  World width in blocks.
+     * @param height World height in blocks.
+     * @return The resolved cell size in blocks.
+     */
+    static int computeCellSize(int width, int height) {
+
+        int needed = (int) Math.ceil((double) Math.max(width, height) / MAX_CELLS_PER_AXIS);
+        return Math.max(MIN_CELL_SIZE, needed);
     }
 
     /**
@@ -105,35 +139,11 @@ public class ExplorationGrid implements Serializable {
         return new ExplorationGrid(xMin, zMin, cellSize, nbCellsX, nbCellsY, data);
     }
 
-    private ExplorationGrid(int xMin, int zMin, int cellSize, int nbCellsX, int nbCellsY, byte[] explorationData) {
-
-        this.xMin = xMin;
-        this.zMin = zMin;
-        this.cellSize = cellSize;
-        this.nbCellsX = nbCellsX;
-        this.nbCellsY = nbCellsY;
-        this.explorationData = explorationData;
-    }
-
-    /**
-     * Computes the cell size for the given world dimensions, ensuring neither axis exceeds
-     * {@value #MAX_CELLS_PER_AXIS} cells while staying at or above {@value #MIN_CELL_SIZE}.
-     *
-     * @param width  World width in blocks.
-     * @param height World height in blocks.
-     * @return The resolved cell size in blocks.
-     */
-    static int computeCellSize(int width, int height) {
-
-        int needed = (int) Math.ceil((double) Math.max(width, height) / MAX_CELLS_PER_AXIS);
-        return Math.max(MIN_CELL_SIZE, needed);
-    }
-
     /**
      * Creates an empty exploration byte array where every cell is {@link ExplorationState#HIDDEN}.
      *
      * @param nbCells Total number of cells.
-     * @return A freshly allocated byte array.
+     * @return A freshly allocated byte array filled with HIDDEN state values.
      */
     private static byte[] emptyExploration(int nbCells) {
 
@@ -141,6 +151,18 @@ public class ExplorationGrid implements Serializable {
         Arrays.fill(array, ExplorationState.HIDDEN.getValue());
 
         return array;
+    }
+
+    /**
+     * Returns the exploration state at a world position.
+     *
+     * @param worldX World X coordinate.
+     * @param worldZ World Z coordinate.
+     * @return The exploration state at that world position.
+     */
+    public ExplorationState stateAtWorldPos(double worldX, double worldZ) {
+
+        return stateAt(toCellX(worldX), toCellZ(worldZ));
     }
 
     /**
@@ -154,31 +176,6 @@ public class ExplorationGrid implements Serializable {
 
         if (!inBounds(cellX, cellY)) return ExplorationState.HIDDEN;
         return ExplorationState.fromValue(explorationData[index(cellX, cellY)]);
-    }
-
-    /**
-     * Returns whether the given cell coordinates are valid.
-     *
-     * @param cellX Cell X index.
-     * @param cellY Cell Y index.
-     * @return Whether the coordinates are inside the grid.
-     */
-    public boolean inBounds(int cellX, int cellY) {
-
-        return cellX >= 0 && cellX < nbCellsX
-                && cellY >= 0 && cellY < nbCellsY;
-    }
-
-    /**
-     * Converts 2D cell coordinates to a row-major array index.
-     *
-     * @param cellX Cell X index.
-     * @param cellY Cell Y index.
-     * @return Row-major array index.
-     */
-    public int index(int cellX, int cellY) {
-
-        return cellY * nbCellsX + cellX;
     }
 
     /**
@@ -204,15 +201,28 @@ public class ExplorationGrid implements Serializable {
     }
 
     /**
-     * Returns the exploration state at a world position.
+     * Returns whether the given cell coordinates are valid.
      *
-     * @param worldX World X coordinate.
-     * @param worldZ World Z coordinate.
-     * @return The exploration state at that world position.
+     * @param cellX Cell X index.
+     * @param cellY Cell Y index.
+     * @return Whether the coordinates are inside the grid.
      */
-    public ExplorationState stateAtWorldPos(double worldX, double worldZ) {
+    public boolean inBounds(int cellX, int cellY) {
 
-        return stateAt(toCellX(worldX), toCellZ(worldZ));
+        return cellX >= 0 && cellX < nbCellsX
+                && cellY >= 0 && cellY < nbCellsY;
+    }
+
+    /**
+     * Converts 2D cell coordinates to a row-major array index.
+     *
+     * @param cellX Cell X index.
+     * @param cellY Cell Y index.
+     * @return Row-major array index.
+     */
+    public int index(int cellX, int cellY) {
+
+        return cellY * nbCellsX + cellX;
     }
 
     /**
@@ -289,23 +299,6 @@ public class ExplorationGrid implements Serializable {
     }
 
     /**
-     * Sets one cell's exploration state.
-     *
-     * @param cellX Cell X index.
-     * @param cellY Cell Y index.
-     * @param state New exploration state.
-     * @return The changed row-major index, or -1 when out of bounds.
-     */
-    public int markCell(int cellX, int cellY, ExplorationState state) {
-
-        if (!inBounds(cellX, cellY)) return -1;
-
-        int index = index(cellX, cellY);
-        explorationData[index] = state.getValue();
-        return index;
-    }
-
-    /**
      * Sets the exploration state for a cell and all cells within {@code range} cells of it.
      *
      * @param cellX Cell X index.
@@ -337,6 +330,23 @@ public class ExplorationGrid implements Serializable {
         }
 
         return changedIndices;
+    }
+
+    /**
+     * Sets a single cell's exploration state to the given value.
+     *
+     * @param cellX Cell X index.
+     * @param cellY Cell Y index.
+     * @param state New exploration state.
+     * @return The changed row-major array index, or -1 if the cell is out of bounds.
+     */
+    public int markCell(int cellX, int cellY, ExplorationState state) {
+
+        if (!inBounds(cellX, cellY)) return -1;
+
+        int index = index(cellX, cellY);
+        explorationData[index] = state.getValue();
+        return index;
     }
 
     /**

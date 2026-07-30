@@ -34,8 +34,14 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+/**
+ * Tests for region polygon rasterization into lookup texture coordinates.
+ */
 class RegionLookupBuilderTest {
 
+    /**
+     * Verifies that a simple square polygon is correctly rasterized into the lookup texture.
+     */
     @Test
     void fillsSquarePolygon() {
         RegionLookupTexture texture = build(List.of(region("square")), List.of(List.of(square(10, 10, 40, 40))));
@@ -44,6 +50,57 @@ class RegionLookupBuilderTest {
         assertNull(texture.getRegionAt(dimension(), 80, 80));
     }
 
+    /**
+     * Builds a region lookup texture from the given regions and their polygon definitions.
+     *
+     * @param regions  the regions to include in the texture.
+     * @param polygons the polygons defining each region's boundaries.
+     * @return a rasterized region lookup texture.
+     */
+    private static RegionLookupTexture build(List<Region> regions, List<List<List<Vec2d>>> polygons) {
+        return RegionLookupBuilder.build(dimension(), regions, polygons);
+    }
+
+    /**
+     * Creates a region with the supplied name used as both its identifier and display name.
+     *
+     * @param name the region's name.
+     * @return a test region fixture.
+     */
+    private static Region region(String name) {
+        return new Region(name, name);
+    }
+
+    /**
+     * Creates a square polygon from two opposite corners (axis-aligned).
+     *
+     * @param x1 the west coordinate.
+     * @param z1 the north coordinate.
+     * @param x2 the east coordinate.
+     * @param z2 the south coordinate.
+     * @return a list of vertices forming a square polygon.
+     */
+    private static List<Vec2d> square(double x1, double z1, double x2, double z2) {
+        return List.of(
+                new Vec2d(x1, z1),
+                new Vec2d(x2, z1),
+                new Vec2d(x2, z2),
+                new Vec2d(x1, z2)
+        );
+    }
+
+    /**
+     * Creates a small test dimension spanning 101x101 blocks.
+     *
+     * @return a test dimension fixture.
+     */
+    private static Dimension dimension() {
+        return new Dimension("Test", "test:dimension", 1f, 0, 101, 0, 101, true);
+    }
+
+    /**
+     * Verifies that a concave polygon is rasterized correctly without incorrectly filling the interior notch.
+     */
     @Test
     void fillsConcavePolygonWithoutFillingNotch() {
         List<Vec2d> concave = List.of(
@@ -61,6 +118,9 @@ class RegionLookupBuilderTest {
         assertNull(texture.getRegionAt(dimension(), 40, 40));
     }
 
+    /**
+     * Verifies that polygon vertices outside the dimension bounds are clamped safely.
+     */
     @Test
     void clampsOutOfBoundsPolygon() {
         RegionLookupTexture texture = build(List.of(region("large")), List.of(List.of(square(-20, -20, 20, 20))));
@@ -69,6 +129,9 @@ class RegionLookupBuilderTest {
         assertNull(texture.getRegionAt(dimension(), 80, 80));
     }
 
+    /**
+     * Verifies that when two region polygons overlap, the last written region takes precedence.
+     */
     @Test
     void overlapUsesLastWrittenRegion() {
         RegionLookupTexture texture = build(
@@ -78,26 +141,5 @@ class RegionLookupBuilderTest {
 
         assertEquals("second", texture.getRegionAt(dimension(), 40, 40));
         assertEquals("first", texture.getRegionAt(dimension(), 20, 20));
-    }
-
-    private static RegionLookupTexture build(List<Region> regions, List<List<List<Vec2d>>> polygons) {
-        return RegionLookupBuilder.build(dimension(), regions, polygons);
-    }
-
-    private static Dimension dimension() {
-        return new Dimension("Test", "test:dimension", 1f, 0, 101, 0, 101, true);
-    }
-
-    private static Region region(String name) {
-        return new Region(name, name);
-    }
-
-    private static List<Vec2d> square(double x1, double z1, double x2, double z2) {
-        return List.of(
-                new Vec2d(x1, z1),
-                new Vec2d(x2, z1),
-                new Vec2d(x2, z2),
-                new Vec2d(x1, z2)
-        );
     }
 }

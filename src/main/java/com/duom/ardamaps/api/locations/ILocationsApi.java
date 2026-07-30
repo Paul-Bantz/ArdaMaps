@@ -37,6 +37,11 @@ import java.util.function.Supplier;
 public interface ILocationsApi {
 
     /**
+     * @return an optional location source to fetch location data from, if one has been registered
+     */
+    Optional<Supplier<CompletableFuture<List<ApiLocation>>>> getLocationSource();
+
+    /**
      * Registers a {@link CompletableFuture} that ArdaMaps will use to fetch location data.
      *
      * <p>Only one source is active at runtime. Calling this method a second time (e.g. from a
@@ -47,9 +52,4 @@ public interface ILocationsApi {
      * @throws IllegalArgumentException if {@code source} is {@code null}.
      */
     void setLocationSource(Supplier<CompletableFuture<List<ApiLocation>>> source);
-
-    /**
-     * @return an optional location source to fetch location data from, if one has been registered
-     */
-    Optional<Supplier<CompletableFuture<List<ApiLocation>>>> getLocationSource();
 }

@@ -332,9 +332,7 @@ public abstract class ArdaMapsScreen extends Screen {
     /**
      * Key press handling
      *
-     * @param keyCode   the code of the key that was pressed
-     * @param scanCode  the scan code of the key that was pressed
-     * @param modifiers the modifiers
+     * @param event the initiating event
      * @return true if the event was consumed, false otherwise
      */
     @Override
@@ -360,11 +358,9 @@ public abstract class ArdaMapsScreen extends Screen {
     }
 
     /**
-     * Gets the function that is called when a search result is selected via the search widget.
-     *
-     * @return the function called when a search result is selected
+     * @return true if this screen is searchable false otherwise
      */
-    protected abstract Function<Object, Void> getOnSearcheResultSelectedFunction();
+    protected abstract boolean isSearchable();
 
     /**
      * Gets the search function that is called when searching an element on screen via the search widget.
@@ -392,9 +388,11 @@ public abstract class ArdaMapsScreen extends Screen {
     }
 
     /**
-     * @return true if this screen is searchable false otherwise
+     * Gets the function that is called when a search result is selected via the search widget.
+     *
+     * @return the function called when a search result is selected
      */
-    protected abstract boolean isSearchable();
+    protected abstract Function<Object, Void> getOnSearcheResultSelectedFunction();
 
     /**
      * Returns the amount of padding to apply around the content area when calculating the padded content area.

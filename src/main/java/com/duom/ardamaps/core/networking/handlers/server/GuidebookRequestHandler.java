@@ -32,24 +32,27 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
+/**
+ * Handler for guidebook requests, responsible for giving or selecting the guidebook in a player's inventory.
+ */
 public class GuidebookRequestHandler extends ServerPacketHandler<EmptyPacket> {
 
-    /** The channel identifier for the PlayerTeleportPacket. */
+    /** The channel identifier for the guidebook request packet. */
     private static final String REQ_CHANNEL = "guidebook_request";
 
     /**
-     * Constructs a new PlayerTeleportHandler.
+     * Constructs a new GuidebookRequestHandler.
      */
     public GuidebookRequestHandler() {
         super(REQ_CHANNEL, EmptyPacket.TYPE, EmptyPacket.CODEC);
     }
 
     /**
-     * Handles the PlayerTeleportPacket by teleporting the player to the specified coordinates.
+     * Handles the guidebook request by giving the player a guidebook or selecting an existing one from their inventory.
      *
      * @param server The Minecraft server instance.
-     * @param player The player to teleport.
-     * @param packet The PlayerTeleportPacket containing teleportation data.
+     * @param player The player to give the guidebook to.
+     * @param packet The empty packet containing the request.
      */
     @Override
     protected void handle(MinecraftServer server, ServerPlayer player, EmptyPacket packet) {

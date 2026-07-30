@@ -52,7 +52,7 @@ public class LocationServer extends BasicLocation implements Serializable {
     @SerializedName("canon")
     private boolean canon;
 
-    /** A detailed description of the location, which may include lore, history, or other information  */
+    /** A detailed description of the location, which may include lore, history, or other information */
     @SerializedName("description")
     private String description;
 
@@ -61,10 +61,10 @@ public class LocationServer extends BasicLocation implements Serializable {
     private String externalUrl;
 
     /**
-     * Converts a LocationServer object to a LocationClient object
+     * Converts a LocationServer instance to a LocationClient instance.
      *
-     * @param server The LocationServer instance
-     * @return The corresponding LocationClient instance
+     * @param server The server-side location data.
+     * @return A new client-side location with copied basic attributes.
      */
     public static LocationClient toLocationClient(LocationServer server) {
 

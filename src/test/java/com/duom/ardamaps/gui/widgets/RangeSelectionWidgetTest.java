@@ -58,42 +58,6 @@ class RangeSelectionWidgetTest {
     }
 
     /**
-     * Verifies that tooltip labels show the covered Y interval and normalize reversed authored bounds.
-     * This protects the user-facing hover text from exposing confusing min/max ordering details.
-     */
-    @Test
-    void tooltipLabel_formatsNormalizedYRange() {
-
-        assertEquals("-500..-128", RangeSelectionWidget.tooltipLabel(new MapLayerRange(0, "0.pmtiles", -500, -128)));
-        assertEquals("-500..-128", RangeSelectionWidget.tooltipLabel(new MapLayerRange(0, "0.pmtiles", -128, -500)));
-    }
-
-    /**
-     * Verifies that the label-area gradient starts fully transparent and ends at the strip background colour.
-     * This protects the softened left edge introduced for the fixed label area.
-     */
-    @Test
-    void gradientColorAt_spansTransparentToBackground() {
-
-        assertEquals(0x00000000, RangeSelectionWidget.gradientColorAt(0, 40));
-        assertEquals(0x70000000, RangeSelectionWidget.gradientColorAt(39, 40));
-    }
-
-    /**
-     * Verifies that tooltip positioning centers above its anchor and clamps cleanly at both screen edges.
-     * This protects hover tooltips for partially clipped cells near the viewport boundaries.
-     */
-    @Test
-    void tooltipHelpers_centerClampAndSitAboveAnchor() {
-
-        assertEquals(40, RangeSelectionWidget.tooltipLeft(200, 60, 40));
-        assertEquals(4, RangeSelectionWidget.tooltipLeft(200, 5, 40));
-        assertEquals(156, RangeSelectionWidget.tooltipLeft(200, 195, 40));
-        assertEquals(56, RangeSelectionWidget.tooltipTop(80, 24));
-        assertEquals(4, RangeSelectionWidget.tooltipTop(10, 24));
-    }
-
-    /**
      * Creates a test widget with control-scroll disabled.
      *
      * @param ranges   the selectable map layer ranges
@@ -145,6 +109,42 @@ class RangeSelectionWidgetTest {
                 20,
                 selected::add,
                 controlDown);
+    }
+
+    /**
+     * Verifies that tooltip labels show the covered Y interval and normalize reversed authored bounds.
+     * This protects the user-facing hover text from exposing confusing min/max ordering details.
+     */
+    @Test
+    void tooltipLabel_formatsNormalizedYRange() {
+
+        assertEquals("-500..-128", RangeSelectionWidget.tooltipLabel(new MapLayerRange(0, "0.pmtiles", -500, -128)));
+        assertEquals("-500..-128", RangeSelectionWidget.tooltipLabel(new MapLayerRange(0, "0.pmtiles", -128, -500)));
+    }
+
+    /**
+     * Verifies that the label-area gradient starts fully transparent and ends at the strip background colour.
+     * This protects the softened left edge introduced for the fixed label area.
+     */
+    @Test
+    void gradientColorAt_spansTransparentToBackground() {
+
+        assertEquals(0x00000000, RangeSelectionWidget.gradientColorAt(0, 40));
+        assertEquals(0x70000000, RangeSelectionWidget.gradientColorAt(39, 40));
+    }
+
+    /**
+     * Verifies that tooltip positioning centers above its anchor and clamps cleanly at both screen edges.
+     * This protects hover tooltips for partially clipped cells near the viewport boundaries.
+     */
+    @Test
+    void tooltipHelpers_centerClampAndSitAboveAnchor() {
+
+        assertEquals(40, RangeSelectionWidget.tooltipLeft(200, 60, 40));
+        assertEquals(4, RangeSelectionWidget.tooltipLeft(200, 5, 40));
+        assertEquals(156, RangeSelectionWidget.tooltipLeft(200, 195, 40));
+        assertEquals(56, RangeSelectionWidget.tooltipTop(80, 24));
+        assertEquals(4, RangeSelectionWidget.tooltipTop(10, 24));
     }
 
     /**
@@ -204,7 +204,7 @@ class RangeSelectionWidgetTest {
     }
 
     /**
-     * Verifies that centering a middle item places its cell center at the widget center.
+     * Verifies that centering a middle item places its cell centre at the widget centre.
      * This protects the positioning math used after programmatic range changes.
      */
     @Test
@@ -219,7 +219,7 @@ class RangeSelectionWidgetTest {
 
     /**
      * Verifies that centering near either end clamps to the available scroll range instead of overscrolling.
-     * This protects the edge behavior when the selected range is near the start or end of the strip.
+     * This protects the edge behaviour when the selected range is near the start or end of the strip.
      */
     @Test
     void centerOn_edgeItems_clampsToEnds() {
@@ -252,6 +252,18 @@ class RangeSelectionWidgetTest {
 
         assertEquals(2, widget.getSelected().index());
         assertEquals(List.of(widget.getSelected()), selected);
+    }
+
+    /**
+     * Creates a mouse button event at the supplied screen coordinates.
+     *
+     * @param x The screen X coordinate.
+     * @param y The screen Y coordinate.
+     * @return A mouse button event fixture.
+     */
+    @SuppressWarnings("SameParameterValue")
+    private static MouseButtonEvent mouse(double x, double y) {
+        return new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0));
     }
 
     /**
@@ -528,10 +540,5 @@ class RangeSelectionWidgetTest {
 
             return controlDown;
         }
-    }
-
-    @SuppressWarnings("SameParameterValue")
-    private static MouseButtonEvent mouse(double x, double y) {
-        return new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0));
     }
 }

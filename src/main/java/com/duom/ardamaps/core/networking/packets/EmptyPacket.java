@@ -34,18 +34,22 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.jspecify.annotations.NonNull;
 
 /**
- * A packet with no data.
+ * A packet containing no data payload.
  * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
 public record EmptyPacket() implements IPacket {
+
     public static final CustomPacketPayload.Type<EmptyPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("guidebook_request"));
+
     public static final StreamCodec<RegistryFriendlyByteBuf, EmptyPacket> CODEC = StreamCodec.unit(new EmptyPacket());
 
     /**
-     * Reads an EmptyPacket from the given PacketByteBuf. Since this packet has no data, the buffer is not read.
+     * Reads an EmptyPacket from the given PacketByteBuf.
+     * <p>
+     * Since this packet has no data, the buffer is not read.
      *
-     * @param buf The PacketByteBuf to read from (ignored)
-     * @return A new instance of EmptyPacket
+     * @param buf The PacketByteBuf to read from (ignored).
+     * @return A new instance of EmptyPacket.
      */
     @SuppressWarnings("unused")
     public static EmptyPacket read(@SuppressWarnings("unused") FriendlyByteBuf buf) {
@@ -53,9 +57,11 @@ public record EmptyPacket() implements IPacket {
     }
 
     /**
-     * Builds an EmptyPacket into a PacketByteBuf. Since this packet has no data, an empty buffer is returned.
+     * Serializes this empty packet to a PacketByteBuf.
+     * <p>
+     * Since this packet has no data, an empty buffer is returned.
      *
-     * @return An empty PacketByteBuf
+     * @return An empty PacketByteBuf.
      */
     @Override
     public FriendlyByteBuf build() {

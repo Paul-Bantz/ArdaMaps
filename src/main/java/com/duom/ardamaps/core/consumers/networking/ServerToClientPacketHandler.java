@@ -47,9 +47,11 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
     /** The unique identifier for the packet channel, constructed using the mod ID and a specific channel name. */
     @Getter
     private final Identifier channelId;
+
     /** The Fabric custom payload type for this channel. */
     @Getter
     private final CustomPacketPayload.Type<T> type;
+
     /** The payload codec for this channel. */
     @Getter
     private final StreamCodec<RegistryFriendlyByteBuf, T> codec;
@@ -58,7 +60,8 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
      * Constructs a new ServerToClientPacketHandler with the specified channel name and packet reader function.
      *
      * @param channel The name of the packet channel, which will be combined with the mod ID to create a unique Identifier.
-     * @param reader  A function that takes a PacketByteBuf and returns an instance of T, used to read incoming packets on the client side.
+     * @param type    the packet type
+     * @param codec   the codec
      */
     @SuppressWarnings("SameParameterValue")
     protected ServerToClientPacketHandler(String channel, CustomPacketPayload.Type<T> type,
@@ -81,10 +84,8 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
     /**
      * Handles incoming packets on the client side. This method is called when a packet is received on the specified channel. It reads the packet data using the provided reader function and then executes the handling logic on the main client thread.
      *
-     * @param client  The MinecraftClient instance representing the client receiving the packet.
-     * @param handler The ClientPlayNetworkHandler that manages network communication on the client side.
-     * @param buf     The PacketByteBuf containing the raw data of the incoming packet, which will be read and deserialized into an instance of T using the reader function.
-     * @param sender  The PacketSender that can be used to send responses back to the server if needed.
+     * @param packet  the packet
+     * @param context the networking context
      */
     @Override
     public void receive(T packet, net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.Context context) {

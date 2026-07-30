@@ -32,8 +32,10 @@ import lombok.Getter;
  */
 public enum UnitSystem {
 
-    /** The metric system, using meters and kilometers. */
+    /** Metric system using meters and kilometers. */
     METRIC("unit.system.metric"),
+
+    /** Imperial system using miles and feet. */
     IMPERIAL("unit.system.imperial");
 
     /** The translation key for the display name of this unit system. */

@@ -30,8 +30,14 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+/**
+ * Tests for {@link Pathfinders} graceful degradation when no provider is available.
+ */
 class PathfindersTest {
 
+    /**
+     * Verifies that pathfinder selection methods are unavailable and no-op when no provider is installed.
+     */
     @Test
     void noProviderIsUnavailableAndNoOp() {
         assertFalse(Pathfinders.isAvailable());

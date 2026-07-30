@@ -41,6 +41,9 @@ class GuiTexturesTest {
 
     private static final Identifier TEXTURE = ModConstants.modId("textures/gui/test.png");
 
+    /**
+     * Verifies that blitRepeating splits texture regions into nearly equal centered chunks.
+     */
     @Test
     void blitRepeating_splitsIntoNearlyEqualCenteredChunks() {
 
@@ -67,6 +70,9 @@ class GuiTexturesTest {
                 org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
     }
 
+    /**
+     * Verifies that blitNineSliced clamps slices to half the destination size.
+     */
     @Test
     void blitNineSliced_clampsSlicesToHalfDestinationSize() {
 
@@ -88,6 +94,9 @@ class GuiTexturesTest {
                 org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
     }
 
+    /**
+     * Verifies that blitMirroredH uses descending U coordinates for horizontal mirroring.
+     */
     @Test
     void blitMirroredH_usesDescendingUCoordinates() {
 

@@ -27,16 +27,16 @@ package com.duom.ardamaps.core.data.guide;
 
 import com.duom.ardamaps.core.data.map.Waypoint;
 import com.duom.ardamaps.gui.ModConstants;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
-import net.minecraft.network.chat.MutableComponent;
 
 /**
  * Scans incoming chat {@link Component} objects for ArdaMaps links (waypoints of guide deep-link tokens) and
@@ -70,8 +70,8 @@ public final class ArdaMapsChatLinkProcessor {
      */
     private static final Pattern GUIDE_LINK_PATTERN = Pattern.compile("\\bguide:\\S+");
 
+    /** Utility class with no public instances. */
     private ArdaMapsChatLinkProcessor() { /* utility class */ }
-
 
     /**
      * Processes a received chat or game message and replaces every guide deep-link token
@@ -79,7 +79,7 @@ public final class ArdaMapsChatLinkProcessor {
      *
      * @param message the incoming chat text, never {@code null}
      * @return the original {@code message} if no guide or waypoints links are found, otherwise a new
-     *         {@link MutableComponent} containing plain and styled segments
+     * {@link MutableComponent} containing plain and styled segments
      */
     public static Component process(Component message) {
 
@@ -89,58 +89,6 @@ public final class ArdaMapsChatLinkProcessor {
 
             // If no guide links have been found, try to find waypoint links
             result = processWaypointLink(result);
-        }
-
-        return result;
-    }
-
-    /**
-     * Processes a received chat or game message and replaces every waypoint token
-     * it contains with a styled, clickable {@link Component} run.
-     *
-     * <p>If the message contains no tokens matching ":waypoint" the
-     * original {@code message} object is returned unchanged, avoiding unnecessary
-     * allocations.</p>
-     *
-     * <p>The surrounding (non-link) text fragments are preserved as plain literal segments;
-     * the original formatting of those segments is intentionally kept minimal because
-     * most server chat messages consist of flat literal text. If the original message
-     * carries complex sibling trees, only the top-level {@link Component#getString()} pass-through
-     * is used - the tree is not walked recursively.</p>
-     *
-     * @param message the incoming chat text, never {@code null}
-     * @return the original {@code message} if no waypoint links are found, otherwise a new
-     *         {@link MutableComponent} containing plain and styled segments
-     */
-    public static @NotNull Component processWaypointLink(@NotNull Component message) {
-
-        MutableComponent result = Component.empty();
-        String raw = message.getString();
-
-        if (!raw.contains("waypoint:")) return message;
-
-        var waypointIndex = raw.indexOf("waypoint:");
-        var waypointJsonIndex = waypointIndex + "waypoint:".length();
-
-        if (waypointJsonIndex >= raw.length()) return message;
-
-        var stringBeginning = raw.substring(0, waypointIndex);
-        var waypointJsonString = raw.substring(waypointJsonIndex);
-
-        // Styled guide-link run
-        Optional<Waypoint> waypoint = Waypoint.fromJson(waypointJsonString);
-
-        if (waypoint.isPresent()) {
-
-            MutableComponent link = Component.literal("waypoint")
-                    .withStyle(style -> style
-                            .withColor(ModConstants.COLOR_BLUE)
-                            .withUnderlined(true)
-                            .withHoverEvent(new HoverEvent.ShowText(Component.literal(waypoint.get().text())))
-                            .withClickEvent(new ClickEvent.RunCommand("/ardamaps waypoint " + waypointJsonString))
-                    );
-            result.append(stringBeginning);
-            result.append(link);
         }
 
         return result;
@@ -162,7 +110,7 @@ public final class ArdaMapsChatLinkProcessor {
      *
      * @param message the incoming chat text, never {@code null}
      * @return the original {@code message} if no guide links are found, otherwise a new
-     *         {@link MutableComponent} containing plain and styled segments
+     * {@link MutableComponent} containing plain and styled segments
      */
     public static @NotNull Component processGuideLink(@NotNull Component message) {
 
@@ -199,6 +147,58 @@ public final class ArdaMapsChatLinkProcessor {
         // Trailing plain text
         if (lastEnd < raw.length()) {
             result.append(Component.literal(raw.substring(lastEnd)));
+        }
+
+        return result;
+    }
+
+    /**
+     * Processes a received chat or game message and replaces every waypoint token
+     * it contains with a styled, clickable {@link Component} run.
+     *
+     * <p>If the message contains no tokens matching ":waypoint" the
+     * original {@code message} object is returned unchanged, avoiding unnecessary
+     * allocations.</p>
+     *
+     * <p>The surrounding (non-link) text fragments are preserved as plain literal segments;
+     * the original formatting of those segments is intentionally kept minimal because
+     * most server chat messages consist of flat literal text. If the original message
+     * carries complex sibling trees, only the top-level {@link Component#getString()} pass-through
+     * is used - the tree is not walked recursively.</p>
+     *
+     * @param message the incoming chat text, never {@code null}
+     * @return the original {@code message} if no waypoint links are found, otherwise a new
+     * {@link MutableComponent} containing plain and styled segments
+     */
+    public static @NotNull Component processWaypointLink(@NotNull Component message) {
+
+        MutableComponent result = Component.empty();
+        String raw = message.getString();
+
+        if (!raw.contains("waypoint:")) return message;
+
+        var waypointIndex = raw.indexOf("waypoint:");
+        var waypointJsonIndex = waypointIndex + "waypoint:".length();
+
+        if (waypointJsonIndex >= raw.length()) return message;
+
+        var stringBeginning = raw.substring(0, waypointIndex);
+        var waypointJsonString = raw.substring(waypointJsonIndex);
+
+        // Styled guide-link run
+        Optional<Waypoint> waypoint = Waypoint.fromJson(waypointJsonString);
+
+        if (waypoint.isPresent()) {
+
+            MutableComponent link = Component.literal("waypoint")
+                    .withStyle(style -> style
+                            .withColor(ModConstants.COLOR_BLUE)
+                            .withUnderlined(true)
+                            .withHoverEvent(new HoverEvent.ShowText(Component.literal(waypoint.get().text())))
+                            .withClickEvent(new ClickEvent.RunCommand("/ardamaps waypoint " + waypointJsonString))
+                    );
+            result.append(stringBeginning);
+            result.append(link);
         }
 
         return result;

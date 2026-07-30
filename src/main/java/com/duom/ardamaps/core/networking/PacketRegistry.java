@@ -25,11 +25,7 @@
 
 package com.duom.ardamaps.core.networking;
 
-import com.duom.ardamaps.core.consumers.networking.IClientPacketHandler;
-import com.duom.ardamaps.core.consumers.networking.IPacket;
-import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
-import com.duom.ardamaps.core.consumers.networking.IServerPacketHandler;
-import com.duom.ardamaps.core.consumers.networking.RespondablePacketHandler;
+import com.duom.ardamaps.core.consumers.networking.*;
 import com.duom.ardamaps.core.networking.handlers.client.PlayerExplorationEventHandler;
 import com.duom.ardamaps.core.networking.handlers.server.*;
 import net.fabricmc.api.EnvType;
@@ -41,32 +37,42 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Registry for all server-bound packets.
+ * Centralized registry for all network packet handlers, managing registration of both client-to-server and server-to-client packet handlers.
  */
 public class PacketRegistry {
+
+    /** Server-bound packet handlers */
+    public static final GuidebookRequestHandler GUIDEBOOK_REQUEST_HANDLER = register(new GuidebookRequestHandler());
+
+    public static final MapSourcesRequestHandler MAP_SOURCES_REQUEST = register(new MapSourcesRequestHandler());
+
+    public static final LocationsRequestHandler LOCATIONS_UPDATE_REQUEST = register(new LocationsRequestHandler());
+
+    public static final RegionsLutRequestHandler REGION_LUT_UPDATE_REQUEST = register(new RegionsLutRequestHandler());
+
+    public static final PlayerTeleportHandler PLAYER_TELEPORT_REQUEST = register(new PlayerTeleportHandler());
+
+    public static final PlayerRangedTeleportHandler PLAYER_RANGED_TELEPORT_REQUEST = register(new PlayerRangedTeleportHandler());
+
+    public static final PlayerWarpHandler PLAYER_WARP_REQUEST = register(new PlayerWarpHandler());
+
+    public static final LocationDetailsRequestHandler LOCATION_DETAILS_REQUEST = register(new LocationDetailsRequestHandler());
+
+    public static final PlayerExplorationEventHandler PLAYER_EXPLORATION_EVENT = registerClient(new PlayerExplorationEventHandler());
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(PacketRegistry.class);
 
-    /** Server-bound packet handlers */
-    public static final GuidebookRequestHandler         GUIDEBOOK_REQUEST_HANDLER      = register(new GuidebookRequestHandler());
-    public static final MapSourcesRequestHandler        MAP_SOURCES_REQUEST            = register(new MapSourcesRequestHandler());
-    public static final LocationsRequestHandler         LOCATIONS_UPDATE_REQUEST       = register(new LocationsRequestHandler());
-    public static final RegionsLutRequestHandler        REGION_LUT_UPDATE_REQUEST      = register(new RegionsLutRequestHandler());
-    public static final PlayerTeleportHandler           PLAYER_TELEPORT_REQUEST        = register(new PlayerTeleportHandler());
-    public static final PlayerRangedTeleportHandler     PLAYER_RANGED_TELEPORT_REQUEST = register(new PlayerRangedTeleportHandler());
-    public static final PlayerWarpHandler               PLAYER_WARP_REQUEST            = register(new PlayerWarpHandler());
-    public static final LocationDetailsRequestHandler   LOCATION_DETAILS_REQUEST       = register(new LocationDetailsRequestHandler());
-    public static final PlayerExplorationEventHandler   PLAYER_EXPLORATION_EVENT       = registerClient(new PlayerExplorationEventHandler());
-
-    /** Class cannot be instantiated. */
+    /** Hidden constructor for this utility class. */
     private PacketRegistry() {
     }
 
     /**
-     * Register a client-to-server packet handler.
+     * Registers a client-to-server packet handler along with its optional response payload.
      *
-     * @param handler The handler to register
+     * @param handler The server packet handler to register.
+     * @param <T>     The handler type.
+     * @return The registered handler.
      */
     private static <T extends IServerPacketHandler<?>> T register(T handler) {
 
@@ -87,9 +93,55 @@ public class PacketRegistry {
     }
 
     /**
-     * Register a server-to-client packet handler.
+     * Registers the server-bound packet payload type.
      *
-     * @param handler The handler to register
+     * @param handler The server packet handler whose payload type should be registered.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerServerboundPayload(IServerPacketHandler<?> handler) {
+
+        PayloadTypeRegistry.serverboundPlay().register((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), handler.getCodec());
+    }
+
+    /**
+     * Registers the server receiver for a server-bound packet handler.
+     *
+     * @param handler The server packet handler to register receiver for.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerServerReceiver(IServerPacketHandler<?> handler) {
+
+        ServerPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), (packet, context) -> ((IServerPacketHandler) handler).receive((IPacket) packet, context));
+    }
+
+    /**
+     * Registers the client-bound response packet payload type.
+     *
+     * @param handler The respondable packet handler whose response payload type should be registered.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerClientboundResponsePayload(RespondablePacketHandler<?, ?> handler) {
+
+        PayloadTypeRegistry.clientboundPlay().register((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getResponseType(), handler.getResponseCodec());
+    }
+
+    /**
+     * Registers the client receiver for a respondable packet handler's response payload.
+     *
+     * @param handler The respondable packet handler to register response receiver for.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerClientResponseReceiver(RespondablePacketHandler<?, ?> handler) {
+
+        ClientPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getResponseType(), (packet, context) -> ((RespondablePacketHandler) handler).receive((IRespondablePacket) packet, context));
+    }
+
+    /**
+     * Registers a server-to-client packet handler for the client environment.
+     *
+     * @param handler The client packet handler to register.
+     * @param <T>     The handler type.
+     * @return The registered handler.
      */
     private static <T extends IClientPacketHandler<?>> T registerClient(T handler) {
 
@@ -103,40 +155,26 @@ public class PacketRegistry {
         return handler;
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void registerServerboundPayload(IServerPacketHandler<?> handler) {
-
-        PayloadTypeRegistry.serverboundPlay().register((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), handler.getCodec());
-    }
-
+    /**
+     * Registers the client-bound packet payload type.
+     *
+     * @param handler The client packet handler whose payload type should be registered.
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static void registerClientboundPayload(IClientPacketHandler<?> handler) {
 
         PayloadTypeRegistry.clientboundPlay().register((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), handler.getCodec());
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void registerClientboundResponsePayload(RespondablePacketHandler<?, ?> handler) {
-
-        PayloadTypeRegistry.clientboundPlay().register((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getResponseType(), handler.getResponseCodec());
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void registerServerReceiver(IServerPacketHandler<?> handler) {
-
-        ServerPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), (packet, context) -> ((IServerPacketHandler) handler).receive((IPacket) packet, context));
-    }
-
+    /**
+     * Registers the client receiver for a client-bound packet handler.
+     *
+     * @param handler The client packet handler to register receiver for.
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static void registerClientReceiver(IClientPacketHandler<?> handler) {
 
         ClientPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), (packet, context) -> ((IClientPacketHandler) handler).receive((IPacket) packet, context));
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void registerClientResponseReceiver(RespondablePacketHandler<?, ?> handler) {
-
-        ClientPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getResponseType(), (packet, context) -> ((RespondablePacketHandler) handler).receive((IRespondablePacket) packet, context));
     }
 
     /**
@@ -163,6 +201,11 @@ public class PacketRegistry {
         clearPendingResponses(LOCATION_DETAILS_REQUEST);
     }
 
+    /**
+     * Clears pending responses for a handler if it supports response callbacks.
+     *
+     * @param handler The handler object to clear responses for.
+     */
     private static void clearPendingResponses(Object handler) {
 
         if (handler instanceof RespondablePacketHandler<?, ?> responseHandler)

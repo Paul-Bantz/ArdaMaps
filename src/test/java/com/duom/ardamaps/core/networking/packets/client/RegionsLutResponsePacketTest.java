@@ -48,8 +48,8 @@ class RegionsLutResponsePacketTest {
     void buildRead_roundTripsRegionLookupTextureAsJson() {
 
         RegionLookupTexture texture = new RegionLookupTexture(
-                new byte[] {0, 1, 2, 1},
-                new Region[] {new Region("r1", "Rohan"), new Region("r2", "Gondor")},
+                new byte[]{0, 1, 2, 1},
+                new Region[]{new Region("r1", "Rohan"), new Region("r2", "Gondor")},
                 2,
                 2,
                 "minecraft:overworld",
@@ -67,7 +67,20 @@ class RegionsLutResponsePacketTest {
     }
 
     /**
-     * Negative lengths must be rejected before byte-array allocation.
+     * Serializes and deserializes a packet through its binary buffer representation.
+     *
+     * @param packet The packet to round-trip.
+     * @return The packet parsed back from the built buffer.
+     */
+    private static RegionsLutResponsePacket roundTrip(RegionsLutResponsePacket packet) {
+
+        var buf = packet.build();
+        buf.readerIndex(0);
+        return RegionsLutResponsePacket.read(buf);
+    }
+
+    /**
+     * Verifies that negative lengths are rejected before byte-array allocation.
      */
     @Test
     void read_negativeDataLength_rejectsBeforeAllocation() {
@@ -81,7 +94,7 @@ class RegionsLutResponsePacketTest {
     }
 
     /**
-     * Oversized lengths must be rejected before byte-array allocation.
+     * Verifies that oversized lengths are rejected before byte-array allocation.
      */
     @Test
     void read_oversizedDataLength_rejectsBeforeAllocation() {
@@ -92,18 +105,5 @@ class RegionsLutResponsePacketTest {
         buf.readerIndex(0);
 
         assertThrows(IllegalArgumentException.class, () -> RegionsLutResponsePacket.read(buf));
-    }
-
-    /**
-     * Serializes and deserializes a packet through its binary buffer representation.
-     *
-     * @param packet The packet to round-trip.
-     * @return The packet parsed back from the built buffer.
-     */
-    private static RegionsLutResponsePacket roundTrip(RegionsLutResponsePacket packet) {
-
-        var buf = packet.build();
-        buf.readerIndex(0);
-        return RegionsLutResponsePacket.read(buf);
     }
 }

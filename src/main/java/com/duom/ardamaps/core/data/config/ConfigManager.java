@@ -58,9 +58,6 @@ import java.util.concurrent.CompletableFuture;
  */
 public abstract class ConfigManager<T extends Configuration<L>, L extends BasicLocation> {
 
-    /** Class logger */
-    private static final Logger LOGGER = LoggerFactory.getLogger(ConfigManager.class);
-
     /** Gson instance for JSON serialization/deserialization */
     protected static final Gson GSON = new GsonBuilder()
             .registerTypeAdapter(Vec3d.class, new Vec3dTypeAdapter())
@@ -70,12 +67,8 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
             .setPrettyPrinting()
             .create();
 
-    /**
-     * @return The shared Gson instance with ArdaMaps' custom type adapters registered.
-     */
-    public static Gson gson() {
-        return GSON;
-    }
+    /** Class logger */
+    private static final Logger LOGGER = LoggerFactory.getLogger(ConfigManager.class);
 
     /** Location configuration file */
     protected final Path locationFile;
@@ -106,16 +99,6 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
         this.loadConfig();
         this.loadLocationsConfig();
         this.loadRegionTextureLookup();
-    }
-
-    /**
-     * Reloads the configuration from file.
-     */
-    public void reload() {
-
-        loadConfig();
-        loadLocationsConfig();
-        loadRegionTextureLookup();
     }
 
     /**
@@ -227,15 +210,6 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
     }
 
     /**
-     * Backs up the location data on this server
-     */
-    public final void backupLocations(){
-
-        Path backupFile = locationFile.resolveSibling(locationFile.getFileName() + ".back");
-        save(backupFile, config.getLocationConfig());
-    }
-
-    /**
      * Saves the provided region texture lookup to the server config directory
      */
     public final void saveRegionTextureLookup() {
@@ -276,5 +250,31 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
             }
 
         }, ArdaMaps.IO_EXECUTOR);
+    }
+
+    /**
+     * @return The shared Gson instance with ArdaMaps' custom type adapters registered.
+     */
+    public static Gson gson() {
+        return GSON;
+    }
+
+    /**
+     * Reloads the configuration from file.
+     */
+    public void reload() {
+
+        loadConfig();
+        loadLocationsConfig();
+        loadRegionTextureLookup();
+    }
+
+    /**
+     * Backs up the location data on this server
+     */
+    public final void backupLocations() {
+
+        Path backupFile = locationFile.resolveSibling(locationFile.getFileName() + ".back");
+        save(backupFile, config.getLocationConfig());
     }
 }

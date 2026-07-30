@@ -28,6 +28,10 @@ package com.duom.ardamaps.core.data.guide;
 import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.gui.ModConstants;
 import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,10 +39,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.resources.Resource;
 
 /**
  * Synchronous, session-scoped cache for guide images loaded from the mod resource pack.
@@ -66,7 +66,9 @@ public final class GuideImageCache {
      */
     private static final Map<String, Optional<Identifier>> CACHE = new HashMap<>();
 
-    private GuideImageCache() {}
+    /** Utility class with no public instances. */
+    private GuideImageCache() {
+    }
 
     /**
      * Returns the registered {@link Identifier} for the texture at {@code src},
@@ -79,7 +81,7 @@ public final class GuideImageCache {
      * @param src path relative to {@code assets/ardamaps/}
      *            (e.g. {@code guide/resources/icon_ardacraft_gradient_128px.png})
      * @return the registered texture identifier, or {@code null} if the resource is
-     *         missing or could not be loaded (a warning is logged in that case)
+     * missing or could not be loaded (a warning is logged in that case)
      */
     public static Identifier getTexture(String src) {
 

@@ -43,7 +43,9 @@ import org.jspecify.annotations.NonNull;
  * @param worldId The Identifier of the world to teleport to. If null, the current world is used.
  */
 public record PlayerTeleportPacket(double x, double y, double z, String worldId) implements IPacket {
+
     public static final CustomPacketPayload.Type<PlayerTeleportPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_teleport"));
+
     public static final StreamCodec<RegistryFriendlyByteBuf, PlayerTeleportPacket> CODEC = IPacket.codec(PlayerTeleportPacket::read);
 
     /**

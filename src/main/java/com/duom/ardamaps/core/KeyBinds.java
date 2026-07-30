@@ -49,7 +49,7 @@ public final class KeyBinds {
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(KeyBinds.class);
-    
+
     /** Translation-key prefix for the key category shown in Controls. */
     private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(ArdaMaps.MOD_ID, "category"));
 

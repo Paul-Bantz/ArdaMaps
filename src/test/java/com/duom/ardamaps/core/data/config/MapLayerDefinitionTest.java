@@ -44,7 +44,7 @@ class MapLayerDefinitionTest {
 
     /**
      * Verifies that a world Y inside a configured band returns that exact band.
-     * This is the baseline ranged-selection behavior that higher-level loaders depend on.
+     * This is the baseline ranged-selection behaviour that higher-level loaders depend on.
      */
     @Test
     void rangeForY_insideBand_returnsContainingRange() {
@@ -112,7 +112,7 @@ class MapLayerDefinitionTest {
 
     /**
      * Verifies that flat layers always return their own path and icon regardless of the supplied Y coordinate.
-     * This guards against ranged-resolution logic leaking into flat-layer behavior.
+     * This guards against ranged-resolution logic leaking into flat-layer behaviour.
      */
     @Test
     void effectivePathAndIcon_useLayerValuesWhenFlat() {

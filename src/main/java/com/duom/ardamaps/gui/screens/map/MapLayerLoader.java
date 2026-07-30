@@ -173,5 +173,6 @@ public class MapLayerLoader {
             int startingCameraZ,
             @Nullable Double playerY,
             Font textRenderer) {
+
     }
 }

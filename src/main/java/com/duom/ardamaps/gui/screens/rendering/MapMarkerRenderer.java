@@ -307,7 +307,6 @@ public class MapMarkerRenderer {
                 var iconIdentifier = ModConstants.id(waypoint.icon());
                 var icon = IconSpriteAtlas.retrieveSprite(iconIdentifier);
 
-
                 if (icon != null
                         && icon.contents() != null
                         && !Objects.equals(icon.contents().name(), MissingTextureAtlasSprite.getLocation())) {
@@ -394,7 +393,6 @@ public class MapMarkerRenderer {
             context.fill(xPos + 4, yPos + 4, xPos + MARKER_BACKGROUND_SIZE - 4, yPos + MARKER_BACKGROUND_SIZE - 4, color);
         }
 
-
         int markerColor = GuiTextures.withAlpha(ModConstants.COLOR_WHITE, markerOpacity);
         if (location.isVisited())
             context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_VISITED_ICON), xPos, yPos, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE, markerColor);
@@ -436,5 +434,6 @@ public class MapMarkerRenderer {
 
     /** Marker render data deferred until after the non-hovered marker pass. */
     private record DeferredMarker(int x, int y, LocationClient location) {
+
     }
 }

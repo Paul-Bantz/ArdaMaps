@@ -54,15 +54,26 @@ public record PlayerRangedTeleportPacket(
         double scanMinBoundY,
         double scanMaxBoundY
 ) implements IRespondablePacket<PlayerRangedTeleportPacket> {
+
     public static final CustomPacketPayload.Type<PlayerRangedTeleportPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_ranged_teleport"));
+
     public static final StreamCodec<RegistryFriendlyByteBuf, PlayerRangedTeleportPacket> CODEC = IPacket.codec(PlayerRangedTeleportPacket::read);
 
+    /**
+     * Constructs a PlayerRangedTeleportPacket with coordinates and scan bounds.
+     *
+     * @param x             The X coordinate to teleport to.
+     * @param z             The Z coordinate to teleport to.
+     * @param worldId       The world identifier to teleport to.
+     * @param scanMinBoundY The minimum Y coordinate to scan for a valid position.
+     * @param scanMaxBoundY The maximum Y coordinate to scan for a valid position.
+     */
     public PlayerRangedTeleportPacket(double x, double z, String worldId, double scanMinBoundY, double scanMaxBoundY) {
         this(new UUID(0L, 0L), x, z, worldId, scanMinBoundY, scanMaxBoundY);
     }
 
     /**
-     * Deserializes a PlayerRangedTeleportPacket from the given PacketByteBuf.
+     * Reads a PlayerRangedTeleportPacket from the given PacketByteBuf.
      *
      * @param buf The PacketByteBuf to read from.
      * @return A new PlayerRangedTeleportPacket instance with the deserialized data.
@@ -99,6 +110,12 @@ public record PlayerRangedTeleportPacket(
         return buf;
     }
 
+    /**
+     * Creates a new PlayerRangedTeleportPacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this request.
+     * @return A new PlayerRangedTeleportPacket with the updated request identifier.
+     */
     @Override
     public PlayerRangedTeleportPacket withRequestId(UUID requestId) {
         return new PlayerRangedTeleportPacket(requestId, x, z, worldId, scanMinBoundY, scanMaxBoundY);

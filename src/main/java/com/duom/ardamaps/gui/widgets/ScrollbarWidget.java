@@ -38,16 +38,16 @@ import net.minecraft.util.Mth;
  */
 public class ScrollbarWidget {
 
-    /** Visual width of the scrollbar (track + thumb) */
+    /** Visual width of the scrollbar track and thumb in pixels. */
     private final int width;
 
-    /** Minimum height of the draggable thumb */
+    /** Minimum height of the draggable thumb in pixels. */
     private final int minThumbHeight;
 
-    /** ARGB colour of the scrollbar track */
+    /** ARGB colour value of the scrollbar track background. */
     private final int trackColor;
 
-    /** ARGB colour of the scrollbar thumb */
+    /** ARGB colour value of the draggable scrollbar thumb. */
     private final int thumbColor;
 
     /**
@@ -56,11 +56,11 @@ public class ScrollbarWidget {
      */
     private final int scrollSpeed;
 
-    /** Current scroll offset (pixels or items, depending on how the caller interprets it) */
+    /** Current scroll offset in pixels or items, depending on how the caller interprets it. */
     @Getter
     private int scrollOffset = 0;
 
-    /** Maximum reachable scroll offset; updated by {@link #setMaxOffset(int)} */
+    /** Maximum reachable scroll offset; updated by setMaxOffset. */
     private int maxOffset = 0;
 
     /**

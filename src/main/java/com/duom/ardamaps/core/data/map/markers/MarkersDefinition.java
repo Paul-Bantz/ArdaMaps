@@ -34,7 +34,6 @@ import com.duom.ardamaps.gui.ModConstants;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.SerializedName;
-import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -75,17 +74,6 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
 
     /** Marker label for undiscovered locations */
     private static final Identifier MARKERS_JSON = ModConstants.modId("markers.json");
-
-    /**
-     * Loads the markers definition from the `markers.json` resource file.
-     *
-     * @return the loaded {@link MarkersDefinition}
-     * @throws RuntimeException if the resource is missing or cannot be parsed
-     */
-    public static @NotNull MarkersDefinition loadMarkersDefinition() {
-
-        return loadMarkersDefinition(Minecraft.getInstance().getResourceManager());
-    }
 
     /**
      * Loads the markers definition from the `markers.json` resource file using the supplied resource manager.

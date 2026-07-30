@@ -199,7 +199,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         confirmResetExplorationButton = Button.builder(
                         Component.translatable("ardamaps.generic.yes"),
-                        button -> {
+                        _ -> {
 
                             // Clear all per-dimension exploration data and re-initialise instances.
                             ArdaMapsClient.CONFIG.getClientProgress().reset(false);
@@ -212,13 +212,13 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         cancelResetExplorationButton = Button.builder(
                         Component.translatable("ardamaps.generic.cancel"),
-                        button -> displayResetProgressConfirmationDialog = false)
+                        _ -> displayResetProgressConfirmationDialog = false)
                 .size(dialogBtnWidth, BUTTON_HEIGHT)
                 .build();
 
         confirmRevealAllButton = Button.builder(
                         Component.translatable("ardamaps.generic.yes"),
-                        button -> {
+                        _ -> {
                             ArdaMapsClient.CONFIG.setMapRevealAll(true);
                             ArdaMapsClient.CONFIG_MANAGER.save();
                             displayRevealAllConfirmationDialog = false;
@@ -228,7 +228,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         cancelRevealAllButton = Button.builder(
                         Component.translatable("ardamaps.generic.cancel"),
-                        button -> {
+                        _ -> {
                             revealAllCheckbox.setChecked(false);
                             displayRevealAllConfirmationDialog = false;
                         })
@@ -240,7 +240,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * Get the search function that is called when searching an element on screen via the search widget.
      * This function should search for a String in a List of elements represented on screen
      *
-     * @return  the search function
+     * @return the search function
      */
     @Override
     protected @Nullable Function<String, List<?>> getSearchFunction() {
@@ -357,7 +357,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         configDirectoryButton = Button.builder(
                         Component.translatable("ardamaps.client.generic.open"),
-                        button -> Util.getPlatform().openFile(FabricLoader.getInstance().getConfigDir().resolve("arda-maps").toFile()))
+                        _ -> Util.getPlatform().openFile(FabricLoader.getInstance().getConfigDir().resolve("arda-maps").toFile()))
                 .width(BUTTON_WIDTH)
                 .tooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.configuration.open_config_directory.tooltip")))
                 .build();
@@ -370,7 +370,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         resetExplorationButton = Button.builder(
                         Component.translatable("ardamaps.client.map.screen.configuration.reset_exploration"),
-                        button -> displayResetProgressConfirmationDialog = true)
+                        _ -> displayResetProgressConfirmationDialog = true)
                 .width(BUTTON_WIDTH)
                 .tooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.configuration.reset_exploration.tooltip")))
                 .build();
@@ -478,10 +478,10 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @return the configured slider widget
      */
     private AbstractSliderButton configureGenericRenderDistanceSlider(Consumer<Tuple<Double, AbstractSliderButton>> onUpdateMessage,
-                                                              Consumer<Tuple<Double, AbstractSliderButton>> onUpdateValue,
-                                                              double currentDrawDistance,
-                                                              int minValue,
-                                                              int maxValue) {
+                                                                      Consumer<Tuple<Double, AbstractSliderButton>> onUpdateValue,
+                                                                      double currentDrawDistance,
+                                                                      int minValue,
+                                                                      int maxValue) {
 
         var baseSliderValue = Mth.clamp((currentDrawDistance - minValue) / (maxValue - minValue), 0, 1);
 
@@ -866,9 +866,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * Handle mouse drags for the configuration screen, including drags on the sliders in the options sections.
      * When a confirmation dialog is displayed, dragging is disabled for all widgets.
      *
-     * @param mouseX the x position of the mouse cursor
-     * @param mouseY the y position of the mouse cursor
-     * @param button the mouse button that is being dragged
+     * @param event  the initiating mouse event
      * @param deltaX the change in x position since the last call
      * @param deltaY the change in y position since the last call
      * @return true if the drag was handled by the configuration screen, false otherwise
@@ -936,5 +934,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     @SuppressWarnings("SameParameterValue")
     private record Margins(int left, int right, int top, int bottom) {
+
     }
 }

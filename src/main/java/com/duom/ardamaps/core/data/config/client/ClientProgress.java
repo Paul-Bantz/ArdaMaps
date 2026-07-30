@@ -121,19 +121,6 @@ public class ClientProgress implements Serializable {
     }
 
     /**
-     * Disposes and clears all locally stored progress without persistence or server-side reset side effects.
-     */
-    public void clearSessionState() {
-
-        explorationState.forEach((key, exploration) -> {
-            LOGGER.warn("Disposing exploration state for dimension {} on disconnect", key);
-            exploration.dispose();
-        });
-        explorationState.clear();
-        visitedLocationIds.clear();
-    }
-
-    /**
      * Initializes the exploration state for all known dimensions
      */
     private void initialize() {
@@ -171,6 +158,19 @@ public class ClientProgress implements Serializable {
     public static String explorationKey(String dimensionId, Integer rangeIndex) {
 
         return rangeIndex == null ? dimensionId : dimensionId + "#" + rangeIndex;
+    }
+
+    /**
+     * Disposes and clears all locally stored progress without persistence or server-side reset side effects.
+     */
+    public void clearSessionState() {
+
+        explorationState.forEach((key, exploration) -> {
+            LOGGER.warn("Disposing exploration state for dimension {} on disconnect", key);
+            exploration.dispose();
+        });
+        explorationState.clear();
+        visitedLocationIds.clear();
     }
 
     /**

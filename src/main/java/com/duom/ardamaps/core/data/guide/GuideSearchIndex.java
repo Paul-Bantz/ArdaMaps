@@ -25,13 +25,13 @@
 
 package com.duom.ardamaps.core.data.guide;
 
+import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.Nullable;
 import org.jsoup.Jsoup;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
-import net.minecraft.client.Minecraft;
 
 /**
  * Session-scoped guide search index used by {@link com.duom.ardamaps.gui.screens.GuideScreen}.
@@ -61,45 +61,8 @@ public final class GuideSearchIndex {
     /** Whether an async index preload is currently running. */
     private static volatile boolean loadingSearchIndex;
 
+    /** Utility class with no public instances. */
     private GuideSearchIndex() {
-    }
-
-    private record GuideSearchEntry(int pageIndex,
-                                    int entryIndex,
-                                    String pageTitle,
-                                    String entryTitle,
-                                    String pageTitleSearch,
-                                    String entryTitleSearch,
-                                    String plainContent,
-                                    String plainContentSearch) {
-    }
-
-    private record SearchSeed(int pageIndex,
-                              int entryIndex,
-                              String pageTitle,
-                              String entryTitle,
-                              String link,
-                              String pageTitleSearch,
-                              String entryTitleSearch) {
-    }
-
-    /**
-     * Public result payload consumed by the guide search UI.
-     *
-     * @param pageIndex   zero-based page index
-     * @param entryIndex  zero-based entry index
-     * @param entryTitle  entry label shown first in the result
-     * @param snippet     fixed-radius context snippet around the first match
-     * @param matchRank   rank bucket (lower is better)
-     * @param matchOffset first match position within the matched source
-     */
-    public record GuideSearchResult(int pageIndex,
-                                    int entryIndex,
-                                    String pageTitle,
-                                    String entryTitle,
-                                    String snippet,
-                                    int matchRank,
-                                    int matchOffset) {
     }
 
     /**
@@ -136,7 +99,7 @@ public final class GuideSearchIndex {
             int from = i;
             int to = Math.min(i + SEARCH_PRELOAD_BATCH_SIZE, seeds.size());
 
-            chain = chain.thenCompose(v -> {
+            chain = chain.thenCompose(_ -> {
                 List<SearchSeed> batch = seeds.subList(from, to);
 
                 CompletableFuture<?>[] futures = batch.stream()
@@ -159,7 +122,7 @@ public final class GuideSearchIndex {
             });
         }
 
-        chain.handle((ignored, throwable) -> {
+        chain.handle((ignored, _) -> {
             List<GuideSearchEntry> finalEntries = new ArrayList<>(built);
             finalEntries.sort(Comparator
                     .comparingInt(GuideSearchEntry::pageIndex)
@@ -246,6 +209,45 @@ public final class GuideSearchIndex {
         return results;
     }
 
+    private static String normaliseForSearch(@Nullable String value) {
+        return collapseWhitespace(value).toLowerCase(Locale.ROOT);
+    }
+
+    private static String buildSnippet(String source, int matchStart, int matchLength) {
+        if (source == null || source.isBlank()) return "";
+        if (matchStart < 0) return "..." + collapseWhitespace(source) + "...";
+
+        int safeStart = Math.min(matchStart, source.length());
+        int safeEnd = Math.max(safeStart, Math.min(safeStart + Math.max(1, matchLength), source.length()));
+
+        int from = Math.max(0, safeStart - SEARCH_SNIPPET_RADIUS);
+        int to = Math.min(source.length(), safeEnd + SEARCH_SNIPPET_RADIUS);
+
+        while (from > 0 && !Character.isWhitespace(source.charAt(from - 1))) from--;
+        while (to < source.length() && !Character.isWhitespace(source.charAt(to))) to++;
+
+        String snippet = source.substring(from, to).trim();
+        if (snippet.isEmpty()) return "";
+
+        return "..." + snippet + "...";
+    }
+
+    private static void insertBestCandidate(Map<Long, GuideSearchResult> uniqueResults, GuideSearchResult candidate) {
+        long key = (((long) candidate.pageIndex()) << 32) | (candidate.entryIndex() & 0xffffffffL);
+        GuideSearchResult existing = uniqueResults.get(key);
+
+        if (existing == null
+                || candidate.matchRank() < existing.matchRank()
+                || (candidate.matchRank() == existing.matchRank() && candidate.matchOffset() < existing.matchOffset())) {
+            uniqueResults.put(key, candidate);
+        }
+    }
+
+    private static String collapseWhitespace(@Nullable String value) {
+        if (value == null || value.isBlank()) return "";
+        return WHITESPACE_PATTERN.matcher(value).replaceAll(" ").trim();
+    }
+
     /**
      * Converts result payload objects into display labels consumed by SearchWidget.
      */
@@ -267,17 +269,6 @@ public final class GuideSearchIndex {
             return result.snippet();
         }
         return null;
-    }
-
-    private static void insertBestCandidate(Map<Long, GuideSearchResult> uniqueResults, GuideSearchResult candidate) {
-        long key = (((long) candidate.pageIndex()) << 32) | (candidate.entryIndex() & 0xffffffffL);
-        GuideSearchResult existing = uniqueResults.get(key);
-
-        if (existing == null
-                || candidate.matchRank() < existing.matchRank()
-                || (candidate.matchRank() == existing.matchRank() && candidate.matchOffset() < existing.matchOffset())) {
-            uniqueResults.put(key, candidate);
-        }
     }
 
     private static List<SearchSeed> collectSearchSeeds(GuideBook book) {
@@ -331,32 +322,45 @@ public final class GuideSearchIndex {
         return collapseWhitespace(Jsoup.parse(html).text());
     }
 
-    private static String buildSnippet(String source, int matchStart, int matchLength) {
-        if (source == null || source.isBlank()) return "";
-        if (matchStart < 0) return "..." + collapseWhitespace(source) + "...";
+    private record GuideSearchEntry(int pageIndex,
+                                    int entryIndex,
+                                    String pageTitle,
+                                    String entryTitle,
+                                    String pageTitleSearch,
+                                    String entryTitleSearch,
+                                    String plainContent,
+                                    String plainContentSearch) {
 
-        int safeStart = Math.min(matchStart, source.length());
-        int safeEnd = Math.max(safeStart, Math.min(safeStart + Math.max(1, matchLength), source.length()));
-
-        int from = Math.max(0, safeStart - SEARCH_SNIPPET_RADIUS);
-        int to = Math.min(source.length(), safeEnd + SEARCH_SNIPPET_RADIUS);
-
-        while (from > 0 && !Character.isWhitespace(source.charAt(from - 1))) from--;
-        while (to < source.length() && !Character.isWhitespace(source.charAt(to))) to++;
-
-        String snippet = source.substring(from, to).trim();
-        if (snippet.isEmpty()) return "";
-
-        return "..." + snippet + "...";
     }
 
-    private static String collapseWhitespace(@Nullable String value) {
-        if (value == null || value.isBlank()) return "";
-        return WHITESPACE_PATTERN.matcher(value).replaceAll(" ").trim();
+    private record SearchSeed(int pageIndex,
+                              int entryIndex,
+                              String pageTitle,
+                              String entryTitle,
+                              String link,
+                              String pageTitleSearch,
+                              String entryTitleSearch) {
+
     }
 
-    private static String normaliseForSearch(@Nullable String value) {
-        return collapseWhitespace(value).toLowerCase(Locale.ROOT);
+    /**
+     * Public result payload consumed by the guide search UI.
+     *
+     * @param pageIndex   zero-based page index
+     * @param entryIndex  zero-based entry index
+     * @param entryTitle  entry label shown first in the result
+     * @param snippet     fixed-radius context snippet around the first match
+     * @param matchRank   rank bucket (lower is better)
+     * @param matchOffset first match position within the matched source
+     */
+    public record GuideSearchResult(int pageIndex,
+                                    int entryIndex,
+                                    String pageTitle,
+                                    String entryTitle,
+                                    String snippet,
+                                    int matchRank,
+                                    int matchOffset) {
+
     }
 }
 

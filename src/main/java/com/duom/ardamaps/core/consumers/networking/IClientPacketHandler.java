@@ -30,6 +30,7 @@ package com.duom.ardamaps.core.consumers.networking;
  * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
 public interface IClientPacketHandler<T extends IPacket> extends IPacketHandler {
+
     /**
      * Handle an incoming packet on the client.
      */

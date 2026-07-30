@@ -65,11 +65,11 @@ public class ArdaMaps implements ModInitializer {
     /** Executor for IO operations */
     public static final ExecutorService IO_EXECUTOR = Executors.newSingleThreadExecutor();
 
-    /** Separate scheduler for periodic location refresh */
-    private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor();
-
     /** The mod identifier. */
     public static final String MOD_ID = "ardamaps";
+
+    /** Separate scheduler for periodic location refresh */
+    private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor();
 
     /** Logger instance for the mod. */
     private static final Logger LOGGER = LoggerFactory.getLogger(ArdaMaps.class);
@@ -100,6 +100,99 @@ public class ArdaMaps implements ModInitializer {
      */
     public static volatile String activeCronExpression = null;
 
+    /**
+     * Builds a list of server world definitions from all levels in the given Minecraft server.
+     *
+     * @param server The Minecraft server instance.
+     * @return An iterable of server world definitions, one per level.
+     */
+    public static Iterable<ServerWorldDefinition> serverWorldDefinitions(MinecraftServer server) {
+
+        List<ServerWorldDefinition> definitions = new ArrayList<>();
+
+        for (var world : server.getAllLevels()) {
+            var dimensionId = world.dimension().identifier();
+            var border = world.getWorldBorder();
+            definitions.add(new ServerWorldDefinition(
+                    dimensionId.toString(),
+                    dimensionId.getPath(),
+                    border.getMinX(),
+                    border.getMaxX(),
+                    border.getMinZ(),
+                    border.getMaxZ()
+            ));
+        }
+
+        return definitions;
+    }
+
+    /**
+     * Computes the delay to the next CRON execution and arms a one-shot task that, after firing,
+     * immediately re-arms itself for the following execution. This gives true CRON semantics
+     * without requiring a Quartz dependency.
+     *
+     * @param cron The validated CRON definition.
+     */
+    private static void scheduleNextCronTrigger(Cron cron) {
+
+        ZonedDateTime now = ZonedDateTime.now();
+        Optional<ZonedDateTime> next = CronScheduleHelper.nextExecution(cron, now);
+
+        if (next.isEmpty()) {
+            ArdaMaps.LOGGER.warn("[ArdaMaps] Could not compute next CRON execution time - scheduled refresh is disabled.");
+            nextScheduledRefresh = null;
+            return;
+        }
+
+        nextScheduledRefresh = next.get();
+        long delayMs = nextScheduledRefresh.toInstant().toEpochMilli() - now.toInstant().toEpochMilli();
+
+        ArdaMaps.LOGGER.info("[ArdaMaps] Next scheduled location refresh: {} (in ~{} minutes)",
+                nextScheduledRefresh, delayMs / 60_000);
+
+        SCHEDULER.schedule(() -> {
+
+            ArdaMaps.LOGGER.info("[ArdaMaps] CRON-triggered location refresh firing");
+            try {
+                ExternalLocationSource.fetchLocations().thenAccept(ServerCommands::saveLocationData)
+                        .exceptionally(ex -> {
+                            ArdaMaps.LOGGER.warn("Failed to fetch locations: {}", ex.getMessage());
+                            return null;
+                        });
+            } catch (RuntimeException e) {
+                ArdaMaps.LOGGER.warn("Failed to start scheduled location fetch", e);
+            } finally {
+                // Re-arm for the next execution even when a synchronous source throws.
+                scheduleNextCronTrigger(cron);
+            }
+
+        }, delayMs, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Shuts down an executor service gracefully, with a timeout and forced shutdown if necessary.
+     *
+     * @param executor The executor service to shut down.
+     * @param name     A name for the executor, used in logging.
+     */
+    private static void shutdownExecutor(ExecutorService executor, String name) {
+
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                ArdaMaps.LOGGER.warn("{} did not terminate in time, forcing shutdown", name);
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Initializes the Arda Maps mod, loading configuration, registering items, packets, and commands,
+     * and setting up server lifecycle event handlers.
+     */
     @Override
     public void onInitialize() {
 
@@ -135,8 +228,9 @@ public class ArdaMaps implements ModInitializer {
     }
 
     /**
-     * Initialization logic run on server start
-     * @param server the server instance
+     * Initialization logic run when the server starts.
+     *
+     * @param server The Minecraft server instance.
      */
     private void onServerStarted(MinecraftServer server) {
 
@@ -146,26 +240,9 @@ public class ArdaMaps implements ModInitializer {
         scheduleLocationRefresh();
     }
 
-    public static Iterable<ServerWorldDefinition> serverWorldDefinitions(MinecraftServer server) {
-
-        List<ServerWorldDefinition> definitions = new ArrayList<>();
-
-        for (var world : server.getAllLevels()) {
-            var dimensionId = world.dimension().identifier();
-            var border = world.getWorldBorder();
-            definitions.add(new ServerWorldDefinition(
-                    dimensionId.toString(),
-                    dimensionId.getPath(),
-                    border.getMinX(),
-                    border.getMaxX(),
-                    border.getMinZ(),
-                    border.getMaxZ()
-            ));
-        }
-
-        return definitions;
-    }
-
+    /**
+     * Initializes the server configuration manager and loads the server configuration.
+     */
     private void initializeServerConfig() {
 
         if (CONFIG_MANAGER != null && CONFIG != null) return;
@@ -256,49 +333,6 @@ public class ArdaMaps implements ModInitializer {
     }
 
     /**
-     * Computes the delay to the next CRON execution and arms a one-shot task that, after firing,
-     * immediately re-arms itself for the following execution. This gives true CRON semantics
-     * without requiring a Quartz dependency.
-     *
-     * @param cron   The validated CRON definition.
-     */
-    private static void scheduleNextCronTrigger(Cron cron) {
-
-        ZonedDateTime now = ZonedDateTime.now();
-        Optional<ZonedDateTime> next = CronScheduleHelper.nextExecution(cron, now);
-
-        if (next.isEmpty()) {
-            ArdaMaps.LOGGER.warn("[ArdaMaps] Could not compute next CRON execution time - scheduled refresh is disabled.");
-            nextScheduledRefresh = null;
-            return;
-        }
-
-        nextScheduledRefresh = next.get();
-        long delayMs = nextScheduledRefresh.toInstant().toEpochMilli() - now.toInstant().toEpochMilli();
-
-        ArdaMaps.LOGGER.info("[ArdaMaps] Next scheduled location refresh: {} (in ~{} minutes)",
-                nextScheduledRefresh, delayMs / 60_000);
-
-        SCHEDULER.schedule(() -> {
-
-            ArdaMaps.LOGGER.info("[ArdaMaps] CRON-triggered location refresh firing");
-            try {
-                ExternalLocationSource.fetchLocations().thenAccept(ServerCommands::saveLocationData)
-                        .exceptionally(ex -> {
-                            ArdaMaps.LOGGER.warn("Failed to fetch locations: {}", ex.getMessage());
-                            return null;
-                        });
-            } catch (RuntimeException e) {
-                ArdaMaps.LOGGER.warn("Failed to start scheduled location fetch", e);
-            } finally {
-                // Re-arm for the next execution even when a synchronous source throws.
-                scheduleNextCronTrigger(cron);
-            }
-
-        }, delayMs, TimeUnit.MILLISECONDS);
-    }
-
-    /**
      * Handles server stopping event.
      *
      * @param ignored The Minecraft server instance.
@@ -306,25 +340,5 @@ public class ArdaMaps implements ModInitializer {
     private void onStop(MinecraftServer ignored) {
 
         SERVER = null;
-    }
-
-    /**
-     * Shuts down an executor service gracefully, with a timeout and forced shutdown if necessary.
-     *
-     * @param executor The executor service to shut down.
-     * @param name     A name for the executor, used in logging.
-     */
-    private static void shutdownExecutor(ExecutorService executor, String name) {
-
-        executor.shutdown();
-        try {
-            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                ArdaMaps.LOGGER.warn("{} did not terminate in time, forcing shutdown", name);
-                executor.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            executor.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
     }
 }

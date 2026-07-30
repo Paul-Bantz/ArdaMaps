@@ -62,9 +62,11 @@ public abstract class RespondablePacketHandler<T extends IRespondablePacket<T>, 
     /** The unique identifier for the response packet channel, constructed using the mod ID and a specific channel name. */
     @Getter
     private final Identifier responseChannelId;
+
     /** The Fabric payload type for responses on this handler. */
     @Getter
     private final CustomPacketPayload.Type<U> responseType;
+
     /** The codec registered for responses on this handler. */
     @Getter
     private final StreamCodec<RegistryFriendlyByteBuf, U> responseCodec;
@@ -73,9 +75,11 @@ public abstract class RespondablePacketHandler<T extends IRespondablePacket<T>, 
      * Constructs a new RespondablePacketHandler with the specified channel names and packet reader functions for both request and response packets.
      *
      * @param channel         The name of the request packet channel, which will be combined with the mod ID to create a unique Identifier for handling incoming requests on the server side.
-     * @param reader          A function that takes a PacketByteBuf and returns an instance of T, used to read incoming request packets on the server side.
+     * @param requestType     The request type
+     * @param requestCodec    The request codec
      * @param responseChannel The name of the response packet channel, which will be combined with the mod ID to create a unique Identifier for sending responses back to clients and handling incoming responses on the client side.
-     * @param responseReader  A function that takes a PacketByteBuf and returns an instance of U, used to read incoming response packets on the client side.
+     * @param responseType    The response type
+     * @param responseCodec   The response codec
      */
     public RespondablePacketHandler(
             final String channel,
@@ -132,9 +136,9 @@ public abstract class RespondablePacketHandler<T extends IRespondablePacket<T>, 
     /**
      * Serializes a response packet and sends it back on this handler's response channel for the supplied request ID.
      *
-     * @param sender The packet sender used to deliver the response to the client.
+     * @param sender    The packet sender used to deliver the response to the client.
      * @param requestId The UUID read from the matching request packet.
-     * @param response The response packet to serialize and send.
+     * @param response  The response packet to serialize and send.
      */
     protected void respond(PacketSender sender, UUID requestId, U response) {
 
@@ -143,6 +147,24 @@ public abstract class RespondablePacketHandler<T extends IRespondablePacket<T>, 
         } catch (RuntimeException e) {
             LOGGER.warn("Unable to send response packet on channel {}", responseChannelId, e);
         }
+    }
+
+    /**
+     * Processes a deserialized request packet and supports deferred responses.
+     * <p>
+     * Return a response packet to answer immediately, or return {@code null} and call {@code responder} exactly once
+     * later. Missing the responder call leaves a dangling client-side response consumer, and calling it more than once
+     * sends duplicate responses for the same request ID.
+     *
+     * @param server    The MinecraftServer instance representing the server on which the packet was received.
+     * @param player    The ServerPlayerEntity representing the player who sent the packet.
+     * @param packet    The deserialized request packet of type T that needs to be processed by the server.
+     * @param responder Callback that sends the response for this request and must be called exactly once for deferred responses.
+     * @return A response packet to send immediately, or {@code null} when {@code responder} will be called later.
+     */
+    protected U handle(MinecraftServer server, ServerPlayer player, T packet, Consumer<U> responder) {
+
+        return handle(server, player, packet);
     }
 
     /**
@@ -158,24 +180,6 @@ public abstract class RespondablePacketHandler<T extends IRespondablePacket<T>, 
     protected U handle(MinecraftServer ignoredServer, ServerPlayer ignoredPlayer, T packet) {
 
         throw new UnsupportedOperationException("Subclasses must override one of the two handle overloads");
-    }
-
-    /**
-     * Processes a deserialized request packet and supports deferred responses.
-     * <p>
-     * Return a response packet to answer immediately, or return {@code null} and call {@code responder} exactly once
-     * later. Missing the responder call leaves a dangling client-side response consumer, and calling it more than once
-     * sends duplicate responses for the same request ID.
-     *
-     * @param server The MinecraftServer instance representing the server on which the packet was received.
-     * @param player The ServerPlayerEntity representing the player who sent the packet.
-     * @param packet The deserialized request packet of type T that needs to be processed by the server.
-     * @param responder Callback that sends the response for this request and must be called exactly once for deferred responses.
-     * @return A response packet to send immediately, or {@code null} when {@code responder} will be called later.
-     */
-    protected U handle(MinecraftServer server, ServerPlayer player, T packet, Consumer<U> responder) {
-
-        return handle(server, player, packet);
     }
 
     /**

@@ -25,7 +25,6 @@
 
 package com.duom.ardamaps.core.networking.handlers.server;
 
-import java.util.OptionalDouble;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -35,6 +34,8 @@ import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.vehicle.DismountHelper;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+
+import java.util.OptionalDouble;
 
 /**
  * Resolves map teleport requests against vanilla collision shapes instead of whole-block solidity flags.
@@ -55,11 +56,11 @@ public final class SafeTeleportScanner {
      * net.minecraft.world.entity.LivingEntity, Pose)} for the real standing bounding box check, and an explicit
      * fluid/fire hazard pass because those hazards can have empty collision shapes.
      *
-     * @param world The destination world to inspect for collision, fluid, and fire hazards.
+     * @param world  The destination world to inspect for collision, fluid, and fire hazards.
      * @param player The player whose standing dimensions are being placed.
-     * @param x The snapped X coordinate for the destination column.
-     * @param feetY The integer feet block candidate being evaluated.
-     * @param z The snapped Z coordinate for the destination column.
+     * @param x      The snapped X coordinate for the destination column.
+     * @param feetY  The integer feet block candidate being evaluated.
+     * @param z      The snapped Z coordinate for the destination column.
      * @return The fractional standing Y coordinate, or empty when the candidate cannot safely hold the player.
      */
     public static OptionalDouble standingHeightAt(ServerLevel world, ServerPlayer player,
@@ -94,9 +95,9 @@ public final class SafeTeleportScanner {
      * {@code !Double.isInfinite(height) && height < 1.0} so unit tests can exercise the pure logic without a
      * Minecraft bootstrap.
      *
-     * @param feetY The integer candidate feet Y coordinate.
+     * @param feetY          The integer candidate feet Y coordinate.
      * @param dismountHeight The shape-derived standing height relative to the candidate block.
-     * @param feetWater Whether the candidate feet block contains water.
+     * @param feetWater      Whether the candidate feet block contains water.
      * @return The exact standing Y coordinate, or empty when unsupported and not swimmable.
      */
     static OptionalDouble resolveStandY(int feetY, double dismountHeight, boolean feetWater) {
@@ -111,23 +112,12 @@ public final class SafeTeleportScanner {
     }
 
     /**
-     * Snaps a horizontal coordinate to the center of its block column.
-     *
-     * @param coord The source coordinate, which may already be centered or may be negative.
-     * @return The center coordinate of the block containing {@code coord}.
-     */
-    static double blockCenter(double coord) {
-
-        return Math.floor(coord) + 0.5D;
-    }
-
-    /**
      * Calculates the block containing the player's standing eye position.
      *
      * @param player The player whose eye height should be used.
-     * @param x The destination X coordinate.
+     * @param x      The destination X coordinate.
      * @param standY The resolved standing Y coordinate.
-     * @param z The destination Z coordinate.
+     * @param z      The destination Z coordinate.
      * @return The block position containing the player's eyes.
      */
     private static BlockPos eyeBlock(ServerPlayer player, double x, double standY, double z) {
@@ -138,7 +128,7 @@ public final class SafeTeleportScanner {
     /**
      * Checks every block touched by the player's standing box for non-collision hazards.
      *
-     * @param world The destination world containing the candidate blocks.
+     * @param world     The destination world containing the candidate blocks.
      * @param playerBox The player's standing bounding box at the candidate destination.
      * @return True if lava or fire intersects the standing box, false otherwise.
      */
@@ -146,5 +136,16 @@ public final class SafeTeleportScanner {
 
         return BlockPos.betweenClosedStream(playerBox).anyMatch(pos ->
                 world.getFluidState(pos).is(FluidTags.LAVA) || world.getBlockState(pos).is(BlockTags.FIRE));
+    }
+
+    /**
+     * Snaps a horizontal coordinate to the centre of its block column.
+     *
+     * @param coord The source coordinate, which may already be centered or may be negative.
+     * @return The centre coordinate of the block containing {@code coord}.
+     */
+    static double blockCenter(double coord) {
+
+        return Math.floor(coord) + 0.5D;
     }
 }

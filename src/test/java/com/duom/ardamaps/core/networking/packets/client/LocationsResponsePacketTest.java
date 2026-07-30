@@ -79,34 +79,6 @@ class LocationsResponsePacketTest {
     }
 
     /**
-     * Negative lengths must be rejected before byte-array allocation.
-     */
-    @Test
-    void read_negativeDataLength_rejectsBeforeAllocation() {
-
-        FriendlyByteBuf buf = FriendlyByteBufs.create();
-        buf.writeUUID(new UUID(0L, 0L));
-        buf.writeInt(-1);
-        buf.readerIndex(0);
-
-        assertThrows(IllegalArgumentException.class, () -> LocationsResponsePacket.read(buf));
-    }
-
-    /**
-     * Oversized lengths must be rejected before byte-array allocation.
-     */
-    @Test
-    void read_oversizedDataLength_rejectsBeforeAllocation() {
-
-        FriendlyByteBuf buf = FriendlyByteBufs.create();
-        buf.writeUUID(new UUID(0L, 0L));
-        buf.writeInt(8 * 1024 * 1024 + 1);
-        buf.readerIndex(0);
-
-        assertThrows(IllegalArgumentException.class, () -> LocationsResponsePacket.read(buf));
-    }
-
-    /**
      * Serializes and deserializes a packet through its binary buffer representation.
      *
      * @param packet The packet to round-trip.
@@ -134,5 +106,33 @@ class LocationsResponsePacketTest {
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new AssertionError(e);
         }
+    }
+
+    /**
+     * Verifies that negative lengths are rejected before byte-array allocation.
+     */
+    @Test
+    void read_negativeDataLength_rejectsBeforeAllocation() {
+
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
+        buf.writeInt(-1);
+        buf.readerIndex(0);
+
+        assertThrows(IllegalArgumentException.class, () -> LocationsResponsePacket.read(buf));
+    }
+
+    /**
+     * Verifies that oversized lengths are rejected before byte-array allocation.
+     */
+    @Test
+    void read_oversizedDataLength_rejectsBeforeAllocation() {
+
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
+        buf.writeInt(8 * 1024 * 1024 + 1);
+        buf.readerIndex(0);
+
+        assertThrows(IllegalArgumentException.class, () -> LocationsResponsePacket.read(buf));
     }
 }

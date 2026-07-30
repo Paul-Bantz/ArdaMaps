@@ -175,6 +175,7 @@ public abstract class TilesMapCamera extends MapCamera {
 
     /**
      * Sets the dimension for this camera. References the player exploration if dimension is valid.
+     *
      * @param dimension The DimensionDefinition to set for this camera
      */
     @Override

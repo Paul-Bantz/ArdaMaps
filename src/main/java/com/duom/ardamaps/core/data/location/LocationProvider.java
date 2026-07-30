@@ -39,13 +39,13 @@ import java.util.TreeMap;
 public class LocationProvider {
 
     /**
-     * Retrieves the list of landmarks for a given namespace within a specified distance from a position.
-     * Keyed by the squared distance to the given position
-     * @param dimension       The dimension to retrieve landmarks for.
+     * Retrieves landmarks within a specified distance from a position.
+     *
+     * @param dimension   The dimension to retrieve landmarks for.
      * @param position    The position to measure distance from.
      * @param maxDistance The maximum distance to filter landmarks.
      * @param filter      Whether to filter out landmarks with position (0,0,0).
-     * @return A map of landmarks within the specified distance from the position keyed by the distance to the position.
+     * @return A map of landmarks keyed by their squared distance to the given position.
      */
     public static TreeMap<Double, LocationClient> getLocations(String dimension, Vec3d position, float maxDistance, boolean filter) {
 

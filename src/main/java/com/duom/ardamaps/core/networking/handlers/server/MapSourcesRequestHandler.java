@@ -35,8 +35,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * A packet sent from the client to the server to request map source data.
- * This returns a list of map layers that the client can display.
+ * Handler for map source requests, responsible for responding with map layer configuration and feature availability.
  */
 public class MapSourcesRequestHandler extends RespondablePacketHandler<MapSourcesRequestPacket, MapSourceResponsePacket> {
 
@@ -55,12 +54,12 @@ public class MapSourcesRequestHandler extends RespondablePacketHandler<MapSource
     }
 
     /**
-     * Handles the incoming EmptyPacket by retrieving the map source configuration and responding with a MapSourceResponsePacket containing the configuration in JSON format.
+     * Handles the incoming map source request by retrieving dimension and map layer configuration and responding with feature availability.
      *
      * @param server The Minecraft server instance.
      * @param player The player who sent the request.
      * @param packet The MapSourcesRequestPacket containing the request data.
-     * @return A MapSourceResponsePacket containing the map source configuration in JSON format.
+     * @return A MapSourceResponsePacket containing the map source configuration and feature availability.
      */
     @Override
     public MapSourceResponsePacket handle(MinecraftServer server, ServerPlayer player, MapSourcesRequestPacket packet) {

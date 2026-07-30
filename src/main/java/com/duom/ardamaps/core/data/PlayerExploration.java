@@ -208,6 +208,17 @@ public class PlayerExploration implements Serializable {
     }
 
     /**
+     * Sets the backing exploration data and resets the pure grid delegate.
+     *
+     * @param explorationData Backing exploration data.
+     */
+    public void setExplorationData(byte[] explorationData) {
+
+        this.grid = ExplorationGrid.create(xMin, zMin, cellSize, nbCellsX, nbCellsY, explorationData);
+        this.explorationData = grid.getExplorationData();
+    }
+
+    /**
      * Initializes the fog-of-war texture and synchronizes it with the current exploration data.
      * Should be called on (or via) the render thread after creating a PlayerExploration instance.
      */
@@ -257,6 +268,33 @@ public class PlayerExploration implements Serializable {
     }
 
     /**
+     * Releases GPU and native texture resources without changing grid data.
+     */
+    private void releaseTextureResources() {
+
+        if (fogTexture != null) {
+
+            if (fogTextureId != null) {
+
+                Client.mc().getTextureManager()
+                        .release(fogTextureId);
+
+                fogTextureId = null;
+            }
+
+            fogTexture.close();
+            fogTexture = null;
+        }
+
+        if (fogMask != null) {
+
+            fogMask.close();
+            fogMask = null;
+        }
+
+    }
+
+    /**
      * @return The dynamic texture name for this exploration range.
      */
     private String textureName() {
@@ -264,6 +302,19 @@ public class PlayerExploration implements Serializable {
         String name = TEXTURE_PREFIX + "_" + sanitizeIdentifierSuffix(dimensionId);
         if (rangeIndex != null) name += "_" + rangeIndex;
         return name;
+    }
+
+    /**
+     * @return The pure grid delegate, rebuilding it after JSON deserialization if needed.
+     */
+    private ExplorationGrid grid() {
+
+        if (grid == null) {
+            grid = ExplorationGrid.create(xMin, zMin, cellSize, nbCellsX, nbCellsY, explorationData);
+            explorationData = grid.getExplorationData();
+        }
+
+        return grid;
     }
 
     /**
@@ -313,42 +364,6 @@ public class PlayerExploration implements Serializable {
     }
 
     /**
-     * Returns the exploration state of the cell at {@code (cellX, cellY)}.
-     *
-     * @param cellX Cell X index.
-     * @param cellY Cell Y index.
-     * @return The {@link ExplorationState}, or {@link ExplorationState#HIDDEN} if out of bounds.
-     */
-    public ExplorationState stateAt(int cellX, int cellY) {
-
-        return grid().stateAt(cellX, cellY);
-    }
-
-    /**
-     * Sets the backing exploration data and resets the pure grid delegate.
-     *
-     * @param explorationData Backing exploration data.
-     */
-    public void setExplorationData(byte[] explorationData) {
-
-        this.grid = ExplorationGrid.create(xMin, zMin, cellSize, nbCellsX, nbCellsY, explorationData);
-        this.explorationData = grid.getExplorationData();
-    }
-
-    /**
-     * @return The pure grid delegate, rebuilding it after JSON deserialization if needed.
-     */
-    private ExplorationGrid grid() {
-
-        if (grid == null) {
-            grid = ExplorationGrid.create(xMin, zMin, cellSize, nbCellsX, nbCellsY, explorationData);
-            explorationData = grid.getExplorationData();
-        }
-
-        return grid;
-    }
-
-    /**
      * Factory method to create a PlayerExploration instance for a ranged dimension.
      *
      * @param dimensionId The ID of the dimension.
@@ -363,6 +378,18 @@ public class PlayerExploration implements Serializable {
             return create(dimension, rangeIndex, null);
 
         return null;
+    }
+
+    /**
+     * Returns the exploration state of the cell at {@code (cellX, cellY)}.
+     *
+     * @param cellX Cell X index.
+     * @param cellY Cell Y index.
+     * @return The {@link ExplorationState}, or {@link ExplorationState#HIDDEN} if out of bounds.
+     */
+    public ExplorationState stateAt(int cellX, int cellY) {
+
+        return grid().stateAt(cellX, cellY);
     }
 
     /**
@@ -459,33 +486,6 @@ public class PlayerExploration implements Serializable {
         releaseTextureResources();
 
         if (dirtyCells != null) dirtyCells.clear();
-    }
-
-    /**
-     * Releases GPU and native texture resources without changing grid data.
-     */
-    private void releaseTextureResources() {
-
-        if (fogTexture != null) {
-
-            if (fogTextureId != null) {
-
-                Client.mc().getTextureManager()
-                        .release(fogTextureId);
-
-                fogTextureId = null;
-            }
-
-            fogTexture.close();
-            fogTexture = null;
-        }
-
-        if (fogMask != null) {
-
-            fogMask.close();
-            fogMask = null;
-        }
-
     }
 
     /**

@@ -523,7 +523,6 @@ public class MapScreen extends ArdaMapsScreen {
 
                 mapRenderer.render(context);
 
-
                 var selectedLocationType = markersSelectionDropdown.getSelected();
                 var focusedLocationPosition = locationContextPanel == null
                         ? null
@@ -548,7 +547,6 @@ public class MapScreen extends ArdaMapsScreen {
 
             updateCoordinates(mouseX, mouseY);
             updateRegionUnderMouse(mouseX, mouseY);
-
 
         } else {
             renderPlaceholder(context);
@@ -781,7 +779,6 @@ public class MapScreen extends ArdaMapsScreen {
     /**
      * Handle screen resizing, update map camera viewport and re-center coordinates button
      *
-     * @param client the Minecraft client instance
      * @param width  the new width of the screen
      * @param height the new height of the screen
      */
@@ -877,9 +874,8 @@ public class MapScreen extends ArdaMapsScreen {
     /**
      * Handle mouse click for starting map dragging
      *
-     * @param mouseX The mouse x position
-     * @param mouseY The mouse y position
-     * @param button The mouse button
+     * @param event       the initiating mouse event
+     * @param doubleClick true if this is a double click
      * @return True if the event was handled
      */
     @Override
@@ -1123,65 +1119,6 @@ public class MapScreen extends ArdaMapsScreen {
     }
 
     /**
-     * Handle mouse release for stopping map dragging
-     * Also handle single clicks on the map
-     *
-     * @param mouseX The mouse x position
-     * @param mouseY The mouse y position
-     * @param button The mouse button
-     */
-    @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
-        double mouseX = event.x();
-        double mouseY = event.y();
-        int button = event.button();
-
-        // Children must get the release first: the parent dispatch is what drives widget
-        // onRelease, and returning early here would swallow it for every left-button release.
-        boolean handledByChild = super.mouseReleased(event);
-
-        // The parent dispatch only reaches the hovered element, so a strip drag that ends
-        // off the widget would otherwise leave it stuck tracking a press.
-        if (!handledByChild && rangeSelectionWidget != null && rangeSelectionWidget.isDragging())
-            handledByChild = rangeSelectionWidget.mouseReleased(event);
-
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-            dragging = false;
-
-            // Check if mouse barely moved (single click, not drag)
-            double distanceSquared = Math.pow(mouseX - clickStartX, 2) + Math.pow(mouseY - clickStartY, 2);
-
-            if (!handledByChild && distanceSquared < CLICK_THRESHOLD_SQUARED) handleMapMarkerClick();
-
-            return true;
-        }
-
-        return handledByChild;
-    }
-
-    /**
-     * Handle clicks on map markers to open location context panel
-     */
-    private void handleMapMarkerClick() {
-
-        if (Client.player() == null) return;
-
-        var anyLocationClicked = false;
-
-        var mouseOverLocation = markerRenderer.getMouseOverLocation();
-        if (mouseOverLocation != null) {
-
-            switchToLayerContaining(mouseOverLocation.getPosition().y());
-            panAndSelectLocation(mouseOverLocation, false);
-
-            anyLocationClicked = true;
-        }
-
-        if (!anyLocationClicked)
-            locationContextPanel = null;
-    }
-
-    /**
      * Switch to the layer having the given Y position in range
      *
      * @param y the y position to select the correct layer
@@ -1202,21 +1139,6 @@ public class MapScreen extends ArdaMapsScreen {
                 rangeSelectionChanged(target);
             }
         }
-    }
-
-    /**
-     * Pans the camera to the given location, opens the side panel, and pushes the entry onto the
-     * navigation history (truncating any forward entries first, then capping at 10).
-     *
-     * @param location the location to display
-     * @param focused  if true zooms to identity at the location
-     */
-    public void panAndSelectLocation(LocationClient location, boolean focused) {
-
-        if (location == null) return;
-
-        locationHistory.push(location);
-        applySidePanel(location, focused);
     }
 
     /**
@@ -1324,6 +1246,79 @@ public class MapScreen extends ArdaMapsScreen {
     }
 
     /**
+     * Handle mouse release for stopping map dragging
+     * Also handle single clicks on the map
+     *
+     * @param event the initiating mouse event
+     * @return true if the event was consumed
+     */
+    @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
+
+        // Children must get the release first: the parent dispatch is what drives widget
+        // onRelease, and returning early here would swallow it for every left-button release.
+        boolean handledByChild = super.mouseReleased(event);
+
+        // The parent dispatch only reaches the hovered element, so a strip drag that ends
+        // off the widget would otherwise leave it stuck tracking a press.
+        if (!handledByChild && rangeSelectionWidget != null && rangeSelectionWidget.isDragging())
+            handledByChild = rangeSelectionWidget.mouseReleased(event);
+
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            dragging = false;
+
+            // Check if mouse barely moved (single click, not drag)
+            double distanceSquared = Math.pow(mouseX - clickStartX, 2) + Math.pow(mouseY - clickStartY, 2);
+
+            if (!handledByChild && distanceSquared < CLICK_THRESHOLD_SQUARED) handleMapMarkerClick();
+
+            return true;
+        }
+
+        return handledByChild;
+    }
+
+    /**
+     * Handle clicks on map markers to open location context panel
+     */
+    private void handleMapMarkerClick() {
+
+        if (Client.player() == null) return;
+
+        var anyLocationClicked = false;
+
+        var mouseOverLocation = markerRenderer.getMouseOverLocation();
+        if (mouseOverLocation != null) {
+
+            switchToLayerContaining(mouseOverLocation.getPosition().y());
+            panAndSelectLocation(mouseOverLocation, false);
+
+            anyLocationClicked = true;
+        }
+
+        if (!anyLocationClicked)
+            locationContextPanel = null;
+    }
+
+    /**
+     * Pans the camera to the given location, opens the side panel, and pushes the entry onto the
+     * navigation history (truncating any forward entries first, then capping at 10).
+     *
+     * @param location the location to display
+     * @param focused  if true zooms to identity at the location
+     */
+    public void panAndSelectLocation(LocationClient location, boolean focused) {
+
+        if (location == null) return;
+
+        locationHistory.push(location);
+        applySidePanel(location, focused);
+    }
+
+    /**
      * Cleans up renderer resources when the screen is removed.
      */
     @Override
@@ -1338,11 +1333,9 @@ public class MapScreen extends ArdaMapsScreen {
     /**
      * Handle mouse dragging for panning the map
      *
-     * @param mouseX The mouse x position
-     * @param mouseY The mouse y position
-     * @param button The mouse button
-     * @param dx     The change in x position
-     * @param dy     The change in y position
+     * @param event the initiating mouse event
+     * @param dx    The change in x position
+     * @param dy    The change in y position
      * @return True if the event was handled
      */
     @Override
@@ -1372,9 +1365,10 @@ public class MapScreen extends ArdaMapsScreen {
     /**
      * Handle mouse scroll for zooming
      *
-     * @param mouseX The mouse x position
-     * @param mouseY The mouse y position
-     * @param amount The scroll amount
+     * @param mouseX           The mouse x position
+     * @param mouseY           The mouse y position
+     * @param horizontalAmount The horizontal scroll amount
+     * @param verticalAmount   The vertical scroll amount
      * @return True if the event was handled
      */
     @Override
@@ -1511,5 +1505,6 @@ public class MapScreen extends ArdaMapsScreen {
      * @param highlightColor The colour used for highlighting the marker (e.g., on hover), used for rendering effects when the marker is interacted with
      */
     private record MarkerInfo(String key, String displayName, Identifier icon, int color, int highlightColor) {
+
     }
 }

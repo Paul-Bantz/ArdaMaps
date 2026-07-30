@@ -43,7 +43,8 @@ public class GuideBook {
     private List<GuidePage> pages;
 
     /** No-arg constructor required by Gson. */
-    public GuideBook() {}
+    public GuideBook() {
+    }
 
     /**
      * @return an unmodifiable view of all pages; never {@code null}

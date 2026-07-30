@@ -63,7 +63,7 @@ public class ServerCommands {
      */
     public static void register() {
         CommandRegistrationCallback.EVENT.register(
-                (dispatcher, registryAccess, environment) ->
+                (dispatcher, _, _) ->
                         registerCommands(dispatcher)
         );
     }
@@ -107,6 +107,24 @@ public class ServerCommands {
         ArdaMaps.CONFIG_MANAGER.validateDimensionConfiguration(ArdaMaps.serverWorldDefinitions(ArdaMaps.SERVER));
 
         ArdaMaps.CONFIG = ArdaMaps.CONFIG_MANAGER.getConfig();
+
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Refreshes location data from the registered LocationSource.
+     *
+     * @param ignoredCommandSource The command context.
+     * @return The result of the command execution.
+     */
+    @SuppressWarnings("SameReturnValue")
+    private static int refreshLocationData(CommandContext<CommandSourceStack> ignoredCommandSource) {
+
+        ExternalLocationSource.fetchLocations().thenAccept(ServerCommands::saveLocationData)
+                .exceptionally(ex -> {
+                    LOGGER.warn("Failed to fetch locations: {}", ex.getMessage());
+                    return null;
+                });
 
         return Command.SINGLE_SUCCESS;
     }
@@ -158,32 +176,6 @@ public class ServerCommands {
     }
 
     /**
-     * Saves the current region lookup texture data to a debug file.
-     *
-     * @param ignoredCommandSource The command context.
-     * @return The result of the command execution.
-     */
-    private static int debugRegionLookupData(CommandContext<CommandSourceStack> ignoredCommandSource) {
-
-        LOGGER.info("Dumping region lookup texture data to file");
-
-        ArdaMaps.IO_EXECUTOR.submit(() -> {
-
-            try {
-
-                RegionLookupTexture texture = ArdaMaps.CONFIG.getRegionLookupTexture();
-                texture.debugSaveToFile(new File("region_lookup_debug.png"));
-
-            } catch (IOException e) {
-
-                LOGGER.error("Failed to save region lookup texture debug image", e);
-            }
-        });
-
-        return Command.SINGLE_SUCCESS;
-    }
-
-    /**
      * Logs the current refresh schedule status (active CRON expression, last refresh time, and
      * next planned refresh time) to the server log. Output is intentionally server-log-only -
      * nothing is sent back to the command source.
@@ -226,19 +218,27 @@ public class ServerCommands {
     }
 
     /**
-     * Refreshes location data from the registered LocationSource.
+     * Saves the current region lookup texture data to a debug file.
      *
      * @param ignoredCommandSource The command context.
      * @return The result of the command execution.
      */
-    @SuppressWarnings("SameReturnValue")
-    private static int refreshLocationData(CommandContext<CommandSourceStack> ignoredCommandSource) {
+    private static int debugRegionLookupData(CommandContext<CommandSourceStack> ignoredCommandSource) {
 
-        ExternalLocationSource.fetchLocations().thenAccept(ServerCommands::saveLocationData)
-                .exceptionally(ex -> {
-                    LOGGER.warn("Failed to fetch locations: {}", ex.getMessage());
-                    return null;
-                });
+        LOGGER.info("Dumping region lookup texture data to file");
+
+        ArdaMaps.IO_EXECUTOR.submit(() -> {
+
+            try {
+
+                RegionLookupTexture texture = ArdaMaps.CONFIG.getRegionLookupTexture();
+                texture.debugSaveToFile(new File("region_lookup_debug.png"));
+
+            } catch (IOException e) {
+
+                LOGGER.error("Failed to save region lookup texture debug image", e);
+            }
+        });
 
         return Command.SINGLE_SUCCESS;
     }

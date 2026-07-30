@@ -28,11 +28,7 @@ package com.duom.ardamaps.core.data.config;
 import com.google.gson.annotations.SerializedName;
 import lombok.Getter;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Definition of the dimension in the configuration.

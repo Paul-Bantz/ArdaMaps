@@ -129,7 +129,6 @@ public class WebpRenderer extends MapRenderable {
 
         syncTextureDimensions(provider);
 
-
         // Translate for sub-pixel accuracy
         var matrices = context.pose();
         matrices.pushMatrix();

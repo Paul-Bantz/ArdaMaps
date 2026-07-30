@@ -35,6 +35,7 @@ import net.minecraft.resources.Identifier;
  * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
 public interface IPacketHandler {
+
     /**
      * Get the channel ID for this packet handler.
      */

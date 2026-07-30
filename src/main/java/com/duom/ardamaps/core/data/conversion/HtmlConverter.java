@@ -135,12 +135,12 @@ public class HtmlConverter {
      * {@code <span>}) are handled by recursing into their children with the current colour
      * unchanged.</p>
      *
-     * @param node   the HTML node to process
-     * @param blocks accumulator list that receives completed {@link ContentBlock}s
-     * @param buf    the mutable text buffer currently being built
-     * @param color  the {@link TextColor} to apply to plain text content
-     * @param stripLeading   whether to strip leading whitespace from text nodes (typically enabled for block-level elements)
-     *                       @param stripTrailing   whether to strip trailing whitespace from text nodes (typically enabled for block-level elements)
+     * @param node          the HTML node to process
+     * @param blocks        accumulator list that receives completed {@link ContentBlock}s
+     * @param buf           the mutable text buffer currently being built
+     * @param color         the {@link TextColor} to apply to plain text content
+     * @param stripLeading  whether to strip leading whitespace from text nodes (typically enabled for block-level elements)
+     * @param stripTrailing whether to strip trailing whitespace from text nodes (typically enabled for block-level elements)
      */
     private static void collectNodes(Node node,
                                      List<ContentBlock> blocks,
@@ -222,7 +222,7 @@ public class HtmlConverter {
      * @param buf     the mutable text buffer currently being built
      * @param color   the {@link TextColor} to propagate to child nodes
      * @param element the element whose children should be walked
-     * @param trim  whether to trim leading/trailing whitespace from text nodes (typically true for block-level elements)
+     * @param trim    whether to trim leading/trailing whitespace from text nodes (typically true for block-level elements)
      */
     @SuppressWarnings("SameParameterValue")
     private static void collectTextNode(List<ContentBlock> blocks,
@@ -257,8 +257,9 @@ public class HtmlConverter {
 
     /**
      * Collects a title type node
-     * @param blocks the current blocks list, used to flush the buffer before and after the title block
-     * @param buf the current buffer
+     *
+     * @param blocks  the current blocks list, used to flush the buffer before and after the title block
+     * @param buf     the current buffer
      * @param element the element to collect
      */
     private static void collectTitleNode(List<ContentBlock> blocks, ParseBuffer buf, Element element) {
@@ -490,7 +491,7 @@ public class HtmlConverter {
         buf.flushTo(blocks);
 
         TextColor bqColor = TextColor.fromRgb(ModConstants.COLOR_BLUE);
-        ParseBuffer bqBuf  = new ParseBuffer();
+        ParseBuffer bqBuf = new ParseBuffer();
         List<ContentBlock> bqBlocks = new ArrayList<>();
 
         for (Node child : element.childNodes()) {
@@ -775,6 +776,7 @@ public class HtmlConverter {
      * @param id   the path segment identifying the specific resource (e.g. {@code "rivendell"})
      */
     private record Link(String type, String id) {
+
     }
 
     /**

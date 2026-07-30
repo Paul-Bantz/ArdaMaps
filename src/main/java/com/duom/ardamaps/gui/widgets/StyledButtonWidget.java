@@ -47,21 +47,13 @@ public class StyledButtonWidget extends AbstractWidget {
     /** On select runnable */
     private final Runnable onSelect;
 
+    /** Button style */
+    private final Style style;
+
     /** Toggled state of the button, if true the button will be rendered in a toggled state */
     @Getter
     @Setter
     private boolean toggled = false;
-
-    /** Button style */
-    private final Style style;
-
-    /**
-     * Button style type
-     */
-    public enum Style {
-        DEFAULT,
-        EDGE
-    }
 
     /**
      * Creates a new Button.
@@ -112,9 +104,10 @@ public class StyledButtonWidget extends AbstractWidget {
 
     /**
      * Renders the button as default style
+     *
      * @param context the draw context
-     * @param mouseX the mouse x position
-     * @param mouseY the mouse y position
+     * @param mouseX  the mouse x position
+     * @param mouseY  the mouse y position
      */
     private void renderDefaultStyle(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
@@ -150,9 +143,10 @@ public class StyledButtonWidget extends AbstractWidget {
 
     /**
      * Renders the button as edge style
+     *
      * @param context the draw context
-     * @param mouseX the mouse x position
-     * @param mouseY the mouse y position
+     * @param mouseX  the mouse x position
+     * @param mouseY  the mouse y position
      */
     private void renderEdgeStyle(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
@@ -175,7 +169,6 @@ public class StyledButtonWidget extends AbstractWidget {
                     512, 512,
                     mouseOver ? GuiTextures.argb(1.0f, 1.0f, 1.0f, 0.5f) : ModConstants.COLOR_WHITE);
         }
-
 
         if (!text.equals(Component.empty())) {
 
@@ -210,8 +203,8 @@ public class StyledButtonWidget extends AbstractWidget {
     /**
      * Handles mouse click events on the button, executing the onSelect runnable and then calling the superclass's onClick method to handle any additional behaviour.
      *
-     * @param mouseX the x position of the mouse cursor at the time of the click
-     * @param mouseY the y position of the mouse cursor at the time of the click
+     * @param event the initiating mouse event
+     * @param doubleClick true if this is a double click
      */
     @Override
     public void onClick(@NonNull MouseButtonEvent event, boolean doubleClick) {
@@ -228,5 +221,13 @@ public class StyledButtonWidget extends AbstractWidget {
     @Override
     protected void updateWidgetNarration(@NonNull NarrationElementOutput builder) {
         defaultButtonNarrationText(builder);
+    }
+
+    /**
+     * Button style type
+     */
+    public enum Style {
+        DEFAULT,
+        EDGE
     }
 }

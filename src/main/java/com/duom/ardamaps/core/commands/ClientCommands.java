@@ -62,18 +62,19 @@ import java.util.Optional;
  */
 public class ClientCommands {
 
-    /** Class logger */
-    private static final Logger LOGGER = LoggerFactory.getLogger(ClientCommands.class);
-
     /** Tab spacing constant for formatted command output. */
     public static final String TAB_SPACING = "    ";
+
     public static final String DOUBLE_TAB_SPACING = TAB_SPACING + TAB_SPACING;
+
+    /** Class logger */
+    private static final Logger LOGGER = LoggerFactory.getLogger(ClientCommands.class);
 
     /**
      * Registers client-side commands.
      */
     public static void register() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, _) ->
                 registerCommands(dispatcher)
         );
     }
@@ -89,8 +90,8 @@ public class ClientCommands {
                 net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal(ArdaMaps.MOD_ID)
                         .executes(ClientCommands::printModInformation)
                         .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("guide")
-                            .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument("link", StringArgumentType.greedyString())
-                                .executes(ClientCommands::openGuideLink)))
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument("link", StringArgumentType.greedyString())
+                                        .executes(ClientCommands::openGuideLink)))
                         .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("waypoint")
                                 .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument("waypointCommandArgs", StringArgumentType.greedyString())
                                         .executes(ClientCommands::addChatWaypoint)))
@@ -137,6 +138,58 @@ public class ClientCommands {
 
         // Give the player a guidebook if they don't have one, or switch to it if they do
         PacketRegistry.GUIDEBOOK_REQUEST_HANDLER.send(new EmptyPacket());
+
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Opens the appropriate ArdaMaps screen for the given guide deep-link.
+     *
+     * <p>Resolves the {@code link} argument using the {@link GuideScreenLink} helpers:</p>
+     * <ul>
+     *   <li>{@code guide:map} - opens the Map screen</li>
+     *   <li>{@code guide:configuration} - opens the Configuration screen</li>
+     *   <li>Any other {@code guide:…} token - opens the Guide screen, which internally
+     *       resolves the page/entry deep-link via {@link GuideScreenLink#resolve}</li>
+     * </ul>
+     *
+     * <p>The screen is opened with {@code null} as parent so that closing it returns
+     * the player straight to the game rather than back to a previous screen.</p>
+     *
+     * @param context the command context containing the {@code link} argument
+     * @return {@link Command#SINGLE_SUCCESS}
+     */
+    private static int openGuideLink(CommandContext<FabricClientCommandSource> context) {
+
+        String link = StringArgumentType.getString(context, "link");
+
+        Client.mc().setScreen(null);
+
+        // Schedule the screen to open on the next client tick, after the chat screen has closed.
+        // Calling setScreen() directly here (or inside mc.execute()) races with the chat screen's
+        // own setScreen(null) dismissal call, causing the new screen to be immediately hidden.
+        if (GuideScreenLink.isMapLink(link))
+            ArdaMapsClient.pendingScreen = new MapScreen(null);
+        else if (GuideScreenLink.isConfigLink(link))
+            ArdaMapsClient.pendingScreen = new ConfigurationScreen(null);
+        else
+            ArdaMapsClient.pendingScreen = new GuideScreen(null, link);
+
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Adds a waypoint to the client via a chatcommand
+     *
+     * @param context the command context containing the {@code waypoint} argument
+     * @return {@link Command#SINGLE_SUCCESS}
+     */
+    private static int addChatWaypoint(CommandContext<FabricClientCommandSource> context) {
+
+        String waypointCommandArgs = StringArgumentType.getString(context, "waypointCommandArgs");
+
+        Optional<Waypoint> waypoint = Waypoint.fromJson(waypointCommandArgs);
+        waypoint.ifPresent(value -> ArdaMapsClient.CONFIG.setWaypoint(value));
 
         return Command.SINGLE_SUCCESS;
     }
@@ -267,57 +320,6 @@ public class ClientCommands {
             );
         }
         contextSource.sendFeedback(Component.literal("}"));
-
-        return Command.SINGLE_SUCCESS;
-    }
-
-    /**
-     * Opens the appropriate ArdaMaps screen for the given guide deep-link.
-     *
-     * <p>Resolves the {@code link} argument using the {@link GuideScreenLink} helpers:</p>
-     * <ul>
-     *   <li>{@code guide:map} - opens the Map screen</li>
-     *   <li>{@code guide:configuration} - opens the Configuration screen</li>
-     *   <li>Any other {@code guide:…} token - opens the Guide screen, which internally
-     *       resolves the page/entry deep-link via {@link GuideScreenLink#resolve}</li>
-     * </ul>
-     *
-     * <p>The screen is opened with {@code null} as parent so that closing it returns
-     * the player straight to the game rather than back to a previous screen.</p>
-     *
-     * @param context the command context containing the {@code link} argument
-     * @return {@link Command#SINGLE_SUCCESS}
-     */
-    private static int openGuideLink(CommandContext<FabricClientCommandSource> context) {
-
-        String link = StringArgumentType.getString(context, "link");
-
-        Client.mc().setScreen(null);
-
-        // Schedule the screen to open on the next client tick, after the chat screen has closed.
-        // Calling setScreen() directly here (or inside mc.execute()) races with the chat screen's
-        // own setScreen(null) dismissal call, causing the new screen to be immediately hidden.
-        if (GuideScreenLink.isMapLink(link))
-            ArdaMapsClient.pendingScreen = new MapScreen(null);
-        else if (GuideScreenLink.isConfigLink(link))
-            ArdaMapsClient.pendingScreen = new ConfigurationScreen(null);
-        else
-            ArdaMapsClient.pendingScreen = new GuideScreen(null, link);
-
-        return Command.SINGLE_SUCCESS;
-    }
-
-    /**
-     * Adds a waypoint to the client via a chatcommand
-     * @param context the command context containing the {@code waypoint} argument
-     * @return {@link Command#SINGLE_SUCCESS}
-     */
-    private static int addChatWaypoint(CommandContext<FabricClientCommandSource> context) {
-
-        String waypointCommandArgs = StringArgumentType.getString(context, "waypointCommandArgs");
-
-        Optional<Waypoint> waypoint = Waypoint.fromJson(waypointCommandArgs);
-        waypoint.ifPresent(value -> ArdaMapsClient.CONFIG.setWaypoint(value));
 
         return Command.SINGLE_SUCCESS;
     }

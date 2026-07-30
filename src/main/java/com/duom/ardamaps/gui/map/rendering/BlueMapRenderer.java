@@ -120,18 +120,6 @@ public class BlueMapRenderer extends MapRenderable {
     }
 
     /**
-     * Releases tile provider resources owned by this renderer.
-     */
-    @Override
-    public void close() {
-
-        if (provider != null) {
-            provider.close();
-            provider = null;
-        }
-    }
-
-    /**
      * Renders the map tiles in LOD-grouped batched passes.
      * <p>
      * A single classification loop separates tiles into:
@@ -202,7 +190,7 @@ public class BlueMapRenderer extends MapRenderable {
         if (!fallbackMap.isEmpty()) {
             Map<Integer, List<TileDraw>> byLod = new LinkedHashMap<>();
             for (TileDraw tile : fallbackMap.values()) {
-                byLod.computeIfAbsent(tile.lod(), k -> new ArrayList<>()).add(tile);
+                byLod.computeIfAbsent(tile.lod(), _ -> new ArrayList<>()).add(tile);
             }
             byLod.forEach((lod, tiles) -> drawTilePass(context, tiles, lod));
         }
@@ -285,6 +273,18 @@ public class BlueMapRenderer extends MapRenderable {
     }
 
     /**
+     * Releases tile provider resources owned by this renderer.
+     */
+    @Override
+    public void close() {
+
+        if (provider != null) {
+            provider.close();
+            provider = null;
+        }
+    }
+
+    /**
      * Lightweight carrier for a resolved tile ready to be drawn.
      *
      * @param texture The loaded tile texture identifier.
@@ -293,5 +293,6 @@ public class BlueMapRenderer extends MapRenderable {
      * @param lod     Actual LOD zoom level of this tile — drives quad size, UV extents and shader uniforms.
      */
     private record TileDraw(Identifier texture, float x0, float y0, int lod) {
+
     }
 }

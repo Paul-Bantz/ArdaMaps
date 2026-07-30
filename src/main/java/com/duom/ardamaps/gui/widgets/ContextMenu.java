@@ -44,13 +44,6 @@ import java.util.List;
  */
 public class ContextMenu {
 
-    /**
-     * Represents a single entry in the context menu, consisting of a label and an action to perform when clicked.
-     * @param label The text label of the menu entry.
-     * @param action The action to execute when the entry is clicked, represented as a Runnable.
-     */
-    public record Entry(Component label, Runnable action) {}
-
     /** Context menu item height */
     private static final int ITEM_HEIGHT = 16;
 
@@ -59,14 +52,6 @@ public class ContextMenu {
 
     /** The horizontal padding for the text within the menu, providing space on either side of the text for better readability. */
     private static final int H_PADDING = 12;
-
-    /** The x-coordinate of the top-left corner of the context menu on the screen. */
-    @Setter
-    private int x;
-
-    /** The y-coordinate of the top-left corner of the context menu on the screen. */
-    @Setter
-    private int y;
 
     /** The list of entries that will be displayed in the context menu, each containing a label and an associated action. */
     private final List<Entry> entries;
@@ -85,12 +70,21 @@ public class ContextMenu {
     @Getter
     private final double worldZ;
 
+    /** The x-coordinate of the top-left corner of the context menu on the screen. */
+    @Setter
+    private int x;
+
+    /** The y-coordinate of the top-left corner of the context menu on the screen. */
+    @Setter
+    private int y;
+
     /**
      * Constructs a new ContextMenu instance with the specified screen coordinates, world coordinates, and menu entries.
-     * @param x The x-coordinate of the top-left corner of the context menu on the screen.
-     * @param y The y-coordinate of the top-left corner of the context menu on the screen.
-     * @param worldX The world X coordinate associated with this context menu, used for actions that require world position.
-     * @param worldZ The world Z coordinate associated with this context menu, used for actions that require world position.
+     *
+     * @param x       The x-coordinate of the top-left corner of the context menu on the screen.
+     * @param y       The y-coordinate of the top-left corner of the context menu on the screen.
+     * @param worldX  The world X coordinate associated with this context menu, used for actions that require world position.
+     * @param worldZ  The world Z coordinate associated with this context menu, used for actions that require world position.
      * @param entries The list of entries that will be displayed in the context menu, each containing a label and an associated action.
      */
     public ContextMenu(int x, int y, double worldX, double worldZ, List<Entry> entries) {
@@ -114,9 +108,10 @@ public class ContextMenu {
     /**
      * Renders the context menu on the screen, including the background and the individual entries.
      * Each entry is highlighted when hovered by the mouse cursor.
+     *
      * @param context The DrawContext used for rendering the menu.
-     * @param mouseX The current x-coordinate of the mouse cursor, used for hover detection.
-     * @param mouseY The current y-coordinate of the mouse cursor, used for hover detection.
+     * @param mouseX  The current x-coordinate of the mouse cursor, used for hover detection.
+     * @param mouseY  The current y-coordinate of the mouse cursor, used for hover detection.
      */
     public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
@@ -157,6 +152,7 @@ public class ContextMenu {
 
     /**
      * Handles mouse click events on the context menu, determining if a click occurred on any of the menu entries and executing the associated action if so.
+     *
      * @param mouseX The x-coordinate of the mouse click event.
      * @param mouseY The y-coordinate of the mouse click event.
      * @param button The mouse button that was clicked, used to determine if it's a left-click.
@@ -179,11 +175,22 @@ public class ContextMenu {
 
     /**
      * Determines if the given mouse coordinates are within the bounds of the context menu, used for hover detection and click handling.
+     *
      * @param mouseX The x-coordinate of the mouse cursor.
      * @param mouseY The y-coordinate of the mouse cursor.
      * @return true if the mouse coordinates are within the context menu bounds, false otherwise.
      */
     public boolean isMouseOver(double mouseX, double mouseY) {
         return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+    }
+
+    /**
+     * Represents a single entry in the context menu, consisting of a label and an action to perform when clicked.
+     *
+     * @param label  The text label of the menu entry.
+     * @param action The action to execute when the entry is clicked, represented as a Runnable.
+     */
+    public record Entry(Component label, Runnable action) {
+
     }
 }

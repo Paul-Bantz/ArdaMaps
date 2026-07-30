@@ -239,12 +239,12 @@ public class BookmarkButtonWidget extends AbstractWidget {
      * Handles mouse click events on the button.
      *
      * <p>Executes the {@link #onSelect} runnable and then delegates to
-     * {@link AbstractWidget#onClick(double, double)} for default click processing
+     * {@link AbstractWidget#onClick(MouseButtonEvent, boolean)} for default click processing
      * (e.g. playing the click sound). If the widget is not {@link #visible} the
      * click is silently ignored.</p>
      *
-     * @param mouseX current x position of the mouse cursor in screen pixels
-     * @param mouseY current y position of the mouse cursor in screen pixels
+     * @param event       the initiating mouse event
+     * @param doubleClick if this is a double click or not
      */
     @Override
     public void onClick(@NonNull MouseButtonEvent event, boolean doubleClick) {

@@ -29,9 +29,10 @@ import com.duom.ardamaps.core.data.map.markers.MarkerType;
 import com.duom.ardamaps.core.data.map.markers.MarkersDefinition;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.*;
+import net.minecraft.resources.Identifier;
+
 import java.lang.reflect.Type;
 import java.util.Map;
-import net.minecraft.resources.Identifier;
 
 /**
  * Custom TypeAdapter for deserializing MarkersDefinition from JSON.

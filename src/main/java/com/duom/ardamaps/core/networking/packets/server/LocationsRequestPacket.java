@@ -44,9 +44,16 @@ import java.util.UUID;
  * @param date The date to filter locations by. If null, all locations will be requested.
  */
 public record LocationsRequestPacket(UUID requestId, Date date) implements IRespondablePacket<LocationsRequestPacket> {
+
     public static final CustomPacketPayload.Type<LocationsRequestPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_data_request"));
+
     public static final StreamCodec<RegistryFriendlyByteBuf, LocationsRequestPacket> CODEC = IPacket.codec(LocationsRequestPacket::read);
 
+    /**
+     * Constructs a LocationsRequestPacket with the given date filter.
+     *
+     * @param date The date to filter locations by, or null to request all locations.
+     */
     public LocationsRequestPacket(Date date) {
         this(new UUID(0L, 0L), date);
     }
@@ -81,6 +88,12 @@ public record LocationsRequestPacket(UUID requestId, Date date) implements IResp
         return buf;
     }
 
+    /**
+     * Creates a new LocationsRequestPacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this request.
+     * @return A new LocationsRequestPacket with the updated request identifier.
+     */
     @Override
     public LocationsRequestPacket withRequestId(UUID requestId) {
         return new LocationsRequestPacket(requestId, date);

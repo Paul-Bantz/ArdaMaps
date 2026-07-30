@@ -39,7 +39,9 @@ import java.lang.reflect.Method;
 final class GuiRenderStateAccess {
 
     private static final Field GUI_RENDER_STATE = findField("guiRenderState");
+
     private static final Field SCISSOR_STACK = findField("scissorStack");
+
     private static final Method SCISSOR_PEEK = findScissorPeek();
 
     private GuiRenderStateAccess() {

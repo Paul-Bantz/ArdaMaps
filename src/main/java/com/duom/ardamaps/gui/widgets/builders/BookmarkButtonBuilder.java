@@ -54,13 +54,17 @@ public class BookmarkButtonBuilder {
     private Runnable onSelect;
 
     /** Private constructor to enforce the use of the static create() method for instantiation. */
-    private BookmarkButtonBuilder(){}
+    private BookmarkButtonBuilder() {
+    }
 
     /** Static factory method to create a new instance of BookmarkButtonBuilder. */
-    public static BookmarkButtonBuilder create(){ return new BookmarkButtonBuilder(); }
+    public static BookmarkButtonBuilder create() {
+        return new BookmarkButtonBuilder();
+    }
 
     /**
      * Sets the position of the button using x and y coordinates.
+     *
      * @param x The x-coordinate of the button's position.
      * @param y The y-coordinate of the button's position.
      * @return The current instance of BookmarkButtonBuilder for method chaining.
@@ -73,7 +77,8 @@ public class BookmarkButtonBuilder {
 
     /**
      * Sets the size of the button using width and height.
-     * @param width The width of the button.
+     *
+     * @param width  The width of the button.
      * @param height The height of the button.
      * @return The current instance of BookmarkButtonBuilder for method chaining.
      */
@@ -85,6 +90,7 @@ public class BookmarkButtonBuilder {
 
     /**
      * Sets the action to be performed when the button is clicked.
+     *
      * @param onClick A Runnable that defines the click behaviour of the button.
      * @return The current instance of BookmarkButtonBuilder for method chaining.
      */
@@ -95,6 +101,7 @@ public class BookmarkButtonBuilder {
 
     /**
      * Sets the style of the button using a ButtonType enum value.
+     *
      * @param style The ButtonType that defines the visual style of the button.
      * @return The current instance of BookmarkButtonBuilder for method chaining.
      */
@@ -104,11 +111,11 @@ public class BookmarkButtonBuilder {
     }
 
     /**
-    * Builds and returns a new instance of BookmarkButtonWidget using the configured properties.
-    * @return A new BookmarkButtonWidget instance with the specified attributes.
-    */
-    public BookmarkButtonWidget build()
-    {
+     * Builds and returns a new instance of BookmarkButtonWidget using the configured properties.
+     *
+     * @return A new BookmarkButtonWidget instance with the specified attributes.
+     */
+    public BookmarkButtonWidget build() {
         return new BookmarkButtonWidget(
                 x,
                 y,

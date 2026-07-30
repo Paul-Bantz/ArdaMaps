@@ -41,4 +41,5 @@ public record MarkerType(String name,
                          @SerializedName("icon") String icon,
                          @SerializedName("color") @JsonAdapter(ColorIntTypeAdapter.class) int color,
                          @SerializedName("highlight_color") @JsonAdapter(ColorIntTypeAdapter.class) int highlightColor) {
+
 }

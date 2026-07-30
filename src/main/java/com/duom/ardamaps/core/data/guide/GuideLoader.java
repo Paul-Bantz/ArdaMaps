@@ -26,9 +26,13 @@
 package com.duom.ardamaps.core.data.guide;
 
 import com.duom.ardamaps.ArdaMaps;
-import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.gui.ModConstants;
 import com.google.gson.Gson;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,10 +44,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Supplier;
-import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.resources.Resource;
-import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
  * Utility class for loading guide data from the mod's resource pack.
@@ -63,7 +63,28 @@ public final class GuideLoader {
     /** Gson instance shared for guide deserialization. */
     private static final Gson GSON = new Gson();
 
+    /** Utility class with no public instances. */
     private GuideLoader() { /* utility class */ }
+
+    /**
+     * Loads and deserializes {@code assets/ardamaps/guide/guide.json} from the active resource manager.
+     *
+     * @return a {@link CompletableFuture} that resolves to the parsed {@link GuideBook},
+     * or an empty {@link GuideBook} if loading fails
+     */
+    public static CompletableFuture<GuideBook> loadGuideBook() {
+
+        return supplyAsyncSafe(() -> {
+
+            var resourceManager = Client.mc().getResourceManager();
+
+            Map<String, String> titles = loadTitles(resourceManager);
+            GuideBook guideBook = loadGuide(resourceManager);
+
+            return resolveTitles(guideBook, titles);
+
+        }, new GuideBook());
+    }
 
     /**
      * Submits {@code task} to {@link ArdaMaps#IO_EXECUTOR}, falling back to {@code fallback}
@@ -86,32 +107,34 @@ public final class GuideLoader {
     }
 
     /**
-     * Gets the current client locale, updated dynamically to reflect language changes.
+     * Loads the pages and entries titles with the correct locale : either client locale if available or default if none found
      *
-     * @return the current client locale
+     * @param resourceManager the resource manager
+     * @return the titles keyed by their IDs
      */
-    private static String getClientLocale() {
-        return Client.mc().getLanguageManager().getSelected();
-    }
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> loadTitles(ResourceManager resourceManager) {
 
-    /**
-     * Loads and deserializes {@code assets/ardamaps/guide/guide.json} from the active resource manager.
-     *
-     * @return a {@link CompletableFuture} that resolves to the parsed {@link GuideBook},
-     * or an empty {@link GuideBook} if loading fails
-     */
-    public static CompletableFuture<GuideBook> loadGuideBook() {
+        Map<String, String> titles = Map.of();
+        String filePath = "titles.json";
 
-        return supplyAsyncSafe(() -> {
+        Optional<Resource> resource = resolveLocale(resourceManager, filePath);
 
-            var resourceManager = Client.mc().getResourceManager();
+        if (resource.isEmpty()) {
 
-            Map<String, String> titles = loadTitles(resourceManager);
-            GuideBook guideBook = loadGuide(resourceManager);
+            LOGGER.warn("[GuideLoader] titles definition not found for any locale - tried client locale, language prefix, and default locale");
+            return titles;
+        }
 
-            return resolveTitles(guideBook, titles);
+        try (Reader reader = new InputStreamReader(resource.get().open(), StandardCharsets.UTF_8)) {
 
-        }, new GuideBook());
+            titles = GSON.fromJson(reader, Map.class);
+        } catch (Exception e) {
+
+            LOGGER.error("[GuideLoader] Failed to load titles.json", e);
+        }
+
+        return titles;
     }
 
     /**
@@ -245,34 +268,12 @@ public final class GuideLoader {
     }
 
     /**
-     * Loads the pages and entries titles with the correct locale : either client locale if available or default if none found
+     * Gets the current client locale, updated dynamically to reflect language changes.
      *
-     * @param resourceManager the resource manager
-     * @return the titles keyed by their IDs
+     * @return the current client locale
      */
-    @SuppressWarnings("unchecked")
-    private static Map<String, String> loadTitles(ResourceManager resourceManager) {
-
-        Map<String, String> titles = Map.of();
-        String filePath = "titles.json";
-
-        Optional<Resource> resource = resolveLocale(resourceManager, filePath);
-
-        if (resource.isEmpty()) {
-
-            LOGGER.warn("[GuideLoader] titles definition not found for any locale - tried client locale, language prefix, and default locale");
-            return titles;
-        }
-
-        try (Reader reader = new InputStreamReader(resource.get().open(), StandardCharsets.UTF_8)) {
-
-            titles = GSON.fromJson(reader, Map.class);
-        } catch (Exception e) {
-
-            LOGGER.error("[GuideLoader] Failed to load titles.json", e);
-        }
-
-        return titles;
+    private static String getClientLocale() {
+        return Client.mc().getLanguageManager().getSelected();
     }
 
     /**

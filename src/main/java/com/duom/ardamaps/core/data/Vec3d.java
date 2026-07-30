@@ -38,14 +38,26 @@ import java.io.Serializable;
  */
 public record Vec3d(double x, double y, double z) implements Serializable {
 
-    /** Zero vector. */
+    /** Zero vector constant. */
     public static final Vec3d ZERO = new Vec3d(0, 0, 0);
 
+    /**
+     * Calculates the Euclidean distance to another vector.
+     *
+     * @param other The other vector.
+     * @return The distance between this vector and the other.
+     */
     public double distanceTo(Vec3d other) {
 
         return Math.sqrt(squaredDistanceTo(other));
     }
 
+    /**
+     * Calculates the squared Euclidean distance to another vector.
+     *
+     * @param other The other vector.
+     * @return The squared distance between this vector and the other.
+     */
     public double squaredDistanceTo(Vec3d other) {
 
         double dx = other.x - x;
@@ -54,6 +66,12 @@ public record Vec3d(double x, double y, double z) implements Serializable {
         return dx * dx + dy * dy + dz * dz;
     }
 
+    /**
+     * Compares this vector to another object for equality based on coordinates.
+     *
+     * @param obj The object to compare to.
+     * @return True if the object is a Vec3d with equal coordinates.
+     */
     @Override
     public boolean equals(Object obj) {
 
@@ -64,6 +82,11 @@ public record Vec3d(double x, double y, double z) implements Serializable {
                 && Double.compare(z, z1) == 0;
     }
 
+    /**
+     * Returns a string representation of this vector in the format "(x, y, z)" with 3 decimal places.
+     *
+     * @return A formatted string representation of this vector.
+     */
     @Override
     public @NonNull String toString() {
 

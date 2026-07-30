@@ -68,10 +68,12 @@ public class BasicLocation implements Serializable {
     protected String id;
 
     /**
-     * Custom serialization to handle transient Vec3d position
+     * Custom serialization to handle transient Vec3d position.
+     * <p>
+     * Writes all fields in order and then serializes position as three double values.
      *
-     * @param stream The output stream
-     * @throws IOException on I/O error
+     * @param stream The output stream.
+     * @throws IOException on I/O error.
      */
     @Serial
     private void writeObject(ObjectOutputStream stream) throws IOException {
@@ -95,11 +97,13 @@ public class BasicLocation implements Serializable {
     }
 
     /**
-     * Custom deserialization to handle transient Vec3d position
+     * Custom deserialization to handle transient Vec3d position.
+     * <p>
+     * Reads all fields in order and reconstructs position from three double values.
      *
-     * @param stream The input stream
-     * @throws IOException            on I/O error
-     * @throws ClassNotFoundException on class not found
+     * @param stream The input stream.
+     * @throws IOException            on I/O error.
+     * @throws ClassNotFoundException if a required class cannot be found.
      */
     @Serial
     @SuppressWarnings("unchecked")

@@ -36,10 +36,7 @@ import org.jspecify.annotations.NonNull;
 public record Vec2d(double x, double y) {
 
     /**
-     * Constructs a new Vec2d with the specified coordinates.
-     *
-     * @param x The X coordinate.
-     * @param y The Y coordinate.
+     * Compact constructor for Vec2d with coordinate validation.
      */
     public Vec2d {
     }

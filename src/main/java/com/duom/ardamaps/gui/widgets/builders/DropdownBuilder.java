@@ -27,11 +27,12 @@ package com.duom.ardamaps.gui.widgets.builders;
 
 import com.duom.ardamaps.gui.widgets.DropdownWidget;
 import com.duom.ardamaps.gui.widgets.TextIdentifierPairItem;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 
 /**
  * Builder class for constructing {@link DropdownWidget} instances with a fluent API.
@@ -43,6 +44,9 @@ import net.minecraft.resources.Identifier;
  */
 @SuppressWarnings("unused")
 public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
+
+    /** whether the dropdown widget should start in an expanded state when created */
+    protected final boolean expanded = false;
 
     /** x coordinate of the dropdown widget */
     protected int x;
@@ -80,9 +84,6 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
     /** icon displayed when no item is selected in the dropdown widget */
     protected Identifier placeholderIcon = null;
 
-    /** whether the dropdown widget should start in an expanded state when created */
-    protected final boolean expanded = false;
-
     /** maximum number of options visible in the dropdown widget before scrolling is enabled */
     protected int maxVisibleOptions = 8;
 
@@ -101,7 +102,8 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
     protected boolean displayAsSprite = false;
 
     /** Private constructor to prevent direct instantiation. Use the static create() method instead. */
-    protected DropdownBuilder() {}
+    protected DropdownBuilder() {
+    }
 
     /**
      * Creates a new instance of the builder.

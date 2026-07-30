@@ -34,17 +34,17 @@ import com.duom.ardamaps.core.data.map.providers.PMTilesHttpTileProvider;
 import com.duom.ardamaps.core.data.map.providers.TileProvider;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
 import com.duom.ardamaps.gui.ModConstants;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Tuple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Optional;
 import java.util.Set;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.Tuple;
 
 /**
  * A map viewer that renders map tiles from PMTiles files.
@@ -133,18 +133,6 @@ public class PmTilesRenderer extends MapRenderable {
     }
 
     /**
-     * Releases tile provider resources owned by this renderer.
-     */
-    @Override
-    public void close() {
-
-        if (tileProvider != null) {
-            tileProvider.close();
-            tileProvider = null;
-        }
-    }
-
-    /**
      * Renders the visible map tiles in a single pass.
      * For each tile at the current zoom level, if it is not yet loaded, its coarse fallback tile
      *
@@ -162,7 +150,6 @@ public class PmTilesRenderer extends MapRenderable {
 
         // Trigger load for current-zoom tiles
         tilesToDisplay.forEach(key -> tileProvider.get(key));
-
 
         boolean debugMode = ArdaMapsClient.CONFIG.isMapDebugDisplay();
         for (PmTileKey key : tilesToDisplay) {
@@ -267,5 +254,17 @@ public class PmTilesRenderer extends MapRenderable {
                 ModConstants.COLOR_WHITE,
                 true
         );
+    }
+
+    /**
+     * Releases tile provider resources owned by this renderer.
+     */
+    @Override
+    public void close() {
+
+        if (tileProvider != null) {
+            tileProvider.close();
+            tileProvider = null;
+        }
     }
 }

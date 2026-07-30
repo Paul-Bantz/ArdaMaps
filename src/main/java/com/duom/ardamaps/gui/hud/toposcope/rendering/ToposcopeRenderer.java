@@ -497,7 +497,14 @@ public class ToposcopeRenderer {
         return hoveredLocation;
     }
 
-    /** A record to hold location data along with its screen position and distance. */
+    /**
+     * Holds a location and its screen-mapped position for rendering on the HUD.
+     *
+     * @param location The location being rendered.
+     * @param screen   The screen coordinates where the location should be drawn.
+     * @param distance The distance from the player to the location in blocks.
+     */
     private record ScreenMappedLocation(LocationClient location, Vec2 screen, double distance) {
+
     }
 }

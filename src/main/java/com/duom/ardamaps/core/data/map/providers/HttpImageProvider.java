@@ -96,27 +96,32 @@ public class HttpImageProvider {
             .maximumSize(MAX_MEMORY_CACHE_SIZE)
             .removalListener(textureRemovalListener)
             .build();
+
     /**
      * Maps every disk-cache key to their original URL.
      * Used to locate and invalidate entries by URL prefix (e.g. all BlueMap tiles).
      */
     private final ConcurrentHashMap<String, String> diskKeyToUrl = new ConcurrentHashMap<>();
+
     /**
      * Tracks the last time (epoch ms) each disk-cache key was accessed.
      * Used by the stale-entry eviction job.
      */
     private final ConcurrentHashMap<String, Long> lastAccessTimes = new ConcurrentHashMap<>();
+
     /**
      * Holds the {@link ScheduledFuture} for each URL prefix registered for periodic BlueMap refresh.
      * Keyed by the prefix string so duplicate calls are no-ops.
      */
     private final ConcurrentHashMap<String, ScheduledFuture<?>> refreshSchedules = new ConcurrentHashMap<>();
+
     /** Single-threaded daemon scheduler for periodic cache-maintenance tasks */
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "ardamaps-cache-scheduler");
         t.setDaemon(true);
         return t;
     });
+
     /** Lazily-initialised DiskLruCache */
     private volatile DiskLruCache diskCache;
 
@@ -184,6 +189,55 @@ public class HttpImageProvider {
             }
         }
         return diskCache;
+    }
+
+    /**
+     * Extracts the file extension from the URI path and maps it to an ImageFileType.
+     * Defaults to PNG if the extension is missing or unrecognized.
+     *
+     * @param uri The URI to extract the file extension from
+     * @return The corresponding ImageFileType, or PNG if unrecognized
+     */
+    public static @NotNull ImageFileType getFileExtension(URI uri) {
+
+        ImageFileType fileExtension = ImageFileType.PNG;
+        try {
+            String decodedPath = URLDecoder.decode(uri.getPath(), StandardCharsets.UTF_8);
+            int lastDot = decodedPath.lastIndexOf('.');
+            if (lastDot != -1)
+                fileExtension = ImageFileType.fromString(decodedPath.substring(lastDot + 1).toLowerCase());
+        } catch (Exception e) {
+            LOGGER.error("Failed to get file extension for URI: {}", uri, e);
+        }
+        return fileExtension;
+    }
+
+    static @NotNull ImageFileType detectImageFileType(byte[] bytes, URI uri) {
+
+        if (hasPrefixAt(bytes, 0, 0x89, 'P', 'N', 'G')) return ImageFileType.PNG;
+        if (hasPrefixAt(bytes, 0, 0xFF, 0xD8, 0xFF)) return ImageFileType.JPEG;
+        if (hasPrefixAt(bytes, 0, 'R', 'I', 'F', 'F') && hasPrefixAt(bytes, 8, 'W', 'E', 'B', 'P'))
+            return ImageFileType.WEBP;
+
+        return getFileExtension(uri);
+    }
+
+    private static boolean hasPrefixAt(byte[] bytes, int offset, int... prefix) {
+
+        if (bytes.length < offset + prefix.length) return false;
+
+        for (int i = 0; i < prefix.length; i++)
+            if ((bytes[offset + i] & 0xFF) != prefix[i]) return false;
+
+        return true;
+    }
+
+    static int argbToAbgr(int argb) {
+
+        // Scrimage uses ARGB, while NativeImage.Format.RGBA expects ABGR-packed colours.
+        return (argb & 0xFF00FF00)
+                | ((argb & 0x00FF0000) >>> 16)
+                | ((argb & 0x000000FF) << 16);
     }
 
     /**
@@ -403,6 +457,8 @@ public class HttpImageProvider {
         loading.remove(url);
     }
 
+    /* Disk I/O */
+
     /**
      * Loads raw image bytes for {@code uri}, consulting the DiskLruCache first
      * and falling back to an HTTP request on a miss.
@@ -455,49 +511,6 @@ public class HttpImageProvider {
     }
 
     /**
-     * Extracts the file extension from the URI path and maps it to an ImageFileType.
-     * Defaults to PNG if the extension is missing or unrecognized.
-     *
-     * @param uri The URI to extract the file extension from
-     * @return The corresponding ImageFileType, or PNG if unrecognized
-     */
-    public static @NotNull ImageFileType getFileExtension(URI uri) {
-
-        ImageFileType fileExtension = ImageFileType.PNG;
-        try {
-            String decodedPath = URLDecoder.decode(uri.getPath(), StandardCharsets.UTF_8);
-            int lastDot = decodedPath.lastIndexOf('.');
-            if (lastDot != -1)
-                fileExtension = ImageFileType.fromString(decodedPath.substring(lastDot + 1).toLowerCase());
-        } catch (Exception e) {
-            LOGGER.error("Failed to get file extension for URI: {}", uri, e);
-        }
-        return fileExtension;
-    }
-
-    static @NotNull ImageFileType detectImageFileType(byte[] bytes, URI uri) {
-
-        if (hasPrefixAt(bytes, 0, 0x89, 'P', 'N', 'G')) return ImageFileType.PNG;
-        if (hasPrefixAt(bytes, 0, 0xFF, 0xD8, 0xFF)) return ImageFileType.JPEG;
-        if (hasPrefixAt(bytes, 0, 'R', 'I', 'F', 'F') && hasPrefixAt(bytes, 8, 'W', 'E', 'B', 'P'))
-            return ImageFileType.WEBP;
-
-        return getFileExtension(uri);
-    }
-
-    private static boolean hasPrefixAt(byte[] bytes, int offset, int... prefix) {
-
-        if (bytes.length < offset + prefix.length) return false;
-
-        for (int i = 0; i < prefix.length; i++)
-            if ((bytes[offset + i] & 0xFF) != prefix[i]) return false;
-
-        return true;
-    }
-
-    /* Disk I/O */
-
-    /**
      * Loads a WebP image from raw bytes using Scrimage and converts it to a NativeImage.
      *
      * @param imageData The raw bytes of the WebP image
@@ -523,6 +536,8 @@ public class HttpImageProvider {
         return scrimageToNativeImage(ImmutableImage.loader().fromBytes(imageData));
     }
 
+    /* Helpers */
+
     /**
      * Returns a DiskLruCache-safe key for {@code uri} (lowercase alphanumeric + '-',
      * max 64 characters as required by DiskLruCache).
@@ -547,8 +562,6 @@ public class HttpImageProvider {
         // DiskLruCache keys must be at most 64 characters
         return key.length() > 64 ? key.substring(key.length() - 64) : key;
     }
-
-    /* Helpers */
 
     /**
      * Opens an HTTP connection and reads all bytes from the response body.
@@ -601,14 +614,6 @@ public class HttpImageProvider {
         }
     }
 
-    static int argbToAbgr(int argb) {
-
-        // Scrimage uses ARGB, while NativeImage.Format.RGBA expects ABGR-packed colors.
-        return (argb & 0xFF00FF00)
-                | ((argb & 0x00FF0000) >>> 16)
-                | ((argb & 0x000000FF) << 16);
-    }
-
     /**
      * Gets the width of the cached texture for the specified URL.
      *
@@ -637,5 +642,6 @@ public class HttpImageProvider {
 
     /** Record to hold texture data */
     private record TextureData(Identifier image, int width, int height) {
+
     }
 }

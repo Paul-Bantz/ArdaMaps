@@ -33,9 +33,7 @@ import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 /**
  * Background renderer validation
@@ -140,6 +138,9 @@ class BackgroundRendererTest {
         assertEquals(pw1, pw2, "pageWidth must be stable across repeated invalidate() calls with same dimensions");
     }
 
+    /**
+     * Verifies that the left page renders using descending U coordinates for horizontal mirroring.
+     */
     @Test
     void render_leftPageUsesMirroredUCoordinates() {
 

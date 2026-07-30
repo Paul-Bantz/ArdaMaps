@@ -33,5 +33,7 @@ import java.io.Serializable;
  * @param id   The unique identifier of the region (ApiRegion.getId()).
  * @param name The display name of the region  (ApiRegion.getName()).
  */
-public record Region(String id, String name) implements Serializable {}
+public record Region(String id, String name) implements Serializable {
+
+}
 

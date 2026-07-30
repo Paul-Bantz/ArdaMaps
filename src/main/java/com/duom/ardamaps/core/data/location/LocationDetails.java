@@ -26,7 +26,12 @@
 package com.duom.ardamaps.core.data.location;
 
 /**
- * Data model representing detailed information about a location
+ * Data model representing detailed information about a location.
+ *
+ * @param name        The name of the location.
+ * @param canon       Whether this location is canon (officially part of the lore).
+ * @param description Detailed description of the location, including history or lore.
+ * @param externalUrl External URL with additional information about the location.
  */
 public record LocationDetails(String name,
                               boolean canon,
@@ -34,9 +39,9 @@ public record LocationDetails(String name,
                               String externalUrl) {
 
     /**
-     * Initializes a new non canon, empty Location Details from its name
+     * Initializes a new location details with default non-canon status and empty text.
      *
-     * @param name the location name
+     * @param name the location name.
      */
     public LocationDetails(String name) {
 

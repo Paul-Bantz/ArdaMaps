@@ -38,18 +38,29 @@ import net.minecraft.resources.Identifier;
  */
 public class IconSpriteAtlas {
 
-    /** Runtime GPU texture storage location. Never read from disk. */
+    /** Runtime GPU texture storage location; never read from disk. */
     public static final Identifier ATLAS_ID = ModConstants.modId("textures/atlas/map_icons.png");
 
+    /** Atlas definition identifier. */
     private static final Identifier ATLAS_DEFINITION = ModConstants.modId("map_icons");
 
+    /** Private constructor to prevent instantiation. */
     private IconSpriteAtlas() {
     }
 
+    /**
+     * Registers the map icon atlas with the Minecraft resource system.
+     */
     public static void register() {
         AtlasRegistry.register(new AtlasManager.AtlasConfig(ATLAS_ID, ATLAS_DEFINITION, false));
     }
 
+    /**
+     * Retrieves a sprite from the map icon atlas.
+     *
+     * @param id the sprite identifier
+     * @return The texture atlas sprite associated with the given identifier
+     */
     public static TextureAtlasSprite retrieveSprite(Identifier id) {
         return Minecraft.getInstance().getAtlasManager().get(new SpriteId(ATLAS_ID, id));
     }

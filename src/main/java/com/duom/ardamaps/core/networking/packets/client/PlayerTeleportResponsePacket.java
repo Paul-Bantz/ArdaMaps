@@ -41,12 +41,15 @@ import java.util.UUID;
  * Response packet sent after a ranged teleport request has completed on the server thread.
  *
  * @param success True when the player was teleported, false when no safe destination was found or the request failed.
- * @param x The resolved destination X coordinate, or zero for failed responses.
- * @param y The resolved destination Y coordinate, including fractional standing heights, or zero for failed responses.
- * @param z The resolved destination Z coordinate, or zero for failed responses.
+ * @param x       The resolved destination X coordinate, or zero for failed responses.
+ * @param y       The resolved destination Y coordinate, including fractional standing heights, or zero for failed responses.
+ * @param z       The resolved destination Z coordinate, or zero for failed responses.
  */
-public record PlayerTeleportResponsePacket(UUID requestId, boolean success, double x, double y, double z) implements IRespondablePacket<PlayerTeleportResponsePacket> {
+public record PlayerTeleportResponsePacket(UUID requestId, boolean success, double x, double y,
+                                           double z) implements IRespondablePacket<PlayerTeleportResponsePacket> {
+
     public static final CustomPacketPayload.Type<PlayerTeleportResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_ranged_teleport_response"));
+
     public static final StreamCodec<RegistryFriendlyByteBuf, PlayerTeleportResponsePacket> CODEC = IPacket.codec(PlayerTeleportResponsePacket::read);
 
     public PlayerTeleportResponsePacket(boolean success, double x, double y, double z) {
@@ -66,8 +69,8 @@ public record PlayerTeleportResponsePacket(UUID requestId, boolean success, doub
     /**
      * Reads a PlayerTeleportResponsePacket from a PacketByteBuf.
      *
-     * @param buf The PacketByteBuf to read from
-     * @return The PlayerTeleportResponsePacket read from the buffer
+     * @param buf The PacketByteBuf to read from.
+     * @return The PlayerTeleportResponsePacket read from the buffer.
      */
     public static PlayerTeleportResponsePacket read(FriendlyByteBuf buf) {
 
@@ -99,6 +102,12 @@ public record PlayerTeleportResponsePacket(UUID requestId, boolean success, doub
         return buf;
     }
 
+    /**
+     * Creates a new PlayerTeleportResponsePacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this response.
+     * @return A new PlayerTeleportResponsePacket with the updated request identifier.
+     */
     @Override
     public PlayerTeleportResponsePacket withRequestId(UUID requestId) {
         return new PlayerTeleportResponsePacket(requestId, success, x, y, z);

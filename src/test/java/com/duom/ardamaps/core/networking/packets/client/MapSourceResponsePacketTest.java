@@ -119,7 +119,7 @@ class MapSourceResponsePacketTest {
     }
 
     /**
-     * Unknown layer types from a newer server should not crash the client; only the unknown layer is skipped.
+     * Verifies that unknown layer types from a newer server are skipped without crashing the client.
      */
     @Test
     void read_unknownLayerType_skipsLayer() {
@@ -138,40 +138,6 @@ class MapSourceResponsePacketTest {
 
         assertEquals(1, parsed.dimensions().size());
         assertTrue(parsed.dimensions().getFirst().getMapLayers().isEmpty());
-    }
-
-    /**
-     * Negative collection sizes must be rejected before list allocation.
-     */
-    @Test
-    void read_negativeDimensionsCount_rejectsBeforeAllocation() {
-
-        var buf = FriendlyByteBufs.create();
-        buf.writeUUID(new UUID(0L, 0L));
-        buf.writeBoolean(false);
-        buf.writeBoolean(false);
-        buf.writeInt(-1);
-        buf.readerIndex(0);
-
-        assertThrows(IllegalArgumentException.class, () -> MapSourceResponsePacket.read(buf));
-    }
-
-    /**
-     * Absurd collection sizes must be rejected before list allocation.
-     */
-    @Test
-    void read_oversizedLayersCount_rejectsBeforeAllocation() {
-
-        var buf = FriendlyByteBufs.create();
-        buf.writeUUID(new UUID(0L, 0L));
-        buf.writeBoolean(false);
-        buf.writeBoolean(false);
-        buf.writeInt(1);
-        writeDimensionHeader(buf);
-        buf.writeInt(129);
-        buf.readerIndex(0);
-
-        assertThrows(IllegalArgumentException.class, () -> MapSourceResponsePacket.read(buf));
     }
 
     /**
@@ -218,5 +184,39 @@ class MapSourceResponsePacketTest {
         buf.writeUtf("fallback.pmtiles");
         buf.writeUtf("fallback.png");
         buf.writeInt(0);
+    }
+
+    /**
+     * Verifies that negative collection sizes are rejected before list allocation.
+     */
+    @Test
+    void read_negativeDimensionsCount_rejectsBeforeAllocation() {
+
+        var buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
+        buf.writeBoolean(false);
+        buf.writeBoolean(false);
+        buf.writeInt(-1);
+        buf.readerIndex(0);
+
+        assertThrows(IllegalArgumentException.class, () -> MapSourceResponsePacket.read(buf));
+    }
+
+    /**
+     * Verifies that absurdly sized collections are rejected before list allocation.
+     */
+    @Test
+    void read_oversizedLayersCount_rejectsBeforeAllocation() {
+
+        var buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
+        buf.writeBoolean(false);
+        buf.writeBoolean(false);
+        buf.writeInt(1);
+        writeDimensionHeader(buf);
+        buf.writeInt(129);
+        buf.readerIndex(0);
+
+        assertThrows(IllegalArgumentException.class, () -> MapSourceResponsePacket.read(buf));
     }
 }

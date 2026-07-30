@@ -47,6 +47,7 @@ import java.util.UUID;
 
 /**
  * A packet sent from the server to the client containing the map source configuration in JSON format.
+ *
  * @param warpsAvailable       whether server-side warps are available
  * @param ardaRegionsAvailable whether server-side ArdaRegions is available
  * @param dimensions           the list of dimensions to transfer
@@ -55,8 +56,8 @@ public record MapSourceResponsePacket(UUID requestId,
                                       boolean warpsAvailable,
                                       boolean ardaRegionsAvailable,
                                       List<Dimension> dimensions) implements IRespondablePacket<MapSourceResponsePacket> {
+
     public static final CustomPacketPayload.Type<MapSourceResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("map_source_response"));
-    public static final StreamCodec<RegistryFriendlyByteBuf, MapSourceResponsePacket> CODEC = IPacket.codec(MapSourceResponsePacket::read);
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(MapSourceResponsePacket.class);
@@ -70,15 +71,24 @@ public record MapSourceResponsePacket(UUID requestId,
     /** Maximum number of ranged layer entries accepted for a single layer. */
     private static final int MAX_RANGES_PER_LAYER = 512;
 
+    public static final StreamCodec<RegistryFriendlyByteBuf, MapSourceResponsePacket> CODEC = IPacket.codec(MapSourceResponsePacket::read);
+
+    /**
+     * Constructs a MapSourceResponsePacket with the given configuration data.
+     *
+     * @param warpsAvailable       Whether warps are available on the server.
+     * @param ardaRegionsAvailable Whether ArdaRegions is available on the server.
+     * @param dimensions           The list of dimension configurations to include in the response.
+     */
     public MapSourceResponsePacket(boolean warpsAvailable, boolean ardaRegionsAvailable, List<Dimension> dimensions) {
         this(new UUID(0L, 0L), warpsAvailable, ardaRegionsAvailable, dimensions);
     }
 
     /**
-     * Reads a MapSourceResponsePacket - ie a maps layer configuration from the given PacketByteBuf.
+     * Reads a MapSourceResponsePacket containing map layer configuration from the given PacketByteBuf.
      *
-     * @param buf The PacketByteBuf to read from
-     * @return The MapSourceResponsePacket read from the buffer
+     * @param buf The PacketByteBuf to read from.
+     * @return The MapSourceResponsePacket read from the buffer.
      */
     public static MapSourceResponsePacket read(FriendlyByteBuf buf) {
 
@@ -152,9 +162,50 @@ public record MapSourceResponsePacket(UUID requestId,
     }
 
     /**
-     * Builds a PacketByteBuf from this MapSourceResponsePacket - ie a maps layer configuration.
+     * Reads and validates an integer collection size from the packet buffer.
      *
-     * @return The PacketByteBuf representing this MapSourceResponsePacket
+     * @param buf   The packet buffer to read from.
+     * @param label Human-readable field label for error messages.
+     * @param max   Maximum accepted count.
+     * @return The validated count.
+     * @throws IllegalArgumentException If count is negative or exceeds maximum.
+     */
+    private static int readCount(FriendlyByteBuf buf, String label, int max) {
+
+        int count = buf.readInt();
+
+        if (count < 0) {
+            throw new IllegalArgumentException("Map source " + label + " count cannot be negative: " + count);
+        }
+
+        if (count > max) {
+            throw new IllegalArgumentException("Map source " + label + " count exceeds maximum of " + max + ": " + count);
+        }
+
+        return count;
+    }
+
+    /**
+     * Parses a map layer source type from a serialized name without failing on version skew.
+     * <p>
+     * Returns null if the enum name is not recognized, allowing graceful degradation when client and server have different versions.
+     *
+     * @param typeName The serialized enum name.
+     * @return The matching MapLayerSource, or null if unknown.
+     */
+    private static MapLayerSource parseMapLayerSource(String typeName) {
+
+        try {
+            return MapLayerSource.valueOf(typeName);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Serializes this packet into a PacketByteBuf containing map layer configuration for transmission over the network.
+     *
+     * @return The PacketByteBuf representing this MapSourceResponsePacket.
      */
     @Override
     public FriendlyByteBuf build() {
@@ -221,6 +272,12 @@ public record MapSourceResponsePacket(UUID requestId,
         return buf;
     }
 
+    /**
+     * Creates a new MapSourceResponsePacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this response.
+     * @return A new MapSourceResponsePacket with the updated request identifier.
+     */
     @Override
     public MapSourceResponsePacket withRequestId(UUID requestId) {
         return new MapSourceResponsePacket(requestId, warpsAvailable, ardaRegionsAvailable, dimensions);
@@ -229,43 +286,5 @@ public record MapSourceResponsePacket(UUID requestId,
     @Override
     public CustomPacketPayload.@NonNull Type<MapSourceResponsePacket> type() {
         return TYPE;
-    }
-
-    /**
-     * Reads and validates an integer collection size from the packet.
-     *
-     * @param buf   The packet buffer.
-     * @param label Human-readable field label for error messages.
-     * @param max   Maximum accepted count.
-     * @return The validated count.
-     */
-    private static int readCount(FriendlyByteBuf buf, String label, int max) {
-
-        int count = buf.readInt();
-
-        if (count < 0) {
-            throw new IllegalArgumentException("Map source " + label + " count cannot be negative: " + count);
-        }
-
-        if (count > max) {
-            throw new IllegalArgumentException("Map source " + label + " count exceeds maximum of " + max + ": " + count);
-        }
-
-        return count;
-    }
-
-    /**
-     * Parses a map layer source from the wire without failing the whole packet on version skew.
-     *
-     * @param typeName Serialized enum name.
-     * @return The matching source, or {@code null} when unknown.
-     */
-    private static MapLayerSource parseMapLayerSource(String typeName) {
-
-        try {
-            return MapLayerSource.valueOf(typeName);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
     }
 }

@@ -34,6 +34,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
  */
 class TileKeyTest {
 
+    /**
+     * Verifies that TileKey and PmTileKey instances with identical coordinates are not equal across different classes.
+     * This enforces type-safe tile-key comparisons so heterogeneous collections do not incorrectly match.
+     */
     @Test
     void tileKeyAndPmTileKey_areNotEqualAcrossClasses() {
 

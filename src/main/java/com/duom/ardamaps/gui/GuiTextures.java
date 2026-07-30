@@ -61,16 +61,6 @@ public final class GuiTextures {
                                       int x, int y, int width, int height,
                                       int leftSlice, int topSlice, int rightSlice, int bottomSlice,
                                       int regionWidth, int regionHeight,
-                                      int u, int v, int textureWidth, int textureHeight) {
-        blitNineSliced(context, texture, x, y, width, height,
-                leftSlice, topSlice, rightSlice, bottomSlice,
-                regionWidth, regionHeight, u, v, textureWidth, textureHeight, ModConstants.COLOR_WHITE);
-    }
-
-    public static void blitNineSliced(GuiGraphicsExtractor context, Identifier texture,
-                                      int x, int y, int width, int height,
-                                      int leftSlice, int topSlice, int rightSlice, int bottomSlice,
-                                      int regionWidth, int regionHeight,
                                       int u, int v, int textureWidth, int textureHeight,
                                       int argb) {
         if (width <= 0 || height <= 0) return;
@@ -134,12 +124,12 @@ public final class GuiTextures {
         }
     }
 
-    public static void blitRepeating(GuiGraphicsExtractor context, Identifier texture,
-                                     int x, int y, int width, int height,
-                                     int u, int v, int tileWidth, int tileHeight,
-                                     int textureWidth, int textureHeight) {
-        blitRepeating(context, texture, x, y, width, height, u, v, tileWidth, tileHeight,
-                textureWidth, textureHeight, ModConstants.COLOR_WHITE);
+    private static void blit(GuiGraphicsExtractor context, Identifier texture,
+                             int x, int y, int u, int v, int width, int height,
+                             int regionWidth, int regionHeight, int textureWidth, int textureHeight,
+                             int argb) {
+        context.blit(RenderPipelines.GUI_TEXTURED, texture,
+                x, y, u, v, width, height, regionWidth, regionHeight, textureWidth, textureHeight, argb);
     }
 
     public static void blitRepeating(GuiGraphicsExtractor context, Identifier texture,
@@ -170,6 +160,30 @@ public final class GuiTextures {
         }
     }
 
+    private static int chunkSize(int totalSize, int parts, int index) {
+        int base = totalSize / parts;
+        int remainder = totalSize % parts;
+        return base + (index < remainder ? 1 : 0);
+    }
+
+    public static void blitNineSliced(GuiGraphicsExtractor context, Identifier texture,
+                                      int x, int y, int width, int height,
+                                      int leftSlice, int topSlice, int rightSlice, int bottomSlice,
+                                      int regionWidth, int regionHeight,
+                                      int u, int v, int textureWidth, int textureHeight) {
+        blitNineSliced(context, texture, x, y, width, height,
+                leftSlice, topSlice, rightSlice, bottomSlice,
+                regionWidth, regionHeight, u, v, textureWidth, textureHeight, ModConstants.COLOR_WHITE);
+    }
+
+    public static void blitRepeating(GuiGraphicsExtractor context, Identifier texture,
+                                     int x, int y, int width, int height,
+                                     int u, int v, int tileWidth, int tileHeight,
+                                     int textureWidth, int textureHeight) {
+        blitRepeating(context, texture, x, y, width, height, u, v, tileWidth, tileHeight,
+                textureWidth, textureHeight, ModConstants.COLOR_WHITE);
+    }
+
     public static void blitMirroredH(GuiGraphicsExtractor context, Identifier texture,
                                      int x, int y, int width, int height,
                                      int u, int v, int sourceWidth, int sourceHeight,
@@ -188,25 +202,11 @@ public final class GuiTextures {
                 | component(blue);
     }
 
-    public static int withAlpha(int argb, float alpha) {
-        return (argb & 0x00FFFFFF) | (component(alpha) << 24);
-    }
-
-    private static void blit(GuiGraphicsExtractor context, Identifier texture,
-                             int x, int y, int u, int v, int width, int height,
-                             int regionWidth, int regionHeight, int textureWidth, int textureHeight,
-                             int argb) {
-        context.blit(RenderPipelines.GUI_TEXTURED, texture,
-                x, y, u, v, width, height, regionWidth, regionHeight, textureWidth, textureHeight, argb);
-    }
-
-    private static int chunkSize(int totalSize, int parts, int index) {
-        int base = totalSize / parts;
-        int remainder = totalSize % parts;
-        return base + (index < remainder ? 1 : 0);
-    }
-
     private static int component(float value) {
         return Math.max(0, Math.min(255, Math.round(value * 255.0f)));
+    }
+
+    public static int withAlpha(int argb, float alpha) {
+        return (argb & 0x00FFFFFF) | (component(alpha) << 24);
     }
 }

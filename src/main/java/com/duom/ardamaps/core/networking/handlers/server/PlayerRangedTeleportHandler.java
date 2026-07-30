@@ -74,9 +74,9 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
      * Resolves the destination world and dimension configuration, scans for a valid teleport position within the
      * specified Y range, and either teleports the player or sends an error message.
      *
-     * @param server The Minecraft server instance.
-     * @param player The player to teleport.
-     * @param packet The PlayerRangedTeleportPacket containing the target coordinates and Y scan range.
+     * @param server    The Minecraft server instance.
+     * @param player    The player to teleport.
+     * @param packet    The PlayerRangedTeleportPacket containing the target coordinates and Y scan range.
      * @param responder Callback that sends the teleport response and must be called exactly once inside the server task.
      * @return Null because the response is sent asynchronously from the server thread.
      */
@@ -114,7 +114,7 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
             }
 
             // Send error message if no safe position found
-            player.sendSystemMessage(Component.literal(String.format("Invalid teleport position at %s %s", (int)packet.x(), (int)packet.z()))
+            player.sendSystemMessage(Component.literal(String.format("Invalid teleport position at %s %s", (int) packet.x(), (int) packet.z()))
                     .withStyle(ChatFormatting.RED), false);
             responder.accept(PlayerTeleportResponsePacket.failed());
         });
@@ -241,7 +241,7 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
      *
      * @param minY     Lower inclusive candidate Y coordinate.
      * @param maxY     Upper inclusive candidate Y coordinate.
-     * @param resolver  Resolver returning the exact standing Y for valid candidate positions.
+     * @param resolver Resolver returning the exact standing Y for valid candidate positions.
      * @return The first valid standing Y value encountered, or empty if none found or the interval is invalid (minY > maxY).
      */
     static OptionalDouble scanUpward(int minY, int maxY, IntFunction<OptionalDouble> resolver) {
@@ -261,7 +261,7 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
      *
      * @param minY     Lower inclusive candidate Y coordinate.
      * @param maxY     Upper inclusive candidate Y coordinate.
-     * @param resolver  Resolver returning the exact standing Y for valid candidate positions.
+     * @param resolver Resolver returning the exact standing Y for valid candidate positions.
      * @return The first valid standing Y value encountered, or empty if none found or the interval is invalid (minY > maxY).
      */
     static OptionalDouble scanDownward(int minY, int maxY, IntFunction<OptionalDouble> resolver) {

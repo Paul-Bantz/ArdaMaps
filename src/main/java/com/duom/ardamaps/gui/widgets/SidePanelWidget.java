@@ -620,9 +620,7 @@ public class SidePanelWidget implements GuiEventListener {
     /**
      * Handles mouse release events for the side panel. Unimplemented as button release effects are not required.
      *
-     * @param mouseX The mouse X position
-     * @param mouseY The mouse Y position
-     * @param button The mouse button that was released
+     * @param event the initiating mouse event
      * @return False as the event is not handled
      */
     @Override
@@ -633,9 +631,7 @@ public class SidePanelWidget implements GuiEventListener {
     /**
      * Handles mouse drag events for the side panel. Unimplemented as dragging is not required.
      *
-     * @param mouseX The mouse X position
-     * @param mouseY The mouse Y position
-     * @param button The mouse button that is being dragged
+     * @param event  the initiating mouse event
      * @param deltaX The change in X position since the last event
      * @param deltaY The change in Y position since the last event
      * @return False as the event is not handled
@@ -648,9 +644,10 @@ public class SidePanelWidget implements GuiEventListener {
     /**
      * Handle mouse scroll for zooming
      *
-     * @param mouseX The mouse x position
-     * @param mouseY The mouse y position
-     * @param amount The scroll amount
+     * @param mouseX           The mouse x position
+     * @param mouseY           The mouse y position
+     * @param horizontalAmount The horizontal scroll amount
+     * @param verticalAmount   The vertical scroll amount
      * @return True if the event was handled
      */
     @Override
@@ -677,9 +674,7 @@ public class SidePanelWidget implements GuiEventListener {
     /**
      * Handles key press events for the side panel. Unimplemented as keyboard interaction is not required.
      *
-     * @param keyCode   The code of the key that was pressed
-     * @param scanCode  The scan code of the key that was pressed
-     * @param modifiers Any modifier keys that were held during the key press
+     * @param event the initiating key event
      * @return False as the event is not handled
      */
     @Override
@@ -690,9 +685,7 @@ public class SidePanelWidget implements GuiEventListener {
     /**
      * Handles key release events for the side panel. Unimplemented as keyboard interaction is not required.
      *
-     * @param keyCode   The code of the key that was released
-     * @param scanCode  The scan code of the key that was released
-     * @param modifiers Any modifier keys that were held during the key release
+     * @param event the initiating key event
      * @return False as the event is not handled
      */
     @Override
@@ -740,7 +733,7 @@ public class SidePanelWidget implements GuiEventListener {
      */
     @Override
     public @NonNull ScreenRectangle getRectangle() {
-        return new ScreenRectangle(0,0,0,0);
+        return new ScreenRectangle(0, 0, 0, 0);
     }
 
     /**

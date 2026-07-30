@@ -44,6 +44,9 @@ import java.util.*;
  */
 public class ClientConfig extends Configuration<LocationClient> {
 
+    /** Waypoints coordinates - not persisted */
+    private final transient HashMap<String, Set<Waypoint>> waypoints = new HashMap<>();
+
     /** Toposcope draw distance in km (metric) or miles (imperial) - defaults to 50 km */
     @Setter
     @Getter
@@ -110,9 +113,6 @@ public class ClientConfig extends Configuration<LocationClient> {
     @Getter
     private transient boolean ardaRegionsAvailable;
 
-    /** Waypoints coordinates - not persisted */
-    private final transient HashMap<String, Set<Waypoint>> waypoints = new HashMap<>();
-
     /**
      * Returns the toposcope draw distance converted to in-game blocks based on the current unit system and the provided dimension definition.
      *
@@ -155,7 +155,9 @@ public class ClientConfig extends Configuration<LocationClient> {
     }
 
     /**
-     * Sets the unit system. When switching, converts stored draw distances to the new unit.
+     * Sets the unit system and converts stored draw distances to the new unit when switching.
+     *
+     * @param newSystem The new unit system to set (metric or imperial).
      */
     public void setUnitSystem(UnitSystem newSystem) {
 
@@ -207,32 +209,33 @@ public class ClientConfig extends Configuration<LocationClient> {
             double dx = waypoint.x() - x;
             double dz = waypoint.z() - z;
 
-           if  (Math.sqrt(dx * dx + dz * dz) <= radius)
-               return Optional.of(waypoint);
+            if (Math.sqrt(dx * dx + dz * dz) <= radius)
+                return Optional.of(waypoint);
         }
 
         return Optional.empty();
     }
 
     /**
-     * Sets the current waypoint coordinates for the client.
+     * Sets a waypoint at the specified coordinates and dimension.
      *
-     * @param x The X coordinate of the waypoint.
-     * @param z The Z coordinate of the waypoint.
-     *          This method allows you to set a waypoint on the client map by specifying its X and Z coordinates. The waypoint can be used for navigation purposes, allowing players to mark specific locations they want to reach or remember on the map. The coordinates should be in the same coordinate system used by the game world.
+     * @param x           The X coordinate of the waypoint.
+     * @param z           The Z coordinate of the waypoint.
+     * @param dimensionId The dimension ID where the waypoint is located.
      */
     public void setWaypoint(double x, double z, String dimensionId) {
 
         var waypoint = new Waypoint((int) x, (int) z, dimensionId);
 
-        var waypointsForDimension = waypoints.computeIfAbsent(dimensionId, waypointDimensionId -> new HashSet<>());
+        var waypointsForDimension = waypoints.computeIfAbsent(dimensionId, _ -> new HashSet<>());
         waypointsForDimension.removeIf(wp -> Objects.equals(wp.dimension(), dimensionId) && Objects.equals(wp.identifier(), waypoint.identifier()));
         waypointsForDimension.add(waypoint);
     }
 
     /**
-     * Removes all the waypoints associated with the given identifier
-     * @param identifier the identifier for which to remove the waypoints.
+     * Removes all waypoints associated with the given identifier.
+     *
+     * @param identifier The identifier for which to remove waypoints.
      */
     public void clearWaypointsByIdentifier(String identifier) {
 
@@ -243,13 +246,13 @@ public class ClientConfig extends Configuration<LocationClient> {
     }
 
     /**
-     * Sets the given waypoint in the given dimension
+     * Sets a waypoint in its associated dimension.
      *
-     * @param waypoint the waypoint to set
+     * @param waypoint The waypoint to set.
      */
     public void setWaypoint(Waypoint waypoint) {
 
-        var waypointsForDimension = waypoints.computeIfAbsent(waypoint.dimension(), waypointDimensionId -> new HashSet<>());
+        var waypointsForDimension = waypoints.computeIfAbsent(waypoint.dimension(), _ -> new HashSet<>());
 
         boolean alreadyHaveWaypointAtPosition = false;
 
@@ -288,9 +291,9 @@ public class ClientConfig extends Configuration<LocationClient> {
     }
 
     /**
-     * Clears all the waypoints for a given dimension
+     * Clears all waypoints for a given dimension.
      *
-     * @param dimensionId the dimension id to clear the waypoints from
+     * @param dimensionId The dimension ID to clear waypoints from.
      */
     public void clearWaypoints(String dimensionId) {
 
@@ -298,8 +301,10 @@ public class ClientConfig extends Configuration<LocationClient> {
     }
 
     /**
-     * @return Whether a valid waypoint is currently set on the client map. A waypoint is considered valid if both X and Z coordinates are not NaN (Not a Number).
-     * This method checks if there is an active waypoint set by verifying that both the X and Z coordinates are valid numbers. If either coordinate is NaN, it indicates that there is no active waypoint, and the method will return false. If both coordinates are valid, it means a waypoint is currently set, and the method will return true.
+     * Checks whether any waypoints are set in the given dimension.
+     *
+     * @param dimensionId The dimension ID to check for waypoints.
+     * @return True if waypoints exist for the dimension, false otherwise.
      */
     public boolean hasWaypoint(String dimensionId) {
 

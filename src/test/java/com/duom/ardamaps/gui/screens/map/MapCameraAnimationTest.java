@@ -34,7 +34,7 @@ import java.util.function.LongSupplier;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for {@link MapCameraAnimation} timing, interpolation, and cancellation behavior.
+ * Tests for {@link MapCameraAnimation} timing, interpolation, and cancellation behaviour.
  */
 class MapCameraAnimationTest {
 

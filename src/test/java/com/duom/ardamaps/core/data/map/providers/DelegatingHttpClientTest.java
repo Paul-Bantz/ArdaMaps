@@ -27,6 +27,8 @@ package com.duom.ardamaps.core.data.map.providers;
 
 import org.junit.jupiter.api.Test;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
 import java.net.CookieHandler;
 import java.net.ProxySelector;
 import java.net.http.HttpClient;
@@ -34,15 +36,8 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLParameters;
-
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link DelegatingHttpClient}.

@@ -38,9 +38,10 @@ public class ByteArrayTypeAdapter
 
     /**
      * Serializes a byte array to a base64-encoded string in JSON.
-     * @param src the object that needs to be converted to JSON.
+     *
+     * @param src       the object that needs to be converted to JSON.
      * @param typeOfSrc the actual type (fully genericized version) of the source object.
-     * @param context the serialization context
+     * @param context   the serialization context
      * @return the resulting JSON element
      */
     @Override
@@ -50,7 +51,8 @@ public class ByteArrayTypeAdapter
 
     /**
      * Deserializes a base64-encoded string from JSON back into a byte array.
-     * @param json The Json data being deserialized
+     *
+     * @param json    The Json data being deserialized
      * @param typeOfT The type of the Object to deserialize to
      * @param context the serialization context
      * @return the byte array represented by the base64 string in the JSON

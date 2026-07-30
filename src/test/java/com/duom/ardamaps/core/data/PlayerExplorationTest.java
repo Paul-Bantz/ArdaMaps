@@ -26,8 +26,8 @@
 package com.duom.ardamaps.core.data;
 
 import com.duom.ardamaps.core.data.config.Dimension;
-import net.minecraft.client.Minecraft;
 import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.Identifier;
@@ -159,7 +159,7 @@ class PlayerExplorationTest {
     /**
      * The maximum world-X coordinate may be exactly one past the last valid cell.
      * This documents that toCellX() does NOT clamp - stateAt() handles OOB via inBounds().
-     * Keeping this behavior explicit prevents later "fixes" from hiding boundary handling bugs in callers.
+     * Keeping this behaviour explicit prevents later "fixes" from hiding boundary handling bugs in callers.
      */
     @Test
     void toCellX_worldXAtDimensionMax_returnsLastCellOrJustBeyond() {
@@ -206,7 +206,7 @@ class PlayerExplorationTest {
     }
 
     /**
-     * Marking a ranged cell on the western edge must clamp negative neighbor coordinates instead of wrapping them into
+     * Marking a ranged cell on the western edge must clamp negative neighbour coordinates instead of wrapping them into
      * the previous row's last column.
      */
     @Test

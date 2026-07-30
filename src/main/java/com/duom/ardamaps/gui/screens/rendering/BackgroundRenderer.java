@@ -370,5 +370,6 @@ public class BackgroundRenderer {
      * @param guiHeight Height of the content area (inside the border)
      */
     public record GuiLayout(int topLeftX, int topLeftY, int guiWidth, int guiHeight) {
+
     }
 }

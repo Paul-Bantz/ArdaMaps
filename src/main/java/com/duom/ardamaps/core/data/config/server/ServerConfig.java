@@ -35,17 +35,17 @@ import lombok.EqualsAndHashCode;
 import java.util.List;
 
 /**
- * Server configuration class
+ * Server-side configuration for ArdaMaps, including dimension definitions and location refresh schedules.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class ServerConfig extends Configuration<LocationServer> {
 
-    /** the list of dimension definitions available on the server. */
+    /** List of dimension definitions available on the server. */
     @SerializedName("dimensions")
     private List<Dimension> dimensions;
 
-    /** CRON expression (Unix/Posix 5-field) defining when to automatically refresh locations from the active LocationSource */
+    /** CRON expression (Unix/Posix 5-field) defining when to automatically refresh locations from the active LocationSource. */
     @SerializedName("refresh_cron")
     private String refreshCron;
 

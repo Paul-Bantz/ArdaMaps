@@ -37,18 +37,39 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.UUID;
 
+/**
+ * A packet sent from the client to the server requesting map source configuration and feature availability.
+ *
+ * @param requestId The unique request identifier for tracking the response.
+ */
 public record MapSourcesRequestPacket(UUID requestId) implements IRespondablePacket<MapSourcesRequestPacket> {
+
     public static final CustomPacketPayload.Type<MapSourcesRequestPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("map_source_request"));
+
     public static final StreamCodec<RegistryFriendlyByteBuf, MapSourcesRequestPacket> CODEC = IPacket.codec(MapSourcesRequestPacket::read);
 
+    /**
+     * Constructs a MapSourcesRequestPacket with a new request identifier.
+     */
     public MapSourcesRequestPacket() {
         this(new UUID(0L, 0L));
     }
 
+    /**
+     * Reads a MapSourcesRequestPacket from the given PacketByteBuf.
+     *
+     * @param buf The PacketByteBuf to read from.
+     * @return A new MapSourcesRequestPacket instance.
+     */
     public static MapSourcesRequestPacket read(FriendlyByteBuf buf) {
         return new MapSourcesRequestPacket(buf.readUUID());
     }
 
+    /**
+     * Serializes this packet into a PacketByteBuf for transmission over the network.
+     *
+     * @return A new PacketByteBuf containing the serialized packet data.
+     */
     @Override
     public FriendlyByteBuf build() {
         FriendlyByteBuf buf = FriendlyByteBufs.create();
@@ -56,6 +77,12 @@ public record MapSourcesRequestPacket(UUID requestId) implements IRespondablePac
         return buf;
     }
 
+    /**
+     * Creates a new MapSourcesRequestPacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this request.
+     * @return A new MapSourcesRequestPacket with the updated request identifier.
+     */
     @Override
     public MapSourcesRequestPacket withRequestId(UUID requestId) {
         return new MapSourcesRequestPacket(requestId);

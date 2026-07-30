@@ -51,9 +51,13 @@ import java.util.zip.GZIPOutputStream;
 /**
  * A packet representing a response containing region lookup texture data.
  */
-public record RegionsLutResponsePacket(UUID requestId, RegionLookupTexture data) implements IRespondablePacket<RegionsLutResponsePacket> {
+public record RegionsLutResponsePacket(UUID requestId,
+                                       RegionLookupTexture data) implements IRespondablePacket<RegionsLutResponsePacket> {
+
     public static final CustomPacketPayload.Type<RegionsLutResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("regions_lut_data_response"));
-    public static final StreamCodec<RegistryFriendlyByteBuf, RegionsLutResponsePacket> CODEC = IPacket.codec(RegionsLutResponsePacket::read);
+
+    /** A static instance representing an empty response, used when no data is available or an error occurs. */
+    public static final RegionsLutResponsePacket EMPTY = new RegionsLutResponsePacket(null);
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(RegionsLutResponsePacket.class);
@@ -61,9 +65,13 @@ public record RegionsLutResponsePacket(UUID requestId, RegionLookupTexture data)
     /** Maximum compressed region LUT payload accepted from the wire. */
     private static final int MAX_COMPRESSED_DATA_LENGTH = 8 * 1024 * 1024;
 
-    /** A static instance representing an empty response, used when no data is available or an error occurs. */
-    public static final RegionsLutResponsePacket EMPTY = new RegionsLutResponsePacket(null);
+    public static final StreamCodec<RegistryFriendlyByteBuf, RegionsLutResponsePacket> CODEC = IPacket.codec(RegionsLutResponsePacket::read);
 
+    /**
+     * Constructs a RegionsLutResponsePacket with the given region lookup texture data.
+     *
+     * @param data The region lookup texture data to include in the response, or null for an empty response.
+     */
     public RegionsLutResponsePacket(RegionLookupTexture data) {
         this(new UUID(0L, 0L), data);
     }
@@ -71,8 +79,8 @@ public record RegionsLutResponsePacket(UUID requestId, RegionLookupTexture data)
     /**
      * Reads a RegionsLutResponsePacket from a PacketByteBuf.
      *
-     * @param buf The PacketByteBuf to read from
-     * @return The RegionsLutResponsePacket read from the buffer
+     * @param buf The PacketByteBuf to read from.
+     * @return The RegionsLutResponsePacket read from the buffer.
      */
     public static RegionsLutResponsePacket read(FriendlyByteBuf buf) {
 
@@ -105,9 +113,35 @@ public record RegionsLutResponsePacket(UUID requestId, RegionLookupTexture data)
     }
 
     /**
-     * Builds a PacketByteBuf from this RegionsLutResponsePacket.
+     * Validates the compressed payload size before allocating the target byte array.
+     * <p>
+     * Ensures the data length is non-negative, does not exceed the maximum, and fits within remaining buffer bytes.
      *
-     * @return A PacketByteBuf representing this RegionsLutResponsePacket
+     * @param dataLength    The declared compressed payload length in bytes.
+     * @param readableBytes The remaining readable bytes in the packet buffer.
+     * @throws IllegalArgumentException If length is negative, exceeds maximum, or exceeds readable bytes.
+     */
+    private static void validateDataLength(int dataLength, int readableBytes) {
+
+        if (dataLength < 0) {
+            throw new IllegalArgumentException("Region LUT response data length cannot be negative: " + dataLength);
+        }
+
+        if (dataLength > MAX_COMPRESSED_DATA_LENGTH) {
+            throw new IllegalArgumentException("Region LUT response data length exceeds maximum of "
+                    + MAX_COMPRESSED_DATA_LENGTH + " bytes: " + dataLength);
+        }
+
+        if (dataLength > readableBytes) {
+            throw new IllegalArgumentException("Region LUT response data length " + dataLength
+                    + " exceeds readable packet bytes " + readableBytes);
+        }
+    }
+
+    /**
+     * Serializes this packet into a compressed PacketByteBuf for transmission over the network.
+     *
+     * @return A PacketByteBuf representing this RegionsLutResponsePacket.
      */
     @Override
     public FriendlyByteBuf build() {
@@ -145,6 +179,12 @@ public record RegionsLutResponsePacket(UUID requestId, RegionLookupTexture data)
         return buf;
     }
 
+    /**
+     * Creates a new RegionsLutResponsePacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this response.
+     * @return A new RegionsLutResponsePacket with the updated request identifier.
+     */
     @Override
     public RegionsLutResponsePacket withRequestId(UUID requestId) {
         return new RegionsLutResponsePacket(requestId, data);
@@ -153,28 +193,5 @@ public record RegionsLutResponsePacket(UUID requestId, RegionLookupTexture data)
     @Override
     public CustomPacketPayload.@NonNull Type<RegionsLutResponsePacket> type() {
         return TYPE;
-    }
-
-    /**
-     * Validates the compressed payload size before allocating the target byte array.
-     *
-     * @param dataLength    Declared compressed payload length.
-     * @param readableBytes Remaining readable bytes in the packet buffer.
-     */
-    private static void validateDataLength(int dataLength, int readableBytes) {
-
-        if (dataLength < 0) {
-            throw new IllegalArgumentException("Region LUT response data length cannot be negative: " + dataLength);
-        }
-
-        if (dataLength > MAX_COMPRESSED_DATA_LENGTH) {
-            throw new IllegalArgumentException("Region LUT response data length exceeds maximum of "
-                    + MAX_COMPRESSED_DATA_LENGTH + " bytes: " + dataLength);
-        }
-
-        if (dataLength > readableBytes) {
-            throw new IllegalArgumentException("Region LUT response data length " + dataLength
-                    + " exceeds readable packet bytes " + readableBytes);
-        }
     }
 }

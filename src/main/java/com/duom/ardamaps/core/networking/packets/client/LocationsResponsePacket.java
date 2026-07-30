@@ -53,9 +53,12 @@ import java.util.zip.GZIPOutputStream;
 /**
  * A packet representing a response containing location data in JSON format.
  */
-public record LocationsResponsePacket(UUID requestId, LocationConfig<LocationClient> data) implements IRespondablePacket<LocationsResponsePacket> {
+public record LocationsResponsePacket(UUID requestId,
+                                      LocationConfig<LocationClient> data) implements IRespondablePacket<LocationsResponsePacket> {
+
     public static final CustomPacketPayload.Type<LocationsResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_data_response"));
-    public static final StreamCodec<RegistryFriendlyByteBuf, LocationsResponsePacket> CODEC = IPacket.codec(LocationsResponsePacket::read);
+
+    public static final LocationsResponsePacket EMPTY = new LocationsResponsePacket(null);
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(LocationsResponsePacket.class);
@@ -67,17 +70,22 @@ public record LocationsResponsePacket(UUID requestId, LocationConfig<LocationCli
     private static final java.lang.reflect.Type LOCATION_CONFIG_TYPE = new TypeToken<LocationConfig<LocationClient>>() {
     }.getType();
 
-    public static final LocationsResponsePacket EMPTY = new LocationsResponsePacket(null);
+    public static final StreamCodec<RegistryFriendlyByteBuf, LocationsResponsePacket> CODEC = IPacket.codec(LocationsResponsePacket::read);
 
+    /**
+     * Constructs a LocationsResponsePacket with the given location data.
+     *
+     * @param data The location configuration data to include in the response, or null for an empty response.
+     */
     public LocationsResponsePacket(LocationConfig<LocationClient> data) {
         this(new UUID(0L, 0L), data);
     }
 
     /**
-     * Reads a MapSourceResponsePacket - ie a timestamped list of location data within the world.
+     * Reads a LocationsResponsePacket containing timestamped location data.
      *
-     * @param buf The PacketByteBuf to read from
-     * @return The MapSourceResponsePacket read from the buffer
+     * @param buf The PacketByteBuf to read from.
+     * @return The LocationsResponsePacket read from the buffer.
      */
     public static LocationsResponsePacket read(FriendlyByteBuf buf) {
 
@@ -110,9 +118,35 @@ public record LocationsResponsePacket(UUID requestId, LocationConfig<LocationCli
     }
 
     /**
-     * Builds a serialized and compressed PacketByteBuf representing the location data.
+     * Validates the compressed payload size before allocating the target byte array.
+     * <p>
+     * Ensures the data length is non-negative, does not exceed the maximum, and fits within remaining buffer bytes.
      *
-     * @return The PacketByteBuf representing this packet
+     * @param dataLength    The declared compressed payload length in bytes.
+     * @param readableBytes The remaining readable bytes in the packet buffer.
+     * @throws IllegalArgumentException If length is negative, exceeds maximum, or exceeds readable bytes.
+     */
+    private static void validateDataLength(int dataLength, int readableBytes) {
+
+        if (dataLength < 0) {
+            throw new IllegalArgumentException("Location response data length cannot be negative: " + dataLength);
+        }
+
+        if (dataLength > MAX_COMPRESSED_DATA_LENGTH) {
+            throw new IllegalArgumentException("Location response data length exceeds maximum of "
+                    + MAX_COMPRESSED_DATA_LENGTH + " bytes: " + dataLength);
+        }
+
+        if (dataLength > readableBytes) {
+            throw new IllegalArgumentException("Location response data length " + dataLength
+                    + " exceeds readable packet bytes " + readableBytes);
+        }
+    }
+
+    /**
+     * Serializes this packet into a compressed PacketByteBuf for transmission over the network.
+     *
+     * @return The PacketByteBuf representing this packet.
      */
     @Override
     public FriendlyByteBuf build() {
@@ -149,6 +183,12 @@ public record LocationsResponsePacket(UUID requestId, LocationConfig<LocationCli
         return buf;
     }
 
+    /**
+     * Creates a new LocationsResponsePacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this response.
+     * @return A new LocationsResponsePacket with the updated request identifier.
+     */
     @Override
     public LocationsResponsePacket withRequestId(UUID requestId) {
         return new LocationsResponsePacket(requestId, data);
@@ -157,28 +197,5 @@ public record LocationsResponsePacket(UUID requestId, LocationConfig<LocationCli
     @Override
     public CustomPacketPayload.@NonNull Type<LocationsResponsePacket> type() {
         return TYPE;
-    }
-
-    /**
-     * Validates the compressed payload size before allocating the target byte array.
-     *
-     * @param dataLength    Declared compressed payload length.
-     * @param readableBytes Remaining readable bytes in the packet buffer.
-     */
-    private static void validateDataLength(int dataLength, int readableBytes) {
-
-        if (dataLength < 0) {
-            throw new IllegalArgumentException("Location response data length cannot be negative: " + dataLength);
-        }
-
-        if (dataLength > MAX_COMPRESSED_DATA_LENGTH) {
-            throw new IllegalArgumentException("Location response data length exceeds maximum of "
-                    + MAX_COMPRESSED_DATA_LENGTH + " bytes: " + dataLength);
-        }
-
-        if (dataLength > readableBytes) {
-            throw new IllegalArgumentException("Location response data length " + dataLength
-                    + " exceeds readable packet bytes " + readableBytes);
-        }
     }
 }

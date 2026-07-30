@@ -44,6 +44,17 @@ public class WaypointsApiImpl implements IWaypointsApi {
     /** Class logger. */
     private static final Logger LOGGER = LoggerFactory.getLogger(WaypointsApiImpl.class);
 
+    /**
+     * Converts an internal waypoint into the public DTO.
+     *
+     * @param waypoint the internal waypoint
+     * @return the public waypoint
+     */
+    public static ApiWaypoint toApiWaypoint(Waypoint waypoint) {
+        return new ApiWaypoint(waypoint.x(), waypoint.z(), waypoint.text(), waypoint.r(), waypoint.g(), waypoint.b(),
+                waypoint.identifier(), waypoint.dimension(), waypoint.showToast(), waypoint.icon());
+    }
+
     @Override
     public void addWaypoint(int x, int z, String text, float r, float g, float b, String identifier, String dimension) {
         addWaypoint(x, z, text, r, g, b, identifier, dimension, true, ModConstants.ICON_WAYPOINT.toString());
@@ -60,57 +71,6 @@ public class WaypointsApiImpl implements IWaypointsApi {
         if (!validateWaypointArguments(waypoint.identifier(), waypoint.dimension())) return;
 
         ArdaMapsClient.CONFIG.setWaypoint(toWaypoint(waypoint));
-    }
-
-    @Override
-    public void removeWaypoint(int x, int z, String identifier, String dimension) {
-        removeWaypoint(new ApiWaypoint(x, z, "", -1, -1, -1, identifier, dimension));
-    }
-
-    @Override
-    public void removeWaypoint(int x, int z, String identifier) {
-        removeWaypoint(x, z, identifier, Client.currentDimensionId());
-    }
-
-    @Override
-    public void removeWaypoint(ApiWaypoint waypoint) {
-        if (waypoint == null) return;
-        if (!validateWaypointArguments(waypoint.identifier(), waypoint.dimension())) return;
-
-        ArdaMapsClient.CONFIG.removeWaypoint(toWaypoint(waypoint));
-    }
-
-    @Override
-    public void removeWaypoints(String identifier) {
-        if (identifier == null) {
-            LOGGER.warn("[ArdaMapsApi] Identifier must not be null");
-            return;
-        }
-
-        ArdaMapsClient.CONFIG.clearWaypointsByIdentifier(identifier);
-    }
-
-    /**
-     * Converts a public waypoint DTO into the internal model.
-     *
-     * @param waypoint the public waypoint
-     * @return the internal waypoint
-     */
-    public static Waypoint toWaypoint(ApiWaypoint waypoint) {
-        return new Waypoint(waypoint.x(), waypoint.z(), waypoint.text(), waypoint.r(), waypoint.g(), waypoint.b(),
-                waypoint.identifier(), waypoint.dimension(), waypoint.showToast(),
-                waypoint.icon() != null ? waypoint.icon() : ModConstants.ICON_WAYPOINT.toString());
-    }
-
-    /**
-     * Converts an internal waypoint into the public DTO.
-     *
-     * @param waypoint the internal waypoint
-     * @return the public waypoint
-     */
-    public static ApiWaypoint toApiWaypoint(Waypoint waypoint) {
-        return new ApiWaypoint(waypoint.x(), waypoint.z(), waypoint.text(), waypoint.r(), waypoint.g(), waypoint.b(),
-                waypoint.identifier(), waypoint.dimension(), waypoint.showToast(), waypoint.icon());
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
@@ -133,5 +93,45 @@ public class WaypointsApiImpl implements IWaypointsApi {
         }
 
         return true;
+    }
+
+    /**
+     * Converts a public waypoint DTO into the internal model.
+     *
+     * @param waypoint the public waypoint
+     * @return the internal waypoint
+     */
+    public static Waypoint toWaypoint(ApiWaypoint waypoint) {
+        return new Waypoint(waypoint.x(), waypoint.z(), waypoint.text(), waypoint.r(), waypoint.g(), waypoint.b(),
+                waypoint.identifier(), waypoint.dimension(), waypoint.showToast(),
+                waypoint.icon() != null ? waypoint.icon() : ModConstants.ICON_WAYPOINT.toString());
+    }
+
+    @Override
+    public void removeWaypoint(int x, int z, String identifier) {
+        removeWaypoint(x, z, identifier, Client.currentDimensionId());
+    }
+
+    @Override
+    public void removeWaypoint(int x, int z, String identifier, String dimension) {
+        removeWaypoint(new ApiWaypoint(x, z, "", -1, -1, -1, identifier, dimension));
+    }
+
+    @Override
+    public void removeWaypoint(ApiWaypoint waypoint) {
+        if (waypoint == null) return;
+        if (!validateWaypointArguments(waypoint.identifier(), waypoint.dimension())) return;
+
+        ArdaMapsClient.CONFIG.removeWaypoint(toWaypoint(waypoint));
+    }
+
+    @Override
+    public void removeWaypoints(String identifier) {
+        if (identifier == null) {
+            LOGGER.warn("[ArdaMapsApi] Identifier must not be null");
+            return;
+        }
+
+        ArdaMapsClient.CONFIG.clearWaypointsByIdentifier(identifier);
     }
 }

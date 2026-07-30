@@ -35,9 +35,14 @@ import org.jetbrains.annotations.NotNull;
 @Getter
 public enum ExplorationState {
 
-    HIDDEN(0, 0x00000000),      // Alpha = 0 (fully hidden)
-    VISIBLE(1, 0x33000000),     // Alpha = 0.5 (semi-transparent)
-    REVEALED(2, 0xFF000000);    // Alpha = 1.0 (fully revealed)
+    /** Fully hidden state with transparent colour (alpha = 0). */
+    HIDDEN(0, 0x00000000),
+
+    /** Partially visible state with semi-transparent colour (alpha = 0.5). */
+    VISIBLE(1, 0x33000000),
+
+    /** Fully revealed state with opaque colour (alpha = 1.0). */
+    REVEALED(2, 0xFF000000);
 
     /** the byte value of this state */
     private final byte value;

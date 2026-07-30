@@ -54,20 +54,6 @@ public final class Warps {
         return resolve() != null;
     }
 
-    /**
-     * Warps the player through the optional service, falling back when unavailable or invalid.
-     *
-     * @param server    the server that owns the destination world
-     * @param player    the player to move
-     * @param warpName  the configured warp name
-     * @param onFailure fallback action for missing or invalid warp targets
-     */
-    public static void warpTo(MinecraftServer server, ServerPlayer player, String warpName, Runnable onFailure) {
-        WarpService warpService = resolve();
-        if (warpService != null) warpService.warpTo(server, player, warpName, onFailure);
-        else onFailure.run();
-    }
-
     private static @Nullable WarpService resolve() {
         if (!resolved) {
             synchronized (Warps.class) {
@@ -90,5 +76,19 @@ public final class Warps {
             log.warn("HuskHomes warp integration is unavailable; falling back to coordinates.", throwable);
             return null;
         }
+    }
+
+    /**
+     * Warps the player through the optional service, falling back when unavailable or invalid.
+     *
+     * @param server    the server that owns the destination world
+     * @param player    the player to move
+     * @param warpName  the configured warp name
+     * @param onFailure fallback action for missing or invalid warp targets
+     */
+    public static void warpTo(MinecraftServer server, ServerPlayer player, String warpName, Runnable onFailure) {
+        WarpService warpService = resolve();
+        if (warpService != null) warpService.warpTo(server, player, warpName, onFailure);
+        else onFailure.run();
     }
 }

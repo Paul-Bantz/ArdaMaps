@@ -30,11 +30,22 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 
+/**
+ * Utility methods for JSON deserialization and validation.
+ */
 public final class JsonAdapterUtils {
 
     private JsonAdapterUtils() {
     }
 
+    /**
+     * Asserts that a JSON element is an object and returns it.
+     *
+     * @param json The JSON element to validate.
+     * @param type A descriptive name for error messages.
+     * @return The JSON object.
+     * @throws JsonParseException if the element is not a JSON object.
+     */
     public static JsonObject object(JsonElement json, String type) {
 
         if (json == null || json.isJsonNull() || !json.isJsonObject())
@@ -43,6 +54,14 @@ public final class JsonAdapterUtils {
         return json.getAsJsonObject();
     }
 
+    /**
+     * Retrieves a required field from a JSON object.
+     *
+     * @param obj   The JSON object.
+     * @param field The field name.
+     * @return The JSON element at the specified field.
+     * @throws JsonParseException if the field is missing or null.
+     */
     public static JsonElement required(JsonObject obj, String field) {
 
         JsonElement value = obj.get(field);

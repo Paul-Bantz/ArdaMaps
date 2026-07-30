@@ -185,6 +185,115 @@ public class RangeSelectionWidget extends AbstractWidget {
     }
 
     /**
+     * Builds the tooltip label for a range.
+     *
+     * @param range The range to label.
+     * @return The numeric Y interval covered by the range.
+     */
+    static String tooltipLabel(MapLayerRange range) {
+
+        return Math.min(range.rangeMinY(), range.rangeMaxY()) + ".." + Math.max(range.rangeMinY(), range.rangeMaxY());
+    }
+
+    /**
+     * Interpolates two ARGB colours channel-by-channel.
+     *
+     * @param interpolationFraction The interpolation fraction in the inclusive range [0, 1].
+     * @return The interpolated ARGB colour.
+     */
+    @SuppressWarnings("ConstantValue")
+    static int lerpColor(float interpolationFraction) {
+
+        float clamped = Math.max(0, Math.min(1, interpolationFraction));
+        int fromA = RangeSelectionWidget.BACKGROUND_TRANSPARENT >>> 24;
+        int fromR = (RangeSelectionWidget.BACKGROUND_TRANSPARENT >>> 16) & 0xFF;
+        int fromG = (RangeSelectionWidget.BACKGROUND_TRANSPARENT >>> 8) & 0xFF;
+        int fromB = RangeSelectionWidget.BACKGROUND_TRANSPARENT & 0xFF;
+        int toA = RangeSelectionWidget.BACKGROUND_COLOR >>> 24;
+        int toR = (RangeSelectionWidget.BACKGROUND_COLOR >>> 16) & 0xFF;
+        int toG = (RangeSelectionWidget.BACKGROUND_COLOR >>> 8) & 0xFF;
+        int toB = RangeSelectionWidget.BACKGROUND_COLOR & 0xFF;
+
+        int alpha = Math.round(fromA + (toA - fromA) * clamped);
+        int red = Math.round(fromR + (toR - fromR) * clamped);
+        int green = Math.round(fromG + (toG - fromG) * clamped);
+        int blue = Math.round(fromB + (toB - fromB) * clamped);
+
+        return alpha << 24 | red << 16 | green << 8 | blue;
+    }
+
+    /**
+     * Computes the background gradient colour for one label-area column.
+     *
+     * @param columnOffset The zero-based column offset inside the label area.
+     * @param labelWidth   The total label-area width in pixels.
+     * @return The ARGB colour to draw for that column.
+     */
+    static int gradientColorAt(int columnOffset, int labelWidth) {
+
+        if (labelWidth <= 0) return BACKGROUND_COLOR;
+        if (labelWidth == 1) return BACKGROUND_COLOR;
+
+        float t = (float) columnOffset / (labelWidth - 1);
+        return lerpColor(t);
+    }
+
+    /**
+     * Clamps a tooltip anchor into the visible strip viewport.
+     *
+     * @param anchorX   The proposed tooltip anchor X coordinate.
+     * @param minAnchor The minimum visible anchor X coordinate.
+     * @param maxAnchor The maximum visible anchor X coordinate.
+     * @return The clamped anchor X coordinate.
+     */
+    static int clampTooltipAnchorX(int anchorX, int minAnchor, int maxAnchor) {
+
+        if (maxAnchor <= minAnchor) return minAnchor;
+        return Math.max(minAnchor, Math.min(maxAnchor, anchorX));
+    }
+
+    /**
+     * Computes the tooltip's top-left X coordinate after centring and screen-edge clamping.
+     *
+     * @param screenWidth  The available screen width.
+     * @param anchorX      The tooltip anchor X coordinate.
+     * @param tooltipWidth The tooltip width.
+     * @return The clamped tooltip X coordinate.
+     */
+    static int tooltipLeft(int screenWidth, int anchorX, int tooltipWidth) {
+
+        return clampToScreen(anchorX - tooltipWidth / 2, TOOLTIP_SCREEN_MARGIN,
+                screenWidth - tooltipWidth - TOOLTIP_SCREEN_MARGIN);
+    }
+
+    /**
+     * Clamps a value into the inclusive range used for tooltip layout.
+     *
+     * @param value The proposed coordinate.
+     * @param min   The minimum allowed coordinate.
+     * @param max   The maximum allowed coordinate.
+     * @return The clamped coordinate.
+     */
+    @SuppressWarnings("SameParameterValue")
+    static int clampToScreen(int value, int min, int max) {
+
+        if (max < min) return min;
+        return Math.max(min, Math.min(max, value));
+    }
+
+    /**
+     * Computes the tooltip's top-left Y coordinate above its anchor.
+     *
+     * @param anchorY       The tooltip anchor Y coordinate.
+     * @param tooltipHeight The tooltip height.
+     * @return The tooltip Y coordinate.
+     */
+    static int tooltipTop(int anchorY, int tooltipHeight) {
+
+        return Math.max(TOOLTIP_SCREEN_MARGIN, anchorY - tooltipHeight);
+    }
+
+    /**
      * Computes the total width occupied by label and range cells.
      *
      * @return The occupied content width in pixels.
@@ -396,8 +505,8 @@ public class RangeSelectionWidget extends AbstractWidget {
     /**
      * Starts tracking a press that may become either a click or a drag.
      *
-     * @param mouseX The mouse X coordinate where the press began.
-     * @param mouseY The mouse Y coordinate where the press began.
+     * @param event       the initiating mouse event
+     * @param doubleClick true if this is a double click
      */
     @Override
     public void onClick(MouseButtonEvent event, boolean doubleClick) {
@@ -411,8 +520,7 @@ public class RangeSelectionWidget extends AbstractWidget {
     /**
      * Updates horizontal scrolling while a drag is active.
      *
-     * @param mouseX The current mouse X coordinate.
-     * @param mouseY The current mouse Y coordinate.
+     * @param event  the initiating mouse event
      * @param deltaX The horizontal mouse movement since the previous event.
      * @param deltaY The vertical mouse movement since the previous event.
      */
@@ -490,8 +598,7 @@ public class RangeSelectionWidget extends AbstractWidget {
     /**
      * Selects an item on click release or finishes an active drag.
      *
-     * @param mouseX The mouse X coordinate where the press was released.
-     * @param mouseY The mouse Y coordinate where the press was released.
+     * @param event the initiating mouse event
      */
     @Override
     public void onRelease(@NonNull MouseButtonEvent event) {
@@ -503,9 +610,10 @@ public class RangeSelectionWidget extends AbstractWidget {
     /**
      * Handles wheel input over the strip, either selecting ranges with control held or panning horizontally.
      *
-     * @param mouseX The mouse X coordinate.
-     * @param mouseY The mouse Y coordinate.
-     * @param amount The scroll amount.
+     * @param mouseX           The mouse X coordinate.
+     * @param mouseY           The mouse Y coordinate.
+     * @param horizontalAmount The horizontal scroll amount.
+     * @param verticalAmount   The vertical scroll amount.
      * @return True when the scroll event was consumed.
      */
     @Override
@@ -677,115 +785,6 @@ public class RangeSelectionWidget extends AbstractWidget {
     private static String label(MapLayerRange range) {
 
         return String.valueOf(range.index());
-    }
-
-    /**
-     * Builds the tooltip label for a range.
-     *
-     * @param range The range to label.
-     * @return The numeric Y interval covered by the range.
-     */
-    static String tooltipLabel(MapLayerRange range) {
-
-        return Math.min(range.rangeMinY(), range.rangeMaxY()) + ".." + Math.max(range.rangeMinY(), range.rangeMaxY());
-    }
-
-    /**
-     * Interpolates two ARGB colours channel-by-channel.
-     *
-     * @param interpolationFraction The interpolation fraction in the inclusive range [0, 1].
-     * @return The interpolated ARGB colour.
-     */
-    @SuppressWarnings("ConstantValue")
-    static int lerpColor(float interpolationFraction) {
-
-        float clamped = Math.max(0, Math.min(1, interpolationFraction));
-        int fromA = RangeSelectionWidget.BACKGROUND_TRANSPARENT >>> 24;
-        int fromR = (RangeSelectionWidget.BACKGROUND_TRANSPARENT >>> 16) & 0xFF;
-        int fromG = (RangeSelectionWidget.BACKGROUND_TRANSPARENT >>> 8) & 0xFF;
-        int fromB = RangeSelectionWidget.BACKGROUND_TRANSPARENT & 0xFF;
-        int toA = RangeSelectionWidget.BACKGROUND_COLOR >>> 24;
-        int toR = (RangeSelectionWidget.BACKGROUND_COLOR >>> 16) & 0xFF;
-        int toG = (RangeSelectionWidget.BACKGROUND_COLOR >>> 8) & 0xFF;
-        int toB = RangeSelectionWidget.BACKGROUND_COLOR & 0xFF;
-
-        int alpha = Math.round(fromA + (toA - fromA) * clamped);
-        int red = Math.round(fromR + (toR - fromR) * clamped);
-        int green = Math.round(fromG + (toG - fromG) * clamped);
-        int blue = Math.round(fromB + (toB - fromB) * clamped);
-
-        return alpha << 24 | red << 16 | green << 8 | blue;
-    }
-
-    /**
-     * Computes the background gradient colour for one label-area column.
-     *
-     * @param columnOffset The zero-based column offset inside the label area.
-     * @param labelWidth   The total label-area width in pixels.
-     * @return The ARGB colour to draw for that column.
-     */
-    static int gradientColorAt(int columnOffset, int labelWidth) {
-
-        if (labelWidth <= 0) return BACKGROUND_COLOR;
-        if (labelWidth == 1) return BACKGROUND_COLOR;
-
-        float t = (float) columnOffset / (labelWidth - 1);
-        return lerpColor(t);
-    }
-
-    /**
-     * Clamps a tooltip anchor into the visible strip viewport.
-     *
-     * @param anchorX   The proposed tooltip anchor X coordinate.
-     * @param minAnchor The minimum visible anchor X coordinate.
-     * @param maxAnchor The maximum visible anchor X coordinate.
-     * @return The clamped anchor X coordinate.
-     */
-    static int clampTooltipAnchorX(int anchorX, int minAnchor, int maxAnchor) {
-
-        if (maxAnchor <= minAnchor) return minAnchor;
-        return Math.max(minAnchor, Math.min(maxAnchor, anchorX));
-    }
-
-    /**
-     * Computes the tooltip's top-left X coordinate after centring and screen-edge clamping.
-     *
-     * @param screenWidth The available screen width.
-     * @param anchorX     The tooltip anchor X coordinate.
-     * @param tooltipWidth The tooltip width.
-     * @return The clamped tooltip X coordinate.
-     */
-    static int tooltipLeft(int screenWidth, int anchorX, int tooltipWidth) {
-
-        return clampToScreen(anchorX - tooltipWidth / 2, TOOLTIP_SCREEN_MARGIN,
-                screenWidth - tooltipWidth - TOOLTIP_SCREEN_MARGIN);
-    }
-
-    /**
-     * Computes the tooltip's top-left Y coordinate above its anchor.
-     *
-     * @param anchorY       The tooltip anchor Y coordinate.
-     * @param tooltipHeight The tooltip height.
-     * @return The tooltip Y coordinate.
-     */
-    static int tooltipTop(int anchorY, int tooltipHeight) {
-
-        return Math.max(TOOLTIP_SCREEN_MARGIN, anchorY - tooltipHeight);
-    }
-
-    /**
-     * Clamps a value into the inclusive range used for tooltip layout.
-     *
-     * @param value The proposed coordinate.
-     * @param min   The minimum allowed coordinate.
-     * @param max   The maximum allowed coordinate.
-     * @return The clamped coordinate.
-     */
-    @SuppressWarnings("SameParameterValue")
-    static int clampToScreen(int value, int min, int max) {
-
-        if (max < min) return min;
-        return Math.max(min, Math.min(max, value));
     }
 
     /**

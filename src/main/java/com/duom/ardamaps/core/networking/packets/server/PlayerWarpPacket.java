@@ -40,14 +40,16 @@ import org.jspecify.annotations.NonNull;
  * @param warpName the name of the warp to teleport to
  */
 public record PlayerWarpPacket(String warpName) implements IPacket {
+
     public static final CustomPacketPayload.Type<PlayerWarpPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_warp"));
+
     public static final StreamCodec<RegistryFriendlyByteBuf, PlayerWarpPacket> CODEC = IPacket.codec(PlayerWarpPacket::read);
 
     /**
-     * Reads a PlayerWarpRequest from the given PacketByteBuf.
+     * Reads a PlayerWarpPacket from the given PacketByteBuf.
      *
      * @param buf The PacketByteBuf to read from.
-     * @return A new PlayerWarpRequest instance.
+     * @return A new PlayerWarpPacket instance.
      */
     public static PlayerWarpPacket read(FriendlyByteBuf buf) {
         return new PlayerWarpPacket(buf.readUtf());

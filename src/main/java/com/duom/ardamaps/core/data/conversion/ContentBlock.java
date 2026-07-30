@@ -49,7 +49,9 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
      *
      * @param text the pre-styled, wrappable text to render
      */
-    record TextBlock(MutableComponent text) implements ContentBlock {}
+    record TextBlock(MutableComponent text) implements ContentBlock {
+
+    }
 
     /**
      * An image loaded from the mod's resource pack that occupies its own horizontal row
@@ -86,9 +88,9 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
             public static Align fromString(String value) {
                 if (value == null) return LEFT;
                 return switch (value.toLowerCase().trim()) {
-                    case "right"  -> RIGHT;
+                    case "right" -> RIGHT;
                     case "center" -> CENTER;
-                    default       -> LEFT;
+                    default -> LEFT;
                 };
             }
         }
@@ -96,8 +98,9 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
 
     /**
      * Block declaration for a title (h1, h2, etc)
+     *
      * @param title the title to display
-     * @param type the type of title
+     * @param type  the type of title
      */
     record TitleBlock(String title, Type type) implements ContentBlock {
 
@@ -119,6 +122,7 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
 
             /**
              * Construct a new Type given a scale
+             *
              * @param scale the title scale
              */
             Type(float scale, int color) {
@@ -129,6 +133,7 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
 
             /**
              * Converts a string to its equivalent title type. Unrecognised values default to H3.
+             *
              * @param value the value to convert
              * @return the converted value
              */
@@ -138,7 +143,7 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
                 return switch (value.toLowerCase().trim()) {
                     case "h1" -> H1;
                     case "h2" -> H2;
-                    default   -> H3;
+                    default -> H3;
                 };
             }
         }
@@ -153,7 +158,9 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
      *
      * @param items the pre-styled text for each list item
      */
-    record ListBlock(List<MutableComponent> items) implements ContentBlock {}
+    record ListBlock(List<MutableComponent> items) implements ContentBlock {
+
+    }
 
     /**
      * A block that renders as an indented blockquote with a left accent bar and
@@ -161,7 +168,9 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
      *
      * @param text the pre-styled text content of the quotation
      */
-    record BlockquoteBlock(MutableComponent text) implements ContentBlock {}
+    record BlockquoteBlock(MutableComponent text) implements ContentBlock {
+
+    }
 
     /**
      * A pure vertical spacer block that represents an explicit {@code <br>} line break
@@ -169,10 +178,14 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
      * list block). The renderer advances {@code totalHeight} by one line for each
      * instance without drawing anything.
      */
-    record LineBreakBlock() implements ContentBlock {}
+    record LineBreakBlock() implements ContentBlock {
+
+    }
 
     /**
      * A vertical separator block representing a vertical separation between two content blocks
      */
-    record SeparatorBlock() implements ContentBlock {}
+    record SeparatorBlock() implements ContentBlock {
+
+    }
 }

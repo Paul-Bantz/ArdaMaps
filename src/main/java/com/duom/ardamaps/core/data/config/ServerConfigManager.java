@@ -142,17 +142,6 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
     }
 
     /**
-     * Minimal world data needed to generate missing dimension config.
-     */
-    public record ServerWorldDefinition(String dimensionId,
-                                        String dimensionName,
-                                        double boundWest,
-                                        double boundEast,
-                                        double boundNorth,
-                                        double boundSouth) {
-    }
-
-    /**
      * Logs warnings for range configuration shapes that are valid but likely surprising.
      */
     private void validateRangeConfiguration() {
@@ -220,5 +209,17 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
         }
 
         return true;
+    }
+
+    /**
+     * Minimal world data needed to generate missing dimension config.
+     */
+    public record ServerWorldDefinition(String dimensionId,
+                                        String dimensionName,
+                                        double boundWest,
+                                        double boundEast,
+                                        double boundNorth,
+                                        double boundSouth) {
+
     }
 }

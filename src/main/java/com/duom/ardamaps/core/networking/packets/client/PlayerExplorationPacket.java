@@ -53,8 +53,11 @@ public record PlayerExplorationPacket(String dimensionId,
                                       String regionId,
                                       List<List<Vec2d>> parentRegionPolygon,
                                       List<List<Vec2d>> regionPolygon) implements IPacket {
+
     public static final CustomPacketPayload.Type<PlayerExplorationPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_exploration_event"));
-    public static final StreamCodec<RegistryFriendlyByteBuf, PlayerExplorationPacket> CODEC = IPacket.codec(PlayerExplorationPacket::read);
+
+    /** Empty packet */
+    public static final PlayerExplorationPacket EMPTY = new PlayerExplorationPacket("", "", List.of(), List.of());
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(PlayerExplorationPacket.class);
@@ -65,8 +68,7 @@ public record PlayerExplorationPacket(String dimensionId,
     /** Maximum number of points accepted in a single polygon. */
     private static final int MAX_POINTS_PER_POLYGON = 16_384;
 
-    /** Empty packet */
-    public static final PlayerExplorationPacket EMPTY = new PlayerExplorationPacket("", "", List.of(), List.of());
+    public static final StreamCodec<RegistryFriendlyByteBuf, PlayerExplorationPacket> CODEC = IPacket.codec(PlayerExplorationPacket::read);
 
     /**
      * Reads a PlayerExplorationPacket from a PacketByteBuf.
@@ -106,10 +108,10 @@ public record PlayerExplorationPacket(String dimensionId,
     }
 
     /**
-     * Reads a list of polygons from the given PacketByteBuf.
+     * Reads a collection of polygons from the given PacketByteBuf.
      *
      * @param buf The PacketByteBuf to read from.
-     * @return A list of polygons, where each polygon is a list of Vec2d points.
+     * @return A list of polygons, where each polygon is a list of Vec2d points in world coordinates.
      */
     private static List<List<Vec2d>> readPolygonFromBuffer(FriendlyByteBuf buf) {
 
@@ -137,12 +139,13 @@ public record PlayerExplorationPacket(String dimensionId,
     }
 
     /**
-     * Reads and validates a VarInt collection size from the packet.
+     * Reads and validates a VarInt collection size from the packet buffer.
      *
-     * @param buf   The packet buffer.
+     * @param buf   The packet buffer to read from.
      * @param label Human-readable field label for error messages.
      * @param max   Maximum accepted count.
      * @return The validated count.
+     * @throws IllegalArgumentException If count is negative or exceeds maximum.
      */
     private static int readCount(FriendlyByteBuf buf, String label, int max) {
 
@@ -160,7 +163,7 @@ public record PlayerExplorationPacket(String dimensionId,
     }
 
     /**
-     * Builds a PacketByteBuf from this PlayerExplorationPacket.
+     * Serializes this packet into a PacketByteBuf for transmission over the network.
      *
      * @return A PacketByteBuf representing this packet.
      */
@@ -208,29 +211,22 @@ public record PlayerExplorationPacket(String dimensionId,
     }
 
     /**
-     * @return true if this is an empty packet
+     * Checks whether this packet represents an empty exploration update.
+     *
+     * @return True if this packet contains no exploration data, false otherwise.
      */
-    public boolean isEmpty(){
+    public boolean isEmpty() {
 
         return this.equals(PlayerExplorationPacket.EMPTY);
     }
 
-    @Override
-    public CustomPacketPayload.@NonNull Type<PlayerExplorationPacket> type() {
-        return TYPE;
-    }
-
     /**
-     * @return this packets hash
-     */
-    @Override
-    public int hashCode() {
-        return Objects.hash(dimensionId, regionId, parentRegionPolygon, regionPolygon);
-    }
-
-    /**
-     * @param obj   the reference object with which to compare.
-     * @return true if the objects are equals, false otherwise
+     * Checks whether this packet is equal to another object.
+     * <p>
+     * Two PlayerExplorationPackets are equal if they have the same dimension, region ID, parent region polygons, and region polygons.
+     *
+     * @param obj The reference object with which to compare.
+     * @return True if the objects are equal, false otherwise.
      */
     @Override
     public boolean equals(Object obj) {
@@ -243,5 +239,20 @@ public record PlayerExplorationPacket(String dimensionId,
                 Objects.equals(regionId, regionId1) &&
                 Objects.equals(parentRegionPolygon, polygon) &&
                 Objects.equals(regionPolygon, regionPolygon1);
+    }
+
+    @Override
+    public CustomPacketPayload.@NonNull Type<PlayerExplorationPacket> type() {
+        return TYPE;
+    }
+
+    /**
+     * Computes the hash code for this packet based on all its exploration data fields.
+     *
+     * @return The hash code of this packet.
+     */
+    @Override
+    public int hashCode() {
+        return Objects.hash(dimensionId, regionId, parentRegionPolygon, regionPolygon);
     }
 }

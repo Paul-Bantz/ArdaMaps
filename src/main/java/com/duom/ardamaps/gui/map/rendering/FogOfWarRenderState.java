@@ -86,6 +86,24 @@ public record FogOfWarRenderState(
                 bounds(x0, y0, x1, y1, pose, scissorArea));
     }
 
+    private static ScreenRectangle bounds(
+            float x0,
+            float y0,
+            float x1,
+            float y1,
+            Matrix3x2f pose,
+            ScreenRectangle scissorArea
+    ) {
+        ScreenRectangle transformed = new ScreenRectangle(
+                (int) Math.floor(x0),
+                (int) Math.floor(y0),
+                (int) Math.ceil(x1 - x0),
+                (int) Math.ceil(y1 - y0))
+                .transformMaxBounds(pose);
+
+        return scissorArea == null ? transformed : scissorArea.intersection(transformed);
+    }
+
     @Override
     public void buildVertices(@NonNull VertexConsumer vertexConsumer) {
 
@@ -93,6 +111,12 @@ public record FogOfWarRenderState(
         vertex(vertexConsumer, x0, y1, 0.0F, 1.0F, paperU0, paperV1);
         vertex(vertexConsumer, x1, y1, 1.0F, 1.0F, paperU1, paperV1);
         vertex(vertexConsumer, x1, y0, 1.0F, 0.0F, paperU1, paperV0);
+    }
+
+    private void vertex(VertexConsumer vertexConsumer, float x, float y, float u, float v, float paperU, float paperV) {
+
+        vertexConsumer.addVertexWith2DPose(pose, x, y).setUv(u, v);
+        CustomVertexAttributes.set(vertexConsumer, ModVertexFormats.UV_PAPER, paperU, paperV);
     }
 
     @Override
@@ -114,29 +138,5 @@ public record FogOfWarRenderState(
                 samplerCache.getRepeat(FilterMode.LINEAR),
                 maskView,
                 samplerCache.getClampToEdge(FilterMode.LINEAR));
-    }
-
-    private void vertex(VertexConsumer vertexConsumer, float x, float y, float u, float v, float paperU, float paperV) {
-
-        vertexConsumer.addVertexWith2DPose(pose, x, y).setUv(u, v);
-        CustomVertexAttributes.set(vertexConsumer, ModVertexFormats.UV_PAPER, paperU, paperV);
-    }
-
-    private static ScreenRectangle bounds(
-            float x0,
-            float y0,
-            float x1,
-            float y1,
-            Matrix3x2f pose,
-            ScreenRectangle scissorArea
-    ) {
-        ScreenRectangle transformed = new ScreenRectangle(
-                (int) Math.floor(x0),
-                (int) Math.floor(y0),
-                (int) Math.ceil(x1 - x0),
-                (int) Math.ceil(y1 - y0))
-                .transformMaxBounds(pose);
-
-        return scissorArea == null ? transformed : scissorArea.intersection(transformed);
     }
 }

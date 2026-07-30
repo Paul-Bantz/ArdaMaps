@@ -48,6 +48,21 @@ public abstract class TileProvider<T extends TileKey> {
     /** Maximum in-memory texture cache size */
     protected static final int MAX_CACHE_SIZE = 256;
 
+    /** Debounce window for buffered get requests. */
+    protected static final long REQUEST_BUFFER_TTL_MS = 500L;
+
+    /** How long a transport/IO failure suppresses retries for a tile key. */
+    protected static final long TRANSPORT_FAILURE_TTL_MS = 30_000L;
+
+    /** Set of tile keys currently being loaded (thread-safe) */
+    protected final Set<T> loading = ConcurrentHashMap.newKeySet();
+
+    /** Keys seen once by get(); a second hit within the debounce window triggers loading. */
+    protected final ConcurrentHashMap<T, Long> pendingRequests = new ConcurrentHashMap<>();
+
+    /** Keys that hit transport/IO failures, mapped to failure timestamp. */
+    protected final ConcurrentHashMap<T, Long> transportFailedKeys = new ConcurrentHashMap<>();
+
     /** Removal listener that destroys dynamic textures evicted from the in-memory cache. */
     private final RemovalListener<T, Identifier> textureRemovalListener =
             (ignoredKey, texture, ignoredCause) -> destroyTexture(texture);
@@ -58,9 +73,6 @@ public abstract class TileProvider<T extends TileKey> {
             .removalListener(textureRemovalListener)
             .build();
 
-    /** Set of tile keys currently being loaded (thread-safe) */
-    protected final Set<T> loading = ConcurrentHashMap.newKeySet();
-
     /** Minimum zoom level available in the PMTiles file */
     @Getter
     protected int minZoom = 0;
@@ -68,18 +80,6 @@ public abstract class TileProvider<T extends TileKey> {
     /** Maximum zoom level available in the PMTiles file */
     @Getter
     protected int maxZoom = 0;
-
-    /** Debounce window for buffered get requests. */
-    protected static final long REQUEST_BUFFER_TTL_MS = 500L;
-
-    /** Keys seen once by get(); a second hit within the debounce window triggers loading. */
-    protected final ConcurrentHashMap<T, Long> pendingRequests = new ConcurrentHashMap<>();
-
-    /** How long a transport/IO failure suppresses retries for a tile key. */
-    protected static final long TRANSPORT_FAILURE_TTL_MS = 30_000L;
-
-    /** Keys that hit transport/IO failures, mapped to failure timestamp. */
-    protected final ConcurrentHashMap<T, Long> transportFailedKeys = new ConcurrentHashMap<>();
 
     /**
      * Registers the given NativeImage as a texture in Minecraft and associates it with the tile key.
@@ -142,26 +142,6 @@ public abstract class TileProvider<T extends TileKey> {
     }
 
     /**
-     * Marks a key as transport-failed (IO/network error): this provider instance will not retry it.
-     */
-    protected void markTransportFailure(T key) {
-
-        transportFailedKeys.put(key, System.currentTimeMillis());
-        clearLoading(key);
-    }
-
-    /**
-     * Clears transient async state for the given key.
-     *
-     * @param key The key whose in-flight/debounce state should be cleared.
-     */
-    protected void clearLoading(T key) {
-
-        loading.remove(key);
-        pendingRequests.remove(key);
-    }
-
-    /**
      * Returns whether the key is still in its transport-failure retry cooldown.
      *
      * @param key The tile key.
@@ -203,9 +183,30 @@ public abstract class TileProvider<T extends TileKey> {
     protected abstract void loadTile(T key);
 
     /**
+     * Marks a key as transport-failed (IO/network error): this provider instance will not retry it.
+     */
+    protected void markTransportFailure(T key) {
+
+        transportFailedKeys.put(key, System.currentTimeMillis());
+        clearLoading(key);
+    }
+
+    /**
+     * Clears transient async state for the given key.
+     *
+     * @param key The key whose in-flight/debounce state should be cleared.
+     */
+    protected void clearLoading(T key) {
+
+        loading.remove(key);
+        pendingRequests.remove(key);
+    }
+
+    /**
      * Eagerly and asynchronously loads a map tile for the given tile key.
      * This method bypass the debouncing on tile loading, essentially "force-loading" the tile.
      * This allows for preloading of tiles.
+     *
      * @param key The tile key identifying the tile to load.
      */
     public void eagerLoadTile(T key) {

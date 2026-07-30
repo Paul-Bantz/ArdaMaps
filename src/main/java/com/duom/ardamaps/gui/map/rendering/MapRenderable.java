@@ -146,11 +146,6 @@ public abstract class MapRenderable {
                 GuiRenderStateAccess.scissorArea(context)));
     }
 
-    private static float transformedPaperUv(float uv, float center, float scale) {
-
-        return (uv - center) * scale + center;
-    }
-
     /**
      * Convenience accessor so subclasses do not need to dereference through the camera.
      *
@@ -158,5 +153,10 @@ public abstract class MapRenderable {
      */
     protected Dimension getDimension() {
         return camera.getDimension();
+    }
+
+    private static float transformedPaperUv(float uv, float center, float scale) {
+
+        return (uv - center) * scale + center;
     }
 }

@@ -35,6 +35,14 @@ public class GridCamera extends MapCamera {
 
     private static final int IDENTITY = 8;
 
+    /**
+     * Creates a new GridCamera with the specified viewport and initial position.
+     *
+     * @param viewportWidth  Viewport width in pixels
+     * @param viewPortHeight Viewport height in pixels
+     * @param centerX        Initial centre X coordinate in world coordinates
+     * @param centerY        Initial centre Y coordinate in world coordinates
+     */
     public GridCamera(int viewportWidth, int viewPortHeight, int centerX, int centerY) {
 
         this.worldX = centerX;
@@ -52,6 +60,18 @@ public class GridCamera extends MapCamera {
     }
 
     /**
+     * Get the render scale factor (pixels per world unit).
+     *
+     * @return The render scale, which equals the camera scale.
+     */
+    @Override
+    public double renderScale() {
+        return scale();
+    }
+
+    /**
+     * Get the current scale factor (pixels per block).
+     *
      * @return Pixels per block at current zoom. At zoom == 8, scale == 1.0.
      */
     @Override
@@ -60,29 +80,38 @@ public class GridCamera extends MapCamera {
     }
 
     /**
+     * Get the scale factor at the given zoom level.
+     *
      * @param zoom Zoom level to calculate scale for.
-     * @return Pixels per block at current zoom. At zoom == 8, scale == 1.0.
+     * @return Pixels per block at the given zoom. At zoom == 8, scale == 1.0.
      */
     private double scale(double zoom) {
         return Math.pow(2.0, zoom - IDENTITY);
     }
 
-    @Override
-    public double renderScale() {
-        return scale();
-    }
-
-    /** Blocks represented by one pixel at current zoom. */
+    /**
+     * Get the number of world blocks represented by one screen pixel.
+     *
+     * @return Blocks per pixel at current zoom.
+     */
     @Override
     public double getBlocksPerPixel() {
         return 1.0 / scale();
     }
 
+    /**
+     * Get the number of screen pixels that represent one world block.
+     *
+     * @return Visual pixels per block at current zoom.
+     */
     @Override
     public double getVisualPixelsPerBlock() {
         return scale();
     }
 
+    /**
+     * Adjust camera zoom to match the preferred render scale (pixels per block).
+     */
     @Override
     public void setZoomToMatchVisualPixelsPerBlock() {
         if (!Double.isNaN(preferredRenderScale) && preferredRenderScale > 0) {
@@ -92,6 +121,13 @@ public class GridCamera extends MapCamera {
         }
     }
 
+    /**
+     * Convert world coordinates to screen coordinates.
+     *
+     * @param objWorldX World X coordinate
+     * @param objWorldZ World Z coordinate
+     * @return Screen coordinates as Vec2d
+     */
     @Override
     public Vec2d worldToScreenCoordinates(double objWorldX, double objWorldZ) {
         return new Vec2d(
@@ -135,8 +171,9 @@ public class GridCamera extends MapCamera {
     }
 
     /**
-     * Width of the entire dimension in pixels at the current zoom level.
-     * Used by renderFogOfWar() to size the fog quad.
+     * Get the world texture width in pixels at the current zoom level.
+     *
+     * @return Width of the entire dimension in pixels at the current zoom level.
      */
     @Override
     public int getWorldTextureWidth() {
@@ -144,8 +181,9 @@ public class GridCamera extends MapCamera {
     }
 
     /**
-     * Height of the entire dimension in pixels at the current zoom level.
-     * Used by renderFogOfWar() to size the fog quad.
+     * Get the world texture height in pixels at the current zoom level.
+     *
+     * @return Height of the entire dimension in pixels at the current zoom level.
      */
     @Override
     public int getWorldTextureHeight() {

@@ -44,6 +44,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
  */
 class MarkersDefinitionTest {
 
+    /**
+     * Verifies that a missing marker type key falls back to the default marker type.
+     */
     @Test
     void getMarkerType_missingLandmarkKey_usesDefaultType() {
 
@@ -65,6 +68,9 @@ class MarkersDefinitionTest {
         assertSame(defaultType, definition.getMarkerType(null));
     }
 
+    /**
+     * Verifies that bare icon paths in marker type JSON are qualified with the mod namespace.
+     */
     @Test
     void fromJson_bareTypeIconPaths_areQualified() {
 

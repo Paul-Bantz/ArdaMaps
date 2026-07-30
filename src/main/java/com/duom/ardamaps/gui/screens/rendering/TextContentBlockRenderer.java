@@ -74,62 +74,8 @@ public final class TextContentBlockRenderer {
     private static final int LIST_INDENT = BULLET_SIZE + BULLET_GAP;
 
     private final Font textRenderer;
+
     private final int defaultColor;
-
-    /**
-     * Pre-measured data for a single glyph in a wrapped line.
-     *
-     * @param relX  x-offset from the start of the line (px)
-     * @param width advance width of this glyph (px)
-     * @param type  run type: identified via the sentinel font {@link Identifier} embedded in the style
-     *              by {@code HtmlConverter} ({@link ModConstants#RUN_FONT_CHATCOMMAND} /
-     *              {@link ModConstants#RUN_FONT_KEYBIND})
-     * @param style the {@link Style} of this glyph (carries insertion text for keybind labels)
-     */
-    private record GlyphRun(int relX, int width, int type, Style style) {}
-
-    /** An {@link FormattedCharSequence} line together with its pre-parsed {@link GlyphRun} list. */
-    private record LineLayout(FormattedCharSequence line, List<GlyphRun> glyphRuns) {}
-
-    /** Sealed hierarchy mirroring {@link ContentBlock} – one entry per block in the layout cache. */
-    private sealed interface BlockLayout permits BlockquoteLayout, ImageLayout, LineBreakLayout, ListLayout, TextLayout, TitleLayout {}
-
-    /** Cached layout for a {@link ContentBlock.TextBlock}. */
-    private record TextLayout(List<LineLayout> lines, int height) implements BlockLayout {}
-
-    /** Cached layout for a {@link ContentBlock.TitleBlock}*/
-    private record TitleLayout(Component line, float scale, int height) implements BlockLayout {}
-
-    /**
-     * Cached layout for a {@link ContentBlock.ImageBlock}.
-     *
-     * @param block        the source image block
-     * @param imageHeight  the (possibly scaled) pixel height of the rendered image
-     * @param captionLines pre-wrapped ordered text lines for the caption (empty = no caption)
-     * @param height       total pixel height: image + optional caption gap + caption lines
-     */
-    private record ImageLayout(ContentBlock.ImageBlock block, int imageHeight,
-                               List<FormattedCharSequence> captionLines, int height) implements BlockLayout {}
-
-    /**
-     * Cached layout for a {@link ContentBlock.ListBlock}.
-     * Each element of {@code items} is the list of wrapped {@link LineLayout}s for one {@code <li>}.
-     */
-    private record ListLayout(List<List<LineLayout>> items, int height) implements BlockLayout {}
-
-    /**
-     * Cached layout for a {@link ContentBlock.BlockquoteBlock}.
-     *
-     * <p>The {@code height} includes {@code ⌈fontHeight/2⌉} px of top and bottom margin so that
-     * surrounding blocks need no special awareness of blockquote spacing.</p>
-     */
-    private record BlockquoteLayout(List<LineLayout> lines, int height) implements BlockLayout {}
-
-    /**
-     * Cached layout for a {@link ContentBlock.LineBreakBlock}.
-     * Advances {@code totalHeight} by one line height without drawing anything.
-     */
-    private record LineBreakLayout(int height) implements BlockLayout {}
 
     /** The {@code wrapWidth} that produced {@link #cachedLayouts}; {@code -1} = no cache. */
     private int cachedWrapWidth = -1;
@@ -163,7 +109,7 @@ public final class TextContentBlockRenderer {
      */
     private void buildLayouts(List<ContentBlock> blocks, int wrapWidth) {
 
-        int fontHeight    = textRenderer.lineHeight;
+        int fontHeight = textRenderer.lineHeight;
         int itemWrapWidth = wrapWidth - LIST_INDENT;
 
         List<BlockLayout> layouts = new ArrayList<>(blocks.size());
@@ -192,28 +138,28 @@ public final class TextContentBlockRenderer {
 
             } else if (block instanceof ContentBlock.SeparatorBlock) {
 
-                layouts.add(new LineBreakLayout(fontHeight/2));
+                layouts.add(new LineBreakLayout(fontHeight / 2));
 
             } else if (block instanceof ContentBlock.TitleBlock titleBlock) {
                 addTitleBlockLayout(titleBlock, fontHeight, layouts);
             }
         }
 
-        cachedLayouts   = layouts;
-        cachedBlocks    = blocks;
+        cachedLayouts = layouts;
+        cachedBlocks = blocks;
         cachedWrapWidth = wrapWidth;
     }
 
     private void addBlockQuoteLayout(int wrapWidth, ContentBlock.BlockquoteBlock bqBlock, int fontHeight, List<BlockLayout> layouts) {
         int bqWrapWidth = wrapWidth - ModConstants.BLOCKQUOTE_INDENT;
         List<FormattedCharSequence> wrappedLines = textRenderer.split(bqBlock.text(), bqWrapWidth);
-        List<LineLayout>  lineLayouts  = new ArrayList<>(wrappedLines.size());
+        List<LineLayout> lineLayouts = new ArrayList<>(wrappedLines.size());
 
         for (FormattedCharSequence line : wrappedLines) {
             lineLayouts.add(new LineLayout(line, parseGlyphRuns(line)));
         }
 
-        int height   = wrappedLines.size() * fontHeight;
+        int height = wrappedLines.size() * fontHeight;
         layouts.add(new BlockquoteLayout(lineLayouts, height));
     }
 
@@ -224,7 +170,7 @@ public final class TextContentBlockRenderer {
         for (var item : listBlock.items()) {
 
             List<FormattedCharSequence> wrappedLines = textRenderer.split(item, itemWrapWidth);
-            List<LineLayout>  lineLayouts  = new ArrayList<>(wrappedLines.size());
+            List<LineLayout> lineLayouts = new ArrayList<>(wrappedLines.size());
 
             for (FormattedCharSequence line : wrappedLines) {
                 lineLayouts.add(new LineLayout(line, parseGlyphRuns(line)));
@@ -244,7 +190,7 @@ public final class TextContentBlockRenderer {
         if (imgBlock.caption() != null && !imgBlock.caption().isBlank()) {
             net.minecraft.network.chat.MutableComponent captionText = net.minecraft.network.chat.Component.literal(imgBlock.caption())
                     .withStyle(s -> s.withItalic(true));
-            captionLines  = textRenderer.split(captionText, wrapWidth);
+            captionLines = textRenderer.split(captionText, wrapWidth);
             captionHeight = 2 + captionLines.size() * (fontHeight + LINE_GAP); // 2 px gap above caption
         }
 
@@ -253,7 +199,7 @@ public final class TextContentBlockRenderer {
 
     private void addContentBlockLayout(int wrapWidth, ContentBlock.TextBlock textBlock, int fontHeight, List<BlockLayout> layouts) {
         List<FormattedCharSequence> wrappedLines = textRenderer.split(textBlock.text(), wrapWidth);
-        List<LineLayout>  lineLayouts  = new ArrayList<>(wrappedLines.size());
+        List<LineLayout> lineLayouts = new ArrayList<>(wrappedLines.size());
 
         for (FormattedCharSequence line : wrappedLines) {
             lineLayouts.add(new LineLayout(line, parseGlyphRuns(line)));
@@ -262,7 +208,6 @@ public final class TextContentBlockRenderer {
         int height = wrappedLines.size() * (fontHeight + LINE_GAP);
         layouts.add(new TextLayout(lineLayouts, height));
     }
-
 
     private void addTitleBlockLayout(ContentBlock.TitleBlock titleBlock, int fontHeight, List<BlockLayout> layouts) {
 
@@ -295,12 +240,12 @@ public final class TextContentBlockRenderer {
         List<GlyphRun> runs = new ArrayList<>();
         StringBuilder seen = new StringBuilder();
 
-        line.accept((index, style, codePoint) -> {
+        line.accept((_, style, codePoint) -> {
             String charStr = new String(Character.toChars(codePoint));
             int xBefore = textRenderer.width(seen.toString());
             seen.append(charStr);
-            int xAfter  = textRenderer.width(seen.toString());
-            int width   = xAfter - xBefore;
+            int xAfter = textRenderer.width(seen.toString());
+            int width = xAfter - xBefore;
             runs.add(new GlyphRun(xBefore, width, detectSpecialRunType(style), style));
             return true;
         });
@@ -421,11 +366,11 @@ public final class TextContentBlockRenderer {
      * @param renderResult the rendering result
      */
     private void renderTitleLayout(GuiGraphicsExtractor context,
-                                  TitleLayout layout,
-                                  int topX, int topY, int startY, int bottomY,
-                                  RenderResult renderResult) {
+                                   TitleLayout layout,
+                                   int topX, int topY, int startY, int bottomY,
+                                   RenderResult renderResult) {
 
-        int titleHeight = (int)(textRenderer.lineHeight * layout.scale);
+        int titleHeight = (int) (textRenderer.lineHeight * layout.scale);
         int drawY = startY + renderResult.totalHeight;
 
         if (drawY + titleHeight >= topY && drawY <= bottomY) {
@@ -470,7 +415,7 @@ public final class TextContentBlockRenderer {
         ContentBlock.ImageBlock imgBlock = layout.block();
         int drawY = startY + renderResult.totalHeight;
 
-        var imageWidth  = Math.min(imgBlock.width(), wrapWidth);
+        var imageWidth = Math.min(imgBlock.width(), wrapWidth);
         var imageHeight = layout.imageHeight();
 
         if (imgBlock.width() > imageWidth) {
@@ -483,9 +428,9 @@ public final class TextContentBlockRenderer {
 
             if (texture != null) {
                 int imgX = switch (imgBlock.align()) {
-                    case LEFT   -> topX;
+                    case LEFT -> topX;
                     case CENTER -> topX + (wrapWidth - imageWidth) / 2;
-                    case RIGHT  -> topX + wrapWidth - imageWidth;
+                    case RIGHT -> topX + wrapWidth - imageWidth;
                 };
                 context.blit(RenderPipelines.GUI_TEXTURED, texture,
                         imgX, drawY,
@@ -509,7 +454,7 @@ public final class TextContentBlockRenderer {
 
                 if (captionDrawY + fontHeight >= topY && captionDrawY <= bottomY) {
                     int lineWidth = textRenderer.width(captionLine);
-                    int captionX  = topX + (wrapWidth - lineWidth) / 2;
+                    int captionX = topX + (wrapWidth - lineWidth) / 2;
                     context.text(textRenderer, captionLine, captionX, captionDrawY + LINE_GAP,
                             ModConstants.COLOR_DARK_BROWN, false);
                 }
@@ -592,18 +537,18 @@ public final class TextContentBlockRenderer {
                                         RenderResult renderResult) {
 
         int fontHeight = textRenderer.lineHeight;
-        int bqColor    = ModConstants.COLOR_BLUE | 0xFF000000;
+        int bqColor = ModConstants.COLOR_BLUE | 0xFF000000;
 
         // Accent bar – spans the full pixel height of the content lines
-        int contentHeight  = layout.lines().size() * (fontHeight + LINE_GAP);
-        int accentTop      = startY + renderResult.totalHeight;
-        int accentBottom   = accentTop + contentHeight;
-        int clampedTop     = Math.max(accentTop, topY);
-        int clampedBottom  = Math.min(accentBottom, bottomY);
+        int contentHeight = layout.lines().size() * (fontHeight + LINE_GAP);
+        int accentTop = startY + renderResult.totalHeight;
+        int accentBottom = accentTop + contentHeight;
+        int clampedTop = Math.max(accentTop, topY);
+        int clampedBottom = Math.min(accentBottom, bottomY);
         if (clampedTop < clampedBottom) {
             context.fill(topX, clampedTop,
-                         topX + ModConstants.BLOCKQUOTE_ACCENT_WIDTH, clampedBottom,
-                         bqColor);
+                    topX + ModConstants.BLOCKQUOTE_ACCENT_WIDTH, clampedBottom,
+                    bqColor);
         }
 
         // Render lines in medium-blue, indented past the accent bar
@@ -650,10 +595,10 @@ public final class TextContentBlockRenderer {
      * Paints background rectangles for {@code <chatcommand>} and {@code <keybind>} inline runs
      * using the pre-parsed {@link GlyphRun} list – no glyph walking or width measurement at render time.
      *
-     * @param context    draw context
-     * @param glyphRuns  pre-parsed glyph runs for this line (from {@link #parseGlyphRuns})
-     * @param startX     left edge X of the text line in screen coordinates
-     * @param drawY      top edge Y of the text line in screen coordinates
+     * @param context   draw context
+     * @param glyphRuns pre-parsed glyph runs for this line (from {@link #parseGlyphRuns})
+     * @param startX    left edge X of the text line in screen coordinates
+     * @param drawY     top edge Y of the text line in screen coordinates
      */
     private void drawSpecialRunBackgrounds(GuiGraphicsExtractor context,
                                            List<GlyphRun> glyphRuns,
@@ -663,26 +608,29 @@ public final class TextContentBlockRenderer {
         if (glyphRuns.isEmpty()) return;
 
         int fontHeight = textRenderer.lineHeight;
-        int padding    = ModConstants.COMMAND_PADDING;
+        int padding = ModConstants.COMMAND_PADDING;
 
         int i = 0;
         while (i < glyphRuns.size()) {
 
             GlyphRun g = glyphRuns.get(i);
-            if (g.type() == 0) { i++; continue; }
+            if (g.type() == 0) {
+                i++;
+                continue;
+            }
 
-            int type     = g.type();
-            int runRelX  = g.relX();
-            int j        = i;
+            int type = g.type();
+            int runRelX = g.relX();
+            int j = i;
             while (j < glyphRuns.size() && glyphRuns.get(j).type() == type) j++;
 
-            GlyphRun last     = glyphRuns.get(j - 1);
-            int runEndRelX    = last.relX() + last.width();
+            GlyphRun last = glyphRuns.get(j - 1);
+            int runEndRelX = last.relX() + last.width();
 
-            int backgroundX    = startX + runRelX   - padding * 2;
+            int backgroundX = startX + runRelX - padding * 2;
             int backgroundEndX = startX + runEndRelX + padding * 2;
-            int backgroundY    = drawY  - padding + LINE_GAP + 1;
-            int backgroundEndY = drawY  + fontHeight + padding + LINE_GAP;
+            int backgroundY = drawY - padding + LINE_GAP + 1;
+            int backgroundEndY = drawY + fontHeight + padding + LINE_GAP;
 
             if (type == 1) {
 
@@ -698,9 +646,9 @@ public final class TextContentBlockRenderer {
                 if (label == null || label.isBlank()) label = "?";
 
                 int labelWidth = textRenderer.width(label);
-                int faceWidth  = backgroundEndX - backgroundX;
+                int faceWidth = backgroundEndX - backgroundX;
                 int faceHeight = backgroundEndY - backgroundY;
-                int keycapY    = backgroundY - textRenderer.lineHeight / 2;
+                int keycapY = backgroundY - textRenderer.lineHeight / 2;
 
                 // Key-cap face (three drawTexture slices: left cap, centre stretch, right cap)
                 context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.ICON_KEYBIND,
@@ -711,8 +659,8 @@ public final class TextContentBlockRenderer {
                         backgroundX + faceWidth - 4, keycapY, 12, 0, 4, 16, 4, 16, 16, 16);
 
                 // Label centred inside the face rect
-                int labelX = backgroundX + (faceWidth  - labelWidth) / 2;
-                int labelY = backgroundY + (faceHeight - fontHeight)  / 2;
+                int labelX = backgroundX + (faceWidth - labelWidth) / 2;
+                int labelY = backgroundY + (faceHeight - fontHeight) / 2;
                 context.text(textRenderer, label, labelX, labelY, ModConstants.KEYBIND_LABEL_COLOR, false);
             }
 
@@ -732,7 +680,7 @@ public final class TextContentBlockRenderer {
     private int detectSpecialRunType(Style style) {
         FontDescription font = style.getFont();
         if (ModConstants.RUN_FONT_CHATCOMMAND.equals(font)) return 1;
-        if (ModConstants.RUN_FONT_KEYBIND.equals(font))     return 2;
+        if (ModConstants.RUN_FONT_KEYBIND.equals(font)) return 2;
         return 0;
     }
 
@@ -741,10 +689,10 @@ public final class TextContentBlockRenderer {
      * rendered line, or {@code previous} if the mouse is not on this line.
      */
     private @Nullable Style pickHoverStyle(int mouseX, int mouseY,
-                                            int fontHeight,
-                                            List<GlyphRun> glyphRuns,
-                                            int drawY, int startX,
-                                            @Nullable Style previous) {
+                                           int fontHeight,
+                                           List<GlyphRun> glyphRuns,
+                                           int drawY, int startX,
+                                           @Nullable Style previous) {
 
         if (mouseY >= drawY && mouseY < drawY + fontHeight && mouseX >= startX) {
             int relX = mouseX - startX;
@@ -755,6 +703,79 @@ public final class TextContentBlockRenderer {
             }
         }
         return previous;
+    }
+
+    /** Sealed hierarchy mirroring {@link ContentBlock} – one entry per block in the layout cache. */
+    private sealed interface BlockLayout permits BlockquoteLayout, ImageLayout, LineBreakLayout, ListLayout, TextLayout, TitleLayout {
+
+    }
+
+    /**
+     * Pre-measured data for a single glyph in a wrapped line.
+     *
+     * @param relX  x-offset from the start of the line (px)
+     * @param width advance width of this glyph (px)
+     * @param type  run type: identified via the sentinel font {@link Identifier} embedded in the style
+     *              by {@code HtmlConverter} ({@link ModConstants#RUN_FONT_CHATCOMMAND} /
+     *              {@link ModConstants#RUN_FONT_KEYBIND})
+     * @param style the {@link Style} of this glyph (carries insertion text for keybind labels)
+     */
+    private record GlyphRun(int relX, int width, int type, Style style) {
+
+    }
+
+    /** An {@link FormattedCharSequence} line together with its pre-parsed {@link GlyphRun} list. */
+    private record LineLayout(FormattedCharSequence line, List<GlyphRun> glyphRuns) {
+
+    }
+
+    /** Cached layout for a {@link ContentBlock.TextBlock}. */
+    private record TextLayout(List<LineLayout> lines, int height) implements BlockLayout {
+
+    }
+
+    /** Cached layout for a {@link ContentBlock.TitleBlock} */
+    private record TitleLayout(Component line, float scale, int height) implements BlockLayout {
+
+    }
+
+    /**
+     * Cached layout for a {@link ContentBlock.ImageBlock}.
+     *
+     * @param block        the source image block
+     * @param imageHeight  the (possibly scaled) pixel height of the rendered image
+     * @param captionLines pre-wrapped ordered text lines for the caption (empty = no caption)
+     * @param height       total pixel height: image + optional caption gap + caption lines
+     */
+    private record ImageLayout(ContentBlock.ImageBlock block, int imageHeight,
+                               List<FormattedCharSequence> captionLines, int height) implements BlockLayout {
+
+    }
+
+    /**
+     * Cached layout for a {@link ContentBlock.ListBlock}.
+     * Each element of {@code items} is the list of wrapped {@link LineLayout}s for one {@code <li>}.
+     */
+    private record ListLayout(List<List<LineLayout>> items, int height) implements BlockLayout {
+
+    }
+
+    /**
+     * Cached layout for a {@link ContentBlock.BlockquoteBlock}.
+     *
+     * <p>The {@code height} includes {@code ⌈fontHeight/2⌉} px of top and bottom margin so that
+     * surrounding blocks need no special awareness of blockquote spacing.</p>
+     */
+    private record BlockquoteLayout(List<LineLayout> lines, int height) implements BlockLayout {
+
+    }
+
+    /**
+     * Cached layout for a {@link ContentBlock.LineBreakBlock}.
+     * Advances {@code totalHeight} by one line height without drawing anything.
+     */
+    private record LineBreakLayout(int height) implements BlockLayout {
+
     }
 
     /**
@@ -769,7 +790,7 @@ public final class TextContentBlockRenderer {
         public Style hoveredStyle;
 
         public RenderResult() {
-            totalHeight  = 0;
+            totalHeight = 0;
             hoveredStyle = null;
         }
     }

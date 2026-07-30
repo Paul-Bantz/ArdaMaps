@@ -92,13 +92,6 @@ public class GuideScreen extends ArdaMapsScreen {
     private static final int BUTTON_SCROLL_SPEED = 1;
 
     /**
-     * Screen layout view state – controls what the left column renders.
-     * {@code PAGE_LIST} shows the page-selection buttons; {@code ENTRY_VIEW}
-     * shows the entries of the selected page plus a back button.
-     */
-    private enum ViewState { PAGE_LIST, ENTRY_VIEW }
-
-    /**
      * Inner margin values applied to the left page column.
      * These control the space between the column's logical boundary and its content.
      */
@@ -160,6 +153,14 @@ public class GuideScreen extends ArdaMapsScreen {
      */
     private final ScrollbarWidget contentScrollbar =
             new ScrollbarWidget(SCROLLBAR_WIDTH, 12, ModConstants.COLOR_BLUE, ModConstants.COLOR_BLUE_HIGHLIGHT, SCROLL_SPEED);
+
+    /**
+     * Deep-link string from {@code ClientConfig#lastPage} supplied at construction time.
+     * Used in {@link #init()} to restore the last-visited page+entry once the book has
+     * finished loading. {@code null} or {@code "guide"} means open the landing page.
+     */
+    @Nullable
+    private final String initialLink;
 
     /**
      * The fully loaded guide book, or {@code null} while the initial async load is in
@@ -272,14 +273,6 @@ public class GuideScreen extends ArdaMapsScreen {
     private Style lastHoveredContentStyle;
 
     /**
-     * Deep-link string from {@code ClientConfig#lastPage} supplied at construction time.
-     * Used in {@link #init()} to restore the last-visited page+entry once the book has
-     * finished loading. {@code null} or {@code "guide"} means open the landing page.
-     */
-    @Nullable
-    private final String initialLink;
-
-    /**
      * Creates a new Guide Screen that attempts to restore the given deep-link.
      *
      * @param parent      the screen to return to when this screen is closed
@@ -360,7 +353,7 @@ public class GuideScreen extends ArdaMapsScreen {
      * Get the search function that is called when searching an element on screen via the search widget.
      * This function should search for a String in a List of elements represented on screen
      *
-     * @return  the search function
+     * @return the search function
      */
     @Override
     protected @Nullable Function<String, List<?>> getSearchFunction() {
@@ -648,6 +641,7 @@ public class GuideScreen extends ArdaMapsScreen {
 
     /**
      * Calculates the page width available for rendering
+     *
      * @param contentArea the content area provided by the screen
      * @return the available page width
      */
@@ -670,50 +664,63 @@ public class GuideScreen extends ArdaMapsScreen {
     }
 
     /**
-     * Left-column rendering for {@link ViewState#PAGE_LIST}: guide title, separator,
-     * and a scrollable list of page toggle buttons.
+     * Renders the right page of the screen: a page title, a horizontal separator, and
+     * the full-width scrollable HTML content for the selected entry.
+     *
+     * <p>A loading placeholder is shown while the book is loading or no page has been
+     * selected yet ({@link #currentPageIndex} {@code < 0}).</p>
+     *
+     * <p>Updates {@link #rightSubTopY} and {@link #rightSubBottomY} each frame for
+     * use in input routing.</p>
+     *
+     * @param context   the draw context for the current frame
+     * @param colX      left edge X of the right area in screen coordinates
+     * @param topY      top edge Y of the right area in screen coordinates
+     * @param bottomY   bottom edge Y of the right area in screen coordinates
+     * @param pageWidth total pixel width available for the right area
+     * @param mouseX    current mouse X in screen coordinates
+     * @param mouseY    current mouse Y in screen coordinates
+     * @param delta     partial tick (unused; kept for signature consistency with the caller)
      */
-    private void renderPageListLeftColumn(GuiGraphicsExtractor context, int colX, int topY, int bottomY,
-                                          int pageWidth, int mouseX, int mouseY, float delta) {
+    @SuppressWarnings("unused")
+    private void renderRightColumn(GuiGraphicsExtractor context, int colX, int topY, int bottomY,
+                                   int pageWidth, int mouseX, int mouseY, float delta) {
         int y = topY;
-        y = renderSectionTitle(context, colX, y, pageWidth, titleGuide) + ModConstants.ROW_SPACING;
-        y += ScreenRenderingUtils.renderSeparator(context, pageWidth, colX, y) + ModConstants.ROW_SPACING;
 
-        leftListTopY = y;
-        leftBottomY = bottomY;
-
-        if (loadingBook) {
-            context.text(font, textLoading, colX, y, ModConstants.COLOR_DARK_BROWN, false);
+        if (viewState == ViewState.PAGE_LIST) {
+            // Show "About" title and the landing page content (guide.html)
+            y = renderSectionTitle(context, colX, y, pageWidth, titleAbout) + ModConstants.ROW_SPACING;
+            y += ScreenRenderingUtils.renderSeparator(context, pageWidth, colX, y) + ModConstants.ROW_SPACING;
+            rightSubTopY = y;
+            rightSubBottomY = bottomY;
+            renderContentSubColumn(context, colX, y, pageWidth, bottomY, mouseX, mouseY,
+                    loadingLanding, landingContent);
             return;
         }
 
-        int visibleHeight = bottomY - y;
-        if (visibleHeight <= 0 || pageButtons.isEmpty()) return;
+        // ENTRY_VIEW
+        if (loadingBook || currentPageIndex < 0) {
+            context.text(font, textLoading, colX, topY, ModConstants.COLOR_DARK_BROWN, false);
+            return;
+        }
 
-        int stride = ModConstants.BUTTON_HEIGHT + ModConstants.ROW_SPACING;
-        int visibleItems = Math.max(1, (visibleHeight + ModConstants.ROW_SPACING) / stride);
-        int maxScroll = Math.max(0, pageButtons.size() - visibleItems);
-        leftScrollbar.setMaxOffset(maxScroll);
-
-        context.enableScissor(colX, y, colX + pageWidth, bottomY);
-
-        int drawY = y - leftScrollbar.getScrollOffset() * stride;
-        for (StyledButtonWidget btn : pageButtons) {
-            btn.setX(colX + pageWidth / 2 - btn.getWidth() / 2);
-            btn.setY(drawY);
-            if (drawY + ModConstants.BUTTON_HEIGHT > y && drawY < bottomY) {
-                btn.extractRenderState(context, mouseX, mouseY, delta);
+        String entryTitle = "";
+        if (guideBook != null && currentPageIndex < guideBook.getPages().size()
+                && selectedEntryIndex >= 0) {
+            var entries = guideBook.getPages().get(currentPageIndex).getEntries();
+            if (selectedEntryIndex < entries.size()) {
+                entryTitle = entries.get(selectedEntryIndex).getTitle();
             }
-            drawY += stride;
         }
 
-        context.disableScissor();
+        y = renderSectionTitle(context, colX, y, pageWidth, Component.literal(entryTitle)) + ModConstants.ROW_SPACING;
+        y += ScreenRenderingUtils.renderSeparator(context, pageWidth, colX, y) + ModConstants.ROW_SPACING;
 
-        if (maxScroll > 0) {
-            leftScrollbar.render(context,
-                    colX + pageWidth - SCROLLBAR_WIDTH, y,
-                    stride * visibleItems, visibleItems, pageButtons.size());
-        }
+        rightSubTopY = y;
+        rightSubBottomY = bottomY;
+
+        renderContentSubColumn(context, colX, y, pageWidth, bottomY, mouseX, mouseY,
+                loadingEntry, currentContent);
     }
 
     /**
@@ -782,69 +789,55 @@ public class GuideScreen extends ArdaMapsScreen {
     }
 
     /**
-     * Renders the right page of the screen: a page title, a horizontal separator, and
-     * the full-width scrollable HTML content for the selected entry.
-     *
-     * <p>A loading placeholder is shown while the book is loading or no page has been
-     * selected yet ({@link #currentPageIndex} {@code < 0}).</p>
-     *
-     * <p>Updates {@link #rightSubTopY} and {@link #rightSubBottomY} each frame for
-     * use in input routing.</p>
-     *
-     * @param context   the draw context for the current frame
-     * @param colX      left edge X of the right area in screen coordinates
-     * @param topY      top edge Y of the right area in screen coordinates
-     * @param bottomY   bottom edge Y of the right area in screen coordinates
-     * @param pageWidth total pixel width available for the right area
-     * @param mouseX    current mouse X in screen coordinates
-     * @param mouseY    current mouse Y in screen coordinates
-     * @param delta     partial tick (unused; kept for signature consistency with the caller)
+     * Left-column rendering for {@link ViewState#PAGE_LIST}: guide title, separator,
+     * and a scrollable list of page toggle buttons.
      */
-    @SuppressWarnings("unused")
-    private void renderRightColumn(GuiGraphicsExtractor context, int colX, int topY, int bottomY,
-                                   int pageWidth, int mouseX, int mouseY, float delta) {
+    private void renderPageListLeftColumn(GuiGraphicsExtractor context, int colX, int topY, int bottomY,
+                                          int pageWidth, int mouseX, int mouseY, float delta) {
         int y = topY;
-
-        if (viewState == ViewState.PAGE_LIST) {
-            // Show "About" title and the landing page content (guide.html)
-            y = renderSectionTitle(context, colX, y, pageWidth, titleAbout) + ModConstants.ROW_SPACING;
-            y += ScreenRenderingUtils.renderSeparator(context, pageWidth, colX, y) + ModConstants.ROW_SPACING;
-            rightSubTopY = y;
-            rightSubBottomY = bottomY;
-            renderContentSubColumn(context, colX, y, pageWidth, bottomY, mouseX, mouseY,
-                    loadingLanding, landingContent);
-            return;
-        }
-
-        // ENTRY_VIEW
-        if (loadingBook || currentPageIndex < 0) {
-            context.text(font, textLoading, colX, topY, ModConstants.COLOR_DARK_BROWN, false);
-            return;
-        }
-
-        String entryTitle = "";
-        if (guideBook != null && currentPageIndex < guideBook.getPages().size()
-                && selectedEntryIndex >= 0) {
-            var entries = guideBook.getPages().get(currentPageIndex).getEntries();
-            if (selectedEntryIndex < entries.size()) {
-                entryTitle = entries.get(selectedEntryIndex).getTitle();
-            }
-        }
-
-        y = renderSectionTitle(context, colX, y, pageWidth, Component.literal(entryTitle)) + ModConstants.ROW_SPACING;
+        y = renderSectionTitle(context, colX, y, pageWidth, titleGuide) + ModConstants.ROW_SPACING;
         y += ScreenRenderingUtils.renderSeparator(context, pageWidth, colX, y) + ModConstants.ROW_SPACING;
 
-        rightSubTopY = y;
-        rightSubBottomY = bottomY;
+        leftListTopY = y;
+        leftBottomY = bottomY;
 
-        renderContentSubColumn(context, colX, y, pageWidth, bottomY, mouseX, mouseY,
-                loadingEntry, currentContent);
+        if (loadingBook) {
+            context.text(font, textLoading, colX, y, ModConstants.COLOR_DARK_BROWN, false);
+            return;
+        }
+
+        int visibleHeight = bottomY - y;
+        if (visibleHeight <= 0 || pageButtons.isEmpty()) return;
+
+        int stride = ModConstants.BUTTON_HEIGHT + ModConstants.ROW_SPACING;
+        int visibleItems = Math.max(1, (visibleHeight + ModConstants.ROW_SPACING) / stride);
+        int maxScroll = Math.max(0, pageButtons.size() - visibleItems);
+        leftScrollbar.setMaxOffset(maxScroll);
+
+        context.enableScissor(colX, y, colX + pageWidth, bottomY);
+
+        int drawY = y - leftScrollbar.getScrollOffset() * stride;
+        for (StyledButtonWidget btn : pageButtons) {
+            btn.setX(colX + pageWidth / 2 - btn.getWidth() / 2);
+            btn.setY(drawY);
+            if (drawY + ModConstants.BUTTON_HEIGHT > y && drawY < bottomY) {
+                btn.extractRenderState(context, mouseX, mouseY, delta);
+            }
+            drawY += stride;
+        }
+
+        context.disableScissor();
+
+        if (maxScroll > 0) {
+            leftScrollbar.render(context,
+                    colX + pageWidth - SCROLLBAR_WIDTH, y,
+                    stride * visibleItems, visibleItems, pageButtons.size());
+        }
     }
 
     /**
      * Draws {@code title} centred horizontally within {@code pageWidth}, scaled to
      * 1.4× the base font size.
-     *
      *
      * @param context   the draw context for the current frame
      * @param x         left edge X of the column this title belongs to
@@ -867,7 +860,6 @@ public class GuideScreen extends ArdaMapsScreen {
 
         return (int) (y + font.lineHeight * scale);
     }
-
 
     /**
      * Renders the content sub-column with the given {@code content} blocks,
@@ -912,7 +904,7 @@ public class GuideScreen extends ArdaMapsScreen {
         );
 
         int totalHeight = result.totalHeight;
-        int maxScroll   = Math.max(0, totalHeight - viewportHeight);
+        int maxScroll = Math.max(0, totalHeight - viewportHeight);
         contentScrollbar.setMaxOffset(maxScroll);
 
         if (maxScroll > 0) {
@@ -926,7 +918,6 @@ public class GuideScreen extends ArdaMapsScreen {
         lastHoveredContentStyle = result.hoveredStyle;
     }
 
-
     /**
      * Handles mouse button press events.
      *
@@ -939,9 +930,8 @@ public class GuideScreen extends ArdaMapsScreen {
      *   <li>The default Minecraft screen handler for any remaining widgets.</li>
      * </ol>
      *
-     * @param mouseX screen-space X of the cursor
-     * @param mouseY screen-space Y of the cursor
-     * @param button the mouse button index (0 = left, 1 = right, 2 = middle)
+     * @param event       the initiating mouse event
+     * @param doubleClick true if this is a double click
      * @return {@code true} if the event was consumed, {@code false} otherwise
      */
     @Override
@@ -1022,9 +1012,10 @@ public class GuideScreen extends ArdaMapsScreen {
      *       always {@link #contentScrollbar}.</li>
      * </ul>
      *
-     * @param mouseX screen-space X of the cursor
-     * @param mouseY screen-space Y of the cursor
-     * @param amount scroll amount (positive = up / away from user)
+     * @param mouseX           screen-space X of the cursor
+     * @param mouseY           screen-space Y of the cursor
+     * @param horizontalAmount the horizontal scroll amount (positive = up / away from user)
+     * @param verticalAmount   the vertical scroll amount
      * @return {@code true} if the event was consumed, {@code false} otherwise
      */
     @Override
@@ -1069,6 +1060,13 @@ public class GuideScreen extends ArdaMapsScreen {
     }
 
     /**
+     * Screen layout view state – controls what the left column renders.
+     * {@code PAGE_LIST} shows the page-selection buttons; {@code ENTRY_VIEW}
+     * shows the entries of the selected page plus a back button.
+     */
+    private enum ViewState {PAGE_LIST, ENTRY_VIEW}
+
+    /**
      * Immutable record holding the four inner margin values (in pixels) for a column.
      *
      * @param left   space between the column's left boundary and its content
@@ -1078,5 +1076,6 @@ public class GuideScreen extends ArdaMapsScreen {
      */
     @SuppressWarnings("SameParameterValue")
     private record Margins(int left, int right, int top, int bottom) {
+
     }
 }

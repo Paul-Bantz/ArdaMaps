@@ -36,10 +36,13 @@ import net.minecraft.resources.Identifier;
  * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
 public abstract class PacketHandler<T extends IPacket> implements IPacketHandler {
+
     /** The unique identifier for the packet channel, constructed using the mod ID and a specific channel name. */
     private final Identifier channelId;
+
     /** The Fabric custom payload type for this channel. */
     private final CustomPacketPayload.Type<T> type;
+
     /** The payload codec for this channel. */
     private final StreamCodec<RegistryFriendlyByteBuf, T> codec;
 

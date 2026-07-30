@@ -90,40 +90,6 @@ public record BlueMapTileRenderState(
                 bounds(x0, y0, x1, y1, pose, scissorArea));
     }
 
-    @Override
-    public void buildVertices(@NonNull VertexConsumer vertexConsumer) {
-
-        vertex(vertexConsumer, x0, y0, 0.0F, 0.0F);
-        vertex(vertexConsumer, x0, y1, 0.0F, vMax);
-        vertex(vertexConsumer, x1, y1, uMax, vMax);
-        vertex(vertexConsumer, x1, y0, uMax, 0.0F);
-    }
-
-    @Override
-    public @NonNull RenderPipeline pipeline() {
-
-        return BlueMapTileShader.blueMapTile();
-    }
-
-    @Override
-    public @NonNull TextureSetup textureSetup() {
-
-        var textureView = Minecraft.getInstance().getTextureManager().getTexture(texture).getTextureView();
-        return TextureSetup.singleTexture(textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-    }
-
-    private void vertex(VertexConsumer vertexConsumer, float x, float y, float u, float v) {
-
-        vertexConsumer.addVertexWith2DPose(pose, x, y).setUv(u, v);
-        CustomVertexAttributes.set(
-                vertexConsumer,
-                ModVertexFormats.TILE_PARAMS,
-                sunlightStrength,
-                ambientLight,
-                lodScale,
-                texelSizeX);
-    }
-
     private static ScreenRectangle bounds(
             float x0,
             float y0,
@@ -140,5 +106,39 @@ public record BlueMapTileRenderState(
                 .transformMaxBounds(pose);
 
         return scissorArea == null ? transformed : scissorArea.intersection(transformed);
+    }
+
+    @Override
+    public void buildVertices(@NonNull VertexConsumer vertexConsumer) {
+
+        vertex(vertexConsumer, x0, y0, 0.0F, 0.0F);
+        vertex(vertexConsumer, x0, y1, 0.0F, vMax);
+        vertex(vertexConsumer, x1, y1, uMax, vMax);
+        vertex(vertexConsumer, x1, y0, uMax, 0.0F);
+    }
+
+    private void vertex(VertexConsumer vertexConsumer, float x, float y, float u, float v) {
+
+        vertexConsumer.addVertexWith2DPose(pose, x, y).setUv(u, v);
+        CustomVertexAttributes.set(
+                vertexConsumer,
+                ModVertexFormats.TILE_PARAMS,
+                sunlightStrength,
+                ambientLight,
+                lodScale,
+                texelSizeX);
+    }
+
+    @Override
+    public @NonNull RenderPipeline pipeline() {
+
+        return BlueMapTileShader.blueMapTile();
+    }
+
+    @Override
+    public @NonNull TextureSetup textureSetup() {
+
+        var textureView = Minecraft.getInstance().getTextureManager().getTexture(texture).getTextureView();
+        return TextureSetup.singleTexture(textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
     }
 }

@@ -48,12 +48,6 @@ public class Toposcope {
     /** Indicates whether the toposcope overlay is currently enabled. */
     public static boolean overlayEnabled = false;
 
-    /** Tracks the previous state of the left mouse button to detect clicks. */
-    private boolean leftMouseButtonWasDown = false;
-
-    /** Tracks the previous state of the right mouse button to detect clicks. */
-    private boolean rightMouseButtonWasDown = false;
-
     /**
      * Set to true for the duration of the tick in which a left-click on a location was consumed.
      * Prevents the render-stale {@code hoveredLocation} from causing a missed suppression after
@@ -67,12 +61,18 @@ public class Toposcope {
      */
     private static boolean rightClickConsumed = false;
 
+    /** Tracks the previous state of the left mouse button to detect clicks. */
+    private boolean leftMouseButtonWasDown = false;
+
+    /** Tracks the previous state of the right mouse button to detect clicks. */
+    private boolean rightMouseButtonWasDown = false;
+
     /**
      * Registers event handlers for the toposcope functionality.
      */
     public void registerRenderer() {
 
-        HudElementRegistry.addLast(ModConstants.modId("toposcope"), (drawContext, delta) -> ToposcopeRenderer.render(drawContext));
+        HudElementRegistry.addLast(ModConstants.modId("toposcope"), (drawContext, _) -> ToposcopeRenderer.render(drawContext));
         registerMouseHoveringCallbacks();
     }
 
@@ -83,46 +83,39 @@ public class Toposcope {
     private void registerMouseHoveringCallbacks() {
 
         // Suppress vanilla left-click: block breaking
-        AttackBlockCallback.EVENT.register((player, world, hand, pos, direction) -> {
+        AttackBlockCallback.EVENT.register((_, _, _, _, _) -> {
             if (shouldSuppressLeftClick())
                 return InteractionResult.FAIL;
             return InteractionResult.PASS;
         });
 
         // Suppress vanilla left-click: entity attack
-        AttackEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
+        AttackEntityCallback.EVENT.register((_, _, _, _, _) -> {
             if (shouldSuppressLeftClick())
                 return InteractionResult.FAIL;
             return InteractionResult.PASS;
         });
 
         // Suppress vanilla right-click: block interaction
-        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+        UseBlockCallback.EVENT.register((_, _, _, _) -> {
             if (shouldSuppressRightClick())
                 return InteractionResult.FAIL;
             return InteractionResult.PASS;
         });
 
         // Suppress vanilla right-click: entity interaction
-        UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
+        UseEntityCallback.EVENT.register((_, _, _, _, _) -> {
             if (shouldSuppressRightClick())
                 return InteractionResult.FAIL;
             return InteractionResult.PASS;
         });
 
         // Suppress vanilla right-click: item use in air
-        UseItemCallback.EVENT.register((player, world, hand) -> {
+        UseItemCallback.EVENT.register((_, _, _) -> {
             if (shouldSuppressRightClick())
                 return InteractionResult.FAIL;
             return InteractionResult.PASS;
         });
-    }
-
-    /**
-     * @return true if the overlay is enabled and player is hovering a location
-     */
-    private static boolean isMouseOverLocation() {
-        return overlayEnabled && ToposcopeRenderer.getHoveredLocation() != null;
     }
 
     /**
@@ -140,6 +133,13 @@ public class Toposcope {
      */
     private static boolean shouldSuppressRightClick() {
         return overlayEnabled && (rightClickConsumed || isMouseOverLocation());
+    }
+
+    /**
+     * @return true if the overlay is enabled and player is hovering a location
+     */
+    private static boolean isMouseOverLocation() {
+        return overlayEnabled && ToposcopeRenderer.getHoveredLocation() != null;
     }
 
     /**
