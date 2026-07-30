@@ -547,8 +547,16 @@ public class HttpImageProvider {
         Pixel[] pixels = img.pixels();
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
-                nativeImage.setColor(x, y, pixels[y * w + x].argb);
+                nativeImage.setColor(x, y, argbToAbgr(pixels[y * w + x].argb));
         return nativeImage;
+    }
+
+    static int argbToAbgr(int argb) {
+
+        // Scrimage uses ARGB, while NativeImage.Format.RGBA expects ABGR-packed colors.
+        return (argb & 0xFF00FF00)
+                | ((argb & 0x00FF0000) >>> 16)
+                | ((argb & 0x000000FF) << 16);
     }
 
     /**

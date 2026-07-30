@@ -225,6 +225,8 @@ public class MapScreen extends ArdaMapsScreen {
      */
     private void configureCoordinatesButton() {
 
+        if (coordinatesButton != null) remove(coordinatesButton);
+
         coordinatesButton = StyledButtonBuilder.create()
                 .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
                 .setOnClick(this::panCameraToPlayer)
@@ -244,7 +246,11 @@ public class MapScreen extends ArdaMapsScreen {
      */
     private void configureDimensionSelectionDropDown() {
 
-        List<Dimension> dimensions = ArdaMapsClient.CONFIG.getDimensions();
+        if (dimensionSelectionDropdown != null) remove(dimensionSelectionDropdown);
+
+        List<Dimension> dimensions = ArdaMapsClient.CONFIG != null && ArdaMapsClient.CONFIG.getDimensions() != null
+                ? ArdaMapsClient.CONFIG.getDimensions()
+                : new ArrayList<>();
 
         var defaultSelection = selectedDimension != null ? selectedDimension : Client.currentDimension();
 
@@ -292,30 +298,24 @@ public class MapScreen extends ArdaMapsScreen {
      */
     private void configureMapLayerSelectionDropDown() {
 
-        List<MapLayerDefinition> mapLayers = new ArrayList<>();
-
-        /*
-         This can happen if the client has not yet received a dimension configuration from the server or the server
-         is misconfigured. Provide a bare empty list to avoid crashing the client.
-         */
-        if (selectedDimension != null)
-            mapLayers = selectedDimension.getMapLayers();
+        List<MapLayerDefinition> mapLayers = MapLayerDropdownOptions.forDimension(selectedDimension);
 
         var provider = ArdaMapsClient.getHttpImageProvider();
         Double playerY = Client.playerPositionY();
 
         // Preload icons
-        for (MapLayerDefinition layer : mapLayers)
-            provider.loadImage(layer.effectiveIcon(playerY));
-
-        // Provide a default grid layer if no layers are defined for the dimension to ensure the map is minimally functional
-        if (mapLayers.isEmpty()) mapLayers.add(MapLayerDefinition.DEFAULT_GRID_LAYER);
+        for (MapLayerDefinition layer : mapLayers) {
+            String icon = layer.effectiveIcon(playerY);
+            if (icon != null && !icon.isEmpty()) provider.loadImage(icon);
+        }
 
         MapLayerDefinition previousSelection = null;
 
         // Preserve selection if not null
         if (layerSelectionDropdown != null)
             previousSelection = mapLayers.contains(layerSelectionDropdown.getSelected()) ? layerSelectionDropdown.getSelected() : null;
+
+        if (layerSelectionDropdown != null) remove(layerSelectionDropdown);
 
         layerSelectionDropdown = MapDropdownBuilder.<MapLayerDefinition, TextIdentifierPairItem>create()
                 .setSize(ModConstants.SMALL_SQUARED_BUTTON_SIZE, ModConstants.SMALL_SQUARED_BUTTON_SIZE)
@@ -348,6 +348,8 @@ public class MapScreen extends ArdaMapsScreen {
      * Configure the vertical range selection widget for the currently selected ranged layer.
      */
     private void configureRangeSelectionWidget() {
+
+        if (rangeSelectionWidget != null) remove(rangeSelectionWidget);
 
         rangeSelectionWidget = RangeSelectionWidgetBuilder.create()
                 .setSize(100, 15)
@@ -385,6 +387,8 @@ public class MapScreen extends ArdaMapsScreen {
      * Configure the markers display dropdown
      */
     private void configureMarkersDisplayDropdown() {
+
+        if (markersSelectionDropdown != null) remove(markersSelectionDropdown);
 
         var nullValue = new TextIdentifierPairItem(Text.translatable("ardamaps.client.map.screen.all.markers"), null);
 
@@ -788,14 +792,14 @@ public class MapScreen extends ArdaMapsScreen {
         var mapCamera = getCamera();
         if (mapCamera != null) {
 
-            var selection = layerSelectionDropdown.getSelected();
+            var selection = layerSelectionDropdown != null ? layerSelectionDropdown.getSelected() : null;
             mapCamera.setViewportSize(width, height);
 
             super.resize(client, width, height);
 
             updateMapButtonPositions();
 
-            if (selection != null) layerSelectionDropdown.setSelected(selection);
+            if (selection != null && layerSelectionDropdown != null) layerSelectionDropdown.setSelected(selection);
 
             positionSidePanel();
 
