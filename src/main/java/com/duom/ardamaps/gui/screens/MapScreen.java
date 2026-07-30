@@ -474,7 +474,7 @@ public class MapScreen extends ArdaMapsScreen {
     }
 
     /**
-     * Render the map screen, main render loop
+     * Render the map screen content, main render loop
      *
      * @param context The draw context
      * @param mouseX  The mouse x position
@@ -486,8 +486,6 @@ public class MapScreen extends ArdaMapsScreen {
 
         // Client should not be null here
         assert minecraft != null;
-
-        extractBackground(context, mouseX, mouseY, delta);
 
         if (mapRenderer != null) {
 

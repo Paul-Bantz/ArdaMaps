@@ -325,18 +325,21 @@ public class SearchWidget extends Screen {
     }
 
     /**
-     * Renders this widget as an overlay on top of the parent screen.
+     * Extracts this widget's render state as an overlay on top of the parent screen.
      *
      * @param context draw context
      * @param mouseX  mouse x position
      * @param mouseY  mouse y position
      * @param delta   frame delta time
      */
+    @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         // Render this screen as an overlay - force mouse position to -1 so that mouse events don't interact
-        if (parent != null)
+        if (parent != null) {
+            parent.extractModBackground(context);
             parent.extractRenderState(context, -1, -1, delta);
+        }
 
         context.fill(0, 0, this.width, this.height, 0xAA000000);
 

@@ -607,12 +607,11 @@ public class GuideScreen extends ArdaMapsScreen {
     /**
      * {@inheritDoc}
      *
-     * <p>Renders the tiled paper background, then the guide UI (three columns), then
+     * <p>Renders the guide UI (three columns), then
      * the standard Minecraft overlay elements (tooltips, etc.).</p>
      */
     @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-        extractBackground(context, mouseX, mouseY, delta);
         renderGuideUi(context, mouseX, mouseY, delta);
         super.extractRenderState(context, mouseX, mouseY, delta);
     }

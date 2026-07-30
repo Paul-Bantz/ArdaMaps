@@ -250,7 +250,15 @@ public abstract class ArdaMapsScreen extends Screen {
     public void extractBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         super.extractBackground(context, mouseX, mouseY, delta);
+        extractModBackground(context);
+    }
 
+    /**
+     * Draws only the ArdaMaps panel background, without triggering the vanilla screen background or blur.
+     *
+     * @param context The DrawContext used for rendering the background.
+     */
+    public void extractModBackground(GuiGraphicsExtractor context) {
         guiBackgroundRenderer.render(context, width, height);
     }
 

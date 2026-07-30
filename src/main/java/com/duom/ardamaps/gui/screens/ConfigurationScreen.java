@@ -521,7 +521,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
     }
 
     /**
-     * Render the configuration screen, including the background, the configuration UI and the confirmation dialog if needed.
+     * Render the configuration screen, including the configuration UI and the confirmation dialog if needed.
      *
      * @param context the draw context
      * @param mouseX  the x position of the mouse cursor
@@ -530,8 +530,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-
-        extractBackground(context, mouseX, mouseY, delta);
 
         renderConfigurationUi(context, mouseX, mouseY, delta);
 
