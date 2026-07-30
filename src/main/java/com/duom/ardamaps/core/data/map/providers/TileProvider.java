@@ -246,10 +246,9 @@ public abstract class TileProvider<T extends TileKey> {
     /**
      * Asynchronously loads a map tile for the given tile key.
      * <p>
-     * When this method is invoked by {@link #endFrame()} or {@link #eagerLoadTile(TileKey)}, the key
-     * has already been added to {@link #loading}. Implementors must <em>not</em> call
-     * {@code loading.add(key)} again; doing so would always return {@code false} and silently abort
-     * the fetch.
+     * When this method is invoked by {@link #endFrame()}, the key has already been added to
+     * {@link #loading}. Implementors must <em>not</em> call {@code loading.add(key)} again; doing
+     * so would always return {@code false} and silently abort the fetch.
      * </p>
      *
      * @param key The tile key identifying the tile to load.
@@ -308,21 +307,6 @@ public abstract class TileProvider<T extends TileKey> {
     public String getTileSourceUrl(T key) {
 
         return null;
-    }
-
-    /**
-     * Eagerly and asynchronously loads a map tile for the given tile key, bypassing the per-frame
-     * budget. Used sparingly for one-off preloads (e.g. the coarsest LOD at configure time) - callers
-     * are responsible for not calling this so often that it defeats {@link #MAX_IN_FLIGHT}.
-     *
-     * @param key The tile key identifying the tile to load.
-     */
-    public void eagerLoadTile(T key) {
-
-        if (peek(key).isPresent()) return;
-        if (loading.add(key)) {
-            loadTile(key);
-        }
     }
 
     /**
