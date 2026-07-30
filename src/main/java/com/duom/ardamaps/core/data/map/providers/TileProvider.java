@@ -239,6 +239,28 @@ public abstract class TileProvider<T extends TileKey> {
     }
 
     /**
+     * Returns a snapshot of the tile keys currently in flight (loading).
+     *
+     * @return An immutable snapshot of the currently-loading tile keys.
+     */
+    public Set<T> getLoadingTiles() {
+
+        return Set.copyOf(loading);
+    }
+
+    /**
+     * Returns the source URL for the given tile key, if this provider fetches tiles over HTTP.
+     * Providers with no per-tile URL (e.g. PMTiles archives) return {@code null}.
+     *
+     * @param key The tile key.
+     * @return The source URL for the tile, or {@code null} if not applicable.
+     */
+    public String getTileSourceUrl(T key) {
+
+        return null;
+    }
+
+    /**
      * Eagerly and asynchronously loads a map tile for the given tile key.
      * This method bypass the debouncing on tile loading, essentially "force-loading" the tile.
      * This allows for preloading of tiles.

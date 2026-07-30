@@ -543,6 +543,9 @@ public class MapScreen extends ArdaMapsScreen {
                 context.disableScissor();
             }
 
+            if (ArdaMapsClient.CONFIG.isMapDebugDisplay())
+                renderTileLoadingDebugPanel(context);
+
             mapFrameRenderer.render(context, contentArea);
 
             updateCoordinates(mouseX, mouseY);
@@ -565,6 +568,29 @@ public class MapScreen extends ArdaMapsScreen {
         // Render region name tooltip if hovering over a region
         if (regionNameUnderMouse != null)
             renderRegionName(context);
+    }
+
+    /**
+     * Renders the "currently loading tiles" debug panel top-left aligned on the screen.
+     * Only invoked when {@code map_debug_display} is enabled. Drawn outside the map's scissor
+     * region so the panel is anchored to the screen, not the map content area.
+     *
+     * @param context The draw context.
+     */
+    private void renderTileLoadingDebugPanel(GuiGraphicsExtractor context) {
+
+        List<String> lines = mapRenderer.getDebugLoadingLines();
+        int x = 4;
+        int y = 4;
+        int lineHeight = font.lineHeight + 1;
+
+        context.text(font, "Currently loading " + lines.size() + " tiles", x, y, ModConstants.COLOR_WHITE, true);
+        y += lineHeight;
+
+        for (String line : lines) {
+            context.text(font, line, x, y, ModConstants.COLOR_WHITE, true);
+            y += lineHeight;
+        }
     }
 
     /**

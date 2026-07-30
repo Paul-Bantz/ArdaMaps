@@ -38,6 +38,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import org.joml.Matrix3x2f;
 
+import java.util.List;
+
 /**
  * Abstract base class for renderable map layers.
  */
@@ -90,6 +92,17 @@ public abstract class MapRenderable {
      */
     public void close() {
         // Default renderables do not own closeable resources.
+    }
+
+    /**
+     * Returns one debug line per tile currently loading for this renderable, used by the
+     * map_debug_display "currently loading tiles" panel. Renderables with no asynchronous
+     * tile provider (e.g. flat-image/grid layers) have nothing to report.
+     *
+     * @return The debug lines describing in-flight tiles, or an empty list if not applicable.
+     */
+    public List<String> getDebugLoadingLines() {
+        return List.of();
     }
 
     /**

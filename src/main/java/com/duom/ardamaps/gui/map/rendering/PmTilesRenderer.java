@@ -43,6 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -268,5 +269,19 @@ public class PmTilesRenderer extends MapRenderable {
             tileProvider.close();
             tileProvider = null;
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     * PMTiles archives have no per-tile URL, so each line is just the tile key.
+     */
+    @Override
+    public List<String> getDebugLoadingLines() {
+
+        if (tileProvider == null) return List.of();
+
+        return tileProvider.getLoadingTiles().stream()
+                .map(PmTileKey::toString)
+                .toList();
     }
 }

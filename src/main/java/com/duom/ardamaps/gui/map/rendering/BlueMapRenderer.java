@@ -285,6 +285,23 @@ public class BlueMapRenderer extends MapRenderable {
     }
 
     /**
+     * {@inheritDoc}
+     * BlueMap tiles are fetched over HTTP, so each line includes the tile's source URL.
+     */
+    @Override
+    public List<String> getDebugLoadingLines() {
+
+        if (provider == null) return List.of();
+
+        return provider.getLoadingTiles().stream()
+                .map(key -> {
+                    String url = provider.getTileSourceUrl(key);
+                    return url == null ? key.toString() : key + " - " + url;
+                })
+                .toList();
+    }
+
+    /**
      * Lightweight carrier for a resolved tile ready to be drawn.
      *
      * @param texture The loaded tile texture identifier.

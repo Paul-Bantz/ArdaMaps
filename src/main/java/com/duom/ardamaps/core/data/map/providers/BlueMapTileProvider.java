@@ -88,4 +88,16 @@ public class BlueMapTileProvider extends TileProvider<TileKey> {
 
         return "%s/%d/x%d/z%d.png".formatted(blueMapRoot, key.z, key.x, key.y);
     }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * BlueMap tiles are fetched over HTTP, so a URL is always available for a given key.
+     * </p>
+     */
+    @Override
+    public String getTileSourceUrl(TileKey key) {
+
+        return getUrlForKey(key);
+    }
 }
