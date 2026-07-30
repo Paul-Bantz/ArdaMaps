@@ -31,8 +31,8 @@ import com.duom.ardamaps.core.data.Vec3d;
 import net.minecraft.client.Camera;
 import net.minecraft.world.phys.Vec2;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Quaternionf;
-import org.joml.Vector3f;
+import org.joml.Matrix4f;
+import org.joml.Vector4f;
 
 /**
  * Utility class for projecting 3D world positions to 2D screen coordinates
@@ -41,13 +41,12 @@ import org.joml.Vector3f;
 public class VectorProjection {
 
     /**
-     * Projects a 3D world position to 2D screen coordinates.
+     * Projects a 3D world position to GUI-scaled 2D screen coordinates.
      * Returns null if the point is behind the camera.
      */
     public static @Nullable Vec2 projectToScreen(Vec3d worldPos) {
 
-        var client = Client.mc();
-        Camera camera = client.gameRenderer.getMainCamera();
+        Camera camera = Client.mc().gameRenderer.getMainCamera();
 
         // Calculate the position relative to the camera
         net.minecraft.world.phys.Vec3 cameraPosition = camera.position();
@@ -57,46 +56,32 @@ public class VectorProjection {
                 worldPos.z - cameraPosition.z
         );
 
-        // Rotate the relative position to match the camera's view direction
-        Quaternionf rot = new Quaternionf(camera.rotation()).conjugate();
-        Vector3f vec = new Vector3f(
+        // Project through the camera's live view-rotation-projection matrix.
+        // This carries the actual rendered FoV and is immune to changes in the camera-local basis convention.
+        Matrix4f viewProjection = camera.getViewRotationProjectionMatrix(new Matrix4f());
+        Vector4f clip = new Vector4f(
                 (float) relativePosition.x,
                 (float) relativePosition.y,
-                (float) relativePosition.z
+                (float) relativePosition.z,
+                1.0f
         );
-        vec.rotate(rot);
+        viewProjection.transform(clip);
 
-        // Check if the point is behind the camera - in which case end here
-        if (vec.z <= 0.0f) return null;
+        // Reject points behind the camera before the perspective divide.
+        if (clip.w <= 0.0f) return null;
 
-        // Extract the coordinates in camera space
-        float camX = -vec.x;
-        float camY = vec.y;
-        float camZ = vec.z;
-
-        // Get screen dimensions and calculate aspect ratio
-        int screenW = Client.getScaledWindowWidth();
-        int screenH = Client.getScaledWindowHeight();
-        float aspect = (float) screenW / screenH;
-
-        // Calculate FoV
-        float fovY = (float) Math.toRadians(client.options.fov().get());
-        float tanHalfFov = (float) Math.tan(fovY / 2.0f);
-
-        /*
-         * Convert to normalized device coordinates (NDC)
-         * This maps the 3D position to a coordinate system where -1 to 1 represents the screen edges
-         * We divide by distance (camZ) to create perspective - things farther away appear smaller
-         */
-        float ndcX = (camX / camZ) / (tanHalfFov * aspect);
-        float ndcY = (camY / camZ) / tanHalfFov;
+        float ndcX = clip.x / clip.w;
+        float ndcY = clip.y / clip.w;
 
         // Check if the point is outside the screen boundaries
         if (ndcX < -1 || ndcX > 1 || ndcY < -1 || ndcY > 1) return null;
 
         // Convert from NDC (-1 to 1) to actual screen coordinates
+        int screenW = Client.getScaledWindowWidth();
+        int screenH = Client.getScaledWindowHeight();
+
         float screenX = (ndcX + 1.0f) * 0.5f * screenW;
-        float screenY = (1.0f - (ndcY + 1.0f) * 0.5f) * screenH;
+        float screenY = (1.0f - ndcY) * 0.5f * screenH;
 
         return new Vec2(screenX, screenY);
     }

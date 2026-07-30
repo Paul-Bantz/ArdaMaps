@@ -27,7 +27,6 @@ package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.gui.ModConstants;
-import java.util.function.Consumer;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
@@ -35,6 +34,9 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.input.InputWithModifiers;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import org.jspecify.annotations.NonNull;
+
+import java.util.function.Consumer;
 
 /**
  * A checkbox widget that can be toggled on or off.
@@ -70,7 +72,7 @@ public class CheckboxWidget extends AbstractButton {
      * @param onChange Callback function to call when the checkbox state changes
      */
     public CheckboxWidget(int x, int y, int width, int height, Component text, boolean checked, boolean enabled, Consumer<Boolean> onChange) {
-        super(x, y, width, height, null);
+        super(x, y, width, height, text);
         this.text = text;
         this.checked = checked;
         this.onChange = onChange;
@@ -87,7 +89,7 @@ public class CheckboxWidget extends AbstractButton {
      * @param delta   Time delta since last render call
      */
     @Override
-    protected void extractContents(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    protected void extractContents(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         int x = this.getX();
         int boxX = this.getX() + (width - size);
         int y = this.getY();
@@ -124,7 +126,7 @@ public class CheckboxWidget extends AbstractButton {
      * Toggles the checked state of the checkbox when it is pressed and calls the onChange callback with the new state.
      */
     @Override
-    public void onPress(InputWithModifiers input) {
+    public void onPress(@NonNull InputWithModifiers input) {
         checked = !checked;
         if (onChange != null) {
             onChange.accept(checked);
@@ -137,7 +139,7 @@ public class CheckboxWidget extends AbstractButton {
      * @param builder The NarrationMessageBuilder to append messages to
      */
     @Override
-    protected void updateWidgetNarration(NarrationElementOutput builder) {
+    protected void updateWidgetNarration(@NonNull NarrationElementOutput builder) {
         this.defaultButtonNarrationText(builder);
     }
 
