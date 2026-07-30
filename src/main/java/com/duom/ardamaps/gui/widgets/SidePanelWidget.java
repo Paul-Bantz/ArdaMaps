@@ -44,7 +44,6 @@ import com.duom.ardamaps.gui.screens.MapScreen;
 import com.duom.ardamaps.gui.screens.ScreenRenderingUtils;
 import com.duom.ardamaps.gui.screens.rendering.TextContentBlockRenderer;
 import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
-import com.mojang.blaze3d.systems.RenderSystem;
 import lombok.Getter;
 import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.Font;

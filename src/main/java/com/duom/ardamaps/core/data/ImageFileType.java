@@ -34,7 +34,6 @@ public enum ImageFileType {
 
     WEBP,
     PNG,
-    JPG,
     JPEG;
 
     /**

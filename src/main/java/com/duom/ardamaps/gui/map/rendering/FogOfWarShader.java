@@ -27,11 +27,8 @@ package com.duom.ardamaps.gui.map.rendering;
 
 import com.duom.ardamaps.gui.ModConstants;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.shaders.UniformType;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
  * Static RenderPipeline declaration for the fog-of-war pass.
@@ -43,55 +40,14 @@ public final class FogOfWarShader {
             .withLocation(ModConstants.modId("pipeline/fog_of_war"))
             .withVertexShader(ModConstants.modId("core/fog_of_war"))
             .withFragmentShader(ModConstants.modId("core/fog_of_war"))
-            .withSampler("FogTex")
-            .withSampler("FogMaskTex")
-            .withUniform("FogUniform", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+            .withSampler("Sampler1")
+            .withVertexFormat(ModVertexFormats.POSITION_TEX_PAPER, VertexFormat.Mode.QUADS)
             .build());
-
-    private static float fogTexScaleX = 1.0F;
-    private static float fogTexScaleY = 1.0F;
-    private static float zoomCenterX;
-    private static float zoomCenterY;
 
     private FogOfWarShader() {
     }
 
     public static RenderPipeline fogOfWar() {
         return FOG_OF_WAR;
-    }
-
-    public static boolean isLoaded() {
-        return true;
-    }
-
-    public static void load(@SuppressWarnings("unused") ResourceManager resourceManager) {
-        // RenderPipelines are static declarations in 26.x; resources are reloaded by Minecraft's shader pipeline.
-    }
-
-    public static void setTextureScale(float scaleX, float scaleY) {
-        fogTexScaleX = scaleX;
-        fogTexScaleY = scaleY;
-    }
-
-    public static void setZoomCenter(float centerX, float centerY) {
-        zoomCenterX = centerX;
-        zoomCenterY = centerY;
-    }
-
-    public static float fogTexScaleX() {
-        return fogTexScaleX;
-    }
-
-    public static float fogTexScaleY() {
-        return fogTexScaleY;
-    }
-
-    public static float zoomCenterX() {
-        return zoomCenterX;
-    }
-
-    public static float zoomCenterY() {
-        return zoomCenterY;
     }
 }

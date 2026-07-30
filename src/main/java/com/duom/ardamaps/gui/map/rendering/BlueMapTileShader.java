@@ -27,11 +27,8 @@ package com.duom.ardamaps.gui.map.rendering;
 
 import com.duom.ardamaps.gui.ModConstants;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.shaders.UniformType;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
  * Static RenderPipeline declaration for BlueMap tile shading.
@@ -43,66 +40,13 @@ public final class BlueMapTileShader {
             .withLocation(ModConstants.modId("pipeline/bluemap_tile"))
             .withVertexShader(ModConstants.modId("core/bluemap_tile"))
             .withFragmentShader(ModConstants.modId("core/bluemap_tile"))
-            .withSampler("Sampler0")
-            .withUniform("BlueMapTileUniform", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+            .withVertexFormat(ModVertexFormats.POSITION_TEX_PARAMS, VertexFormat.Mode.QUADS)
             .build());
-
-    private static float sunlightStrength = 0.6F;
-    private static float ambientLight = 0.35F;
-    private static float lodScale = 1.0F;
-    private static float texelSizeX = 1.0F;
-    private static float texelSizeY = 1.0F;
 
     private BlueMapTileShader() {
     }
 
     public static RenderPipeline blueMapTile() {
         return BLUEMAP_TILE;
-    }
-
-    public static boolean isLoaded() {
-        return true;
-    }
-
-    public static void load(@SuppressWarnings("unused") ResourceManager resourceManager) {
-        // RenderPipelines are static declarations in 26.x; resources are reloaded by Minecraft's shader pipeline.
-    }
-
-    public static void setSunlightStrength(float value) {
-        sunlightStrength = value;
-    }
-
-    public static void setAmbientLight(float value) {
-        ambientLight = value;
-    }
-
-    public static void setLodScale(float value) {
-        lodScale = value;
-    }
-
-    public static void setTexelSize(float x, float y) {
-        texelSizeX = x;
-        texelSizeY = y;
-    }
-
-    public static float sunlightStrength() {
-        return sunlightStrength;
-    }
-
-    public static float ambientLight() {
-        return ambientLight;
-    }
-
-    public static float lodScale() {
-        return lodScale;
-    }
-
-    public static float texelSizeX() {
-        return texelSizeX;
-    }
-
-    public static float texelSizeY() {
-        return texelSizeY;
     }
 }

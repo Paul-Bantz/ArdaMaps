@@ -55,7 +55,6 @@ import com.duom.ardamaps.gui.widgets.*;
 import com.duom.ardamaps.gui.widgets.builders.MapDropdownBuilder;
 import com.duom.ardamaps.gui.widgets.builders.RangeSelectionWidgetBuilder;
 import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -205,7 +204,9 @@ public class MapScreen extends ArdaMapsScreen {
 
         super.init();
 
+        removed = false;
         var previousSidePanel = locationContextPanel;
+        int layerGenerationBeforeWidgets = layerLoadGeneration;
 
         configureCoordinatesButton();
         configureDimensionSelectionDropDown();
@@ -220,6 +221,9 @@ public class MapScreen extends ArdaMapsScreen {
 
         if (previousSidePanel != null)
             locationContextPanel = previousSidePanel;
+
+        if (mapRenderer == null && layerLoadGeneration == layerGenerationBeforeWidgets)
+            reloadSelectedLayer();
     }
 
     /**

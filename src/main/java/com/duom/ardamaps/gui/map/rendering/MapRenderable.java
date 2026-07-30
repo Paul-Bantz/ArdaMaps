@@ -35,8 +35,8 @@ import com.duom.ardamaps.gui.ModConstants;
 import lombok.Getter;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import org.joml.Matrix3x2f;
 
 /**
  * Abstract base class for renderable map layers.
@@ -113,7 +113,6 @@ public abstract class MapRenderable {
     protected void renderFogOfWar(GuiGraphicsExtractor context) {
 
         if (ArdaMapsClient.CONFIG.isMapRevealAll()) return;
-        if (!FogOfWarShader.isLoaded()) return;
         if (exploration == null || exploration.getFogTextureId() == null) return;
 
         var pos = camera.worldToScreenCoordinates(new Vec2d(getDimension().getXMin(), getDimension().getZMin()));
@@ -126,14 +125,30 @@ public abstract class MapRenderable {
         float scaleY = renderHeight / 256.0f;
         float centerX = (float) ((camera.getWorldX() - getDimension().getXMin()) / (double) getDimension().getWidth());
         float centerY = (float) ((camera.getWorldZ() - getDimension().getZMin()) / (double) getDimension().getHeight());
-        FogOfWarShader.setTextureScale(scaleX, scaleY);
-        FogOfWarShader.setZoomCenter(centerX, centerY);
 
-        context.blit(RenderPipelines.GUI_TEXTURED, exploration.getFogTextureId(),
-                (int) screenX, (int) screenY,
-                0, 0,
-                (int) renderWidth, (int) renderHeight,
-                (int) renderWidth, (int) renderHeight);
+        float paperU0 = transformedPaperUv(0.0F, centerX, scaleX);
+        float paperV0 = transformedPaperUv(0.0F, centerY, scaleY);
+        float paperU1 = transformedPaperUv(1.0F, centerX, scaleX);
+        float paperV1 = transformedPaperUv(1.0F, centerY, scaleY);
+
+        GuiRenderStateAccess.add(context, new FogOfWarRenderState(
+                ModConstants.FOG_OF_WAR_TEXTURE,
+                exploration.getFogTextureId(),
+                new Matrix3x2f(context.pose()),
+                (float) screenX,
+                (float) screenY,
+                (float) (screenX + renderWidth),
+                (float) (screenY + renderHeight),
+                paperU0,
+                paperV0,
+                paperU1,
+                paperV1,
+                GuiRenderStateAccess.scissorArea(context)));
+    }
+
+    private static float transformedPaperUv(float uv, float center, float scale) {
+
+        return (uv - center) * scale + center;
     }
 
     /**

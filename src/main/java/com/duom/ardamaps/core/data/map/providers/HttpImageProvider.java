@@ -335,22 +335,33 @@ public class HttpImageProvider {
 
             try {
                 var uri = URI.create(url);
-                byte[] rawImageData = loadBytes(uri);
+                byte[] rawImageData;
 
-                if (rawImageData != null) {
-                    var fileExt = getFileExtension(uri);
-                    loadedImage = switch (fileExt) {
-                        case WEBP -> new Tuple<>(loadWebpImage(rawImageData), url);
-                        case PNG, JPG, JPEG -> new Tuple<>(
-                                NativeImage.read(new ByteArrayInputStream(rawImageData)), url);
-                    };
+                try {
+                    rawImageData = loadBytes(uri);
+                } catch (IOException e) {
+                    LOGGER.warn("Failed to load image bytes @\"{}\"", url, e);
+                    if (onIoFailure != null) onIoFailure.run();
+                    return null;
                 }
 
-            } catch (IOException e) {
-                LOGGER.warn("Failed to load image @\"{}\"", url, e);
-                if (onIoFailure != null) onIoFailure.run();
+                if (rawImageData != null) {
+                    var fileType = detectImageFileType(rawImageData, uri);
+                    try {
+                        loadedImage = switch (fileType) {
+                            case WEBP -> new Tuple<>(loadWebpImage(rawImageData), url);
+                            case JPEG -> new Tuple<>(loadJpegImage(rawImageData), url);
+                            case PNG -> new Tuple<>(NativeImage.read(new ByteArrayInputStream(rawImageData)), url);
+                        };
+                    } catch (IOException e) {
+                        LOGGER.warn("Failed to decode image @\"{}\" as {}", url, fileType, e);
+                        removeDiskCacheEntry(url);
+                    }
+                }
+
             } catch (RuntimeException e) {
                 LOGGER.error("Unexpected error loading image @\"{}\"", url, e);
+                removeDiskCacheEntry(url);
             }
 
             return loadedImage;
@@ -464,6 +475,26 @@ public class HttpImageProvider {
         return fileExtension;
     }
 
+    static @NotNull ImageFileType detectImageFileType(byte[] bytes, URI uri) {
+
+        if (hasPrefixAt(bytes, 0, 0x89, 'P', 'N', 'G')) return ImageFileType.PNG;
+        if (hasPrefixAt(bytes, 0, 0xFF, 0xD8, 0xFF)) return ImageFileType.JPEG;
+        if (hasPrefixAt(bytes, 0, 'R', 'I', 'F', 'F') && hasPrefixAt(bytes, 8, 'W', 'E', 'B', 'P'))
+            return ImageFileType.WEBP;
+
+        return getFileExtension(uri);
+    }
+
+    private static boolean hasPrefixAt(byte[] bytes, int offset, int... prefix) {
+
+        if (bytes.length < offset + prefix.length) return false;
+
+        for (int i = 0; i < prefix.length; i++)
+            if ((bytes[offset + i] & 0xFF) != prefix[i]) return false;
+
+        return true;
+    }
+
     /* Disk I/O */
 
     /**
@@ -477,7 +508,19 @@ public class HttpImageProvider {
 
         WebpImageReader reader = new WebpImageReader();
         ImmutableImage image = reader.read(imageData);
-        return webpToNativeImage(image);
+        return scrimageToNativeImage(image);
+    }
+
+    /**
+     * Loads a JPEG image from raw bytes using Scrimage and converts it to a NativeImage.
+     *
+     * @param imageData The raw bytes of the JPEG image
+     * @return A NativeImage containing the decoded image data
+     * @throws IOException if the image data cannot be decoded
+     */
+    private @NotNull NativeImage loadJpegImage(byte[] imageData) throws IOException {
+
+        return scrimageToNativeImage(ImmutableImage.loader().fromBytes(imageData));
     }
 
     /**
@@ -530,12 +573,12 @@ public class HttpImageProvider {
     }
 
     /**
-     * Converts a Scrimage ImmutableImage (used for WebP decoding) to a Minecraft NativeImage.
+     * Converts a Scrimage ImmutableImage to a Minecraft NativeImage.
      *
      * @param img The ImmutableImage to convert
      * @return A NativeImage containing the same pixel data as the input image
      */
-    private NativeImage webpToNativeImage(ImmutableImage img) {
+    private NativeImage scrimageToNativeImage(ImmutableImage img) {
 
         int w = img.width;
         int h = img.height;
@@ -545,6 +588,17 @@ public class HttpImageProvider {
             for (int x = 0; x < w; x++)
                 nativeImage.setPixel(x, y, argbToAbgr(pixels[y * w + x].argb));
         return nativeImage;
+    }
+
+    private void removeDiskCacheEntry(String url) {
+
+        try {
+            URI uri = URI.create(url);
+            DiskLruCache cache = getDiskCache();
+            if (cache != null) cache.remove(getDiskCacheKey(uri));
+        } catch (IOException | RuntimeException e) {
+            LOGGER.debug("Failed to remove undecodable image cache entry @\"{}\"", url, e);
+        }
     }
 
     static int argbToAbgr(int argb) {

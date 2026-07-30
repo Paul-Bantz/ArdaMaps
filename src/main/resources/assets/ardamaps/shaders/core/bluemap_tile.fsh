@@ -1,4 +1,4 @@
-#version 150
+#version 330
 
 /*
  * This file is part of ArdaMaps.
@@ -29,18 +29,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-uniform sampler2D TileTex;
-uniform float SunlightStrength;
-uniform float AmbientLight;
-uniform float LodScale;
-uniform vec2 TexelSize; // (1/imageSize, 1/(imageSize*2)) — one texel step in UV space
 
-in vec2 texCoord;
+uniform sampler2D Sampler0;
+
+in vec2 texCoord0;
+flat in vec4 tileParams;
+
 out vec4 fragColor;
 
-// Decodes a signed world height from BlueMap's meta encoding.
-// Green channel carries the high byte (× 256), blue carries the low byte.
-// Values >= 32768 are negative (two's-complement in 16-bit unsigned space).
 float metaToHeight(vec4 meta) {
     float h = meta.g * 65280.0 + meta.b * 255.0;
     if (h >= 32768.0) {
@@ -50,32 +46,30 @@ float metaToHeight(vec4 meta) {
 }
 
 void main() {
-    // --- Color (top half of the PNG: v in [0, ~0.5]) ---
-    vec4 color = texture(TileTex, texCoord);
+    float sunlightStrength = tileParams.x;
+    float ambientLight = tileParams.y;
+    float lodScale = tileParams.z;
+    vec2 texelSize = vec2(tileParams.w, tileParams.w * 0.5);
 
-    // --- Meta (bottom half of the PNG: v in [~0.5, 1.0]) ---
-    // Adding 0.5 to V shifts from the colour region to the shading-data region.
-    vec2 metaBase = vec2(texCoord.x, texCoord.y + 0.5);
-    vec4 meta  = texture(TileTex, metaBase);
-    vec4 metaX = texture(TileTex, vec2(texCoord.x + TexelSize.x, texCoord.y + 0.5));
-    vec4 metaZ = texture(TileTex, vec2(texCoord.x, texCoord.y + TexelSize.y + 0.5));
+    vec4 color = texture(Sampler0, texCoord0);
 
-    float height  = metaToHeight(meta);
+    vec2 metaBase = vec2(texCoord0.x, texCoord0.y + 0.5);
+    vec4 meta = texture(Sampler0, metaBase);
+    vec4 metaX = texture(Sampler0, vec2(texCoord0.x + texelSize.x, texCoord0.y + 0.5));
+    vec4 metaZ = texture(Sampler0, vec2(texCoord0.x, texCoord0.y + texelSize.y + 0.5));
+
+    float height = metaToHeight(meta);
     float heightX = metaToHeight(metaX);
     float heightZ = metaToHeight(metaZ);
 
-    // Height gradient in X and Z directions, normalised by LOD scale so that
-    // coarser tiles (where one texel covers more world blocks) produce the same
-    // visual shading intensity as fine tiles.
-    float heightDiff = ((height - heightX) + (height - heightZ)) / LodScale;
+    float heightDiff = ((height - heightX) + (height - heightZ)) / lodScale;
     float shade = clamp(heightDiff * 0.06, -0.2, 0.04);
 
     color.rgb += shade;
 
-    // Block-light stored in the red channel (0–255 -> 0–15 light levels).
     float blockLight = meta.r * 255.0;
-    float light = mix(blockLight, 15.0, SunlightStrength);
-    color.rgb *= mix(AmbientLight, 1.0, light / 15.0);
+    float light = mix(blockLight, 15.0, sunlightStrength);
+    color.rgb *= mix(ambientLight, 1.0, light / 15.0);
 
     fragColor = color;
 }

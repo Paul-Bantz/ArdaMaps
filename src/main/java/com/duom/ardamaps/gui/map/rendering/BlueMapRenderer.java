@@ -30,12 +30,11 @@ import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.BlueMapCamera;
 import com.duom.ardamaps.core.data.map.providers.BlueMapTileProvider;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Tuple;
+import org.joml.Matrix3x2f;
 
 import java.util.*;
 
@@ -144,16 +143,14 @@ public class BlueMapRenderer extends MapRenderable {
      *       their {@link PmTileKey} (many primary tiles can resolve to the same coarser tile)
      *       and then grouped by their actual LOD so shader uniforms and quad geometry are correct.</li>
      * </ul>
-     * Sub-pixel precision is preserved by encoding the exact floating-point screen position directly
-     * into vertex coordinates rather than using a matrix push/translate/pop.
+     * Sub-pixel precision is preserved by submitting each tile's floating-point screen
+     * bounds directly to the GUI render state.
      * </p>
      */
     private void renderMap(GuiGraphicsExtractor context) {
 
         int coarsestZoom = mapCamera.getCoarsestZoom();
         int primaryZ = mapCamera.getTileSourceClampedZoom();
-
-        if (!BlueMapTileShader.isLoaded()) return;
 
         // Ensure coarsest-LOD tiles are loaded so fallbacks are always available
         mapCamera.getVisibleTiles(coarsestZoom).forEach(key -> provider.get(key));
@@ -194,10 +191,6 @@ public class BlueMapRenderer extends MapRenderable {
                 }
             }
         }
-
-        // Shared shader setup (once for the whole frame)
-        BlueMapTileShader.setSunlightStrength(SUNLIGHT_STRENGTH);
-        BlueMapTileShader.setAmbientLight(AMBIENT_LIGHT);
 
         // Pass 1: primary LOD tiles (all same lod -> one uniform update)
         if (!primaryTiles.isEmpty()) {
@@ -256,17 +249,23 @@ public class BlueMapRenderer extends MapRenderable {
         int renderSize = getDisplayedTileSize(lod);
         int imageSize = renderSize + 1;   // BlueMap adds a 1-pixel overlap on the right/bottom edge
         float lodScale = (float) Math.pow(mapCamera.getLodFactor(), lod - 1);
-
-        // Set LOD-dependent uniforms once for the whole pass
-        BlueMapTileShader.setLodScale(lodScale);
-        BlueMapTileShader.setTexelSize(1f / imageSize, 1f / (imageSize * 2));
+        float texelSizeX = 1f / imageSize;
+        Matrix3x2f pose = new Matrix3x2f(context.pose());
+        var scissorArea = GuiRenderStateAccess.scissorArea(context);
 
         for (TileDraw tile : tiles) {
-            context.blit(RenderPipelines.GUI_TEXTURED, tile.texture(),
-                    (int) tile.x0(), (int) tile.y0(),
-                    0, 0,
-                    renderSize, renderSize,
-                    imageSize, imageSize * 2);
+            GuiRenderStateAccess.add(context, new BlueMapTileRenderState(
+                    tile.texture(),
+                    pose,
+                    tile.x0(),
+                    tile.y0(),
+                    tile.x0() + renderSize,
+                    tile.y0() + renderSize,
+                    SUNLIGHT_STRENGTH,
+                    AMBIENT_LIGHT,
+                    lodScale,
+                    texelSizeX,
+                    scissorArea));
         }
     }
 

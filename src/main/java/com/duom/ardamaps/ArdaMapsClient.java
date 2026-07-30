@@ -53,8 +53,6 @@ import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.hud.compass.Compass;
 import com.duom.ardamaps.gui.hud.toposcope.Toposcope;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
-import com.duom.ardamaps.gui.map.rendering.BlueMapTileShader;
-import com.duom.ardamaps.gui.map.rendering.FogOfWarShader;
 import com.duom.ardamaps.gui.screens.ConfigurationScreen;
 import com.duom.ardamaps.gui.screens.GuideScreen;
 import com.duom.ardamaps.gui.screens.MapScreen;
@@ -173,6 +171,7 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         KeyBinds.register();
         IconSpriteAtlas.register();
+        suppressTileverseHttpClientCloseWarning();
 
         this.registerModItems();
         this.registerResourceListeners();
@@ -213,10 +212,18 @@ public class ArdaMapsClient implements ClientModInitializer {
                 .registerReloadListener(new MarkersLoaderReloadListener());
 
         ResourceManagerHelper.get(PackType.CLIENT_RESOURCES)
-                .registerReloadListener(new ShaderLoaderReloadListener());
-
-        ResourceManagerHelper.get(PackType.CLIENT_RESOURCES)
                 .registerReloadListener(new GuideImageCacheReloadListener());
+    }
+
+    private static void suppressTileverseHttpClientCloseWarning() {
+
+        // tileverse 1.4.0 closes its HttpClient by reflecting into jdk.internal.net.http, which JPMS
+        // blocks on JDK 25. The close still succeeds; only the reflective shutdown path is skipped.
+        java.util.logging.Logger.getLogger("io.tileverse.rangereader.http.HttpRangeReader")
+                .setFilter(record -> {
+                    String message = record.getMessage();
+                    return message == null || !message.startsWith("Error shutting down HttpClient");
+                });
     }
 
     /**
@@ -679,26 +686,6 @@ public class ArdaMapsClient implements ClientModInitializer {
         public void onResourceManagerReload(ResourceManager manager) {
 
             MarkersManager.reload();
-        }
-    }
-
-    /**
-     * A resource reload listener that loads the fog of war shader when client resources are reloaded.
-     */
-    private static class ShaderLoaderReloadListener implements SimpleSynchronousResourceReloadListener {
-
-        /** The identifier for this resource reload listener, used to distinguish it from other listeners. */
-        @Override
-        public Identifier getFabricId() {
-            return ModConstants.modId("shader_loader");
-        }
-
-        /** Loads all custom shaders when client resources are reloaded. */
-        @Override
-        public void onResourceManagerReload(ResourceManager manager) {
-
-            FogOfWarShader.load(manager);
-            BlueMapTileShader.load(manager);
         }
     }
 
