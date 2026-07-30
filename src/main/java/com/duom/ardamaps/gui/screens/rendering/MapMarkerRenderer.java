@@ -33,6 +33,7 @@ import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.map.Waypoint;
 import com.duom.ardamaps.core.data.map.cameras.MapCamera;
 import com.duom.ardamaps.core.data.map.markers.MarkersManager;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import com.duom.ardamaps.gui.map.PlayerIcon;
@@ -257,10 +258,11 @@ public class MapMarkerRenderer {
         context.blit(RenderPipelines.GUI_TEXTURED, iconImage,
                 screenX,
                 screenZ,
-                PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE,
+                0, 0,
                 iconSize, iconSize,
                 PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE,
-                PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE
+                PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE,
+                outOfRange ? GuiTextures.withAlpha(ModConstants.COLOR_WHITE, MARKER_OUT_OF_RANGE_OPACITY) : ModConstants.COLOR_WHITE
         );
     }
 
@@ -310,11 +312,14 @@ public class MapMarkerRenderer {
                         && icon.contents() != null
                         && !Objects.equals(icon.contents().name(), MissingTextureAtlasSprite.getLocation())) {
 
-                    context.blitSprite(RenderPipelines.GUI_TEXTURED, icon, screenX, screenY, MARKER_ICON_SIZE, MARKER_ICON_SIZE);
+                    context.blitSprite(RenderPipelines.GUI_TEXTURED, icon, screenX, screenY, MARKER_ICON_SIZE, MARKER_ICON_SIZE,
+                            GuiTextures.argb(waypoint.r(), waypoint.g(), waypoint.b(), 1.0f));
 
                 } else {
 
-                    context.blit(RenderPipelines.GUI_TEXTURED, iconIdentifier, screenX, screenY, 0, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE);
+                    context.blit(RenderPipelines.GUI_TEXTURED, iconIdentifier, screenX, screenY, 0, 0,
+                            MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE,
+                            GuiTextures.argb(waypoint.r(), waypoint.g(), waypoint.b(), 1.0f));
                 }
 
             }
@@ -390,12 +395,13 @@ public class MapMarkerRenderer {
         }
 
 
+        int markerColor = GuiTextures.withAlpha(ModConstants.COLOR_WHITE, markerOpacity);
         if (location.isVisited())
-            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_VISITED_ICON), xPos, yPos, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE);
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_VISITED_ICON), xPos, yPos, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE, markerColor);
         else
-            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_ICON), xPos, yPos, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE);
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_ICON), xPos, yPos, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE, markerColor);
 
-        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), iconXPos, iconYPos, MARKER_ICON_SIZE, MARKER_ICON_SIZE);
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), iconXPos, iconYPos, MARKER_ICON_SIZE, MARKER_ICON_SIZE, markerColor);
 
     }
 

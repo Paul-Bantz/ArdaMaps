@@ -25,12 +25,13 @@
 
 package com.duom.ardamaps.gui.screens.rendering;
 
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 
 /**
- * Renders the GUI background using a 9-slice technique.The texture represents the right page of a book (512×512).
+ * Renders the GUI background using manually sliced texture patches. The texture represents the right page of a book (512×512).
  * A mirrored copy is drawn as the left page, and the original as the right page, split at screen centre (width/2).
  * <p>Texture is drawn at GUI_RATIO (default 16:9) to maintain consistency across screen resolutions</b></p>
  * <br/>
@@ -124,7 +125,7 @@ public class BackgroundRenderer {
      */
     public void render(GuiGraphicsExtractor context, int screenWidth, int screenHeight) {
         invalidate(screenWidth, screenHeight);
-        drawNineSliceGui(context);
+        drawBookGui(context);
     }
 
     /**
@@ -166,13 +167,12 @@ public class BackgroundRenderer {
     }
 
     /**
-     * Renders the book GUI background using a 9-slice technique. The right page is drawn directly from the texture,
+     * Renders the book GUI background using sliced texture patches. The right page is drawn directly from the texture,
      * while the left page is drawn as a horizontally flipped copy with UV coordinates swapped for correct mirroring.
-     * Nearest-neighbour filtering is enabled during rendering to maintain crisp pixel art, and restored to linear filtering afterwards.
      *
      * @param context the DrawContext to render with, provided by the caller's render method
      */
-    private void drawNineSliceGui(GuiGraphicsExtractor context) {
+    private void drawBookGui(GuiGraphicsExtractor context) {
         int spineX = guiTopLeftX + pageWidth; // spine = right edge of left page
         drawLeftPage(context);
         drawRightPage(context, spineX, guiTopLeftY);
@@ -242,8 +242,7 @@ public class BackgroundRenderer {
     }
 
     /**
-     * Draws a single texture patch horizontally flipped using a Tessellator quad
-     * with U coordinates swapped (u+srcW at left, u at right).
+     * Draws a single texture patch horizontally flipped by swapping normalized U coordinates.
      *
      * @param context the DrawContext to render with, provided by the caller's render method
      * @param x       the X coordinate of the top-left corner of the destination rectangle to draw the texture patch into
@@ -258,8 +257,8 @@ public class BackgroundRenderer {
     private void drawTextureH(GuiGraphicsExtractor context,
                               int x, int y, int w, int h,
                               int u, int v, int srcW, int srcH) {
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.GUI_TEXTURE,
-                x, y, u, v, w, h, srcW, srcH, TEXTURE_SIZE, TEXTURE_SIZE);
+        GuiTextures.blitMirroredH(context, ModConstants.GUI_TEXTURE,
+                x, y, w, h, u, v, srcW, srcH, TEXTURE_SIZE, TEXTURE_SIZE);
     }
 
     /**
@@ -295,7 +294,7 @@ public class BackgroundRenderer {
                 int drawW = Math.min(tileW, destinationWidth - dx);
                 int partSrcW = drawW < tileW ? Math.round(srcW * ((float) drawW / tileW)) : srcW;
                 drawTextureH(context, destinationX + dx, destinationY + dy, drawW, drawH,
-                        u, v, partSrcW, partSrcH);
+                        u + srcW - partSrcW, v + srcH - partSrcH, partSrcW, partSrcH);
             }
         }
     }

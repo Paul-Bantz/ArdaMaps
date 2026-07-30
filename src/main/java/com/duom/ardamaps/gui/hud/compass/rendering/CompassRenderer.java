@@ -34,6 +34,7 @@ import com.duom.ardamaps.core.data.conversion.DistanceUnitConverter;
 import com.duom.ardamaps.core.data.conversion.VectorProjection;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.map.Waypoint;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import com.duom.ardamaps.gui.widgets.ToastWidget;
@@ -171,7 +172,10 @@ public class CompassRenderer {
      */
     private static void drawBackground(GuiGraphicsExtractor context, int centerX, float globalAlpha) {
 
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.COMPASS_BACKGROUND, centerX - COMPASS_WIDTH / 2, COMPASS_TRACK_OFFSET_Y, 0, 0, COMPASS_WIDTH, COMPASS_TRACK_HEIGHT, COMPASS_WIDTH, COMPASS_TRACK_HEIGHT);
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.COMPASS_BACKGROUND,
+                centerX - COMPASS_WIDTH / 2, COMPASS_TRACK_OFFSET_Y,
+                0, 0, COMPASS_WIDTH, COMPASS_TRACK_HEIGHT, COMPASS_WIDTH, COMPASS_TRACK_HEIGHT,
+                GuiTextures.withAlpha(ModConstants.COLOR_WHITE, globalAlpha));
     }
 
     /**
@@ -264,11 +268,15 @@ public class CompassRenderer {
                     && icon.contents() != null
                     && !Objects.equals(icon.contents().name(), MissingTextureAtlasSprite.getLocation())) {
 
-                context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_WAYPOINT), 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE);
+                context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_WAYPOINT),
+                        0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE,
+                        GuiTextures.argb(waypoint.r(), waypoint.g(), waypoint.b(), globalAlpha));
 
             } else {
 
-                context.blit(RenderPipelines.GUI_TEXTURED, iconIdentifier, 0, 0, 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE);
+                context.blit(RenderPipelines.GUI_TEXTURED, iconIdentifier,
+                        0, 0, 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE,
+                        GuiTextures.argb(waypoint.r(), waypoint.g(), waypoint.b(), globalAlpha));
             }
 
             context.text(textRenderer, realWorldUnits, (LANDMARK_ICON_SIZE / 2)-(textRenderer.width(realWorldUnits) / 2), LANDMARK_ICON_SIZE + 15, ModConstants.COLOR_WHITE, false);
@@ -307,7 +315,10 @@ public class CompassRenderer {
 
                 float alpha = Math.min(getAlpha(x, centerX), globalAlpha);
 
-                context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(sprite), (int) (x - HALF_COMPASS_TRACK_HEIGHT), COMPASS_TRACK_OFFSET_Y, COMPASS_TRACK_HEIGHT, COMPASS_TRACK_HEIGHT);
+                context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(sprite),
+                        (int) (x - HALF_COMPASS_TRACK_HEIGHT), COMPASS_TRACK_OFFSET_Y,
+                        COMPASS_TRACK_HEIGHT, COMPASS_TRACK_HEIGHT,
+                        GuiTextures.withAlpha(ModConstants.COLOR_WHITE, alpha));
             }
         }
     }
@@ -433,7 +444,9 @@ public class CompassRenderer {
         context.pose().pushMatrix();
         context.pose().translate(x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET);
 
-        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(textureToDraw), 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE);
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(textureToDraw),
+                0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE,
+                GuiTextures.withAlpha(ModConstants.COLOR_WHITE, alpha));
 
         context.pose().popMatrix();
     }
@@ -451,7 +464,9 @@ public class CompassRenderer {
         context.pose().pushMatrix();
         context.pose().translate(x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET);
 
-        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.UNKNOWN_ICON), 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE);
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.UNKNOWN_ICON),
+                0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE,
+                GuiTextures.withAlpha(ModConstants.COLOR_WHITE, alpha));
 
         context.pose().popMatrix();
     }

@@ -25,11 +25,17 @@
 
 package com.duom.ardamaps.gui.screens.rendering;
 
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * Background renderer validation
@@ -132,5 +138,30 @@ class BackgroundRendererTest {
 
         assertEquals(ph1, ph2, "pageHeight must be stable across repeated invalidate() calls with same dimensions");
         assertEquals(pw1, pw2, "pageWidth must be stable across repeated invalidate() calls with same dimensions");
+    }
+
+    @Test
+    void render_leftPageUsesMirroredUCoordinates() {
+
+        BackgroundRenderer renderer = new BackgroundRenderer();
+        GuiGraphicsExtractor context = mock(GuiGraphicsExtractor.class);
+
+        renderer.render(context, 800, 600);
+
+        ArgumentCaptor<Float> u0 = ArgumentCaptor.forClass(Float.class);
+        ArgumentCaptor<Float> u1 = ArgumentCaptor.forClass(Float.class);
+        verify(context, atLeastOnce()).blit(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                u0.capture(),
+                u1.capture(),
+                org.mockito.ArgumentMatchers.anyFloat(),
+                org.mockito.ArgumentMatchers.anyFloat());
+
+        assertTrue(u0.getAllValues().stream().anyMatch(value -> value > u1.getAllValues().get(u0.getAllValues().indexOf(value))),
+                "At least one left-page patch must use descending U coordinates for horizontal mirroring");
     }
 }

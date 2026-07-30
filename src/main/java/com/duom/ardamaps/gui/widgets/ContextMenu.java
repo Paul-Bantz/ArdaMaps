@@ -26,12 +26,12 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
@@ -122,8 +122,12 @@ public class ContextMenu {
 
         var textRenderer = Client.mc().font;
 
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                x, y, 16, 176, width, height, 64, 64, 512, 512);
+        GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
+                x, y, width, height,
+                16, 16,
+                64, 64,
+                16, 176,
+                ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
 
         for (int i = 0; i < entries.size(); i++) {
             int itemY = y + PADDING + i * ITEM_HEIGHT;
@@ -132,8 +136,12 @@ public class ContextMenu {
 
             if (hovered) {
 
-                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                        x, itemY, 80, 176, width, ITEM_HEIGHT, 64, 64, 512, 512);
+                GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
+                        x, itemY, width, ITEM_HEIGHT,
+                        16, 1, 16, 1,
+                        64, 64,
+                        80, 176,
+                        ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
             }
 
             context.text(

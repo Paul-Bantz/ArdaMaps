@@ -38,6 +38,7 @@ import com.duom.ardamaps.core.networking.PacketRegistry;
 import com.duom.ardamaps.core.networking.packets.server.LocationDetailsRequestPacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerWarpPacket;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.screens.MapScreen;
 import com.duom.ardamaps.gui.screens.ScreenRenderingUtils;
@@ -54,7 +55,6 @@ import net.minecraft.client.gui.navigation.FocusNavigationEvent;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -360,8 +360,12 @@ public class SidePanelWidget implements GuiEventListener {
      */
     private void renderBackground(GuiGraphicsExtractor context) {
 
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.PAPER_TEXTURE,
-                screenX1, screenY1, 0, 0, screenX2 - screenX1, screenY2 - screenY1, 256, 256, 512, 512);
+        GuiTextures.blitNineSliced(context, ModConstants.PAPER_TEXTURE,
+                screenX1, screenY1, screenX2 - screenX1, screenY2 - screenY1,
+                64, 64,
+                256, 256,
+                0, 0,
+                ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
 
     }
 

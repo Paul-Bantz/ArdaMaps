@@ -26,6 +26,7 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import lombok.Getter;
 import lombok.Setter;
@@ -124,11 +125,14 @@ public class StyledButtonWidget extends AbstractWidget {
         if (toggled) v += 64;
         else if (isMouseOver(mouseX, mouseY)) v += 32;
 
-        if (!active) {
-        }
-
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                x, y, u, v, width, height, 128, 32, 512, 512);
+        int color = !active ? GuiTextures.argb(0.85f, 0.85f, 0.85f, 1.0f) : ModConstants.COLOR_WHITE;
+        GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
+                x, y, width, height,
+                12, 9,
+                128, 32,
+                u, v,
+                ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE,
+                color);
 
         var text = getMessage();
 
@@ -157,8 +161,6 @@ public class StyledButtonWidget extends AbstractWidget {
         var text = getMessage();
         var mouseOver = isMouseOver(mouseX, mouseY);
 
-        if (isMouseOver(mouseX, mouseY))
-
         if (toggled || mouseOver) {
 
             var indicatorHeight = getHeight();
@@ -169,7 +171,8 @@ public class StyledButtonWidget extends AbstractWidget {
                     32, 242,
                     indicatorWidth, indicatorHeight,
                     14, 64,
-                    512, 512);
+                    512, 512,
+                    mouseOver ? GuiTextures.argb(1.0f, 1.0f, 1.0f, 0.5f) : ModConstants.COLOR_WHITE);
         }
 
 

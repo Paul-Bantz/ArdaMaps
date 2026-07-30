@@ -25,8 +25,8 @@
 
 package com.duom.ardamaps.gui.widgets;
 
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -180,10 +180,9 @@ public class ToastWidget {
 
         if (icon != null) {
 
-            var sprite = IconSpriteAtlas.retrieveSprite(icon);
-
-
-            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), contentX, iconY, ICON_SIZE, ICON_SIZE);
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon),
+                    contentX, iconY, ICON_SIZE, ICON_SIZE,
+                    GuiTextures.argb(iconR, iconG, iconB, alpha));
 
             contentX += ICON_SIZE + ICON_TEXT_GAP;
         }

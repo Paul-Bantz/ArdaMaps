@@ -42,6 +42,7 @@ import com.duom.ardamaps.core.data.map.markers.MarkersManager;
 import com.duom.ardamaps.core.networking.PacketRegistry;
 import com.duom.ardamaps.core.networking.packets.server.PlayerRangedTeleportPacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.map.rendering.MapRenderable;
 import com.duom.ardamaps.gui.screens.map.LocationNavigationHistory;
@@ -684,7 +685,7 @@ public class MapScreen extends ArdaMapsScreen {
         var centerX = width / 2;
         var centerY = height / 2;
 
-        context.blit(ModConstants.ARDACRAFT_LOGO,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.ARDACRAFT_LOGO,
                 centerX - ARDACRAFT_LOGO_HALF_SIZE,
                 centerY - ARDACRAFT_LOGO_HALF_SIZE,
                 0, 0,
@@ -719,8 +720,12 @@ public class MapScreen extends ArdaMapsScreen {
         var x = paddedContentArea.topLeftX() + 5;
         var y = paddedContentArea.topLeftY() + 5;
 
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                x, y, 144, 160, labelWidth, labelHeight, 96, 48, 512, 512);
+        GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
+                x, y, labelWidth, labelHeight,
+                16, 16,
+                96, 48,
+                144, 160,
+                ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
 
         context.text(
                 font,

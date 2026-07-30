@@ -26,6 +26,7 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import lombok.Getter;
@@ -410,13 +411,13 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
 
     protected void drawListSlice(GuiGraphicsExtractor context, int x, int y, boolean isHovered, boolean isSelected) {
 
-        int v = 46;
-
-        if (isHovered) v += 40;
-        else if (isSelected) v += 20;
-
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS, x, y,
-                0, v, originalWidth, originalHeight, 200, 20, 512, 512);
+        int u = isHovered || isSelected ? 80 : 16;
+        GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS, x, y,
+                originalWidth, originalHeight,
+                16, 16,
+                64, 64,
+                u, 176,
+                ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
     }
 
     /**

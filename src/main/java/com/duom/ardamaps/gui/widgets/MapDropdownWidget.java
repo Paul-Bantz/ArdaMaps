@@ -26,6 +26,7 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import org.jetbrains.annotations.Nullable;
@@ -189,8 +190,12 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
         E itemPair = optionDisplay.apply(selected);
         Component label = (selected == null) ? placeholderText : itemPair.text();
 
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                x, y, u, v, width, originalHeight, 128, 32, 512, 512);
+        GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
+                x, y, width, originalHeight,
+                12, 9,
+                128, 32,
+                u, v,
+                ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
 
         if (displayIcons) {
 
@@ -268,8 +273,12 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
             var y = getDropdownListTopY(visibleCount);
 
             if (visibleCount > 0) {
-                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                        getX(), y, 16, 176, width, computedHeight, 64, 64, 512, 512);
+                GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
+                        getX(), y, width, computedHeight,
+                        16, 16,
+                        64, 64,
+                        16, 176,
+                        ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
             }
 
             super.renderExpandedDropdown(context, items, mouseX, mouseY);
@@ -304,8 +313,12 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
             if (y == listTop) topSliceHeight = 16;
             if (y == listBottom) bottomSliceHeight = 16;
 
-            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                    x, y, 80, 176, width, originalHeight, 64, 64, 512, 512);
+            GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
+                    x, y, width, originalHeight,
+                    16, topSliceHeight, 16, bottomSliceHeight,
+                    64, 64,
+                    80, 176,
+                    ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
         }
     }
 

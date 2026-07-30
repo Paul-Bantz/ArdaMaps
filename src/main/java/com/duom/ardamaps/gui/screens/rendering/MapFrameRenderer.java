@@ -27,8 +27,8 @@ package com.duom.ardamaps.gui.screens.rendering;
 
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.gui.ModConstants;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 
 /**
  * Renderer for the frame around the map.
@@ -157,7 +157,7 @@ public class MapFrameRenderer {
             int segW = scaledFrameBarLongEdge;
             if (x + segW > endX) segW = endX - x;
 
-            context.blit(ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
                     x, y,
                     edgeU, edgeV,
                     segW, scaledFrameBarShortEdge,
@@ -189,7 +189,7 @@ public class MapFrameRenderer {
             int segW = scaledFrameBarLongEdge;
             if (x + segW > endX) segW = endX - x;
 
-            context.blit(ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
                     x, y,
                     edgeU, edgeV,
                     segW, scaledFrameBarShortEdge,
@@ -221,7 +221,7 @@ public class MapFrameRenderer {
             int segH = scaledFrameBarLongEdge;
             if (y + segH > endY) segH = endY - y;
 
-            context.blit(ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
                     x, y,
                     edgeU, edgeV,
                     scaledFrameBarShortEdge, segH,
@@ -253,7 +253,7 @@ public class MapFrameRenderer {
             int segmentHeight = scaledFrameBarLongEdge;
             if (y + segmentHeight > endY) segmentHeight = endY - y;
 
-            context.blit(ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
                     x, y,
                     edgeU, edgeV,
                     scaledFrameBarShortEdge, segmentHeight,
@@ -276,25 +276,25 @@ public class MapFrameRenderer {
 
         var cornerUv = scaledFrameTextureSize - scaledCornerSize;
 
-        context.blit(ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
                 (int) (topLeft.x()), (int) (topLeft.y()),
                 0, 0,
                 scaledCornerSize, scaledCornerSize,
                 scaledFrameTextureSize, scaledFrameTextureSize);
 
-        context.blit(ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
                 (int) (topRight.x() - scaledCornerSize), (int) (topRight.y()),
                 cornerUv, 0,
                 scaledCornerSize, scaledCornerSize,
                 scaledFrameTextureSize, scaledFrameTextureSize);
 
-        context.blit(ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
                 (int) (bottomRight.x() - scaledCornerSize), (int) (bottomRight.y() - scaledCornerSize),
                 cornerUv, cornerUv,
                 scaledCornerSize, scaledCornerSize,
                 scaledFrameTextureSize, scaledFrameTextureSize);
 
-        context.blit(ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
                 (int) (bottomLeft.x()), (int) (bottomLeft.y() - scaledCornerSize),
                 0, cornerUv,
                 scaledCornerSize, scaledCornerSize,

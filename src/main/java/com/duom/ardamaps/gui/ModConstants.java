@@ -67,6 +67,12 @@ public class ModConstants {
 
     public static final Identifier ARDACRAFT_LOGO = modId("textures/icons/icon_ardacraft_gradient_128px.png");
 
+    /**
+     * Legacy GUI nine-slice calls address 512px sheets through vanilla's old 256-unit texture space.
+     * Direct full-sheet blits still use the real texture dimensions.
+     */
+    public static final int LEGACY_TEXTURE_SPACE = 256;
+
     /** Texture identifiers for various icons used in the map GUI, such as the close button, map icon, configuration icon, and others. */
     public static final Identifier CLOSE_ICON = modId("icons/icon_close");
     public static final Identifier MAP_ICON = modId("icons/icon_map");

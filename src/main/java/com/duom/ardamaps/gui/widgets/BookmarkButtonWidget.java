@@ -25,6 +25,7 @@
 
 package com.duom.ardamaps.gui.widgets;
 
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -150,9 +151,9 @@ public class BookmarkButtonWidget extends AbstractWidget {
     /**
      * Renders the guide button style.
      *
-     * <p>Draws the button background at UV offset (288, 288) within the GUI element
-     * atlas and overlays the {@link ModConstants#GUIDE_ICON} sprite in a blue-grey
-     * tint (0.53, 0.65, 0.78) when not hovered.</p>
+     * <p>Draws the button background at UV offset (384, 128) within the GUI element
+     * atlas and overlays the {@link ModConstants#GUIDE_ICON} sprite in a muted purple
+     * tint (0.61, 0.49, 0.65) when not hovered.</p>
      *
      * @param context the {@link GuiGraphicsExtractor} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
@@ -189,10 +190,9 @@ public class BookmarkButtonWidget extends AbstractWidget {
      *       This forms the background shape of the bookmark tab.</li>
      *   <li>Draws the supplied {@code icon} sprite centred inside the button. The icon is
      *       sized to 50 % of the shorter button dimension. When the cursor is <em>not</em>
-     *       hovering over the button the shader colour is set to ({@code r}, {@code g},
-     *       {@code b}, 1.0) before drawing; otherwise the icon renders at full white to
-     *       produce a hover-highlight effect. The shader colour is always reset to white
-     *       after the draw call.</li>
+     *       hovering over the button the icon is drawn with tint ({@code r}, {@code g},
+     *       {@code b}, 1.0); otherwise the icon renders at full white to produce a
+     *       hover-highlight effect.</li>
      * </ol>
      *
      * @param context the {@link GuiGraphicsExtractor} used for all draw calls
@@ -225,9 +225,12 @@ public class BookmarkButtonWidget extends AbstractWidget {
         var iconSize = (int) (Math.min(getWidth(), getHeight()) * .5);
         var halfIconSize = (int) (iconSize / 2f);
 
-        if (!isMouseOver(mouseX, mouseY) && !isFocused())
+        int color = isMouseOver(mouseX, mouseY) || isFocused()
+                ? ModConstants.COLOR_WHITE
+                : GuiTextures.argb(r, g, b, 1.0f);
 
-        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), x + halfIconSize, y + halfIconSize, iconSize, iconSize);
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon),
+                x + halfIconSize, y + halfIconSize, iconSize, iconSize, color);
 
     }
 

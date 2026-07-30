@@ -26,6 +26,7 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -104,17 +105,19 @@ public class CheckboxWidget extends AbstractButton {
             return;
         }
 
+        int color = active ? ModConstants.COLOR_WHITE : GuiTextures.argb(1.0f, 1.0f, 1.0f, 0.7f);
+
         if (this.isHovered()) {
             if (checked) {
-                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.TEXTURE, boxX, y, 20, 20, size, size, 20, 20, 64, 64);
+                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.TEXTURE, boxX, y, 20, 20, size, size, 20, 20, 64, 64, color);
             } else {
-                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.TEXTURE, boxX, y, 20, 0, size, size, 20, 20, 64, 64);
+                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.TEXTURE, boxX, y, 20, 0, size, size, 20, 20, 64, 64, color);
             }
         } else {
             if (checked) {
-                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.TEXTURE, boxX, y, 0, 20, size, size, 20, 20, 64, 64);
+                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.TEXTURE, boxX, y, 0, 20, size, size, 20, 20, 64, 64, color);
             } else {
-                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.TEXTURE, boxX, y, 0, 0, size, size, 20, 20, 64, 64);
+                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.TEXTURE, boxX, y, 0, 0, size, size, 20, 20, 64, 64, color);
             }
         }
 
