@@ -182,6 +182,11 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
         this.iconSize = (int) (originalHeight * .5f);
     }
 
+    /**
+     * Sets the width of this widget
+     *
+     * @param width the width to set
+     */
     @Override
     public void setWidth(int width) {
 
@@ -189,6 +194,14 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
         originalWidth = width;
     }
 
+    /**
+     * Renders the dropdown widget
+     *
+     * @param context the draw context
+     * @param mouseX  the mouse x position
+     * @param mouseY  the mouse y position
+     * @param delta   the delta elapsed since the last tick
+     */
     @Override
     protected void extractWidgetRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
@@ -324,6 +337,13 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
         return (item == null && selected == null) || (item != null && item.equals(selected));
     }
 
+    /**
+     * Renders the main dropdown button
+     *
+     * @param context the draw context
+     * @param mouseX  the mouse x position
+     * @param mouseY  the mouse y position
+     */
     protected void renderMainButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         Font textRenderer = Client.mc().font;

@@ -87,10 +87,12 @@ public class PmTilesRenderer extends MapRenderable {
 
         try {
 
-            if (layer.remote())
-                tileProvider = PMTilesHttpTileProvider.init(layer.path());
-            else
-                tileProvider = PMTilesFileTileProvider.init(layer.path());
+            TileProvider<PmTileKey> newProvider = layer.remote()
+                    ? PMTilesHttpTileProvider.init(layer.path())
+                    : PMTilesFileTileProvider.init(layer.path());
+
+            if (tileProvider != null) tileProvider.close();
+            tileProvider = newProvider;
 
             mapCamera.setTilesZoomBounds(tileProvider.getMinZoom(), tileProvider.getMaxZoom());
             mapCamera.setCameraZoomBounds(layer.minZoom(), layer.maxZoom());
@@ -154,7 +156,7 @@ public class PmTilesRenderer extends MapRenderable {
         boolean debugMode = ArdaMapsClient.CONFIG.isMapDebugDisplay();
         for (PmTileKey key : tilesToDisplay) {
 
-            Optional<Identifier> tex = tileProvider.get(key);
+            Optional<Identifier> tex = tileProvider.peek(key);
 
             PmTileKey renderKey = key;
 
@@ -212,7 +214,7 @@ public class PmTilesRenderer extends MapRenderable {
                     current.y >> 1
             );
 
-            Optional<Identifier> tex = tileProvider.get(current);
+            Optional<Identifier> tex = tileProvider.peek(current);
             if (tex.isPresent()) return new Tuple<>(current, tex);
 
         }

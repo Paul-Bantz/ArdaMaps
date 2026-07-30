@@ -49,7 +49,7 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
     private static final Logger LOGGER = LoggerFactory.getLogger(PMTilesProvider.class);
 
     /** PMTiles reader for accessing tile data */
-    protected PMTilesReader reader;
+    protected volatile PMTilesReader reader;
 
     /**
      * Asynchronously loads a map tile for the given tile key.
@@ -59,26 +59,36 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
     @Override
     public void loadTile(PmTileKey key) {
 
-        if (reader == null) {
+        // Snapshot the reader once: `close()` may null the field concurrently, and re-reading it
+        // inside the lambda would be a check-then-use race against that assignment.
+        PMTilesReader activeReader = reader;
+
+        if (activeReader == null) {
             clearLoading(key);
             return;
         }
 
         CompletableFuture.supplyAsync(() -> {
 
+            if (closed) return null;
+
             Optional<ByteBuffer> optionalTile;
             try {
-                optionalTile = reader.getTile(key.toTileId());
+                optionalTile = activeReader.getTile(key.toTileId());
             } catch (IOException e) {
-                LOGGER.error("Failed to read tile {} from PMTiles source", key, e);
+                LOGGER.warn("Failed to read tile {} from PMTiles source", key, e);
                 markTransportFailure(key);
                 return null;
             } catch (RuntimeException e) {
-                LOGGER.error("Unexpected error reading tile {} from PMTiles source", key, e);
+                LOGGER.warn("Unexpected error reading tile {} from PMTiles source", key, e);
+                markTransportFailure(key);
                 return null;
             }
 
-            if (optionalTile.isEmpty()) return null;
+            if (optionalTile.isEmpty()) {
+                markMissing(key);
+                return null;
+            }
 
             ByteBuffer buffer = optionalTile.get();
             buffer.rewind();
@@ -96,7 +106,7 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
                 return null;
             }
 
-        }, ArdaMapsClient.IMAGE_EXECUTOR).whenComplete((image, ex) -> {
+        }, ArdaMapsClient.TILE_EXECUTOR).whenComplete((image, ex) -> {
             if (ex != null) {
                 LOGGER.error("Unexpected async failure loading PMTiles tile {}", key, ex);
                 clearLoading(key);

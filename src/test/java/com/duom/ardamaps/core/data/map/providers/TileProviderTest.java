@@ -128,6 +128,42 @@ class TileProviderTest {
     }
 
     /**
+     * Verifies {@link TileProvider#peek(TileKey)} never enqueues a load, even repeatedly.
+     */
+    @Test
+    void peek_neverTriggersLoading() {
+
+        var provider = new TestTileProvider();
+        var key = new TileKey(6, 1, 1);
+
+        provider.peek(key);
+        provider.peek(key);
+        provider.peek(key);
+
+        assertEquals(0, provider.loadCalls, "peek() must never trigger a load");
+        assertTrue(provider.pendingRequests.isEmpty(), "peek() must not enter the debounce buffer");
+    }
+
+    /**
+     * Verifies a key marked missing is skipped by {@code get()} without expiring, unlike a
+     * transport failure.
+     */
+    @Test
+    void markMissing_suppressesFurtherGetCalls() {
+
+        var provider = new TestTileProvider();
+        var key = new TileKey(7, 2, 3);
+
+        provider.markMissing(key);
+
+        provider.get(key);
+        provider.get(key);
+
+        assertEquals(0, provider.loadCalls, "Keys marked missing must never be retried");
+        assertTrue(provider.peek(key).isEmpty(), "A missing key should not have a cached texture");
+    }
+
+    /**
      * Minimal test double for {@link TileProvider} that counts load attempts.
      * <p>
      * The implementation immediately clears the in-flight marker so repeated

@@ -63,6 +63,14 @@ public abstract class TileProvider<T extends TileKey> {
     /** Keys that hit transport/IO failures, mapped to failure timestamp. */
     protected final ConcurrentHashMap<T, Long> transportFailedKeys = new ConcurrentHashMap<>();
 
+    /** Keys confirmed absent from the source (not a failure); bounded so a long session can't leak memory. */
+    protected final Cache<T, Boolean> missingKeys = Caffeine.newBuilder()
+            .maximumSize(MAX_CACHE_SIZE)
+            .build();
+
+    /** Set once {@link #close()} has run; lets in-flight async loads bail out instead of touching released state. */
+    protected volatile boolean closed;
+
     /** Removal listener that destroys dynamic textures evicted from the in-memory cache. */
     private final RemovalListener<T, Identifier> textureRemovalListener =
             (ignoredKey, texture, ignoredCause) -> destroyTexture(texture);
@@ -123,6 +131,8 @@ public abstract class TileProvider<T extends TileKey> {
         Identifier cached = textures.getIfPresent(key);
         if (cached != null) return Optional.of(cached);
 
+        if (missingKeys.getIfPresent(key) != null) return Optional.empty();
+
         long now = System.currentTimeMillis();
         if (isTransportFailed(key, now)) return Optional.empty();
 
@@ -137,6 +147,19 @@ public abstract class TileProvider<T extends TileKey> {
         if (loading.add(key)) {
             loadTile(key);
         }
+
+        return Optional.ofNullable(textures.getIfPresent(key));
+    }
+
+    /**
+     * Returns the cached texture for the given key, if already loaded, without triggering a load
+     * or otherwise mutating any transient state. Intended for fallback lookups (e.g. coarser zoom
+     * levels) that should not themselves count as tile requests.
+     *
+     * @param key The tile key.
+     * @return The cached texture identifier, or empty if not currently loaded.
+     */
+    public Optional<Identifier> peek(T key) {
 
         return Optional.ofNullable(textures.getIfPresent(key));
     }
@@ -192,6 +215,19 @@ public abstract class TileProvider<T extends TileKey> {
     }
 
     /**
+     * Marks a key as confirmed absent from the source (e.g. outside the archive's tile set).
+     * Unlike a transport failure, this is not time-limited: the source is not going to gain a
+     * tile it does not have, so continuing to retry it every frame would be pure waste.
+     *
+     * @param key The tile key known not to exist in the source.
+     */
+    protected void markMissing(T key) {
+
+        missingKeys.put(key, Boolean.TRUE);
+        clearLoading(key);
+    }
+
+    /**
      * Clears transient async state for the given key.
      *
      * @param key The key whose in-flight/debounce state should be cleared.
@@ -218,11 +254,14 @@ public abstract class TileProvider<T extends TileKey> {
      */
     public void close() {
 
+        closed = true;
+
         textures.invalidateAll();
         textures.cleanUp();
         loading.clear();
         pendingRequests.clear();
         transportFailedKeys.clear();
+        missingKeys.invalidateAll();
     }
 
     /**

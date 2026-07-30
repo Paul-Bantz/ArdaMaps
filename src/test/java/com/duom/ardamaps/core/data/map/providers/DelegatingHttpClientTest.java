@@ -31,12 +31,17 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import java.net.CookieHandler;
 import java.net.ProxySelector;
+import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
@@ -115,5 +120,72 @@ class DelegatingHttpClientTest {
         try (DelegatingHttpClient client = DelegatingHttpClient.create()) {
             assertEquals(Optional.of(Duration.ofSeconds(30)), client.connectTimeout());
         }
+    }
+
+    /**
+     * Verifies {@code send} applies the default request timeout when the caller's request has none,
+     * so a stalled server can never block a synchronous range read indefinitely.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    void send_requestWithoutTimeout_delegatesWithDefaultTimeout() throws Exception {
+
+        HttpClient delegate = mock(HttpClient.class);
+        var client = new DelegatingHttpClient(delegate);
+        HttpRequest request = HttpRequest.newBuilder(URI.create("https://example.test/tile")).build();
+        HttpResponse<Void> response = mock(HttpResponse.class);
+
+        doReturn(response).when(delegate).send(any(), any());
+
+        client.send(request, HttpResponse.BodyHandlers.discarding());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
+        verify(delegate).send(captor.capture(), any());
+        assertEquals(Optional.of(Duration.ofSeconds(15)), captor.getValue().timeout());
+        assertEquals(request.uri(), captor.getValue().uri());
+    }
+
+    /**
+     * Verifies {@code send} leaves an explicit request timeout untouched.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    void send_requestWithExplicitTimeout_isPassedThroughUnchanged() throws Exception {
+
+        HttpClient delegate = mock(HttpClient.class);
+        var client = new DelegatingHttpClient(delegate);
+        HttpRequest request = HttpRequest.newBuilder(URI.create("https://example.test/tile"))
+                .timeout(Duration.ofSeconds(2))
+                .build();
+        HttpResponse<Void> response = mock(HttpResponse.class);
+
+        doReturn(response).when(delegate).send(any(), any());
+
+        client.send(request, HttpResponse.BodyHandlers.discarding());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
+        verify(delegate).send(captor.capture(), any());
+        assertEquals(Optional.of(Duration.ofSeconds(2)), captor.getValue().timeout());
+    }
+
+    /**
+     * Verifies {@code sendAsync} also applies the default timeout when absent.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    void sendAsync_requestWithoutTimeout_delegatesWithDefaultTimeout() {
+
+        HttpClient delegate = mock(HttpClient.class);
+        var client = new DelegatingHttpClient(delegate);
+        HttpRequest request = HttpRequest.newBuilder(URI.create("https://example.test/tile")).build();
+        HttpResponse<Void> response = mock(HttpResponse.class);
+
+        doReturn(CompletableFuture.completedFuture(response)).when(delegate).sendAsync(any(), any());
+
+        client.sendAsync(request, HttpResponse.BodyHandlers.discarding());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
+        verify(delegate).sendAsync(captor.capture(), any());
+        assertEquals(Optional.of(Duration.ofSeconds(15)), captor.getValue().timeout());
     }
 }

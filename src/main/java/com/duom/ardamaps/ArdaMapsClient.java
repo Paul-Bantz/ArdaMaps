@@ -81,8 +81,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The client-side initializer for the Arda Maps mod, responsible for setting up client-specific features such as the toposcope and compass HUD elements, handling resource reloads, and managing player exploration tracking.
@@ -95,6 +100,37 @@ public class ArdaMapsClient implements ClientModInitializer {
             Executors.newFixedThreadPool(
                     Math.max(2, Runtime.getRuntime().availableProcessors() / 2)
             );
+
+    /**
+     * Dedicated executor for PMTiles range reads. Kept separate from {@link #IMAGE_EXECUTOR} so a
+     * slow or unresponsive PMTiles source (blocking HTTP range reads) cannot starve BlueMap/WebP
+     * image loading, which shares {@link #IMAGE_EXECUTOR}. Bounded with a fixed-size queue so a
+     * stuck source sheds new requests instead of growing an unbounded backlog.
+     */
+    public static final ExecutorService TILE_EXECUTOR = new ThreadPoolExecutor(
+            Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+            Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+            0L, TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(256),
+            tileExecutorThreadFactory()
+    );
+
+    /**
+     * Creates the daemon thread factory for {@link #TILE_EXECUTOR}, naming threads so PMTiles
+     * tasks are identifiable in logs and thread dumps (rather than the generic {@code pool-N-thread-M}).
+     *
+     * @return A thread factory producing named daemon threads.
+     */
+    private static ThreadFactory tileExecutorThreadFactory() {
+
+        AtomicInteger threadId = new AtomicInteger();
+        return runnable -> {
+            Thread thread = new Thread(runnable);
+            thread.setDaemon(true);
+            thread.setName("ardamaps-pmtiles-tile-%02d".formatted(threadId.incrementAndGet()));
+            return thread;
+        };
+    }
 
     /** How long (ms) the near-locations cache is valid before refreshing. */
     public static final long LOCATION_CACHE_MS = 100L;
@@ -330,11 +366,22 @@ public class ArdaMapsClient implements ClientModInitializer {
         // Shutdown the image executor
         IMAGE_EXECUTOR.shutdown();
         try {
-            if (!IMAGE_EXECUTOR.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+            if (!IMAGE_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
                 IMAGE_EXECUTOR.shutdownNow();
             }
         } catch (InterruptedException e) {
             IMAGE_EXECUTOR.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+
+        // Shutdown the PMTiles tile executor
+        TILE_EXECUTOR.shutdown();
+        try {
+            if (!TILE_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
+                TILE_EXECUTOR.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            TILE_EXECUTOR.shutdownNow();
             Thread.currentThread().interrupt();
         }
 

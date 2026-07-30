@@ -52,6 +52,9 @@ public final class DelegatingHttpClient extends HttpClient {
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(30);
 
+    /** Default per-request timeout applied when a request doesn't already specify one. */
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
+
     private final HttpClient delegate;
 
     /**
@@ -222,7 +225,7 @@ public final class DelegatingHttpClient extends HttpClient {
     public <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler)
             throws IOException, InterruptedException {
 
-        return delegate.send(request, responseBodyHandler);
+        return delegate.send(withRequestTimeout(request), responseBodyHandler);
     }
 
     /**
@@ -239,7 +242,7 @@ public final class DelegatingHttpClient extends HttpClient {
             HttpResponse.BodyHandler<T> responseBodyHandler
     ) {
 
-        return delegate.sendAsync(request, responseBodyHandler);
+        return delegate.sendAsync(withRequestTimeout(request), responseBodyHandler);
     }
 
     /**
@@ -258,7 +261,23 @@ public final class DelegatingHttpClient extends HttpClient {
             HttpResponse.PushPromiseHandler<T> pushPromiseHandler
     ) {
 
-        return delegate.sendAsync(request, responseBodyHandler, pushPromiseHandler);
+        return delegate.sendAsync(withRequestTimeout(request), responseBodyHandler, pushPromiseHandler);
+    }
+
+    /**
+     * Returns the request unchanged if it already specifies a timeout, otherwise rebuilds it with
+     * the default {@link #REQUEST_TIMEOUT} so a stalled server can never block a caller indefinitely.
+     *
+     * @param request The request to check.
+     * @return The request, with a default timeout applied if none was set.
+     */
+    private static HttpRequest withRequestTimeout(HttpRequest request) {
+
+        if (request.timeout().isPresent()) return request;
+
+        return HttpRequest.newBuilder(request, (_, _) -> true)
+                .timeout(REQUEST_TIMEOUT)
+                .build();
     }
 
     /**
