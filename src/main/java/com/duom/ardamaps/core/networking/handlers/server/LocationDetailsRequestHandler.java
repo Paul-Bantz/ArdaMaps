@@ -50,7 +50,8 @@ public class LocationDetailsRequestHandler extends RespondablePacketHandler<Loca
      * Constructs a new LocationDetailsRequestHandler, specifying the request and response channels and packet readers.
      */
     public LocationDetailsRequestHandler() {
-        super(REQ_CHANNEL, LocationDetailsRequestPacket::read, RESP_CHANNEL, LocationDetailsResponsePacket::read);
+        super(REQ_CHANNEL, LocationDetailsRequestPacket.TYPE, LocationDetailsRequestPacket.CODEC,
+                RESP_CHANNEL, LocationDetailsResponsePacket.TYPE, LocationDetailsResponsePacket.CODEC);
     }
 
     /**

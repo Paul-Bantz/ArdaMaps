@@ -26,8 +26,12 @@
 package com.duom.ardamaps.core.networking.packets.server;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 /**
  * Packet sent by the server to teleport the player to a specific location, optionally in a specific world.
@@ -38,6 +42,8 @@ import net.minecraft.network.FriendlyByteBuf;
  * @param worldId The Identifier of the world to teleport to. If null, the current world is used.
  */
 public record PlayerTeleportPacket(double x, double y, double z, String worldId) implements IPacket {
+    public static final CustomPacketPayload.Type<PlayerTeleportPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_teleport"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, PlayerTeleportPacket> CODEC = IPacket.codec(PlayerTeleportPacket::read);
 
     /**
      * Constructs a PlayerTeleportPacket with only X and Z coordinates, setting Y to NaN.
@@ -74,12 +80,17 @@ public record PlayerTeleportPacket(double x, double y, double z, String worldId)
     @Override
     public FriendlyByteBuf build() {
 
-        FriendlyByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
         buf.writeDouble(x);
         buf.writeDouble(y);
         buf.writeDouble(z);
         buf.writeUtf(worldId);
 
         return buf;
+    }
+
+    @Override
+    public CustomPacketPayload.Type<PlayerTeleportPacket> type() {
+        return TYPE;
     }
 }

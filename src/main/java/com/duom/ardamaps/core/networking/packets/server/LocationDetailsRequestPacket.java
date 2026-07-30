@@ -26,22 +26,48 @@
 package com.duom.ardamaps.core.networking.packets.server;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
-public record LocationDetailsRequestPacket(String locationIdentifier) implements IPacket {
+import java.util.UUID;
+
+public record LocationDetailsRequestPacket(UUID requestId, String locationIdentifier) implements IRespondablePacket<LocationDetailsRequestPacket> {
+    public static final CustomPacketPayload.Type<LocationDetailsRequestPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_details_request"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, LocationDetailsRequestPacket> CODEC = IPacket.codec(LocationDetailsRequestPacket::read);
+
+    public LocationDetailsRequestPacket(String locationIdentifier) {
+        this(new UUID(0L, 0L), locationIdentifier);
+    }
+
     @Override
     public FriendlyByteBuf build() {
 
-        FriendlyByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
+        buf.writeUUID(requestId);
         buf.writeUtf(locationIdentifier);
         return buf;
     }
 
     public static LocationDetailsRequestPacket read(FriendlyByteBuf buf) {
 
+        var requestId = buf.readUUID();
         var location = buf.readUtf();
 
-        return new LocationDetailsRequestPacket(location);
+        return new LocationDetailsRequestPacket(requestId, location);
+    }
+
+    @Override
+    public LocationDetailsRequestPacket withRequestId(UUID requestId) {
+        return new LocationDetailsRequestPacket(requestId, locationIdentifier);
+    }
+
+    @Override
+    public CustomPacketPayload.Type<LocationDetailsRequestPacket> type() {
+        return TYPE;
     }
 }

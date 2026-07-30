@@ -25,42 +25,22 @@
 
 package com.duom.ardamaps.core.consumers.networking;
 
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-
-import java.util.function.Function;
+import java.util.UUID;
 
 /**
- * Interface for network packets.
- * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
+ * Packet payload that carries a request id for request/response networking.
+ *
+ * @param <T> The concrete packet type.
  */
-public interface IPacket extends CustomPacketPayload {
+public interface IRespondablePacket<T extends IRespondablePacket<T>> extends IPacket {
     /**
-     * Convert the packet to an instance of the object.
-     *
-     * @param buf The packet byte buffer to read
+     * @return The request id correlating a response to a request.
      */
-    @SuppressWarnings("unused")
-    static <T> T read(FriendlyByteBuf buf) {
-        return null;
-    }
+    UUID requestId();
 
     /**
-     * Build the packet.
+     * @param requestId The request id to attach.
+     * @return A copy of this payload with the supplied request id.
      */
-    FriendlyByteBuf build();
-
-    /**
-     * Creates a simple payload codec backed by the packet's legacy read/build methods.
-     *
-     * @param reader The packet reader.
-     * @return A StreamCodec for play-phase payload registration.
-     * @param <T> The packet type.
-     */
-    static <T extends IPacket> StreamCodec<RegistryFriendlyByteBuf, T> codec(Function<FriendlyByteBuf, T> reader) {
-
-        return StreamCodec.of((buf, packet) -> buf.writeBytes(packet.build()), reader::apply);
-    }
+    T withRequestId(UUID requestId);
 }

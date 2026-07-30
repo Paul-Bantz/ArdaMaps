@@ -65,7 +65,8 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
      * Constructs a new PlayerRangedTeleportHandler and registers it for the specified channel.
      */
     public PlayerRangedTeleportHandler() {
-        super(REQ_CHANNEL, PlayerRangedTeleportPacket::read, RESP_CHANNEL, PlayerTeleportResponsePacket::read);
+        super(REQ_CHANNEL, PlayerRangedTeleportPacket.TYPE, PlayerRangedTeleportPacket.CODEC,
+                RESP_CHANNEL, PlayerTeleportResponsePacket.TYPE, PlayerTeleportResponsePacket.CODEC);
     }
 
     /**

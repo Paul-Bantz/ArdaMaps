@@ -29,8 +29,8 @@ import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.core.consumers.networking.RespondablePacketHandler;
 import com.duom.ardamaps.core.integration.Regions;
 import com.duom.ardamaps.core.integration.Warps;
-import com.duom.ardamaps.core.networking.packets.EmptyPacket;
 import com.duom.ardamaps.core.networking.packets.client.MapSourceResponsePacket;
+import com.duom.ardamaps.core.networking.packets.server.MapSourcesRequestPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -40,7 +40,7 @@ import net.minecraft.server.network.ServerGamePacketListenerImpl;
  * A packet sent from the client to the server to request map source data.
  * This returns a list of map layers that the client can display.
  */
-public class MapSourcesRequestHandler extends RespondablePacketHandler<EmptyPacket, MapSourceResponsePacket> {
+public class MapSourcesRequestHandler extends RespondablePacketHandler<MapSourcesRequestPacket, MapSourceResponsePacket> {
 
     /** The channel identifier for the map source request and response packets. */
     private static final String REQ_CHANNEL = "map_source_request";
@@ -52,7 +52,8 @@ public class MapSourcesRequestHandler extends RespondablePacketHandler<EmptyPack
      * Constructs a new MapSourcesRequestHandler, specifying the request and response channels and packet readers.
      */
     public MapSourcesRequestHandler() {
-        super(REQ_CHANNEL, EmptyPacket::read, RESP_CHANNEL, MapSourceResponsePacket::read);
+        super(REQ_CHANNEL, MapSourcesRequestPacket.TYPE, MapSourcesRequestPacket.CODEC,
+                RESP_CHANNEL, MapSourceResponsePacket.TYPE, MapSourceResponsePacket.CODEC);
     }
 
     /**
@@ -66,7 +67,7 @@ public class MapSourcesRequestHandler extends RespondablePacketHandler<EmptyPack
      * @return A MapSourceResponsePacket containing the map source configuration in JSON format.
      */
     @Override
-    public MapSourceResponsePacket handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler, EmptyPacket packet, PacketSender sender) {
+    public MapSourceResponsePacket handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler, MapSourcesRequestPacket packet, PacketSender sender) {
 
         return new MapSourceResponsePacket(Warps.isAvailable(), Regions.isAvailable(), ArdaMaps.CONFIG.getDimensions());
     }

@@ -43,7 +43,7 @@ public class GuidebookRequestHandler extends ServerPacketHandler<EmptyPacket> {
      * Constructs a new PlayerTeleportHandler.
      */
     public GuidebookRequestHandler() {
-        super(REQ_CHANNEL, EmptyPacket::read);
+        super(REQ_CHANNEL, EmptyPacket.TYPE, EmptyPacket.CODEC);
     }
 
     /**

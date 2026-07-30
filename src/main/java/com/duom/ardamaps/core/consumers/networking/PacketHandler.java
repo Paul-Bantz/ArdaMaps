@@ -26,23 +26,32 @@
 package com.duom.ardamaps.core.consumers.networking;
 
 import com.duom.ardamaps.ArdaMaps;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
 /**
  * Abstract base class for packet handlers, providing common functionality.
  * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
-public abstract class PacketHandler implements IPacketHandler {
+public abstract class PacketHandler<T extends IPacket> implements IPacketHandler {
     /** The unique identifier for the packet channel, constructed using the mod ID and a specific channel name. */
     private final Identifier channelId;
+    /** The Fabric custom payload type for this channel. */
+    private final CustomPacketPayload.Type<T> type;
+    /** The payload codec for this channel. */
+    private final StreamCodec<RegistryFriendlyByteBuf, T> codec;
 
     /**
      * Constructs a new PacketHandler with the specified channel name.
      *
      * @param channelId The name of the packet channel, which will be combined with the mod ID to create a unique Identifier.
      */
-    public PacketHandler(final String channelId) {
+    public PacketHandler(final String channelId, final CustomPacketPayload.Type<T> type, final StreamCodec<RegistryFriendlyByteBuf, T> codec) {
         this.channelId = Identifier.tryBuild(ArdaMaps.MOD_ID, channelId);
+        this.type = type;
+        this.codec = codec;
     }
 
     /**
@@ -51,5 +60,15 @@ public abstract class PacketHandler implements IPacketHandler {
     @Override
     public Identifier getChannelId() {
         return channelId;
+    }
+
+    @Override
+    public CustomPacketPayload.Type<T> getType() {
+        return type;
+    }
+
+    @Override
+    public StreamCodec<RegistryFriendlyByteBuf, T> getCodec() {
+        return codec;
     }
 }

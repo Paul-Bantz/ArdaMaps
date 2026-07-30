@@ -27,7 +27,6 @@ package com.duom.ardamaps.core.consumers.networking;
 
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -45,15 +44,11 @@ public interface IServerPacketHandler<T extends IPacket> extends IPacketHandler 
      * @param packet The packet to send
      */
     default void send(final T packet) {
-        ClientPlayNetworking.send(getChannelId(), packet.build());
+        ClientPlayNetworking.send(packet);
     }
 
     /**
      * Handle an incoming packet on the server.
      */
-    void handle(MinecraftServer server,
-                ServerPlayer player,
-                ServerGamePacketListenerImpl handler,
-                FriendlyByteBuf buf,
-                PacketSender sender);
+    void receive(T packet, net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.Context context);
 }

@@ -33,59 +33,35 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import java.util.Date;
+
 import java.util.UUID;
 
-/**
- * A packet sent from the client to the server requesting location data, optionally filtered by a date.
- *
- * @param date The date to filter locations by. If null, all locations will be requested.
- */
-public record LocationsRequestPacket(UUID requestId, Date date) implements IRespondablePacket<LocationsRequestPacket> {
-    public static final CustomPacketPayload.Type<LocationsRequestPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_data_request"));
-    public static final StreamCodec<RegistryFriendlyByteBuf, LocationsRequestPacket> CODEC = IPacket.codec(LocationsRequestPacket::read);
+public record MapSourcesRequestPacket(UUID requestId) implements IRespondablePacket<MapSourcesRequestPacket> {
+    public static final CustomPacketPayload.Type<MapSourcesRequestPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("map_source_request"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, MapSourcesRequestPacket> CODEC = IPacket.codec(MapSourcesRequestPacket::read);
 
-    public LocationsRequestPacket(Date date) {
-        this(new UUID(0L, 0L), date);
+    public MapSourcesRequestPacket() {
+        this(new UUID(0L, 0L));
     }
 
-    /**
-     * Reads a LocationsRequestPacket from the given PacketByteBuf.
-     *
-     * @param buf The PacketByteBuf to read from.
-     * @return A new LocationsRequestPacket instance.
-     */
-    public static LocationsRequestPacket read(FriendlyByteBuf buf) {
-
-        var requestId = buf.readUUID();
-        var hasData = buf.readBoolean();
-        Date updateDate = null;
-        if (hasData) updateDate = new Date(buf.readLong());
-
-        return new LocationsRequestPacket(requestId, updateDate);
+    public static MapSourcesRequestPacket read(FriendlyByteBuf buf) {
+        return new MapSourcesRequestPacket(buf.readUUID());
     }
 
-    /**
-     * Builds a PacketByteBuf from this LocationsRequestPacket.
-     *
-     * @return A PacketByteBuf representing this LocationsRequestPacket.
-     */
     @Override
     public FriendlyByteBuf build() {
         FriendlyByteBuf buf = FriendlyByteBufs.create();
         buf.writeUUID(requestId);
-        buf.writeBoolean(date != null);
-        if (date != null) buf.writeLong(date.getTime());
         return buf;
     }
 
     @Override
-    public LocationsRequestPacket withRequestId(UUID requestId) {
-        return new LocationsRequestPacket(requestId, date);
+    public MapSourcesRequestPacket withRequestId(UUID requestId) {
+        return new MapSourcesRequestPacket(requestId);
     }
 
     @Override
-    public CustomPacketPayload.Type<LocationsRequestPacket> type() {
+    public CustomPacketPayload.Type<MapSourcesRequestPacket> type() {
         return TYPE;
     }
 }

@@ -32,6 +32,7 @@ import com.duom.ardamaps.core.networking.handlers.client.PlayerExplorationEventH
 import com.duom.ardamaps.core.networking.handlers.server.*;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
@@ -67,11 +68,18 @@ public class PacketRegistry {
      */
     private static <T extends IServerPacketHandler<?>> T register(T handler) {
 
-        ServerPlayNetworking.registerGlobalReceiver(handler.getChannelId(), handler::handle);
+        registerServerboundPayload(handler);
         var clientEnv = FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT;
 
-        if (clientEnv && handler instanceof RespondablePacketHandler<?, ?> responseHandler) {
-            ClientPlayNetworking.registerGlobalReceiver(responseHandler.getResponseChannelId(), responseHandler::handle);
+        if (!clientEnv) {
+            registerServerReceiver(handler);
+        }
+
+        if (handler instanceof RespondablePacketHandler<?, ?> responseHandler) {
+            registerClientboundResponsePayload(responseHandler);
+            if (clientEnv) {
+                registerClientResponseReceiver(responseHandler);
+            }
         }
         return handler;
     }
@@ -81,15 +89,52 @@ public class PacketRegistry {
      *
      * @param handler The handler to register
      */
-    private static <T extends IClientPacketHandler> T registerClient(T handler) {
+    private static <T extends IClientPacketHandler<?>> T registerClient(T handler) {
 
+        registerClientboundPayload(handler);
         var clientEnv = FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT;
         if (clientEnv) {
 
-            ClientPlayNetworking.registerGlobalReceiver(handler.getChannelId(), handler::handle);
+            registerClientReceiver(handler);
         }
 
         return handler;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerServerboundPayload(IServerPacketHandler<?> handler) {
+
+        PayloadTypeRegistry.serverboundPlay().register((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), handler.getCodec());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerClientboundPayload(IClientPacketHandler<?> handler) {
+
+        PayloadTypeRegistry.clientboundPlay().register((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), handler.getCodec());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerClientboundResponsePayload(RespondablePacketHandler<?, ?> handler) {
+
+        PayloadTypeRegistry.clientboundPlay().register((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getResponseType(), handler.getResponseCodec());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerServerReceiver(IServerPacketHandler<?> handler) {
+
+        ServerPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), (packet, context) -> ((IServerPacketHandler) handler).receive(packet, context));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerClientReceiver(IClientPacketHandler<?> handler) {
+
+        ClientPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), (packet, context) -> ((IClientPacketHandler) handler).receive(packet, context));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerClientResponseReceiver(RespondablePacketHandler<?, ?> handler) {
+
+        ClientPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getResponseType(), (packet, context) -> ((RespondablePacketHandler) handler).receive(packet, context));
     }
 
     /**

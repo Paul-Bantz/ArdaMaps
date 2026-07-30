@@ -26,8 +26,15 @@
 package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+
+import java.util.UUID;
 
 /**
  * Response packet sent after a ranged teleport request has completed on the server thread.
@@ -37,7 +44,13 @@ import net.minecraft.network.FriendlyByteBuf;
  * @param y The resolved destination Y coordinate, including fractional standing heights, or zero for failed responses.
  * @param z The resolved destination Z coordinate, or zero for failed responses.
  */
-public record PlayerTeleportResponsePacket(boolean success, double x, double y, double z) implements IPacket {
+public record PlayerTeleportResponsePacket(UUID requestId, boolean success, double x, double y, double z) implements IRespondablePacket<PlayerTeleportResponsePacket> {
+    public static final CustomPacketPayload.Type<PlayerTeleportResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_ranged_teleport_response"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, PlayerTeleportResponsePacket> CODEC = IPacket.codec(PlayerTeleportResponsePacket::read);
+
+    public PlayerTeleportResponsePacket(boolean success, double x, double y, double z) {
+        this(new UUID(0L, 0L), success, x, y, z);
+    }
 
     /**
      * Creates a failed teleport response with zeroed coordinates.
@@ -57,12 +70,13 @@ public record PlayerTeleportResponsePacket(boolean success, double x, double y, 
      */
     public static PlayerTeleportResponsePacket read(FriendlyByteBuf buf) {
 
+        UUID requestId = buf.readUUID();
         boolean packetSuccess = buf.readBoolean();
         double packetX = buf.readDouble();
         double packetY = buf.readDouble();
         double packetZ = buf.readDouble();
 
-        return new PlayerTeleportResponsePacket(packetSuccess, packetX, packetY, packetZ);
+        return new PlayerTeleportResponsePacket(requestId, packetSuccess, packetX, packetY, packetZ);
     }
 
     /**
@@ -73,13 +87,24 @@ public record PlayerTeleportResponsePacket(boolean success, double x, double y, 
     @Override
     public FriendlyByteBuf build() {
 
-        FriendlyByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
 
+        buf.writeUUID(requestId);
         buf.writeBoolean(success);
         buf.writeDouble(x);
         buf.writeDouble(y);
         buf.writeDouble(z);
 
         return buf;
+    }
+
+    @Override
+    public PlayerTeleportResponsePacket withRequestId(UUID requestId) {
+        return new PlayerTeleportResponsePacket(requestId, success, x, y, z);
+    }
+
+    @Override
+    public CustomPacketPayload.Type<PlayerTeleportResponsePacket> type() {
+        return TYPE;
     }
 }

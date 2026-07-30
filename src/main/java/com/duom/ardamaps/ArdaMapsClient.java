@@ -46,6 +46,7 @@ import com.duom.ardamaps.core.data.map.providers.HttpImageProvider;
 import com.duom.ardamaps.core.items.ModItems;
 import com.duom.ardamaps.core.networking.PacketRegistry;
 import com.duom.ardamaps.core.networking.packets.EmptyPacket;
+import com.duom.ardamaps.core.networking.packets.server.MapSourcesRequestPacket;
 import com.duom.ardamaps.core.networking.packets.server.LocationsRequestPacket;
 import com.duom.ardamaps.core.networking.packets.server.RegionsLutRequestPacket;
 import com.duom.ardamaps.gui.ModConstants;
@@ -417,7 +418,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      */
     public static void refreshMapSources() {
 
-        PacketRegistry.MAP_SOURCES_REQUEST.send(new EmptyPacket(), response -> {
+        PacketRegistry.MAP_SOURCES_REQUEST.send(new MapSourcesRequestPacket(), response -> {
 
             List<Dimension> dimensions = response.dimensions();
 

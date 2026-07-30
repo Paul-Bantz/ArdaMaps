@@ -55,7 +55,7 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
      * Constructs a new PlayerTeleportHandler.
      */
     public PlayerTeleportHandler() {
-        super(REQ_CHANNEL, PlayerTeleportPacket::read);
+        super(REQ_CHANNEL, PlayerTeleportPacket.TYPE, PlayerTeleportPacket.CODEC);
     }
 
     /**

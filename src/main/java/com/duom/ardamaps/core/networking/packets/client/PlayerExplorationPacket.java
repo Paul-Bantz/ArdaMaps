@@ -27,8 +27,12 @@ package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
 import com.duom.ardamaps.core.data.Vec2d;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +52,8 @@ public record PlayerExplorationPacket(String dimensionId,
                                       String regionId,
                                       List<List<Vec2d>> parentRegionPolygon,
                                       List<List<Vec2d>> regionPolygon) implements IPacket {
+    public static final CustomPacketPayload.Type<PlayerExplorationPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_exploration_event"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, PlayerExplorationPacket> CODEC = IPacket.codec(PlayerExplorationPacket::read);
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(PlayerExplorationPacket.class);
@@ -160,7 +166,7 @@ public record PlayerExplorationPacket(String dimensionId,
     @Override
     public FriendlyByteBuf build() {
 
-        FriendlyByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
 
         buf.writeUtf(dimensionId);
         buf.writeUtf(regionId);
@@ -206,6 +212,11 @@ public record PlayerExplorationPacket(String dimensionId,
     public boolean isEmpty(){
 
         return this.equals(PlayerExplorationPacket.EMPTY);
+    }
+
+    @Override
+    public CustomPacketPayload.Type<PlayerExplorationPacket> type() {
+        return TYPE;
     }
 
     /**

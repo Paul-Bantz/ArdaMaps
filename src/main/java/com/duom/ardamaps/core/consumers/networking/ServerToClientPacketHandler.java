@@ -27,15 +27,13 @@ package com.duom.ardamaps.core.consumers.networking;
 
 import com.duom.ardamaps.ArdaMaps;
 import lombok.Getter;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
-import java.util.function.Function;
 
 /**
  * Abstract base class for handling server-to-client packets in the ArdaMaps mod.
@@ -44,14 +42,17 @@ import java.util.function.Function;
  *
  * @param <T> The type of packet being handled, which must implement the IPacket interface.
  */
-public abstract class ServerToClientPacketHandler<T extends IPacket> implements IClientPacketHandler {
+public abstract class ServerToClientPacketHandler<T extends IPacket> implements IClientPacketHandler<T> {
 
     /** The unique identifier for the packet channel, constructed using the mod ID and a specific channel name. */
     @Getter
     private final Identifier channelId;
-
-    /** A function that reads a packet of type T from a PacketByteBuf. This is used to deserialize incoming packets on the client side. */
-    private final Function<FriendlyByteBuf, T> reader;
+    /** The Fabric custom payload type for this channel. */
+    @Getter
+    private final CustomPacketPayload.Type<T> type;
+    /** The payload codec for this channel. */
+    @Getter
+    private final StreamCodec<RegistryFriendlyByteBuf, T> codec;
 
     /**
      * Constructs a new ServerToClientPacketHandler with the specified channel name and packet reader function.
@@ -60,9 +61,11 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
      * @param reader  A function that takes a PacketByteBuf and returns an instance of T, used to read incoming packets on the client side.
      */
     @SuppressWarnings("SameParameterValue")
-    protected ServerToClientPacketHandler(String channel, Function<FriendlyByteBuf, T> reader) {
+    protected ServerToClientPacketHandler(String channel, CustomPacketPayload.Type<T> type,
+                                          StreamCodec<RegistryFriendlyByteBuf, T> codec) {
         this.channelId = Identifier.tryBuild(ArdaMaps.MOD_ID, channel);
-        this.reader = reader;
+        this.type = type;
+        this.codec = codec;
     }
 
     /**
@@ -72,10 +75,7 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
      * @param packet The packet of type T to be sent to the client, which will be serialized and transmitted over the network.
      */
     public void send(ServerPlayer player, T packet) {
-        FriendlyByteBuf buf = PacketByteBufs.create();
-        FriendlyByteBuf packetBuf = packet.build();
-        buf.writeBytes(packetBuf);
-        ServerPlayNetworking.send(player, channelId, buf);
+        ServerPlayNetworking.send(player, packet);
     }
 
     /**
@@ -87,9 +87,8 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
      * @param sender  The PacketSender that can be used to send responses back to the server if needed.
      */
     @Override
-    public void handle(Minecraft client, ClientPacketListener handler, FriendlyByteBuf buf, PacketSender sender) {
-        T packet = reader.apply(buf);
-        client.execute(() -> handle(client, packet));
+    public void receive(T packet, net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.Context context) {
+        handle(context.client(), packet);
     }
 
     /**

@@ -50,7 +50,7 @@ public class PlayerWarpHandler extends ServerPacketHandler<PlayerWarpPacket> {
      * Constructs a new PlayerWarpHandler.
      */
     public PlayerWarpHandler() {
-        super(REQ_CHANNEL, PlayerWarpPacket::read);
+        super(REQ_CHANNEL, PlayerWarpPacket.TYPE, PlayerWarpPacket.CODEC);
     }
 
     /**

@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.core.networking.packets.client;
 
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,7 +41,7 @@ class PlayerExplorationPacketTest {
     @Test
     void read_negativePolygonCount_returnsEmptyPacket() {
 
-        var buf = PacketByteBufs.create();
+        var buf = FriendlyByteBufs.create();
         buf.writeUtf("minecraft:overworld");
         buf.writeUtf("region-1");
         buf.writeVarInt(-1);
@@ -56,7 +56,7 @@ class PlayerExplorationPacketTest {
     @Test
     void read_oversizedPolygonCount_returnsEmptyPacket() {
 
-        var buf = PacketByteBufs.create();
+        var buf = FriendlyByteBufs.create();
         buf.writeUtf("minecraft:overworld");
         buf.writeUtf("region-1");
         buf.writeVarInt(1025);

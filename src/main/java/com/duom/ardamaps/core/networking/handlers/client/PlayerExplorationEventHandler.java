@@ -50,7 +50,7 @@ public class PlayerExplorationEventHandler extends ServerToClientPacketHandler<P
     public static final String RESP_CHANNEL = "player_exploration_event";
 
     public PlayerExplorationEventHandler() {
-        super(RESP_CHANNEL, PlayerExplorationPacket::read);
+        super(RESP_CHANNEL, PlayerExplorationPacket.TYPE, PlayerExplorationPacket.CODEC);
     }
 
     @Override

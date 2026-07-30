@@ -26,15 +26,19 @@
 package com.duom.ardamaps.core.networking.packets;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import com.duom.ardamaps.gui.ModConstants;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 /**
  * A packet with no data.
  * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
 public record EmptyPacket() implements IPacket {
-    private static final FriendlyByteBuf EMPTY = PacketByteBufs.create();
+    public static final CustomPacketPayload.Type<EmptyPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("guidebook_request"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, EmptyPacket> CODEC = StreamCodec.unit(new EmptyPacket());
 
     /**
      * Reads an EmptyPacket from the given PacketByteBuf. Since this packet has no data, the buffer is not read.
@@ -53,6 +57,11 @@ public record EmptyPacket() implements IPacket {
      */
     @Override
     public FriendlyByteBuf build() {
-        return EMPTY;
+        return net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs.empty();
+    }
+
+    @Override
+    public CustomPacketPayload.Type<EmptyPacket> type() {
+        return TYPE;
     }
 }

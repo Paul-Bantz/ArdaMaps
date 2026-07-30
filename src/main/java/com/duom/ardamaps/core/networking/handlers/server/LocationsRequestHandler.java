@@ -60,7 +60,8 @@ public class LocationsRequestHandler extends RespondablePacketHandler<LocationsR
      * Constructs a new LocationsRequestHandler, specifying the request and response channels and packet readers.
      */
     public LocationsRequestHandler() {
-        super(REQ_CHANNEL, LocationsRequestPacket::read, RESP_CHANNEL, LocationsResponsePacket::read);
+        super(REQ_CHANNEL, LocationsRequestPacket.TYPE, LocationsRequestPacket.CODEC,
+                RESP_CHANNEL, LocationsResponsePacket.TYPE, LocationsResponsePacket.CODEC);
     }
 
     /**

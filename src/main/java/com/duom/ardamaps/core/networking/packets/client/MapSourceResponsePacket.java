@@ -26,17 +26,23 @@
 package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
+import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.config.MapLayerSource;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * A packet sent from the server to the client containing the map source configuration in JSON format.
@@ -44,9 +50,12 @@ import java.util.List;
  * @param ardaRegionsAvailable whether server-side ArdaRegions is available
  * @param dimensions           the list of dimensions to transfer
  */
-public record MapSourceResponsePacket(boolean warpsAvailable,
+public record MapSourceResponsePacket(UUID requestId,
+                                      boolean warpsAvailable,
                                       boolean ardaRegionsAvailable,
-                                      List<Dimension> dimensions) implements IPacket {
+                                      List<Dimension> dimensions) implements IRespondablePacket<MapSourceResponsePacket> {
+    public static final CustomPacketPayload.Type<MapSourceResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("map_source_response"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, MapSourceResponsePacket> CODEC = IPacket.codec(MapSourceResponsePacket::read);
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(MapSourceResponsePacket.class);
@@ -60,6 +69,10 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
     /** Maximum number of ranged layer entries accepted for a single layer. */
     private static final int MAX_RANGES_PER_LAYER = 512;
 
+    public MapSourceResponsePacket(boolean warpsAvailable, boolean ardaRegionsAvailable, List<Dimension> dimensions) {
+        this(new UUID(0L, 0L), warpsAvailable, ardaRegionsAvailable, dimensions);
+    }
+
     /**
      * Reads a MapSourceResponsePacket - ie a maps layer configuration from the given PacketByteBuf.
      *
@@ -68,6 +81,7 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
      */
     public static MapSourceResponsePacket read(FriendlyByteBuf buf) {
 
+        var requestId = buf.readUUID();
         var warpsAvailable = buf.readBoolean();
         var ardaRegionsAvailable = buf.readBoolean();
         var dimensionsCount = readCount(buf, "dimensions", MAX_DIMENSIONS);
@@ -133,7 +147,7 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
             dimensions.add(dimension);
         }
 
-        return new MapSourceResponsePacket(warpsAvailable, ardaRegionsAvailable, dimensions);
+        return new MapSourceResponsePacket(requestId, warpsAvailable, ardaRegionsAvailable, dimensions);
     }
 
     /**
@@ -144,8 +158,9 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
     @Override
     public FriendlyByteBuf build() {
 
-        FriendlyByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
 
+        buf.writeUUID(requestId);
         buf.writeBoolean(warpsAvailable);
         buf.writeBoolean(ardaRegionsAvailable);
 
@@ -203,6 +218,16 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
         }
 
         return buf;
+    }
+
+    @Override
+    public MapSourceResponsePacket withRequestId(UUID requestId) {
+        return new MapSourceResponsePacket(requestId, warpsAvailable, ardaRegionsAvailable, dimensions);
+    }
+
+    @Override
+    public CustomPacketPayload.Type<MapSourceResponsePacket> type() {
+        return TYPE;
     }
 
     /**

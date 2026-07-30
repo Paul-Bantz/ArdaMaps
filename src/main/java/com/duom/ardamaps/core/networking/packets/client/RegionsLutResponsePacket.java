@@ -26,11 +26,16 @@
 package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
+import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
 import com.duom.ardamaps.core.data.config.ConfigManager;
 import com.duom.ardamaps.core.data.map.RegionLookupTexture;
+import com.duom.ardamaps.gui.ModConstants;
 import com.google.gson.JsonSyntaxException;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,13 +43,16 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
  * A packet representing a response containing region lookup texture data.
  */
-public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPacket {
+public record RegionsLutResponsePacket(UUID requestId, RegionLookupTexture data) implements IRespondablePacket<RegionsLutResponsePacket> {
+    public static final CustomPacketPayload.Type<RegionsLutResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("regions_lut_data_response"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, RegionsLutResponsePacket> CODEC = IPacket.codec(RegionsLutResponsePacket::read);
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(RegionsLutResponsePacket.class);
@@ -55,6 +63,10 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
     /** A static instance representing an empty response, used when no data is available or an error occurs. */
     public static final RegionsLutResponsePacket EMPTY = new RegionsLutResponsePacket(null);
 
+    public RegionsLutResponsePacket(RegionLookupTexture data) {
+        this(new UUID(0L, 0L), data);
+    }
+
     /**
      * Reads a RegionsLutResponsePacket from a PacketByteBuf.
      *
@@ -63,6 +75,7 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
      */
     public static RegionsLutResponsePacket read(FriendlyByteBuf buf) {
 
+        var requestId = buf.readUUID();
         var dataLength = buf.readInt();
 
         if (dataLength != 0) {
@@ -78,7 +91,7 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
                 try (GZIPInputStream gzip = new GZIPInputStream(outputStream)) {
                     var json = new String(gzip.readAllBytes(), StandardCharsets.UTF_8);
                     var regionLut = ConfigManager.gson().fromJson(json, RegionLookupTexture.class);
-                    return new RegionsLutResponsePacket(regionLut);
+                    return new RegionsLutResponsePacket(requestId, regionLut);
                 }
 
             } catch (IOException | JsonSyntaxException e) {
@@ -87,7 +100,7 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
             }
         }
 
-        return RegionsLutResponsePacket.EMPTY;
+        return new RegionsLutResponsePacket(requestId, null);
     }
 
     /**
@@ -98,8 +111,9 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
     @Override
     public FriendlyByteBuf build() {
 
-        FriendlyByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
 
+        buf.writeUUID(requestId);
         var hasData = data != null && data.lastUpdate() != null;
 
         if (hasData) {
@@ -128,6 +142,16 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
         }
 
         return buf;
+    }
+
+    @Override
+    public RegionsLutResponsePacket withRequestId(UUID requestId) {
+        return new RegionsLutResponsePacket(requestId, data);
+    }
+
+    @Override
+    public CustomPacketPayload.Type<RegionsLutResponsePacket> type() {
+        return TYPE;
     }
 
     /**

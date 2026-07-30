@@ -26,16 +26,29 @@
 package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
+import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
 import com.duom.ardamaps.core.data.location.LocationDetails;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+
+import java.util.UUID;
 
 /**
  * A packet sent from the server to the client containing detailed information about a specific location.
  *
  * @param details The LocationDetails object containing the information about the location.
  */
-public record LocationDetailsResponsePacket(LocationDetails details) implements IPacket {
+public record LocationDetailsResponsePacket(UUID requestId, LocationDetails details) implements IRespondablePacket<LocationDetailsResponsePacket> {
+    public static final CustomPacketPayload.Type<LocationDetailsResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_details_response"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, LocationDetailsResponsePacket> CODEC = IPacket.codec(LocationDetailsResponsePacket::read);
+
+    public LocationDetailsResponsePacket(LocationDetails details) {
+        this(new UUID(0L, 0L), details);
+    }
 
     /**
      * Reads a LocationDetailsResponsePacket from the given PacketByteBuf.
@@ -45,7 +58,7 @@ public record LocationDetailsResponsePacket(LocationDetails details) implements 
      */
     public static LocationDetailsResponsePacket read(FriendlyByteBuf buf) {
 
-        return new LocationDetailsResponsePacket(new LocationDetails(buf.readUtf(),  buf.readBoolean(), buf.readUtf(), buf.readUtf()));
+        return new LocationDetailsResponsePacket(buf.readUUID(), new LocationDetails(buf.readUtf(),  buf.readBoolean(), buf.readUtf(), buf.readUtf()));
     }
 
     /**
@@ -56,13 +69,24 @@ public record LocationDetailsResponsePacket(LocationDetails details) implements 
     @Override
     public FriendlyByteBuf build() {
 
-        FriendlyByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
 
+        buf.writeUUID(requestId);
         buf.writeUtf(details.name() != null ? details.name() : "");
         buf.writeBoolean(details.canon());
         buf.writeUtf(details.description() != null ? details.description() : "");
         buf.writeUtf(details.externalUrl() != null ? details.externalUrl() : "");
 
         return buf;
+    }
+
+    @Override
+    public LocationDetailsResponsePacket withRequestId(UUID requestId) {
+        return new LocationDetailsResponsePacket(requestId, details);
+    }
+
+    @Override
+    public CustomPacketPayload.Type<LocationDetailsResponsePacket> type() {
+        return TYPE;
     }
 }

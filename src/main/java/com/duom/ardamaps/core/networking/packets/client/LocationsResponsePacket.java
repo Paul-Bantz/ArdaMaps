@@ -26,13 +26,18 @@
 package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
+import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
 import com.duom.ardamaps.core.data.config.ConfigManager;
 import com.duom.ardamaps.core.data.config.LocationConfig;
 import com.duom.ardamaps.core.data.location.LocationClient;
+import com.duom.ardamaps.gui.ModConstants;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,13 +46,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
  * A packet representing a response containing location data in JSON format.
  */
-public record LocationsResponsePacket(LocationConfig<LocationClient> data) implements IPacket {
+public record LocationsResponsePacket(UUID requestId, LocationConfig<LocationClient> data) implements IRespondablePacket<LocationsResponsePacket> {
+    public static final CustomPacketPayload.Type<LocationsResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_data_response"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, LocationsResponsePacket> CODEC = IPacket.codec(LocationsResponsePacket::read);
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(LocationsResponsePacket.class);
@@ -61,6 +69,10 @@ public record LocationsResponsePacket(LocationConfig<LocationClient> data) imple
 
     public static final LocationsResponsePacket EMPTY = new LocationsResponsePacket(null);
 
+    public LocationsResponsePacket(LocationConfig<LocationClient> data) {
+        this(new UUID(0L, 0L), data);
+    }
+
     /**
      * Reads a MapSourceResponsePacket - ie a timestamped list of location data within the world.
      *
@@ -69,6 +81,7 @@ public record LocationsResponsePacket(LocationConfig<LocationClient> data) imple
      */
     public static LocationsResponsePacket read(FriendlyByteBuf buf) {
 
+        var requestId = buf.readUUID();
         var dataLength = buf.readInt();
 
         if (dataLength != 0) {
@@ -84,7 +97,7 @@ public record LocationsResponsePacket(LocationConfig<LocationClient> data) imple
                 try (GZIPInputStream gzip = new GZIPInputStream(outputStream)) {
                     var json = new String(gzip.readAllBytes(), StandardCharsets.UTF_8);
                     LocationConfig<LocationClient> locationsConfig = ConfigManager.gson().fromJson(json, LOCATION_CONFIG_TYPE);
-                    return new LocationsResponsePacket(locationsConfig);
+                    return new LocationsResponsePacket(requestId, locationsConfig);
                 }
 
             } catch (IOException | JsonSyntaxException e) {
@@ -93,7 +106,7 @@ public record LocationsResponsePacket(LocationConfig<LocationClient> data) imple
             }
         }
 
-        return LocationsResponsePacket.EMPTY;
+        return new LocationsResponsePacket(requestId, null);
     }
 
     /**
@@ -103,8 +116,9 @@ public record LocationsResponsePacket(LocationConfig<LocationClient> data) imple
      */
     @Override
     public FriendlyByteBuf build() {
-        FriendlyByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
 
+        buf.writeUUID(requestId);
         var hasData = data != null && data.getLastUpdate() != null;
 
         if (hasData) {
@@ -133,6 +147,16 @@ public record LocationsResponsePacket(LocationConfig<LocationClient> data) imple
         }
 
         return buf;
+    }
+
+    @Override
+    public LocationsResponsePacket withRequestId(UUID requestId) {
+        return new LocationsResponsePacket(requestId, data);
+    }
+
+    @Override
+    public CustomPacketPayload.Type<LocationsResponsePacket> type() {
+        return TYPE;
     }
 
     /**

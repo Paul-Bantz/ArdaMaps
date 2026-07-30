@@ -57,7 +57,8 @@ public class RegionsLutRequestHandler extends RespondablePacketHandler<RegionsLu
      * Constructs a new RegionsLutRequestHandler, specifying the request and response channels and packet readers.
      */
     public RegionsLutRequestHandler() {
-        super(REQ_CHANNEL, RegionsLutRequestPacket::read, RESP_CHANNEL, RegionsLutResponsePacket::read);
+        super(REQ_CHANNEL, RegionsLutRequestPacket.TYPE, RegionsLutRequestPacket.CODEC,
+                RESP_CHANNEL, RegionsLutResponsePacket.TYPE, RegionsLutResponsePacket.CODEC);
     }
 
     /**

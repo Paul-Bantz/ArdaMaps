@@ -26,6 +26,9 @@
 package com.duom.ardamaps.core.consumers.networking;
 
 import net.minecraft.resources.Identifier;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 /**
  * Interface for handling network packets.
@@ -36,4 +39,14 @@ public interface IPacketHandler {
      * Get the channel ID for this packet handler.
      */
     Identifier getChannelId();
+
+    /**
+     * @return The Fabric payload type handled by this handler.
+     */
+    CustomPacketPayload.Type<? extends IPacket> getType();
+
+    /**
+     * @return The codec registered for this payload type.
+     */
+    StreamCodec<RegistryFriendlyByteBuf, ? extends IPacket> getCodec();
 }

@@ -26,8 +26,12 @@
 package com.duom.ardamaps.core.networking.packets.server;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 /**
  * Packet sent by the server to warp the player to a specific location
@@ -35,6 +39,8 @@ import net.minecraft.network.FriendlyByteBuf;
  * @param warpName the name of the warp to teleport to
  */
 public record PlayerWarpPacket(String warpName) implements IPacket {
+    public static final CustomPacketPayload.Type<PlayerWarpPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_warp"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, PlayerWarpPacket> CODEC = IPacket.codec(PlayerWarpPacket::read);
 
     /**
      * Reads a PlayerWarpRequest from the given PacketByteBuf.
@@ -53,8 +59,13 @@ public record PlayerWarpPacket(String warpName) implements IPacket {
      */
     @Override
     public FriendlyByteBuf build() {
-        FriendlyByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
         buf.writeUtf(warpName);
         return buf;
+    }
+
+    @Override
+    public CustomPacketPayload.Type<PlayerWarpPacket> type() {
+        return TYPE;
     }
 }

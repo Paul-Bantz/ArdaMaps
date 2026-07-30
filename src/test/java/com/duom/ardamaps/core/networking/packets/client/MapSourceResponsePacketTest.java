@@ -29,10 +29,11 @@ import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.config.MapLayerSource;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -123,7 +124,8 @@ class MapSourceResponsePacketTest {
     @Test
     void read_unknownLayerType_skipsLayer() {
 
-        var buf = PacketByteBufs.create();
+        var buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
         buf.writeBoolean(false);
         buf.writeBoolean(false);
         buf.writeInt(1);
@@ -144,7 +146,8 @@ class MapSourceResponsePacketTest {
     @Test
     void read_negativeDimensionsCount_rejectsBeforeAllocation() {
 
-        var buf = PacketByteBufs.create();
+        var buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
         buf.writeBoolean(false);
         buf.writeBoolean(false);
         buf.writeInt(-1);
@@ -159,7 +162,8 @@ class MapSourceResponsePacketTest {
     @Test
     void read_oversizedLayersCount_rejectsBeforeAllocation() {
 
-        var buf = PacketByteBufs.create();
+        var buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
         buf.writeBoolean(false);
         buf.writeBoolean(false);
         buf.writeInt(1);
