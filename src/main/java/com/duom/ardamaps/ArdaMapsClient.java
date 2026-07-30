@@ -41,6 +41,7 @@ import com.duom.ardamaps.core.data.guide.GuideScreenLink;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.location.LocationProvider;
 import com.duom.ardamaps.core.data.map.RegionLookupTexture;
+import com.duom.ardamaps.core.data.map.markers.MarkersDefinition;
 import com.duom.ardamaps.core.data.map.markers.MarkersManager;
 import com.duom.ardamaps.core.data.map.providers.HttpImageProvider;
 import com.duom.ardamaps.core.items.ModItems;
@@ -63,8 +64,8 @@ import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
-import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
+import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
+import net.fabricmc.fabric.api.resource.v1.reloader.SimpleReloadListener;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -72,9 +73,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.resources.ResourceManager;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
 import org.lwjgl.glfw.GLFW;
@@ -208,11 +207,9 @@ public class ArdaMapsClient implements ClientModInitializer {
      */
     private void registerResourceListeners() {
 
-        ResourceManagerHelper.get(PackType.CLIENT_RESOURCES)
-                .registerReloadListener(new MarkersLoaderReloadListener());
-
-        ResourceManagerHelper.get(PackType.CLIENT_RESOURCES)
-                .registerReloadListener(new GuideImageCacheReloadListener());
+        ResourceLoader loader = ResourceLoader.get(PackType.CLIENT_RESOURCES);
+        loader.registerReloadListener(ModConstants.modId("markers_loader"), new MarkersLoaderReloadListener());
+        loader.registerReloadListener(ModConstants.modId("guide_image_cache"), new GuideImageCacheReloadListener());
     }
 
     private static void suppressTileverseHttpClientCloseWarning() {
@@ -673,19 +670,18 @@ public class ArdaMapsClient implements ClientModInitializer {
     /**
      * A resource reload listener that loads markers definitions when client resources are reloaded.
      */
-    private static class MarkersLoaderReloadListener implements SimpleSynchronousResourceReloadListener {
+    private static class MarkersLoaderReloadListener extends SimpleReloadListener<MarkersDefinition> {
 
-        /** The identifier for this resource reload listener, used to distinguish it from other listeners. */
         @Override
-        public @NonNull Identifier getFabricId() {
-            return ModConstants.modId("markers_loader");
+        protected MarkersDefinition prepare(SharedState state) {
+
+            return MarkersDefinition.loadMarkersDefinition(state.resourceManager());
         }
 
-        /** Loads all custom shaders when client resources are reloaded. */
         @Override
-        public void onResourceManagerReload(@NonNull ResourceManager manager) {
+        protected void apply(MarkersDefinition definition, @NonNull SharedState state) {
 
-            MarkersManager.reload();
+            MarkersManager.set(definition);
         }
     }
 
@@ -693,15 +689,17 @@ public class ArdaMapsClient implements ClientModInitializer {
      * A resource reload listener that clears the {@link GuideImageCache} when client
      * resources are reloaded, so guide images are re-read from the updated resource pack.
      */
-    private static class GuideImageCacheReloadListener implements SimpleSynchronousResourceReloadListener {
+    private static class GuideImageCacheReloadListener extends SimpleReloadListener<Void> {
 
         @Override
-        public @NonNull Identifier getFabricId() {
-            return ModConstants.modId("guide_image_cache");
+        protected Void prepare(@NonNull SharedState state) {
+
+            return null;
         }
 
         @Override
-        public void onResourceManagerReload(@NonNull ResourceManager manager) {
+        protected void apply(Void value, @NonNull SharedState state) {
+
             GuideImageCache.clear();
         }
     }

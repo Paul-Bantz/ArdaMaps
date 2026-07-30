@@ -84,14 +84,24 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
      */
     public static @NotNull MarkersDefinition loadMarkersDefinition() {
 
+        return loadMarkersDefinition(Minecraft.getInstance().getResourceManager());
+    }
+
+    /**
+     * Loads the markers definition from the `markers.json` resource file using the supplied resource manager.
+     *
+     * @param manager the resource manager for the reload in progress
+     * @return the loaded {@link MarkersDefinition}
+     * @throws RuntimeException if the resource is missing or cannot be parsed
+     */
+    public static @NotNull MarkersDefinition loadMarkersDefinition(ResourceManager manager) {
+
         MarkersDefinition markersDefinition = createDefault();
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(Identifier.class, new SpriteTypeAdapter())
                 .registerTypeAdapter(MarkerType.class, new MarkerTypeTypeAdapter())
                 .registerTypeAdapter(MarkersDefinition.class, new MarkersDefinitionTypeAdapter())
                 .create();
-
-        ResourceManager manager = Minecraft.getInstance().getResourceManager();
 
         Optional<Resource> resource = manager.getResource(MARKERS_JSON);
 

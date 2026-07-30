@@ -37,7 +37,7 @@ import org.mockito.Mockito;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Tests for {@link DistanceUnitConverter} unit selection and threshold formatting behavior.
+ * Tests for {@link DistanceUnitConverter} unit selection and threshold formatting behaviour.
  */
 class DistanceUnitConverterTest {
 
@@ -90,7 +90,7 @@ class DistanceUnitConverterTest {
 
     /**
      * Verifies that metric distances at the threshold switch to kilometers.
-     * This guards the exact cutoff behavior so boundary values do not oscillate between units.
+     * This guards the exact cutoff behaviour so boundary values do not oscillate between units.
      */
     @Test
     void asRealWorldUnits_metricAtThreshold_returnsKilometers() {
