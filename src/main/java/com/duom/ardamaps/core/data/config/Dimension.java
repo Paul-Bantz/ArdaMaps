@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Definition of the dimension in the configuration.
@@ -140,17 +141,17 @@ public class Dimension {
         this.id = id;
 
         this.scaleFactor = scaleFactor;
-        this.scale = 1f / scaleFactor;
+        this.scale = scaleFactor != 0f && Float.isFinite(scaleFactor) ? 1f / scaleFactor : 1f;
 
         this.xMin = xMin;
         this.xMax = xMax;
 
-        this.width = xMax - xMin - 1;
+        this.width = xMax - xMin + 1;
 
         this.zMin = zMin;
         this.zMax = zMax;
 
-        this.height = zMax - zMin - 1;
+        this.height = zMax - zMin + 1;
 
         this.supportsArdaRegions = supportsArdaRegions;
 
@@ -194,5 +195,28 @@ public class Dimension {
                 .findFirst()
                 .map(MapLayerDefinition::ranges)
                 .orElse(Collections.emptyList());
+    }
+
+    /**
+     * Dimensions are identified by their configured ID across config reloads and network refreshes.
+     *
+     * @param obj The object to compare to.
+     * @return Whether both dimensions represent the same dimension ID.
+     */
+    @Override
+    public boolean equals(Object obj) {
+
+        if (this == obj) return true;
+        if (!(obj instanceof Dimension dimension)) return false;
+        return Objects.equals(id, dimension.id);
+    }
+
+    /**
+     * @return Hash code based on the stable dimension ID.
+     */
+    @Override
+    public int hashCode() {
+
+        return Objects.hash(id);
     }
 }

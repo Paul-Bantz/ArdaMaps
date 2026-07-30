@@ -65,8 +65,8 @@ class RegionLookupTextureTest {
      */
     @BeforeEach
     void setUp() {
-        // xMin=0, xMax=401, zMin=0, zMax=401 -> width=400, height=400 (xMax - xMin - 1)
-        dimension = new Dimension("Test", "test:dim", 1f, 0, 401, 0, 401, false);
+        // xMin=0, xMax=399, zMin=0, zMax=399 -> inclusive width=400, height=400.
+        dimension = new Dimension("Test", "test:dim", 1f, 0, 399, 0, 399, false);
         regions = new Region[]{new Region("r1", "Shire"), new Region("r2", "Rohan"), new Region("r3", "Gondor")};
         pixels = new byte[]{
                 1, 1, 2, 2,
@@ -104,7 +104,7 @@ class RegionLookupTextureTest {
     @Test
     void getRegionAt_dimensionIdMismatch_returnsNull() {
 
-        Dimension otherDim = new Dimension("Other", "other:dim", 1f, 0, 401, 0, 401, false);
+        Dimension otherDim = new Dimension("Other", "other:dim", 1f, 0, 399, 0, 399, false);
         RegionLookupTexture tex = new RegionLookupTexture(pixels, regions, TEX_W, TEX_H, "test:dim", new Date());
 
         assertNull(tex.getRegionAt(otherDim, 50, 50));

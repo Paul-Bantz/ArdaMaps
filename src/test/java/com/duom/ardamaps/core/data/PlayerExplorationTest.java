@@ -56,7 +56,7 @@ class PlayerExplorationTest {
 
     /**
      * Offset world: starts at negative coordinates (like the real Arda world).
-     * xMin = -1000, xMax = 1001 -> width = 2000.  zMin = -500, zMax = 501 -> height = 1000.
+     * xMin = -1000, xMax = 1001 -> inclusive width = 2002.  zMin = -500, zMax = 501 -> inclusive height = 1002.
      */
     private static final Dimension OFFSET_DIM =
             new Dimension("Offset", "test:offset", 1f, -1000, 1001, -500, 501, false);

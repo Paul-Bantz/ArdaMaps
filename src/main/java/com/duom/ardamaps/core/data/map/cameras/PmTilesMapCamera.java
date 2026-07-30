@@ -28,7 +28,6 @@ package com.duom.ardamaps.core.data.map.cameras;
 import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
-import net.minecraft.util.math.MathHelper;
 
 import java.util.Set;
 
@@ -99,8 +98,8 @@ public class PmTilesMapCamera extends TilesMapCamera {
         double minWorldZ = worldZ - halfViePortHeight;
         double maxWorldZ = worldZ + halfViePortHeight;
 
-        int tilesBoundX = dimension.getWidth() / blocksPerTile;
-        int tilesBoundY = dimension.getHeight() / blocksPerTile;
+        int tilesBoundX = Math.max(0, (dimension.getWidth() - 1) / blocksPerTile);
+        int tilesBoundY = Math.max(0, (dimension.getHeight() - 1) / blocksPerTile);
 
         // Convert to tile coordinates
         int minTileX = (int) Math.floor((minWorldX - dimension.getXMin()) / blocksPerTile);
@@ -148,7 +147,7 @@ public class PmTilesMapCamera extends TilesMapCamera {
      */
     @Override
     public int getTileSourceClampedZoom() {
-        return (int) MathHelper.clamp(zoom, minTileZoom, maxTileZoom);
+        return (int) CameraMath.clamp(zoom, minTileZoom, maxTileZoom);
     }
 
     /**
@@ -336,7 +335,7 @@ public class PmTilesMapCamera extends TilesMapCamera {
         if (Double.isNaN(preferredRenderScale)) return;
 
         double newZoom = (Math.log(preferredRenderScale / scale) / Math.log(2.0)) + identityZoom;
-        newZoom = MathHelper.clamp(newZoom, minCameraZoom, maxCameraZoom);
+        newZoom = CameraMath.clamp(newZoom, minCameraZoom, maxCameraZoom);
         this.zoom = newZoom;
         this.targetCameraZoom = newZoom;
 

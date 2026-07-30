@@ -28,7 +28,6 @@ package com.duom.ardamaps.core.data.map.cameras;
 import com.duom.ardamaps.core.data.Vec2d;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.util.math.MathHelper;
 
 /**
  * A flat map camera implementation.
@@ -145,8 +144,8 @@ public class FlatMapCamera extends MapCamera {
     public Vec2d screenToWorldCoordinates(double screenX, double screenY, int screenW, int screenH, double zoom){
 
         return new Vec2d(
-                worldX + (screenX - screenW / 2.0) / scale() * getBlocksPerPixel(),
-                worldZ + (screenY - screenH / 2.0) / scale() * getBlocksPerPixel()
+                worldX + (screenX - screenW / 2.0) / scale(zoom) * getBlocksPerPixel(),
+                worldZ + (screenY - screenH / 2.0) / scale(zoom) * getBlocksPerPixel()
         );
     }
 
@@ -188,7 +187,7 @@ public class FlatMapCamera extends MapCamera {
         if (Double.isNaN(preferredRenderScale)) return;
 
         double newZoom = (Math.log(preferredRenderScale * getBlocksPerPixel() / scale) / Math.log(2.0)) + identityZoom;
-        newZoom = MathHelper.clamp(newZoom, minCameraZoom, maxCameraZoom);
+        newZoom = CameraMath.clamp(newZoom, minCameraZoom, maxCameraZoom);
         this.zoom = newZoom;
         this.targetCameraZoom = newZoom;
 

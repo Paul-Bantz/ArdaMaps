@@ -30,7 +30,6 @@ import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.util.math.MathHelper;
 
 import java.util.Set;
 
@@ -275,7 +274,7 @@ public class BlueMapCamera extends TilesMapCamera {
         if (Double.isNaN(preferredRenderScale)) return;
 
         double newZoom = identityZoom - (Math.log(preferredRenderScale) / Math.log(lodFactor));
-        newZoom = MathHelper.clamp(newZoom, maxCameraZoom, minCameraZoom); // note: BlueMap min/max are inverted (higher value = more zoomed out)
+        newZoom = CameraMath.clamp(newZoom, maxCameraZoom, minCameraZoom); // note: BlueMap min/max are inverted (higher value = more zoomed out)
         this.zoom = newZoom;
         this.targetCameraZoom = newZoom;
 
@@ -312,7 +311,7 @@ public class BlueMapCamera extends TilesMapCamera {
         var newZoom = targetCameraZoom - amount * 0.35;
 
         if (newZoom < minCameraZoom || newZoom > maxCameraZoom) {
-            targetCameraZoom = MathHelper.clamp(newZoom, maxCameraZoom, minCameraZoom);
+            targetCameraZoom = CameraMath.clamp(newZoom, maxCameraZoom, minCameraZoom);
 
         } else {
             targetCameraZoom = newZoom;
@@ -374,7 +373,7 @@ public class BlueMapCamera extends TilesMapCamera {
         } else {
             lod = (int) Math.ceil(-Math.log(s) / Math.log(lodFactor));
         }
-        return MathHelper.clamp(lod, maxTileZoom, minTileZoom);
+        return CameraMath.clamp(lod, maxTileZoom, minTileZoom);
     }
 
     /**

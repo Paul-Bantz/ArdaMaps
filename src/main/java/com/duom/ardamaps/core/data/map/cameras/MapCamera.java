@@ -29,7 +29,6 @@ import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.config.Dimension;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.util.math.MathHelper;
 
 /**
  * Abstract base class for map cameras, handling zoom levels and world-to-screen coordinate conversions.
@@ -224,7 +223,7 @@ public abstract class MapCamera {
         double lo = dimension.getXMin() + halfW - worldOffset;
         double hi = dimension.getXMax() - halfW + worldOffset;
 
-        this.worldX = lo <= hi ? MathHelper.clamp(worldX, lo, hi) : (dimension.getXMin() + dimension.getXMax()) / 2.0;
+        this.worldX = lo <= hi ? CameraMath.clamp(worldX, lo, hi) : (dimension.getXMin() + dimension.getXMax()) / 2.0;
     }
 
     /**
@@ -238,7 +237,7 @@ public abstract class MapCamera {
         double lo = dimension.getZMin() + halfH - worldOffset;
         double hi = dimension.getZMax() - halfH + worldOffset;
 
-        this.worldZ = lo <= hi ? MathHelper.clamp(worldZ, lo, hi) : (dimension.getZMin() + dimension.getZMax()) / 2.0;
+        this.worldZ = lo <= hi ? CameraMath.clamp(worldZ, lo, hi) : (dimension.getZMin() + dimension.getZMax()) / 2.0;
     }
 
     /**
@@ -363,7 +362,7 @@ public abstract class MapCamera {
         var newZoom = targetCameraZoom + amount;
 
         if (newZoom < minCameraZoom || newZoom > maxCameraZoom) {
-            targetCameraZoom = MathHelper.clamp(newZoom, minCameraZoom, maxCameraZoom);
+            targetCameraZoom = CameraMath.clamp(newZoom, minCameraZoom, maxCameraZoom);
         } else {
             targetCameraZoom = newZoom;
         }

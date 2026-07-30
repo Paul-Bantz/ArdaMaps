@@ -45,10 +45,10 @@ class PmTilesMapCameraTest {
 
     /**
      * A 2048×2048-block world, centred on (0, 0).
-     * xMin=0, xMax=2049, so width = 2049 - 0 - 1 = 2048. Same for Z.
+     * xMin=0, xMax=2047, so inclusive width = 2048. Same for Z.
      */
     private static final Dimension DIMENSION =
-            new Dimension("Test", "test:dim", 1f, 0, 2049, 0, 2049, false);
+            new Dimension("Test", "test:dim", 1f, 0, 2047, 0, 2047, false);
 
     /** 640×480 viewport, centred at world (1024, 1024) - the middle of the dimension. */
     private PmTilesMapCamera camera;
@@ -175,7 +175,8 @@ class PmTilesMapCameraTest {
     }
 
     /**
-     * No tile coordinate should exceed the world bounds expressed in tile indices.tilesBoundX = worldWidth / blocksPerTile = 2048 / 256 = 8.
+     * No tile coordinate should exceed the world bounds expressed in tile indices:
+     * floor((worldWidth - 1) / blocksPerTile) = floor(2047 / 256) = 7.
      */
     @Test
     void getVisibleTiles_tilesClampedToWorldBounds() {
@@ -184,8 +185,23 @@ class PmTilesMapCameraTest {
         for (PmTileKey key : tiles) {
             assertTrue(key.x >= 0, "tile.x must be >= 0, was " + key.x);
             assertTrue(key.y >= 0, "tile.y must be >= 0, was " + key.y);
-            assertTrue(key.x <= 8, "tile.x must be <= 8, was " + key.x);
-            assertTrue(key.y <= 8, "tile.y must be <= 8, was " + key.y);
+            assertTrue(key.x <= 7, "tile.x must be <= 7, was " + key.x);
+            assertTrue(key.y <= 7, "tile.y must be <= 7, was " + key.y);
         }
+    }
+
+    /**
+     * When world width is an exact multiple of tile footprint, the last tile index is one less than the quotient.
+     * This prevents a phantom eastern/southern tile from being re-requested forever.
+     */
+    @Test
+    void getVisibleTiles_exactMultipleWorld_doesNotIncludePhantomTile() {
+
+        camera.updateZoom(2);
+        camera.setViewportSize(10_000, 10_000);
+
+        Set<PmTileKey> tiles = camera.getVisibleTiles(8);
+
+        assertTrue(tiles.stream().noneMatch(key -> key.x == 8 || key.y == 8));
     }
 }
