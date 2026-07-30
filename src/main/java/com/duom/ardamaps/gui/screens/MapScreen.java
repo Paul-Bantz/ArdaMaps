@@ -58,8 +58,11 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -479,12 +482,12 @@ public class MapScreen extends ArdaMapsScreen {
      * @param delta   The time since last frame
      */
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         // Client should not be null here
         assert minecraft != null;
 
-        renderBackground(context);
+        extractBackground(context, mouseX, mouseY, delta);
 
         if (mapRenderer != null) {
 
@@ -507,7 +510,7 @@ public class MapScreen extends ArdaMapsScreen {
                     // Drive zoom/pan damping every render frame so the animation
                     // is truly frame-rate independent and does not jump on frame skips.
                     if (!animation.isRunning())
-                        mapCamera.update(minecraft.getDeltaFrameTime(), contentArea.topLeftX(), contentArea.topLeftY());
+                        mapCamera.update(delta, contentArea.topLeftX(), contentArea.topLeftY());
 
                     // Clear background with dark colour - will display if some areas of the map are not covered by tiles
                     context.fill(contentArea.topLeftX(),
@@ -519,8 +522,6 @@ public class MapScreen extends ArdaMapsScreen {
 
                 mapRenderer.render(context);
 
-                RenderSystem.enableBlend();
-                RenderSystem.defaultBlendFunc();
 
                 var selectedLocationType = markersSelectionDropdown.getSelected();
                 var focusedLocationPosition = locationContextPanel == null
@@ -547,13 +548,12 @@ public class MapScreen extends ArdaMapsScreen {
             updateCoordinates(mouseX, mouseY);
             updateRegionUnderMouse(mouseX, mouseY);
 
-            RenderSystem.disableBlend();
 
         } else {
             renderPlaceholder(context);
         }
 
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
 
         // Render context menu if opened
         if (mapContextMenu != null)
@@ -681,7 +681,7 @@ public class MapScreen extends ArdaMapsScreen {
      *
      * @param context The draw context
      */
-    private void renderPlaceholder(GuiGraphics context) {
+    private void renderPlaceholder(GuiGraphicsExtractor context) {
 
         var centerX = width / 2;
         var centerY = height / 2;
@@ -695,7 +695,7 @@ public class MapScreen extends ArdaMapsScreen {
                 ARDACRAFT_LOGO_SIZE,
                 ARDACRAFT_LOGO_SIZE);
 
-        context.drawCenteredString(
+        context.centeredText(
                 font,
                 Component.translatable("ardamaps.client.map.screen.no.map.selected"),
                 centerX,
@@ -708,7 +708,7 @@ public class MapScreen extends ArdaMapsScreen {
      *
      * @param context The draw context
      */
-    private void renderRegionName(GuiGraphics context) {
+    private void renderRegionName(GuiGraphicsExtractor context) {
 
         if (getCamera() == null) return;
 
@@ -721,18 +721,10 @@ public class MapScreen extends ArdaMapsScreen {
         var x = paddedContentArea.topLeftX() + 5;
         var y = paddedContentArea.topLeftY() + 5;
 
-        context.blitNineSliced(ModConstants.MAP_GUI_ELEMENTS,
-                x, y,
-                labelWidth, labelHeight,
-                16,
-                16,
-                16,
-                16,
-                96,
-                48,
-                144, 160);
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
+                x, y, 144, 160, labelWidth, labelHeight, 96, 48, 512, 512);
 
-        context.drawString(
+        context.text(
                 font,
                 Component.literal(regionNameUnderMouse),
                 x + labelWidth / 2 - textWidth / 2,
@@ -787,7 +779,7 @@ public class MapScreen extends ArdaMapsScreen {
      * @param height the new height of the screen
      */
     @Override
-    public void resize(Minecraft client, int width, int height) {
+    public void resize(int width, int height) {
 
         var mapCamera = getCamera();
         if (mapCamera != null) {
@@ -795,7 +787,7 @@ public class MapScreen extends ArdaMapsScreen {
             var selection = layerSelectionDropdown != null ? layerSelectionDropdown.getSelected() : null;
             mapCamera.setViewportSize(width, height);
 
-            super.resize(client, width, height);
+            super.resize(width, height);
 
             updateMapButtonPositions();
 
@@ -805,7 +797,7 @@ public class MapScreen extends ArdaMapsScreen {
 
         } else {
 
-            super.resize(client, width, height);
+            super.resize(width, height);
         }
     }
 
@@ -884,10 +876,13 @@ public class MapScreen extends ArdaMapsScreen {
      * @return True if the event was handled
      */
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
 
         var mapCamera = getCamera();
-        if (mapCamera == null) return super.mouseClicked(mouseX, mouseY, button);
+        if (mapCamera == null) return super.mouseClicked(event, doubleClick);
         var mouseInMapArea = mapFrameRenderer.coordinatesInFrame(mouseX, mouseY, MAP_FRAME_PADDING);
 
         // Context menu click handling
@@ -947,7 +942,7 @@ public class MapScreen extends ArdaMapsScreen {
             return true;
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     /**
@@ -1048,7 +1043,7 @@ public class MapScreen extends ArdaMapsScreen {
                 );
 
                 Client.mc().keyboardHandler.setClipboard("waypoint:" + Waypoint.toJson(sharedWaypoint));
-                Client.player().displayClientMessage(Component.translatable("ardamaps.client.map.screen.context.menu.set.waypoint.share.message"), true);
+                Client.player().sendSystemMessage(Component.translatable("ardamaps.client.map.screen.context.menu.set.waypoint.share.message"));
 
                 mapContextMenu = null;
             });
@@ -1129,16 +1124,19 @@ public class MapScreen extends ArdaMapsScreen {
      * @param button The mouse button
      */
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
 
         // Children must get the release first: the parent dispatch is what drives widget
         // onRelease, and returning early here would swallow it for every left-button release.
-        boolean handledByChild = super.mouseReleased(mouseX, mouseY, button);
+        boolean handledByChild = super.mouseReleased(event);
 
         // The parent dispatch only reaches the hovered element, so a strip drag that ends
         // off the widget would otherwise leave it stuck tracking a press.
         if (!handledByChild && rangeSelectionWidget != null && rangeSelectionWidget.isDragging())
-            handledByChild = rangeSelectionWidget.mouseReleased(mouseX, mouseY, button);
+            handledByChild = rangeSelectionWidget.mouseReleased(event);
 
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
             dragging = false;
@@ -1341,7 +1339,9 @@ public class MapScreen extends ArdaMapsScreen {
      * @return True if the event was handled
      */
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+    public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+        double mouseX = event.x();
+        double mouseY = event.y();
 
         var mapCamera = getCamera();
         if (mapCamera != null && dragging && !mouseOverMapWidgets(mouseX, mouseY)) {
@@ -1359,7 +1359,7 @@ public class MapScreen extends ArdaMapsScreen {
             return true;
         }
 
-        return super.mouseDragged(mouseX, mouseY, button, dx, dy);
+        return super.mouseDragged(event, dx, dy);
     }
 
     /**
@@ -1371,20 +1371,20 @@ public class MapScreen extends ArdaMapsScreen {
      * @return True if the event was handled
      */
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
 
         if (mouseOverMapWidgets(mouseX, mouseY)) {
 
-            if (locationContextPanel != null && locationContextPanel.mouseScrolled(mouseX, mouseY, amount))
+            if (locationContextPanel != null && locationContextPanel.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount))
                 return true;
 
-            return super.mouseScrolled(mouseX, mouseY, amount);
+            return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
         }
 
         var cam = getCamera();
         if (cam != null) {
             animation.cancel();
-            cam.setZoom(mouseX, mouseY, width, height, amount * 0.5);
+            cam.setZoom(mouseX, mouseY, width, height, verticalAmount * 0.5);
         }
 
         return true;
@@ -1398,14 +1398,15 @@ public class MapScreen extends ArdaMapsScreen {
      * </ul>
      */
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
+        int keyCode = event.key();
 
         if (keyCode == GLFW.GLFW_KEY_ESCAPE && locationContextPanel != null) {
             locationContextPanel = null;
             return true;
         }
 
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     /**

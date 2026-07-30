@@ -28,12 +28,14 @@ package com.duom.ardamaps.gui.widgets;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
-import com.mojang.blaze3d.vertex.PoseStack;
 import lombok.Getter;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
@@ -187,22 +189,15 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
-        super.render(context, mouseX, mouseY, delta);
+        renderMainButton(context, mouseX, mouseY);
 
         renderTitle(context);
         List<T> allItems = computeItemList();
 
         if (expanded) {
-
-            PoseStack matrices = context.pose();
-            matrices.pushPose();
-            matrices.translate(0, 0, 200);
-
             renderExpandedDropdown(context, allItems, mouseX, mouseY);
-
-            matrices.popPose();
         }
     }
 
@@ -212,7 +207,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      * @param context The drawing context
      */
     @SuppressWarnings("ConstantValue")
-    private void renderTitle(GuiGraphics context) {
+    private void renderTitle(GuiGraphicsExtractor context) {
 
         Component title = getMessage();
 
@@ -220,7 +215,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
 
             Font textRenderer = Client.mc().font;
             int titleY = getY() - (textRenderer.lineHeight / 2) - 8;
-            context.drawString(textRenderer, title, getX(), titleY, ModConstants.COLOR_WHITE);
+            context.text(textRenderer, title, getX(), titleY, ModConstants.COLOR_WHITE);
         }
     }
 
@@ -232,7 +227,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      * @param mouseX  Current mouse X position
      * @param mouseY  Current mouse Y position
      */
-    protected void renderExpandedDropdown(GuiGraphics context, List<T> items, int mouseX, int mouseY) {
+    protected void renderExpandedDropdown(GuiGraphicsExtractor context, List<T> items, int mouseX, int mouseY) {
 
         var dropDownItems = computeDropdownItems(items);
         int visibleCount = getVisibleDropdownItemCount(dropDownItems);
@@ -328,8 +323,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
         return (item == null && selected == null) || (item != null && item.equals(selected));
     }
 
-    @Override
-    protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    protected void renderMainButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         Font textRenderer = Client.mc().font;
         int x = getX();
@@ -357,7 +351,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      * @param isHovered  Whether the mouse is hovering over this item
      * @param isSelected whether this item is selected
      */
-    private void renderDropdownItem(GuiGraphics context, int x, int y, T item, boolean isHovered, boolean isSelected) {
+    private void renderDropdownItem(GuiGraphicsExtractor context, int x, int y, T item, boolean isHovered, boolean isSelected) {
 
         Font textRenderer = Client.mc().font;
 
@@ -374,9 +368,9 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
             if (icon != null) {
 
                 if (displayAsSprite)
-                    context.blit(x + buttonPadding, y + (originalHeight - iconSize) / 2, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(icon));
+                    context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), x + buttonPadding, y + (originalHeight - iconSize) / 2, iconSize, iconSize);
                 else
-                    context.blit(icon, x + buttonPadding, y + (originalHeight - iconSize) / 2, 0, 0, iconSize, iconSize, iconSize, iconSize);
+                    context.blit(RenderPipelines.GUI_TEXTURED, icon, x + buttonPadding, y + (originalHeight - iconSize) / 2, 0, 0, iconSize, iconSize, iconSize, iconSize);
 
                 hasIcon = true;
             }
@@ -391,7 +385,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
                 textX += iconSize + TEXT_MARGIN;
 
             int textY = y + (originalHeight - textRenderer.lineHeight) / 2;
-            context.drawString(textRenderer, display, textX, textY, getLabelColor(), false);
+            context.text(textRenderer, display, textX, textY, getLabelColor(), false);
         }
     }
 
@@ -403,7 +397,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      * @param x            Button X position
      * @param y            Button Y position
      */
-    private void renderExpandArrow(GuiGraphics context, Font textRenderer, int x, int y) {
+    private void renderExpandArrow(GuiGraphicsExtractor context, Font textRenderer, int x, int y) {
         boolean isUpDirection = expandDirection == ExpandDirection.UP_LEFT ||
                 expandDirection == ExpandDirection.UP_RIGHT;
         String arrow = expanded
@@ -412,23 +406,18 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
 
         int arrowX = x + originalWidth - textRenderer.width(arrow) - 4;
         int arrowY = y + (originalHeight - textRenderer.lineHeight) / 2;
-        context.drawString(textRenderer, Component.literal(arrow), arrowX, arrowY, ModConstants.COLOR_WHITE);
+        context.text(textRenderer, Component.literal(arrow), arrowX, arrowY, ModConstants.COLOR_WHITE);
     }
 
-    protected void drawListSlice(GuiGraphics context, int x, int y, boolean isHovered, boolean isSelected) {
+    protected void drawListSlice(GuiGraphicsExtractor context, int x, int y, boolean isHovered, boolean isSelected) {
 
         int v = 46;
 
         if (isHovered) v += 40;
         else if (isSelected) v += 20;
 
-        context.blitNineSliced(WIDGETS_LOCATION, x, y,
-                originalWidth, originalHeight,
-                20,
-                4,
-                200,
-                20,
-                0, v);
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS, x, y,
+                0, v, originalWidth, originalHeight, 200, 20, 512, 512);
     }
 
     /**
@@ -442,14 +431,20 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY) {
+    public void onClick(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
         if (!expanded) {
             expand();
         } else {
             selectItemAtMousePosition(mouseX, mouseY);
             collapse();
         }
-        super.onClick(mouseX, mouseY);
+        super.onClick(event, doubleClick);
+    }
+
+    public void onClick(double mouseX, double mouseY) {
+        onClick(new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(0, 0)), false);
     }
 
     /**
@@ -501,20 +496,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      * @param mouseY The y-coordinate of the mouse click event
      * @return true if the click was handled, false otherwise
      */
-    @Override
-    protected boolean clicked(double mouseX, double mouseY) {
-        if (!this.active || !this.visible) {
-            return false;
-        }
-
-        boolean mouseOver = isMouseOver(mouseX, mouseY);
-        if (!mouseOver && expanded) {
-            collapse();
-        }
-
-        return mouseOver;
-    }
-
     /**
      * Checks if the mouse is over the dropdown widget or its expanded area.
      *
@@ -633,17 +614,17 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      * @return true if the scroll event was handled (i.e., if the dropdown is expanded and has more items than visible), false otherwise
      */
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         if (expanded) {
             List<T> dropdownItems = computeDropdownItems(computeItemList());
             int visibleCount = getVisibleDropdownItemCount(dropdownItems);
 
             if (dropdownItems.size() > visibleCount) {
                 scrollbar.setMaxOffset(dropdownItems.size() - visibleCount);
-                return scrollbar.scroll(amount);
+                return scrollbar.scroll(verticalAmount);
             }
         }
-        return super.mouseScrolled(mouseX, mouseY, amount);
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     /**

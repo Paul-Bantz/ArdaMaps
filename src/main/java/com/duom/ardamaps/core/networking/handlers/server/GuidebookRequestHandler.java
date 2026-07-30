@@ -78,7 +78,7 @@ public class GuidebookRequestHandler extends ServerPacketHandler<EmptyPacket> {
                 // If guidebook is in hotbar, select it
                 if (i < 9) {
 
-                    player.getInventory().selected = i;
+                    player.getInventory().setSelectedSlot(i);
 
                     // Sync held item to client
                     player.inventoryMenu.broadcastChanges();
@@ -102,7 +102,7 @@ public class GuidebookRequestHandler extends ServerPacketHandler<EmptyPacket> {
 
                 if (stack.is(ModItems.GUIDEBOOK)) {
 
-                    player.getInventory().selected = i;
+                    player.getInventory().setSelectedSlot(i);
 
                     break;
                 }

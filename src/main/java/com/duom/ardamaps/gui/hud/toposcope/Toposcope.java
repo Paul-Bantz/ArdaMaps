@@ -31,8 +31,9 @@ import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.networking.PacketRegistry;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerWarpPacket;
+import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.hud.toposcope.rendering.ToposcopeRenderer;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.event.player.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionResult;
@@ -71,7 +72,7 @@ public class Toposcope {
      */
     public void registerRenderer() {
 
-        HudRenderCallback.EVENT.register((drawContext, v) -> ToposcopeRenderer.render(drawContext));
+        HudElementRegistry.addLast(ModConstants.modId("toposcope"), (drawContext, delta) -> ToposcopeRenderer.render(drawContext));
         registerMouseHoveringCallbacks();
     }
 
@@ -168,7 +169,7 @@ public class Toposcope {
         locationClickConsumed = false;
         rightClickConsumed = false;
 
-        long handle = client.getWindow().getWindow();
+        long handle = client.getWindow().handle();
         boolean leftDown = GLFW.glfwGetMouseButton(handle, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
         boolean rightDown = GLFW.glfwGetMouseButton(handle, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
 

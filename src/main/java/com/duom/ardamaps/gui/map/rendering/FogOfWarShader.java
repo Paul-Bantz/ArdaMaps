@@ -25,96 +25,73 @@
 
 package com.duom.ardamaps.gui.map.rendering;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.duom.ardamaps.gui.ModConstants;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import net.minecraft.client.renderer.ShaderInstance;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
- * Utility class for managing the fog of war shader.
+ * Static RenderPipeline declaration for the fog-of-war pass.
  */
-public class FogOfWarShader {
+public final class FogOfWarShader {
 
-    /** Class logger */
-    private static final Logger LOGGER = LoggerFactory.getLogger(FogOfWarShader.class);
-    
-    /** The fog of war shader program. */
-    private static ShaderInstance FOG_OF_WAR;
+    /** Pipeline used to combine map imagery with the exploration mask. */
+    public static final RenderPipeline FOG_OF_WAR = RenderPipelines.register(RenderPipeline.builder(RenderPipelines.GUI_TEXTURED_SNIPPET)
+            .withLocation(ModConstants.modId("pipeline/fog_of_war"))
+            .withVertexShader(ModConstants.modId("core/fog_of_war"))
+            .withFragmentShader(ModConstants.modId("core/fog_of_war"))
+            .withSampler("FogTex")
+            .withSampler("FogMaskTex")
+            .withUniform("FogUniform", UniformType.UNIFORM_BUFFER)
+            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+            .build());
 
-    /**
-     * Get the fog of war shader program.
-     *
-     * @return The fog of war shader program.
-     */
-    public static ShaderInstance fogOfWar() {
+    private static float fogTexScaleX = 1.0F;
+    private static float fogTexScaleY = 1.0F;
+    private static float zoomCenterX;
+    private static float zoomCenterY;
+
+    private FogOfWarShader() {
+    }
+
+    public static RenderPipeline fogOfWar() {
         return FOG_OF_WAR;
     }
 
-    /**
-     * @return Whether the fog-of-war shader is available.
-     */
     public static boolean isLoaded() {
-        return FOG_OF_WAR != null;
+        return true;
     }
 
-    /**
-     * Initialize the fog of war shader.
-     *
-     * @param resourceManager The resource manager.
-     */
-    public static void load(ResourceManager resourceManager) {
-
-        try {
-            ShaderInstance shader = new ShaderInstance(resourceManager, "fog_of_war", DefaultVertexFormat.POSITION_TEX);
-            ShaderInstance previous = FOG_OF_WAR;
-            FOG_OF_WAR = shader;
-            if (previous != null) previous.close();
-        } catch (IOException e) {
-            LOGGER.error("Unable to load fog_of_war shader; keeping previous shader if available", e);
-        }
+    public static void load(@SuppressWarnings("unused") ResourceManager resourceManager) {
+        // RenderPipelines are static declarations in 26.x; resources are reloaded by Minecraft's shader pipeline.
     }
 
-    /**
-     * Set the texture scale uniform for the fog of war shader.
-     *
-     * @param scaleX The scale in the X direction.
-     * @param scaleY The scale in the Y direction.
-     */
     public static void setTextureScale(float scaleX, float scaleY) {
-
-        RenderSystem.getShader();
-
-        if (FOG_OF_WAR != null) {
-
-            var fogScaleUniform = FOG_OF_WAR.getUniform("FogTexScale");
-
-            if (fogScaleUniform != null) {
-                fogScaleUniform.set(scaleX, scaleY);
-            }
-        }
+        fogTexScaleX = scaleX;
+        fogTexScaleY = scaleY;
     }
 
-    /**
-     * Set the zoom centre uniform for the fog of war shader.
-     *
-     * @param centerX The centre in the X direction.
-     * @param centerY The centre in the Y direction.
-     */
     public static void setZoomCenter(float centerX, float centerY) {
+        zoomCenterX = centerX;
+        zoomCenterY = centerY;
+    }
 
-        RenderSystem.getShader();
+    public static float fogTexScaleX() {
+        return fogTexScaleX;
+    }
 
-        if (FOG_OF_WAR != null) {
+    public static float fogTexScaleY() {
+        return fogTexScaleY;
+    }
 
-            var paperScaleUniform = FOG_OF_WAR.getUniform("ZoomCenter");
+    public static float zoomCenterX() {
+        return zoomCenterX;
+    }
 
-            if (paperScaleUniform != null) {
-                paperScaleUniform.set(centerX, centerY);
-            }
-        }
+    public static float zoomCenterY() {
+        return zoomCenterY;
     }
 }

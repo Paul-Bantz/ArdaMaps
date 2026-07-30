@@ -26,6 +26,8 @@
 package com.duom.ardamaps.core.networking;
 
 import com.duom.ardamaps.core.consumers.networking.IClientPacketHandler;
+import com.duom.ardamaps.core.consumers.networking.IPacket;
+import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
 import com.duom.ardamaps.core.consumers.networking.IServerPacketHandler;
 import com.duom.ardamaps.core.consumers.networking.RespondablePacketHandler;
 import com.duom.ardamaps.core.networking.handlers.client.PlayerExplorationEventHandler;
@@ -122,19 +124,19 @@ public class PacketRegistry {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static void registerServerReceiver(IServerPacketHandler<?> handler) {
 
-        ServerPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), (packet, context) -> ((IServerPacketHandler) handler).receive(packet, context));
+        ServerPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), (packet, context) -> ((IServerPacketHandler) handler).receive((IPacket) packet, context));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static void registerClientReceiver(IClientPacketHandler<?> handler) {
 
-        ClientPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), (packet, context) -> ((IClientPacketHandler) handler).receive(packet, context));
+        ClientPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getType(), (packet, context) -> ((IClientPacketHandler) handler).receive((IPacket) packet, context));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static void registerClientResponseReceiver(RespondablePacketHandler<?, ?> handler) {
 
-        ClientPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getResponseType(), (packet, context) -> ((RespondablePacketHandler) handler).receive(packet, context));
+        ClientPlayNetworking.registerGlobalReceiver((net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type) handler.getResponseType(), (packet, context) -> ((RespondablePacketHandler) handler).receive((IRespondablePacket) packet, context));
     }
 
     /**

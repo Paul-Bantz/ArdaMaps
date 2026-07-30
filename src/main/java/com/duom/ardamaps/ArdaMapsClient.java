@@ -64,13 +64,14 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.minecraft.client.DeltaTracker;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
 import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
@@ -191,7 +192,7 @@ public class ArdaMapsClient implements ClientModInitializer {
         ClientLifecycleEvents.CLIENT_STOPPING.register(this::onStop);
 
         // Render queued toast notifications on the HUD
-        HudRenderCallback.EVENT.register(this::renderToast);
+        HudElementRegistry.addLast(ModConstants.modId("toast"), this::renderToast);
 
         this.registerChatProcessor();
 
@@ -344,7 +345,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      * @param drawContext the draw context
      * @param tickDelta   unused tick delta
      */
-    private void renderToast(GuiGraphics drawContext, @SuppressWarnings("unused") float tickDelta) {
+    private void renderToast(GuiGraphicsExtractor drawContext, @SuppressWarnings("unused") DeltaTracker tickDelta) {
 
         ToastWidget head = TOAST_QUEUE.peek();
 
@@ -379,7 +380,7 @@ public class ArdaMapsClient implements ClientModInitializer {
             if (processed == message) return true; // nothing to restyle
 
             Minecraft mc = Minecraft.getInstance();
-            mc.execute(() -> mc.gui.getChat().addMessage(processed));
+            mc.execute(() -> mc.gui.getChat().addClientSystemMessage(processed));
 
             return false; // cancel the unstyled original
         });
@@ -630,7 +631,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      */
     public void handleGuidebookDisplay(Minecraft client) {
 
-        long handle = client.getWindow().getWindow();
+        long handle = client.getWindow().handle();
         boolean rightDown = GLFW.glfwGetMouseButton(handle, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
 
         if (rightDown && !rightMouseButtonWasDown && client.screen == null && isHoldingGuidebook(client)) {
@@ -733,7 +734,7 @@ public class ArdaMapsClient implements ClientModInitializer {
             if (atlas == null) {
                 atlas = IconSpriteAtlas.create(Minecraft.getInstance().getTextureManager());
             }
-            return atlas.reload(sharedState, prepareExecutor, synchronizer, applyExecutor);
+            return synchronizer.wait(null);
         }
     }
 

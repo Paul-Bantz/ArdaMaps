@@ -29,8 +29,10 @@ import com.duom.ardamaps.core.data.conversion.ContentBlock;
 import com.duom.ardamaps.core.data.guide.GuideImageCache;
 import com.duom.ardamaps.gui.ModConstants;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FontDescription;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
@@ -326,7 +328,7 @@ public final class TextContentBlockRenderer {
      * and the {@link Style} under the mouse cursor (or {@code null} if none)
      */
     public RenderResult render(
-            GuiGraphics context,
+            GuiGraphicsExtractor context,
             List<ContentBlock> blocks,
             int topX,
             int topY,
@@ -387,7 +389,7 @@ public final class TextContentBlockRenderer {
      * @param mouseY       mouse Y coordinate
      * @param renderResult the rendering result
      */
-    private void renderTextLayout(GuiGraphics context,
+    private void renderTextLayout(GuiGraphicsExtractor context,
                                   TextLayout layout,
                                   int topX, int topY, int startY, int bottomY,
                                   int mouseX, int mouseY,
@@ -418,7 +420,7 @@ public final class TextContentBlockRenderer {
      * @param bottomY      bottom Y of the viewport
      * @param renderResult the rendering result
      */
-    private void renderTitleLayout(GuiGraphics context,
+    private void renderTitleLayout(GuiGraphicsExtractor context,
                                   TitleLayout layout,
                                   int topX, int topY, int startY, int bottomY,
                                   RenderResult renderResult) {
@@ -428,11 +430,11 @@ public final class TextContentBlockRenderer {
 
         if (drawY + titleHeight >= topY && drawY <= bottomY) {
 
-            context.pose().pushPose();
-            context.pose().translate(topX, drawY, 0);
-            context.pose().scale(layout.scale, layout.scale, 1.0f);
+            context.pose().pushMatrix();
+            context.pose().translate(topX, drawY);
+            context.pose().scale(layout.scale, layout.scale);
 
-            context.drawString(
+            context.text(
                     textRenderer,
                     layout.line,
                     0,
@@ -441,7 +443,7 @@ public final class TextContentBlockRenderer {
                     false
             );
 
-            context.pose().popPose();
+            context.pose().popMatrix();
         }
 
         renderResult.totalHeight += titleHeight;
@@ -459,7 +461,7 @@ public final class TextContentBlockRenderer {
      * @param bottomY      bottom Y of the viewport
      * @param renderResult the rendering result
      */
-    private void renderImageLayout(GuiGraphics context,
+    private void renderImageLayout(GuiGraphicsExtractor context,
                                    ImageLayout layout,
                                    int wrapWidth,
                                    int topX, int topY, int startY, int bottomY,
@@ -485,7 +487,7 @@ public final class TextContentBlockRenderer {
                     case CENTER -> topX + (wrapWidth - imageWidth) / 2;
                     case RIGHT  -> topX + wrapWidth - imageWidth;
                 };
-                context.blit(texture,
+                context.blit(RenderPipelines.GUI_TEXTURED, texture,
                         imgX, drawY,
                         0, 0,
                         imageWidth, imageHeight,
@@ -508,7 +510,7 @@ public final class TextContentBlockRenderer {
                 if (captionDrawY + fontHeight >= topY && captionDrawY <= bottomY) {
                     int lineWidth = textRenderer.width(captionLine);
                     int captionX  = topX + (wrapWidth - lineWidth) / 2;
-                    context.drawString(textRenderer, captionLine, captionX, captionDrawY + LINE_GAP,
+                    context.text(textRenderer, captionLine, captionX, captionDrawY + LINE_GAP,
                             ModConstants.COLOR_DARK_BROWN, false);
                 }
 
@@ -530,7 +532,7 @@ public final class TextContentBlockRenderer {
      * @param mouseY       mouse Y coordinate
      * @param renderResult the rendering result
      */
-    private void renderListLayout(GuiGraphics context,
+    private void renderListLayout(GuiGraphicsExtractor context,
                                   ListLayout layout,
                                   int topX, int topY, int startY, int bottomY,
                                   int mouseX, int mouseY,
@@ -583,7 +585,7 @@ public final class TextContentBlockRenderer {
      * @param mouseY       mouse Y coordinate
      * @param renderResult the rendering result
      */
-    private void renderBlockquoteLayout(GuiGraphics context,
+    private void renderBlockquoteLayout(GuiGraphicsExtractor context,
                                         BlockquoteLayout layout,
                                         int topX, int topY, int startY, int bottomY,
                                         int mouseX, int mouseY,
@@ -612,9 +614,9 @@ public final class TextContentBlockRenderer {
 
             if (drawY + fontHeight >= topY && drawY <= bottomY) {
                 drawSpecialRunBackgrounds(context, lineLayout.glyphRuns(), textX, drawY);
-                context.drawString(textRenderer, lineLayout.line(), textX, drawY + LINE_GAP, bqColor, false);
+                context.text(textRenderer, lineLayout.line(), textX, drawY + LINE_GAP, bqColor, false);
                 renderResult.hoveredStyle = pickHoverStyle(mouseX, mouseY, fontHeight,
-                        lineLayout.line(), drawY, textX, renderResult.hoveredStyle);
+                        lineLayout.glyphRuns(), drawY, textX, renderResult.hoveredStyle);
             }
 
             renderResult.totalHeight += fontHeight + LINE_GAP;
@@ -633,15 +635,15 @@ public final class TextContentBlockRenderer {
      * @param mouseY       mouse Y coordinate
      * @param fontHeight   the font height
      */
-    private void drawLine(GuiGraphics context, LineLayout lineLayout, int x, int y,
+    private void drawLine(GuiGraphicsExtractor context, LineLayout lineLayout, int x, int y,
                           RenderResult renderResult, int mouseX, int mouseY, int fontHeight) {
 
         drawSpecialRunBackgrounds(context, lineLayout.glyphRuns(), x, y);
 
-        context.drawString(textRenderer, lineLayout.line(), x, y + LINE_GAP, defaultColor, false);
+        context.text(textRenderer, lineLayout.line(), x, y + LINE_GAP, defaultColor, false);
 
         renderResult.hoveredStyle = pickHoverStyle(mouseX, mouseY, fontHeight,
-                lineLayout.line(), y, x, renderResult.hoveredStyle);
+                lineLayout.glyphRuns(), y, x, renderResult.hoveredStyle);
     }
 
     /**
@@ -653,7 +655,7 @@ public final class TextContentBlockRenderer {
      * @param startX     left edge X of the text line in screen coordinates
      * @param drawY      top edge Y of the text line in screen coordinates
      */
-    private void drawSpecialRunBackgrounds(GuiGraphics context,
+    private void drawSpecialRunBackgrounds(GuiGraphicsExtractor context,
                                            List<GlyphRun> glyphRuns,
                                            int startX,
                                            int drawY) {
@@ -701,17 +703,17 @@ public final class TextContentBlockRenderer {
                 int keycapY    = backgroundY - textRenderer.lineHeight / 2;
 
                 // Key-cap face (three drawTexture slices: left cap, centre stretch, right cap)
-                context.blit(ModConstants.ICON_KEYBIND,
-                        backgroundX,                keycapY, 4,             16,  0, 0,  4, 16, 16, 16);
-                context.blit(ModConstants.ICON_KEYBIND,
-                        backgroundX + 4,            keycapY, faceWidth - 8, 16,  4, 0,  8, 16, 16, 16);
-                context.blit(ModConstants.ICON_KEYBIND,
-                        backgroundX + faceWidth - 4, keycapY, 4,            16, 12, 0,  4, 16, 16, 16);
+                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.ICON_KEYBIND,
+                        backgroundX, keycapY, 0, 0, 4, 16, 4, 16, 16, 16);
+                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.ICON_KEYBIND,
+                        backgroundX + 4, keycapY, 4, 0, faceWidth - 8, 16, 8, 16, 16, 16);
+                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.ICON_KEYBIND,
+                        backgroundX + faceWidth - 4, keycapY, 12, 0, 4, 16, 4, 16, 16, 16);
 
                 // Label centred inside the face rect
                 int labelX = backgroundX + (faceWidth  - labelWidth) / 2;
                 int labelY = backgroundY + (faceHeight - fontHeight)  / 2;
-                context.drawString(textRenderer, label, labelX, labelY, ModConstants.KEYBIND_LABEL_COLOR, false);
+                context.text(textRenderer, label, labelX, labelY, ModConstants.KEYBIND_LABEL_COLOR, false);
             }
 
             i = j;
@@ -720,7 +722,7 @@ public final class TextContentBlockRenderer {
 
     /**
      * Returns the special run type for a given {@link Style} by inspecting the sentinel
-     * font {@link Identifier} embedded by {@code HtmlConverter}:
+     * font {@link FontDescription} embedded by {@code HtmlConverter}:
      * <ul>
      *   <li>{@code 1} – chatcommand ({@link ModConstants#RUN_FONT_CHATCOMMAND})</li>
      *   <li>{@code 2} – keybind    ({@link ModConstants#RUN_FONT_KEYBIND})</li>
@@ -728,7 +730,7 @@ public final class TextContentBlockRenderer {
      * </ul>
      */
     private int detectSpecialRunType(Style style) {
-        Identifier font = style.getFont();
+        FontDescription font = style.getFont();
         if (ModConstants.RUN_FONT_CHATCOMMAND.equals(font)) return 1;
         if (ModConstants.RUN_FONT_KEYBIND.equals(font))     return 2;
         return 0;
@@ -740,13 +742,17 @@ public final class TextContentBlockRenderer {
      */
     private @Nullable Style pickHoverStyle(int mouseX, int mouseY,
                                             int fontHeight,
-                                            FormattedCharSequence line,
+                                            List<GlyphRun> glyphRuns,
                                             int drawY, int startX,
                                             @Nullable Style previous) {
 
         if (mouseY >= drawY && mouseY < drawY + fontHeight && mouseX >= startX) {
-            Style s = textRenderer.getSplitter().componentStyleAtWidth(line, mouseX - startX);
-            if (s != null) return s;
+            int relX = mouseX - startX;
+            for (GlyphRun glyphRun : glyphRuns) {
+                if (relX >= glyphRun.relX() && relX < glyphRun.relX() + glyphRun.width()) {
+                    return glyphRun.style();
+                }
+            }
         }
         return previous;
     }

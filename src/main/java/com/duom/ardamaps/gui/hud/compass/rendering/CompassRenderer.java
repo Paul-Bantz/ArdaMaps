@@ -37,9 +37,9 @@ import com.duom.ardamaps.core.data.map.Waypoint;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import com.duom.ardamaps.gui.widgets.ToastWidget;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -116,7 +116,7 @@ public class CompassRenderer {
      * @param context   the draw context
      * @param tickDelta unused
      */
-    public static void render(GuiGraphics context, float tickDelta) {
+    public static void render(GuiGraphicsExtractor context, float tickDelta) {
 
         var player = Client.player();
         if (player == null) return;
@@ -140,8 +140,6 @@ public class CompassRenderer {
             maxCompassRenderDistanceSquared = blockCompassRenderDistance * blockCompassRenderDistance;
         }
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
 
         var textRenderer = Client.mc().font;
         var playerPos = new Vec3d(player.getX(), player.getY(), player.getZ());
@@ -153,18 +151,15 @@ public class CompassRenderer {
         yaw = Mth.wrapDegrees(yaw);
 
         var matrices = context.pose();
-        matrices.pushPose();
-        matrices.translate(0, 0, -150);
-
+        matrices.pushMatrix();
         drawBackground(context, centerX, globalAlpha);
 
         renderMarkers(context, playerPos, yaw, centerX, globalAlpha);
         renderWaypoint(context, playerPos, yaw, centerX, textRenderer, globalAlpha);
         renderCardinals(context, yaw, centerX, globalAlpha);
 
-        matrices.popPose();
+        matrices.popMatrix();
 
-        RenderSystem.disableBlend();
     }
 
     /**
@@ -174,11 +169,9 @@ public class CompassRenderer {
      * @param centerX     the centre of the screen
      * @param globalAlpha the global alpha
      */
-    private static void drawBackground(GuiGraphics context, int centerX, float globalAlpha) {
+    private static void drawBackground(GuiGraphicsExtractor context, int centerX, float globalAlpha) {
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, globalAlpha);
-        context.blit(ModConstants.COMPASS_BACKGROUND, centerX - COMPASS_WIDTH / 2, COMPASS_TRACK_OFFSET_Y, 0, 0, COMPASS_WIDTH, COMPASS_TRACK_HEIGHT, COMPASS_WIDTH, COMPASS_TRACK_HEIGHT);
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.COMPASS_BACKGROUND, centerX - COMPASS_WIDTH / 2, COMPASS_TRACK_OFFSET_Y, 0, 0, COMPASS_WIDTH, COMPASS_TRACK_HEIGHT, COMPASS_WIDTH, COMPASS_TRACK_HEIGHT);
     }
 
     /**
@@ -190,7 +183,7 @@ public class CompassRenderer {
      * @param centerX     the centre of the screen
      * @param globalAlpha the global alpha
      */
-    private static void renderMarkers(GuiGraphics context, Vec3d playerPos, float playerYaw, int centerX, float globalAlpha) {
+    private static void renderMarkers(GuiGraphicsExtractor context, Vec3d playerPos, float playerYaw, int centerX, float globalAlpha) {
 
         var exploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(Client.currentDimensionId(), false);
 
@@ -231,7 +224,7 @@ public class CompassRenderer {
      * @param textRenderer the text renderer
      */
     @SuppressWarnings({"ConstantValue", "resource"})
-    private static void renderWaypoint(GuiGraphics context, Vec3d playerPos, float yaw, int centerX, Font textRenderer, float globalAlpha) {
+    private static void renderWaypoint(GuiGraphicsExtractor context, Vec3d playerPos, float yaw, int centerX, Font textRenderer, float globalAlpha) {
 
         var currentDimensionId = Client.currentDimensionId();
         var waypointsToRemove = new ArrayList<Waypoint>();
@@ -264,25 +257,23 @@ public class CompassRenderer {
             var iconIdentifier = ModConstants.id(waypoint.icon());
             var icon = IconSpriteAtlas.retrieveSprite(iconIdentifier);
 
-            context.pose().pushPose();
-            context.pose().translate( x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET, 100);
-            RenderSystem.setShaderColor(waypoint.r(), waypoint.g(), waypoint.b(), globalAlpha);
+            context.pose().pushMatrix();
+            context.pose().translate(x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET);
 
             if (icon != null
                     && icon.contents() != null
                     && !Objects.equals(icon.contents().name(), MissingTextureAtlasSprite.getLocation())) {
 
-                context.blit(0, 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_WAYPOINT));
+                context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_WAYPOINT), 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE);
 
             } else {
 
-                context.blit(iconIdentifier, 0, 0, 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE);
+                context.blit(RenderPipelines.GUI_TEXTURED, iconIdentifier, 0, 0, 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE);
             }
 
-            context.drawString(textRenderer, realWorldUnits, (LANDMARK_ICON_SIZE / 2)-(textRenderer.width(realWorldUnits) / 2), LANDMARK_ICON_SIZE + 15, ModConstants.COLOR_WHITE, false);
-            RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+            context.text(textRenderer, realWorldUnits, (LANDMARK_ICON_SIZE / 2)-(textRenderer.width(realWorldUnits) / 2), LANDMARK_ICON_SIZE + 15, ModConstants.COLOR_WHITE, false);
 
-            context.pose().popPose();
+            context.pose().popMatrix();
         }
 
         // Safely remove waypoints here
@@ -299,7 +290,7 @@ public class CompassRenderer {
      * @param centerX      the centre of the screen
      * @param globalAlpha  the transparency of the compass
      */
-    private static void renderCardinals(GuiGraphics context, float yaw, int centerX, float globalAlpha) {
+    private static void renderCardinals(GuiGraphicsExtractor context, float yaw, int centerX, float globalAlpha) {
 
         for (Cardinal cardinal : CARDINALS) {
 
@@ -316,9 +307,7 @@ public class CompassRenderer {
 
                 float alpha = Math.min(getAlpha(x, centerX), globalAlpha);
 
-                RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
-                context.blit((int) (x - HALF_COMPASS_TRACK_HEIGHT), COMPASS_TRACK_OFFSET_Y, 0, COMPASS_TRACK_HEIGHT, COMPASS_TRACK_HEIGHT, IconSpriteAtlas.retrieveSprite(sprite));
-                RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+                context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(sprite), (int) (x - HALF_COMPASS_TRACK_HEIGHT), COMPASS_TRACK_OFFSET_Y, COMPASS_TRACK_HEIGHT, COMPASS_TRACK_HEIGHT);
             }
         }
     }
@@ -437,18 +426,16 @@ public class CompassRenderer {
      * @param textureToDraw the texture to draw
      * @param zOffset       the z offset on which to draw the icon
      */
-    private static void drawLocationIcon(GuiGraphics context, float alpha, float x, Identifier textureToDraw, int zOffset) {
+    private static void drawLocationIcon(GuiGraphicsExtractor context, float alpha, float x, Identifier textureToDraw, int zOffset) {
 
         if (textureToDraw == null) return;
 
-        context.pose().pushPose();
-        context.pose().translate(x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET, zOffset);
+        context.pose().pushMatrix();
+        context.pose().translate(x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET);
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
-        context.blit(0, 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, IconSpriteAtlas.retrieveSprite(textureToDraw));
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(textureToDraw), 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     /**
@@ -459,16 +446,14 @@ public class CompassRenderer {
      * @param x       the x position on the screen
      * @param zOffset the z offset on which to draw the icon
      */
-    private static void drawUnknownLocationSprite(GuiGraphics context, float alpha, float x, int zOffset) {
+    private static void drawUnknownLocationSprite(GuiGraphicsExtractor context, float alpha, float x, int zOffset) {
 
-        context.pose().pushPose();
-        context.pose().translate(x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET, zOffset);
+        context.pose().pushMatrix();
+        context.pose().translate(x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET);
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
-        context.blit(0, 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, IconSpriteAtlas.retrieveSprite(ModConstants.UNKNOWN_ICON));
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.UNKNOWN_ICON), 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     /** Cardinal directions **/

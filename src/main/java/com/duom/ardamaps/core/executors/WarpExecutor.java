@@ -33,8 +33,11 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Relative;
 import net.minecraft.world.level.Level;
 import net.william278.huskhomes.api.FabricHuskHomesAPI;
+
+import java.util.Set;
 
 /**
  * HuskHomes-backed warp executor. This class is only loaded after HuskHomes is known to be present.
@@ -64,7 +67,7 @@ public class WarpExecutor implements WarpService {
                 return;
             }
 
-            player.teleportTo(serverWorld, warp.getX(), warp.getY(), warp.getZ(), player.getYRot(), player.getXRot());
+            player.teleportTo(serverWorld, warp.getX(), warp.getY(), warp.getZ(), Set.<Relative>of(), player.getYRot(), player.getXRot(), true);
         });
     }
 }

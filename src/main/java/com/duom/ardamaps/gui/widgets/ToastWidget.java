@@ -28,7 +28,8 @@ package com.duom.ardamaps.gui.widgets;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
@@ -156,7 +157,7 @@ public class ToastWidget {
      *
      * @param context the draw context provided by the HUD render callback
      */
-    public void render(GuiGraphics context) {
+    public void render(GuiGraphicsExtractor context) {
 
         Minecraft mc = Minecraft.getInstance();
 
@@ -173,8 +174,6 @@ public class ToastWidget {
         int x = screenW - toastWidth;
         int y = screenH * 2 / 3;
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
 
         int contentX = x + PADDING;
         int iconY = y + PADDING;
@@ -183,11 +182,9 @@ public class ToastWidget {
 
             var sprite = IconSpriteAtlas.retrieveSprite(icon);
 
-            RenderSystem.setShaderColor(iconR, iconG, iconB, alpha);
 
-            context.blit(contentX, iconY, 0, ICON_SIZE, ICON_SIZE, IconSpriteAtlas.retrieveSprite(icon));
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), contentX, iconY, ICON_SIZE, ICON_SIZE);
 
-            RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
             contentX += ICON_SIZE + ICON_TEXT_GAP;
         }
 
@@ -197,9 +194,8 @@ public class ToastWidget {
         int textAlpha = (int) (alpha * 255);
         int textColor = (textAlpha << 24) | 0x00FFFFFF;
 
-        context.drawString(textRenderer, message, contentX, textY, textColor, true);
+        context.text(textRenderer, message, contentX, textY, textColor, true);
 
-        RenderSystem.disableBlend();
     }
 
     /**
@@ -224,4 +220,3 @@ public class ToastWidget {
         }
     }
 }
-

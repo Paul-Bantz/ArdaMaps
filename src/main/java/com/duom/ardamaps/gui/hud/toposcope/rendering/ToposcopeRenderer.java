@@ -40,8 +40,9 @@ import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec2;
@@ -110,7 +111,7 @@ public class ToposcopeRenderer {
      *
      * @param drawContext The drawing context.
      */
-    public static void render(GuiGraphics drawContext) {
+    public static void render(GuiGraphicsExtractor drawContext) {
 
         if (!Toposcope.overlayEnabled) return;
 
@@ -210,16 +211,14 @@ public class ToposcopeRenderer {
      * @param drawContext  The drawing context for rendering operations.
      * @param textRenderer The text renderer for drawing location names and distances.
      */
-    private static void renderScreenMappedLocations(GuiGraphics drawContext, Font textRenderer) {
+    private static void renderScreenMappedLocations(GuiGraphicsExtractor drawContext, Font textRenderer) {
         List<List<ScreenMappedLocation>> groups = groupByScreenPosition();
 
         // Track hovered location
         hoveredLocation = null;
 
         var matrices = drawContext.pose();
-        matrices.pushPose();
-        matrices.translate(0, 0, -150);
-
+        matrices.pushMatrix();
         for (var group : groups) {
 
             // Stable sort by world position so the render order never changes between frames
@@ -237,7 +236,7 @@ public class ToposcopeRenderer {
             for (int index = 0; index < group.size(); index++)
                 drawMarker(drawContext, group, index, groupAnchor, textRenderer);
         }
-        matrices.popPose();
+        matrices.popMatrix();
     }
 
     /**
@@ -293,7 +292,7 @@ public class ToposcopeRenderer {
      * @param groupAnchor  The stable average screen position of the group.
      * @param textRenderer The text renderer for the location label.
      */
-    private static void drawMarker(GuiGraphics drawContext, List<ScreenMappedLocation> group, int groupIndex, Vec2 groupAnchor, Font textRenderer) {
+    private static void drawMarker(GuiGraphicsExtractor drawContext, List<ScreenMappedLocation> group, int groupIndex, Vec2 groupAnchor, Font textRenderer) {
 
         int groupSpacing = 4;
 
@@ -322,8 +321,7 @@ public class ToposcopeRenderer {
             hoveredLocation = location;
 
         var matrices = drawContext.pose();
-        matrices.translate(0, 0, 200);
-        matrices.pushPose();
+        matrices.pushMatrix();
 
         // Draw underline if hovered
         if (isHovered) {
@@ -335,16 +333,11 @@ public class ToposcopeRenderer {
             int bgX = iconX - 16;
             int bgY = baseY - 8;
 
-            drawContext.blitNineSliced(ModConstants.MAP_GUI_ELEMENTS,
+            drawContext.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
                     bgX, bgY,
+                    144, 160,
                     bgWidth, bgHeight,
-                    16,
-                    16,
-                    16,
-                    16,
-                    96,
-                    48,
-                    144, 160);
+                    256, 256);
 
             boolean hasActiveWaypoint = getLocationActiveWaypoint(location).isPresent();
 
@@ -353,7 +346,7 @@ public class ToposcopeRenderer {
                 var locationIcon = location.getIcon();
 
                 if (locationIcon != null)
-                    drawContext.blit(iconX, baseY, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(locationIcon));
+                    drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(locationIcon), iconX, baseY, iconSize, iconSize);
 
                 if (ArdaMapsClient.CONFIG.isMapRevealAll() || location.isVisited())
                     drawWaypointAndTeleportHints(drawContext, textRenderer, hasActiveWaypoint);
@@ -361,13 +354,13 @@ public class ToposcopeRenderer {
                     drawWaypointHint(drawContext, textRenderer, hasActiveWaypoint);
 
             } else {
-                drawContext.blit(iconX, baseY, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(ModConstants.UNKNOWN_ICON));
+                drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.UNKNOWN_ICON), iconX, baseY, iconSize, iconSize);
                 drawWaypointHint(drawContext, textRenderer, hasActiveWaypoint);
             }
         }
 
         // Draw location name
-        drawContext.drawString(
+        drawContext.text(
                 textRenderer,
                 location.getName(),
                 nameX,
@@ -377,7 +370,7 @@ public class ToposcopeRenderer {
         );
 
         // Draw distance
-        drawContext.drawString(
+        drawContext.text(
                 textRenderer,
                 DistanceUnitConverter.asRealWorldUnits(Client.currentDimension(), entry.distance),
                 nameX,
@@ -386,7 +379,7 @@ public class ToposcopeRenderer {
                 !isHovered
         );
 
-        matrices.popPose();
+        matrices.popMatrix();
     }
 
     /**
@@ -422,11 +415,11 @@ public class ToposcopeRenderer {
      * @param textRenderer      the text renderer
      * @param hasActiveWaypoint whether there is an active waypoint or not to adjust the hint text
      */
-    private static void drawWaypointAndTeleportHints(GuiGraphics drawContext, Font textRenderer, boolean hasActiveWaypoint) {
+    private static void drawWaypointAndTeleportHints(GuiGraphicsExtractor drawContext, Font textRenderer, boolean hasActiveWaypoint) {
 
         Component waypointHint = hasActiveWaypoint ? REMOVE_WAYPOINT_HINT : SET_WAYPOINT_HINT;
-        drawContext.blit(exploredTeleportHintXPosition, hintYPosition, 0, 8, 8, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_MOUSE_LEFT_CLICK));
-        drawContext.drawString(
+        drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_MOUSE_LEFT_CLICK), exploredTeleportHintXPosition, hintYPosition, 8, 8);
+        drawContext.text(
                 textRenderer,
                 TELEPORT_HINT,
                 exploredTeleportHintXPosition + 12,
@@ -434,8 +427,8 @@ public class ToposcopeRenderer {
                 ModConstants.COLOR_WHITE,
                 true);
 
-        drawContext.blit(exploredSetWaypointHintXPosition, hintYPosition, 0, 8, 8, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_MOUSE_RIGHT_CLICK));
-        drawContext.drawString(
+        drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_MOUSE_RIGHT_CLICK), exploredSetWaypointHintXPosition, hintYPosition, 8, 8);
+        drawContext.text(
                 textRenderer,
                 waypointHint,
                 exploredSetWaypointHintXPosition + 12,
@@ -451,10 +444,10 @@ public class ToposcopeRenderer {
      * @param textRenderer      the text renderer
      * @param hasActiveWaypoint whether there is an active waypoint or not to adjust the hint text
      */
-    private static void drawWaypointHint(GuiGraphics drawContext, Font textRenderer, boolean hasActiveWaypoint) {
+    private static void drawWaypointHint(GuiGraphicsExtractor drawContext, Font textRenderer, boolean hasActiveWaypoint) {
         Component waypointHint = hasActiveWaypoint ? REMOVE_WAYPOINT_HINT : SET_WAYPOINT_HINT;
-        drawContext.blit(unknownSetWaypointHintXPosition, hintYPosition, 0, 8, 8, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_MOUSE_RIGHT_CLICK));
-        drawContext.drawString(
+        drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_MOUSE_RIGHT_CLICK), unknownSetWaypointHintXPosition, hintYPosition, 8, 8);
+        drawContext.text(
                 textRenderer,
                 waypointHint,
                 unknownSetWaypointHintXPosition + 12,

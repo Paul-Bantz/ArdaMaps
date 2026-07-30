@@ -36,12 +36,14 @@ import com.duom.ardamaps.gui.widgets.builders.CheckboxBuilder;
 import com.duom.ardamaps.gui.widgets.builders.DropdownBuilder;
 import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.Util;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.util.Util;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -527,13 +529,13 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param delta   the time delta since the last render call
      */
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
-        renderBackground(context);
+        extractBackground(context, mouseX, mouseY, delta);
 
         renderConfigurationUi(context, mouseX, mouseY, delta);
 
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
 
         renderConfirmationDialog(context, mouseX, mouseY, delta);
     }
@@ -546,7 +548,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param mouseY  the y position of the mouse cursor
      * @param delta   the time delta since the last render call
      */
-    private void renderConfigurationUi(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    private void renderConfigurationUi(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         var contentArea = getPaddedContentArea();
         var leftColX = contentArea.topLeftX() + leftPageMargins.left;
@@ -596,7 +598,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param mouseY    the y position of the mouse cursor
      * @param delta     the time delta since the last render call
      */
-    private void renderMapOptions(GuiGraphics context, int x, int y, int pageWidth, int mouseX, int mouseY, float delta) {
+    private void renderMapOptions(GuiGraphicsExtractor context, int x, int y, int pageWidth, int mouseX, int mouseY, float delta) {
 
         y = renderRow(context, x, y, pageWidth, unitSystemLabel,
                 unitSystemDropdown, mouseX, mouseY, delta) + ModConstants.ROW_SPACING;
@@ -622,7 +624,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param mouseY    the y position of the mouse cursor
      * @param delta     the time delta since the last render call
      */
-    private void renderToposcopeOptions(GuiGraphics context, int x, int y, int pageWidth, int mouseX, int mouseY, float delta) {
+    private void renderToposcopeOptions(GuiGraphicsExtractor context, int x, int y, int pageWidth, int mouseX, int mouseY, float delta) {
 
         renderRow(context, x, y, pageWidth, toposcopePoiLabel,
                 toposcopeRenderDistanceSlider, mouseX, mouseY, delta);
@@ -639,7 +641,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param mouseY    the y position of the mouse cursor
      * @param delta     the time delta since the last render call
      */
-    private void renderCompassOptions(GuiGraphics context, int x, int y, int pageWidth, int mouseX, int mouseY, float delta) {
+    private void renderCompassOptions(GuiGraphicsExtractor context, int x, int y, int pageWidth, int mouseX, int mouseY, float delta) {
 
         y = renderRow(context, x, y, pageWidth, compassOpacityLabel,
                 compassOpacitySlider, mouseX, mouseY, delta) + ModConstants.ROW_SPACING;
@@ -661,7 +663,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param delta   the time delta since the last render call
      * @return the y position of the bottom edge of the row, to be used for rendering subsequent rows
      */
-    private int renderRow(GuiGraphics context, int x, int y, int pageWidth, AbstractWidget widget, int mouseX, int mouseY, float delta) {
+    private int renderRow(GuiGraphicsExtractor context, int x, int y, int pageWidth, AbstractWidget widget, int mouseX, int mouseY, float delta) {
 
         var xPos = x + pageWidth / 2 - widget.getWidth() / 2;
         var yPos = y - widget.getHeight() / 2;
@@ -677,7 +679,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
             mousePosY = -1;
         }
 
-        widget.render(context, mousePosX, mousePosY, delta);
+        widget.extractRenderState(context, mousePosX, mousePosY, delta);
 
         return y + widget.getHeight();
     }
@@ -696,7 +698,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param delta   the time delta since the last render call
      * @return the y position of the bottom edge of the row, to be used for rendering subsequent rows
      */
-    private int renderRow(GuiGraphics context, int x, int y, int width,
+    private int renderRow(GuiGraphicsExtractor context, int x, int y, int width,
                           Component label, AbstractWidget widget, int mouseX, int mouseY, float delta) {
 
         var halfPageWidth = width / 2;
@@ -708,7 +710,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         int rightX = x + halfPageWidth;
         int labelY = y - lineH;
 
-        context.drawString(font, label, x, labelY, ModConstants.COLOR_DARK_BROWN, false);
+        context.text(font, label, x, labelY, ModConstants.COLOR_DARK_BROWN, false);
 
         // Widget - vertically centred in the row
         int widgetYPosition = y - BUTTON_HEIGHT / 2;
@@ -727,7 +729,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
             mousePosY = -1;
         }
 
-        widget.render(context, mousePosX, mousePosY, delta);
+        widget.extractRenderState(context, mousePosX, mousePosY, delta);
 
         return widgetYPosition + BUTTON_HEIGHT;
     }
@@ -742,17 +744,17 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param title     the title text to render
      * @return the y position of the bottom edge of the title, to be used for rendering subsequent elements in the section
      */
-    private int renderSectionTitle(GuiGraphics context, int x, int y, int pageWidth, Component title) {
+    private int renderSectionTitle(GuiGraphicsExtractor context, int x, int y, int pageWidth, Component title) {
 
         float scale = 1.4f;
         int textW = font.width(title);
         int xOffset = (int) (pageWidth / 2f - (textW * scale / 2f));
 
-        context.pose().pushPose();
-        context.pose().translate(x + xOffset, y, 0);
-        context.pose().scale(scale, scale, 1f);
-        context.drawString(font, title, 0, 0, ModConstants.COLOR_DARK_BROWN, false);
-        context.pose().popPose();
+        context.pose().pushMatrix();
+        context.pose().translate(x + xOffset, y);
+        context.pose().scale(scale, scale);
+        context.text(font, title, 0, 0, ModConstants.COLOR_DARK_BROWN, false);
+        context.pose().popMatrix();
 
         return (int) (y + font.lineHeight * scale);
     }
@@ -766,12 +768,11 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param mouseY  the y position of the mouse cursor
      * @param delta   the time delta since the last render call
      */
-    private void renderConfirmationDialog(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    private void renderConfirmationDialog(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         if (!isDisplayingConfirmationDialog()) return;
 
-        context.pose().pushPose();
-        context.pose().translate(0, 0, 200);
+        context.pose().pushMatrix();
 
         context.fillGradient(0, 0, this.width, this.height, -1072689136, -804253680);
 
@@ -782,16 +783,8 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         var dialogY = (this.height - dialogHeight) / 2;
         var dialogPadding = (int) (dialogWidth * .1);
 
-        context.blitNineSliced(ModConstants.PAPER_TEXTURE,
-                dialogX, dialogY,
-                dialogWidth, dialogHeight,
-                64,
-                64,
-                64,
-                64,
-                256,
-                256,
-                0, 0);
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.PAPER_TEXTURE,
+                dialogX, dialogY, 0, 0, dialogWidth, dialogHeight, 256, 256, 512, 512);
 
         var text = displayResetProgressConfirmationDialog ? confirmationResetExplorationDialogText : confirmationRevealAllDialogText;
         var okButton = displayResetProgressConfirmationDialog ? confirmResetExplorationButton : confirmRevealAllButton;
@@ -805,7 +798,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         for (FormattedCharSequence line : multilinePrompt) {
 
-            context.drawString(font, line, x, y, ModConstants.COLOR_DARK_BROWN, false);
+            context.text(font, line, x, y, ModConstants.COLOR_DARK_BROWN, false);
             y += lineHeight;
         }
 
@@ -813,13 +806,13 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         okButton.setPosition(x, dialogY + dialogHeight - dialogPadding - BUTTON_HEIGHT);
         okButton.setWidth(buttonWidth);
-        okButton.render(context, mouseX, mouseY, delta);
+        okButton.extractRenderState(context, mouseX, mouseY, delta);
 
         cancelBtn.setPosition(x + buttonWidth + 8, dialogY + dialogHeight - dialogPadding - BUTTON_HEIGHT);
         cancelBtn.setWidth(buttonWidth);
-        cancelBtn.render(context, mouseX, mouseY, delta);
+        cancelBtn.extractRenderState(context, mouseX, mouseY, delta);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     /**
@@ -832,15 +825,17 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @return true if the click was handled by the configuration screen, false otherwise
      */
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
 
         if (isDisplayingConfirmationDialog()) {
 
-            confirmResetExplorationButton.mouseClicked(mouseX, mouseY, button);
-            confirmRevealAllButton.mouseClicked(mouseX, mouseY, button);
+            confirmResetExplorationButton.mouseClicked(event, doubleClick);
+            confirmRevealAllButton.mouseClicked(event, doubleClick);
 
-            cancelResetExplorationButton.mouseClicked(mouseX, mouseY, button);
-            cancelRevealAllButton.mouseClicked(mouseX, mouseY, button);
+            cancelResetExplorationButton.mouseClicked(event, doubleClick);
+            cancelRevealAllButton.mouseClicked(event, doubleClick);
 
             return true;
         }
@@ -849,31 +844,31 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         if (mapOptionsToggleButton.isToggled()) {
 
-            consumed |= unitSystemDropdown.mouseClicked(mouseX, mouseY, button);
+            consumed |= unitSystemDropdown.mouseClicked(event, doubleClick);
 
             if (!consumed) {
 
-                consumed = revealAllCheckbox.mouseClicked(mouseX, mouseY, button);
-                consumed |= resetExplorationButton.mouseClicked(mouseX, mouseY, button);
-                consumed |= configDirectoryButton.mouseClicked(mouseX, mouseY, button);
+                consumed = revealAllCheckbox.mouseClicked(event, doubleClick);
+                consumed |= resetExplorationButton.mouseClicked(event, doubleClick);
+                consumed |= configDirectoryButton.mouseClicked(event, doubleClick);
             }
 
         } else if (compassOptionsToggleButton.isToggled()) {
 
-            consumed |= compassRenderDistanceSlider.mouseClicked(mouseX, mouseY, button);
-            consumed |= compassOpacitySlider.mouseClicked(mouseX, mouseY, button);
+            consumed |= compassRenderDistanceSlider.mouseClicked(event, doubleClick);
+            consumed |= compassOpacitySlider.mouseClicked(event, doubleClick);
 
         } else if (toposcopeOptionsToggleButton.isToggled()) {
 
-            consumed |= toposcopeRenderDistanceSlider.mouseClicked(mouseX, mouseY, button);
+            consumed |= toposcopeRenderDistanceSlider.mouseClicked(event, doubleClick);
 
         }
 
-        consumed |= mapOptionsToggleButton.mouseClicked(mouseX, mouseY, button);
-        consumed |= compassOptionsToggleButton.mouseClicked(mouseX, mouseY, button);
-        consumed |= toposcopeOptionsToggleButton.mouseClicked(mouseX, mouseY, button);
+        consumed |= mapOptionsToggleButton.mouseClicked(event, doubleClick);
+        consumed |= compassOptionsToggleButton.mouseClicked(event, doubleClick);
+        consumed |= toposcopeOptionsToggleButton.mouseClicked(event, doubleClick);
 
-        return consumed || super.mouseClicked(mouseX, mouseY, button);
+        return consumed || super.mouseClicked(event, doubleClick);
     }
 
     /**
@@ -897,7 +892,9 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @return true if the drag was handled by the configuration screen, false otherwise
      */
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
 
         if (isDisplayingConfirmationDialog()) return true;
 
@@ -906,18 +903,18 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         if (compassOptionsToggleButton.isToggled()) {
 
             if (compassRenderDistanceSlider.isMouseOver(mouseX, mouseY))
-                consumed |= compassRenderDistanceSlider.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+                consumed |= compassRenderDistanceSlider.mouseDragged(event, deltaX, deltaY);
 
             if (compassOpacitySlider.isMouseOver(mouseX, mouseY))
-                consumed |= compassOpacitySlider.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+                consumed |= compassOpacitySlider.mouseDragged(event, deltaX, deltaY);
 
         } else if (toposcopeOptionsToggleButton.isToggled()) {
 
             if (toposcopeRenderDistanceSlider.isMouseOver(mouseX, mouseY))
-                consumed |= toposcopeRenderDistanceSlider.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+                consumed |= toposcopeRenderDistanceSlider.mouseDragged(event, deltaX, deltaY);
         }
 
-        return consumed || super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        return consumed || super.mouseDragged(event, deltaX, deltaY);
     }
 
     /**

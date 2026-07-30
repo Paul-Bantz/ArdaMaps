@@ -98,11 +98,12 @@ public abstract class TileProvider<T extends TileKey> {
         }
 
         Minecraft.getInstance().execute(() -> {
-            DynamicTexture tex = new DynamicTexture(image);
-
-            Identifier id = Minecraft.getInstance()
+            String textureName = prefix + key.z + "_" + key.x + "_" + key.y;
+            DynamicTexture tex = new DynamicTexture(() -> textureName, image);
+            Identifier id = com.duom.ardamaps.gui.ModConstants.modId(textureName);
+            Minecraft.getInstance()
                     .getTextureManager()
-                    .register(prefix + key.z + "_" + key.x + "_" + key.y, tex);
+                    .register(id, tex);
 
             textures.put(key, id);
             loading.remove(key);

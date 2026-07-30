@@ -103,13 +103,14 @@ public final class GuideImageCache {
         try (var is = resource.get().open()) {
 
             NativeImage img = NativeImage.read(is);
-            DynamicTexture tex = new DynamicTexture(img);
-
             // Sanitize path characters that are illegal in dynamic texture names
             String sanitised = src.replace('/', '_').replace('.', '_');
-            Identifier registered = Minecraft.getInstance()
+            String textureName = "ardamaps_guide_" + sanitised;
+            DynamicTexture tex = new DynamicTexture(() -> textureName, img);
+            Identifier registered = com.duom.ardamaps.gui.ModConstants.modId(textureName);
+            Minecraft.getInstance()
                     .getTextureManager()
-                    .register("ardamaps_guide_" + sanitised, tex);
+                    .register(registered, tex);
 
             CACHE.put(src, Optional.of(registered));
             return registered;

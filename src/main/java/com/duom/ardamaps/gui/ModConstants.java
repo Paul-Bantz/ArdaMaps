@@ -28,6 +28,7 @@ package com.duom.ardamaps.gui;
 import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.gui.screens.rendering.TextContentBlockRenderer;
 import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.FontDescription;
 
 /**
  * A utility class that holds constants for the map GUI, such as button dimensions and texture identifiers.
@@ -113,7 +114,7 @@ public class ModConstants {
      * {@link TextContentBlockRenderer} reads {@code Style.getFont()} and compares it against this
      * value to identify chatcommand runs – no colour-sniffing required.
      */
-    public static final Identifier RUN_FONT_CHATCOMMAND = modId("run/chatcommand");
+    public static final FontDescription RUN_FONT_CHATCOMMAND = new FontDescription.Resource(modId("run/chatcommand"));
 
     /**
      * Sentinel font {@link Identifier} written into the {@link net.minecraft.network.chat.Style} of every
@@ -121,7 +122,7 @@ public class ModConstants {
      * {@link TextContentBlockRenderer} reads {@code Style.getFont()} and compares it against this
      * value to identify keybind runs – no colour-sniffing required.
      */
-    public static final Identifier RUN_FONT_KEYBIND = modId("run/keybind");
+    public static final FontDescription RUN_FONT_KEYBIND = new FontDescription.Resource(modId("run/keybind"));
 
     /**
      * Padding in pixels applied around the background rectangle of both

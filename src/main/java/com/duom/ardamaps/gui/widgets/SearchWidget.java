@@ -29,10 +29,12 @@ import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.screens.ArdaMapsScreen;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.tooltip.DefaultTooltipPositioner;
 import net.minecraft.network.chat.Component;
@@ -130,7 +132,7 @@ public class SearchWidget extends Screen {
         addRenderableWidget(title);
         addRenderableWidget(searchField);
 
-        this.magicalSpecialHackyFocus(searchField);
+        this.setInitialFocus(searchField);
     }
 
     /**
@@ -268,26 +270,29 @@ public class SearchWidget extends Screen {
      * @return True if event was consumed
      */
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
+        int keyCode = event.key();
 
         if (keyCode == GLFW.GLFW_KEY_ENTER
                 && !searchResults.isEmpty()
                 && searchResults.get(0) instanceof Button buttonWidget) {
 
-            buttonWidget.onPress();
+            buttonWidget.onPress(event);
             return true;
         }
 
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
 
         var clickOverButton = children().stream().anyMatch(child -> child.isMouseOver(mouseX, mouseY));
 
         if (clickOverButton)
-            return super.mouseClicked(mouseX, mouseY, button);
+            return super.mouseClicked(event, doubleClick);
 
         // Player clicked outside any button, close the search overlay
         onClose();
@@ -312,11 +317,11 @@ public class SearchWidget extends Screen {
      * @param height new window height
      */
     @Override
-    public void resize(Minecraft client, int width, int height) {
+    public void resize(int width, int height) {
 
-        if (parent != null) parent.resize(client, width, height);
+        if (parent != null) parent.resize(width, height);
 
-        super.resize(client, width, height);
+        super.resize(width, height);
     }
 
     /**
@@ -327,20 +332,20 @@ public class SearchWidget extends Screen {
      * @param mouseY  mouse y position
      * @param delta   frame delta time
      */
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         // Render this screen as an overlay - force mouse position to -1 so that mouse events don't interact
         if (parent != null)
-            parent.render(context, -1, -1, delta);
+            parent.extractRenderState(context, -1, -1, delta);
 
         context.fill(0, 0, this.width, this.height, 0xAA000000);
 
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
 
         for (var tooltipEntry : resultTooltips.entrySet()) {
             if (tooltipEntry.getKey().isMouseOver(mouseX, mouseY)) {
                 List<FormattedCharSequence> wrappedTooltip = font.split(tooltipEntry.getValue(), TOOLTIP_MAX_WIDTH);
-                context.renderTooltip(font, wrappedTooltip, DefaultTooltipPositioner.INSTANCE, mouseX, mouseY);
+                context.setTooltipForNextFrame(font, wrappedTooltip, DefaultTooltipPositioner.INSTANCE, mouseX, mouseY, false);
                 break;
             }
         }

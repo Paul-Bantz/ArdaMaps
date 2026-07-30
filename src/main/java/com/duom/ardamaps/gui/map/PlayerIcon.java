@@ -78,7 +78,7 @@ public class PlayerIcon {
 
         if (player == null) return;
 
-        Identifier skinId = player.getSkinTextureLocation();
+        Identifier skinId = player.getSkin().body().texturePath();
 
         TextureManager textureManager = Client.mc().getTextureManager();
         AbstractTexture texture = textureManager.getTexture(skinId);
@@ -101,12 +101,13 @@ public class PlayerIcon {
         if (skinImage == null) {
 
             var defaultTex = DefaultPlayerSkin.getDefaultSkin();
+            Identifier defaultSkinId = defaultTex.body().texturePath();
             LOGGER.info("Loading default skin texture failed for {}, @'{}'",
                     player.getName().getString(),
-                    defaultTex.getPath()
+                    defaultSkinId.getPath()
             );
             // Should never happen, but be safe
-            skinImage = loadResourceTexture(defaultTex);
+            skinImage = loadResourceTexture(defaultSkinId);
         }
 
         playerIcon = getIcon(skinImage);
@@ -157,7 +158,7 @@ public class PlayerIcon {
         // Hat layer (8x8 - 48x48 at (0,0))
         blit(skin, head, 40, 8, 8, 8, 0, 0, 48, 48);
 
-        DynamicTexture texture = new DynamicTexture(head);
+        DynamicTexture texture = new DynamicTexture(() -> "ArdaMaps player head map marker", head);
         Identifier id = ModConstants.modId("player_head_map_marker");
         Client.mc().getTextureManager().register(id, texture);
 
@@ -189,11 +190,11 @@ public class PlayerIcon {
             for (int y = 0; y < dh; y++) {
                 int srcX = sx + x * sw / dw;
                 int srcY = sy + y * sh / dh;
-                int color = src.getPixelRGBA(srcX, srcY);
+                int color = src.getPixel(srcX, srcY);
 
                 // Respect transparency (important for hat layer)
                 if ((color >>> 24) != 0) {
-                    dst.setPixelRGBA(dx + x, dy + y, color);
+                    dst.setPixel(dx + x, dy + y, color);
                 }
             }
         }

@@ -36,12 +36,11 @@ import com.duom.ardamaps.core.data.map.markers.MarkersManager;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import com.duom.ardamaps.gui.map.PlayerIcon;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -117,7 +116,7 @@ public class MapMarkerRenderer {
      * @param mouseX                  The current mouse X coordinate.
      * @param mouseY                  The current mouse Y coordinate.
      */
-    public void render(GuiGraphics context, Font textRenderer, MapCamera mapCamera, MapFrameRenderer mapFrameRenderer,
+    public void render(GuiGraphicsExtractor context, Font textRenderer, MapCamera mapCamera, MapFrameRenderer mapFrameRenderer,
                        @Nullable MapLayerRange selectedRange, @Nullable Vec3d focusedLocationPosition,
                        @Nullable String selectedTypeKey, boolean mouseOverWidgets, int framePadding, int mouseX, int mouseY) {
 
@@ -144,7 +143,7 @@ public class MapMarkerRenderer {
      * @param mouseX                  The current mouse X coordinate.
      * @param mouseY                  The current mouse Y coordinate.
      */
-    private void renderMarkers(GuiGraphics context, Font textRenderer, MapCamera mapCamera, MapFrameRenderer mapFrameRenderer,
+    private void renderMarkers(GuiGraphicsExtractor context, Font textRenderer, MapCamera mapCamera, MapFrameRenderer mapFrameRenderer,
                                @Nullable MapLayerRange selectedRange, @Nullable Vec3d focusedLocationPosition,
                                @Nullable String selectedTypeKey, boolean mouseOverWidgets, int mouseX, int mouseY) {
 
@@ -226,7 +225,7 @@ public class MapMarkerRenderer {
      * @param selectedRange    The currently selected vertical range, or null when the layer is unranged.
      * @param framePadding     The padding used by frame hit-testing.
      */
-    private void renderPlayerMarker(GuiGraphics context, MapCamera mapCamera, MapFrameRenderer mapFrameRenderer,
+    private void renderPlayerMarker(GuiGraphicsExtractor context, MapCamera mapCamera, MapFrameRenderer mapFrameRenderer,
                                     @Nullable MapLayerRange selectedRange, int framePadding) {
 
         if (!Objects.equals(mapCamera.getDimension(), Client.currentDimension())) return;
@@ -255,16 +254,14 @@ public class MapMarkerRenderer {
 
         context.fill(screenX, screenZ, screenX + iconSize, screenZ + iconSize, markerBackgroundColor);
 
-        if (outOfRange) RenderSystem.setShaderColor(1f, 1f, 1f, MARKER_OUT_OF_RANGE_OPACITY);
-        context.blit(iconImage,
+        context.blit(RenderPipelines.GUI_TEXTURED, iconImage,
                 screenX,
                 screenZ,
-                iconSize, iconSize,
                 PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE,
+                iconSize, iconSize,
                 PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE,
                 PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE
         );
-        if (outOfRange) RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
     }
 
     /**
@@ -279,7 +276,7 @@ public class MapMarkerRenderer {
      * @param mouseY           The current mouse Y coordinate.
      */
     @SuppressWarnings({"ConstantValue", "resource"})
-    private void renderWaypoint(GuiGraphics context, Font textRenderer, MapCamera mapCamera, MapFrameRenderer mapFrameRenderer,
+    private void renderWaypoint(GuiGraphicsExtractor context, Font textRenderer, MapCamera mapCamera, MapFrameRenderer mapFrameRenderer,
                                 int framePadding, int mouseX, int mouseY) {
 
         var waypoints = ArdaMapsClient.CONFIG.getWaypoints(mapCamera.getDimension().getId());
@@ -300,7 +297,7 @@ public class MapMarkerRenderer {
                     && mouseY <= screenY + MARKER_ICON_SIZE) {
 
                 mouseOverWaypoint = waypoint;
-                context.renderTooltip(textRenderer, Component.literal(waypoint.text()), mouseX, mouseY);
+                context.setTooltipForNextFrame(textRenderer, Component.literal(waypoint.text()), mouseX, mouseY);
             }
 
             if (mapFrameRenderer.coordinatesInFrame(screenX, screenY, framePadding) && waypoint.icon() != null) {
@@ -308,20 +305,18 @@ public class MapMarkerRenderer {
                 var iconIdentifier = ModConstants.id(waypoint.icon());
                 var icon = IconSpriteAtlas.retrieveSprite(iconIdentifier);
 
-                RenderSystem.setShaderColor(waypoint.r(), waypoint.g(), waypoint.b(), 1.0f);
 
                 if (icon != null
                         && icon.contents() != null
                         && !Objects.equals(icon.contents().name(), MissingTextureAtlasSprite.getLocation())) {
 
-                    context.blit(screenX, screenY, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, icon);
+                    context.blitSprite(RenderPipelines.GUI_TEXTURED, icon, screenX, screenY, MARKER_ICON_SIZE, MARKER_ICON_SIZE);
 
                 } else {
 
-                    context.blit(iconIdentifier, screenX, screenY, 0, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE);
+                    context.blit(RenderPipelines.GUI_TEXTURED, iconIdentifier, screenX, screenY, 0, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE);
                 }
 
-                RenderSystem.setShaderColor(1f, 1f, 1f, 1.0f);
             }
         }
     }
@@ -361,7 +356,7 @@ public class MapMarkerRenderer {
      * @param focused      True when the marker should render its focused highlight and label.
      * @param outOfRange   True when the marker lies outside the currently selected vertical range.
      */
-    private void renderMarker(GuiGraphics context, Font textRenderer, LocationClient location,
+    private void renderMarker(GuiGraphicsExtractor context, Font textRenderer, LocationClient location,
                               int xPos, int yPos, boolean focused, boolean outOfRange) {
 
         var iconXPos = xPos + MARKER_ICON_X_OFFSET;
@@ -372,10 +367,6 @@ public class MapMarkerRenderer {
         int highlightColor = outOfRange ? withOpacity(location.getHighlightColor()) : location.getHighlightColor();
         float markerOpacity = outOfRange ? MARKER_OUT_OF_RANGE_OPACITY : 1f;
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(GameRenderer::getPositionTexShader);
-
         if (focused) {
 
             var screenX = xPos + HALF_MARKER_SIZE;
@@ -385,7 +376,7 @@ public class MapMarkerRenderer {
 
             var text = location.getName();
             var textX = screenX - textRenderer.width(text) / 2;
-            context.drawString(
+            context.text(
                     textRenderer,
                     text,
                     textX,
@@ -398,17 +389,14 @@ public class MapMarkerRenderer {
             context.fill(xPos + 4, yPos + 4, xPos + MARKER_BACKGROUND_SIZE - 4, yPos + MARKER_BACKGROUND_SIZE - 4, color);
         }
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, markerOpacity);
 
         if (location.isVisited())
-            context.blit(xPos, yPos, 0, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_VISITED_ICON));
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_VISITED_ICON), xPos, yPos, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE);
         else
-            context.blit(xPos, yPos, 0, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_ICON));
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_ICON), xPos, yPos, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE);
 
-        context.blit(iconXPos, iconYPos, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, IconSpriteAtlas.retrieveSprite(icon));
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), iconXPos, iconYPos, MARKER_ICON_SIZE, MARKER_ICON_SIZE);
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-        RenderSystem.disableBlend();
     }
 
     /**

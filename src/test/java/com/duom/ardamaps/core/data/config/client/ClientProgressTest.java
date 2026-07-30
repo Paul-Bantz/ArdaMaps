@@ -79,9 +79,6 @@ class ClientProgressTest {
         Minecraft mockClient = Mockito.mock(Minecraft.class);
         TextureManager mockTextureManager = Mockito.mock(TextureManager.class);
         Mockito.when(mockClient.getTextureManager()).thenReturn(mockTextureManager);
-        Mockito.when(mockTextureManager.register(Mockito.<String>any(), Mockito.any(DynamicTexture.class)))
-                .thenReturn(Identifier.fromNamespaceAndPath("ardamaps", "dummy"));
-
         mockedMinecraftClient = Mockito.mockStatic(Minecraft.class);
         mockedMinecraftClient.when(Minecraft::getInstance).thenReturn(mockClient);
 

@@ -30,11 +30,12 @@ import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.gui.ModConstants;
 import lombok.Getter;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
@@ -288,7 +289,7 @@ public class RangeSelectionWidget extends AbstractWidget {
      * @param delta   The frame delta.
      */
     @Override
-    protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         if (!visible) return;
 
@@ -301,7 +302,7 @@ public class RangeSelectionWidget extends AbstractWidget {
 
         if (labelWidth > 0) {
             int labelTextY = getY() + height / 2 - textRenderer.lineHeight / 2;
-            context.drawString(textRenderer, label, contentX + LABEL_MARGIN, labelTextY, ModConstants.COLOR_WHITE);
+            context.text(textRenderer, label, contentX + LABEL_MARGIN, labelTextY, ModConstants.COLOR_WHITE);
         }
 
         int scissorRight = stripX + viewportWidth();
@@ -318,7 +319,7 @@ public class RangeSelectionWidget extends AbstractWidget {
                 int textX = itemX + itemWidth / 2 - textRenderer.width(itemLabel) / 2;
                 int textY = getY() + height / 2 - textRenderer.lineHeight / 2;
                 int color = index == selectedIndex ? ModConstants.COLOR_BLUE_EMPHASIZED : ModConstants.COLOR_WHITE;
-                context.drawString(textRenderer, itemLabel, textX, textY, color);
+                context.text(textRenderer, itemLabel, textX, textY, color);
             }
 
             context.disableScissor();
@@ -334,7 +335,7 @@ public class RangeSelectionWidget extends AbstractWidget {
      *
      * @param context The drawing context.
      */
-    private void renderBackground(GuiGraphics context) {
+    private void renderBackground(GuiGraphicsExtractor context) {
 
         int contentX = contentX();
         int widgetTop = getY();
@@ -357,7 +358,7 @@ public class RangeSelectionWidget extends AbstractWidget {
      * @param context      The drawing context.
      * @param textRenderer The text renderer used for ellipsis measurement.
      */
-    private void renderEllipses(GuiGraphics context, Font textRenderer) {
+    private void renderEllipses(GuiGraphicsExtractor context, Font textRenderer) {
 
         if (!showCaps()) return;
 
@@ -367,13 +368,13 @@ public class RangeSelectionWidget extends AbstractWidget {
         if (scrollOffset < 0) {
             int capX = contentX() + labelWidth;
             int textX = capX + ELLIPSIS_CAP_WIDTH / 2 - textWidth / 2;
-            context.drawString(textRenderer, ELLIPSIS, textX, textY, ModConstants.COLOR_WHITE);
+            context.text(textRenderer, ELLIPSIS, textX, textY, ModConstants.COLOR_WHITE);
         }
 
         if (scrollOffset > minScrollOffset()) {
             int capX = stripX() + viewportWidth();
             int textX = capX + ELLIPSIS_CAP_WIDTH / 2 - textWidth / 2;
-            context.drawString(textRenderer, ELLIPSIS, textX, textY, ModConstants.COLOR_WHITE);
+            context.text(textRenderer, ELLIPSIS, textX, textY, ModConstants.COLOR_WHITE);
         }
     }
 
@@ -384,13 +385,13 @@ public class RangeSelectionWidget extends AbstractWidget {
      * @param textRenderer The text renderer used for tooltip layout.
      * @param hoveredIndex The hovered range index.
      */
-    private void renderTooltip(GuiGraphics context, Font textRenderer, int hoveredIndex) {
+    private void renderTooltip(GuiGraphicsExtractor context, Font textRenderer, int hoveredIndex) {
 
         MapLayerRange range = ranges.get(hoveredIndex);
         int anchorX = clampTooltipAnchorX((int) itemXAt(hoveredIndex) + itemWidth / 2, stripX(), stripX() + viewportWidth());
         int anchorY = getY() - TOOLTIP_GAP;
         List<FormattedCharSequence> tooltip = List.of(Component.literal(tooltipLabel(range)).getVisualOrderText());
-        context.renderTooltip(textRenderer, tooltip, AboveAnchorTooltipPositioner.INSTANCE, anchorX, anchorY);
+        context.setTooltipForNextFrame(textRenderer, tooltip, AboveAnchorTooltipPositioner.INSTANCE, anchorX, anchorY, false);
     }
 
     /**
@@ -400,12 +401,16 @@ public class RangeSelectionWidget extends AbstractWidget {
      * @param mouseY The mouse Y coordinate where the press began.
      */
     @Override
-    public void onClick(double mouseX, double mouseY) {
+    public void onClick(MouseButtonEvent event, boolean doubleClick) {
 
         dragging = true;
-        dragStartMouseX = mouseX;
+        dragStartMouseX = event.x();
         dragStartOffset = scrollOffset;
         dragMoved = false;
+    }
+
+    public void onClick(double mouseX, double mouseY) {
+        onClick(new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(0, 0)), false);
     }
 
     /**
@@ -417,10 +422,14 @@ public class RangeSelectionWidget extends AbstractWidget {
      * @param deltaY The vertical mouse movement since the previous event.
      */
     @Override
-    protected void onDrag(double mouseX, double mouseY, double deltaX, double deltaY) {
+    protected void onDrag(MouseButtonEvent event, double deltaX, double deltaY) {
 
-        scrollOffset = clampScrollOffset(dragStartOffset + (mouseX - dragStartMouseX));
-        if (Math.abs(mouseX - dragStartMouseX) > DRAG_THRESHOLD) dragMoved = true;
+        scrollOffset = clampScrollOffset(dragStartOffset + (event.x() - dragStartMouseX));
+        if (Math.abs(event.x() - dragStartMouseX) > DRAG_THRESHOLD) dragMoved = true;
+    }
+
+    protected void onDrag(double mouseX, double mouseY, double deltaX, double deltaY) {
+        onDrag(new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(0, 0)), deltaX, deltaY);
     }
 
     /**
@@ -494,10 +503,14 @@ public class RangeSelectionWidget extends AbstractWidget {
      * @param mouseY The mouse Y coordinate where the press was released.
      */
     @Override
-    public void onRelease(double mouseX, double mouseY) {
+    public void onRelease(MouseButtonEvent event) {
 
-        if (!dragMoved) selectIndex(indexAt(mouseX, mouseY));
+        if (!dragMoved) selectIndex(indexAt(event.x(), event.y()));
         dragging = false;
+    }
+
+    public void onRelease(double mouseX, double mouseY) {
+        onRelease(new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(0, 0)));
     }
 
     /**
@@ -509,14 +522,18 @@ public class RangeSelectionWidget extends AbstractWidget {
      * @return True when the scroll event was consumed.
      */
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
 
-        if (!isMouseOver(mouseX, mouseY) || amount == 0) return false;
+        if (!isMouseOver(mouseX, mouseY) || verticalAmount == 0) return false;
 
-        if (isControlDown()) return selectRelative(amount > 0 ? 1 : -1);
+        if (isControlDown()) return selectRelative(verticalAmount > 0 ? 1 : -1);
 
-        scrollOffset = clampScrollOffset(scrollOffset + amount * itemWidth);
+        scrollOffset = clampScrollOffset(scrollOffset + verticalAmount * itemWidth);
         return true;
+    }
+
+    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+        return mouseScrolled(mouseX, mouseY, 0, amount);
     }
 
     /**
@@ -526,7 +543,9 @@ public class RangeSelectionWidget extends AbstractWidget {
      */
     boolean isControlDown() {
 
-        return Screen.hasControlDown();
+        long handle = Client.mc().getWindow().handle();
+        return org.lwjgl.glfw.GLFW.glfwGetKey(handle, org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_CONTROL) == org.lwjgl.glfw.GLFW.GLFW_PRESS
+                || org.lwjgl.glfw.GLFW.glfwGetKey(handle, org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_CONTROL) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
     }
 
     /**

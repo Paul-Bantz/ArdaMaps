@@ -38,11 +38,13 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.world.entity.Relative;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.OptionalDouble;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
 
@@ -102,7 +104,7 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
 
             // Get the dimension configuration and calculate effective scan bounds
             Dimension dimension = resolveDimension(packet.worldId());
-            VerticalBounds overallBounds = effectiveOverallBounds(dimension, serverWorld.getMinBuildHeight(), serverWorld.getMaxBuildHeight());
+            VerticalBounds overallBounds = effectiveOverallBounds(dimension, serverWorld.getMinY(), serverWorld.getMaxY());
             double x = SafeTeleportScanner.blockCenter(packet.x());
             double z = SafeTeleportScanner.blockCenter(packet.z());
 
@@ -112,13 +114,13 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
 
             if (candidateY.isPresent()) {
                 double y = candidateY.getAsDouble();
-                player.teleportTo(serverWorld, x, y, z, player.getYRot(), player.getXRot());
+                player.teleportTo(serverWorld, x, y, z, Set.<Relative>of(), player.getYRot(), player.getXRot(), true);
                 responder.accept(new PlayerTeleportResponsePacket(true, x, y, z));
                 return;
             }
 
             // Send error message if no safe position found
-            player.displayClientMessage(Component.literal(String.format("Invalid teleport position at %s %s", (int)packet.x(), (int)packet.z()))
+            player.sendSystemMessage(Component.literal(String.format("Invalid teleport position at %s %s", (int)packet.x(), (int)packet.z()))
                     .withStyle(ChatFormatting.RED), false);
             responder.accept(PlayerTeleportResponsePacket.failed());
         });
@@ -138,7 +140,7 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
         if (worldId == null) return null;
 
         for (ServerLevel world : server.getAllLevels()) {
-            if (world.dimension().location().toString().equals(worldId)) return world;
+            if (world.dimension().identifier().toString().equals(worldId)) return world;
         }
 
         return null;

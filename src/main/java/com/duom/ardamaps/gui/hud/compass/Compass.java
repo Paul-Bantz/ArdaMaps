@@ -26,7 +26,8 @@
 package com.duom.ardamaps.gui.hud.compass;
 
 import com.duom.ardamaps.gui.hud.compass.rendering.CompassRenderer;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 
 /**
  * HUD Compass definition
@@ -38,6 +39,7 @@ public class Compass {
      */
     public void registerRenderer() {
 
-        HudRenderCallback.EVENT.register(CompassRenderer::render);
+        HudElementRegistry.addLast(ModConstants.modId("compass"), (context, delta) ->
+                CompassRenderer.render(context, delta.getGameTimeDeltaTicks()));
     }
 }

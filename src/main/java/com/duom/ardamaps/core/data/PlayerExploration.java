@@ -230,10 +230,11 @@ public class PlayerExploration implements Serializable {
 
         fogMask = new NativeImage(nbCellsX, nbCellsY, true);
 
-        fogTexture = new DynamicTexture(fogMask);
-        fogTextureId = Minecraft.getInstance()
+        fogTexture = new DynamicTexture(this::textureName, fogMask);
+        fogTextureId = com.duom.ardamaps.gui.ModConstants.modId(textureName());
+        Minecraft.getInstance()
                 .getTextureManager()
-                .register(textureName(), fogTexture);
+                .register(fogTextureId, fogTexture);
     }
 
     /**
@@ -275,7 +276,7 @@ public class PlayerExploration implements Serializable {
         for (int idx : dirtyCells) {
             int x = idx % nbCellsX;
             int y = idx / nbCellsX;
-            fogMask.setPixelRGBA(x, y, grid.stateAt(x, y).getColor());
+            fogMask.setPixel(x, y, grid.stateAt(x, y).getColor());
         }
 
         dirtyCells.clear();

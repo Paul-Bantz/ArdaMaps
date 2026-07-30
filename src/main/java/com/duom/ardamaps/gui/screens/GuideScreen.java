@@ -36,17 +36,19 @@ import com.duom.ardamaps.gui.widgets.ScrollbarWidget;
 import com.duom.ardamaps.gui.widgets.StyledButtonWidget;
 import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.controls.KeyBindsScreen;
+import net.minecraft.client.gui.screens.options.controls.KeyBindsScreen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
@@ -609,10 +611,10 @@ public class GuideScreen extends ArdaMapsScreen {
      * the standard Minecraft overlay elements (tooltips, etc.).</p>
      */
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-        renderBackground(context);
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        extractBackground(context, mouseX, mouseY, delta);
         renderGuideUi(context, mouseX, mouseY, delta);
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
 
     /**
@@ -625,7 +627,7 @@ public class GuideScreen extends ArdaMapsScreen {
      * @param mouseY  current mouse Y in screen coordinates
      * @param delta   partial tick used for animations
      */
-    private void renderGuideUi(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    private void renderGuideUi(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         var contentArea = getPaddedContentArea();
 
         int leftColX = contentArea.topLeftX() + LEFT_MARGINS.left();
@@ -660,7 +662,7 @@ public class GuideScreen extends ArdaMapsScreen {
      * Renders the left column. Delegates to {@link #renderPageListLeftColumn} or
      * {@link #renderEntryViewLeftColumn} depending on {@link #viewState}.
      */
-    private void renderLeftColumn(GuiGraphics context, int colX, int topY, int bottomY,
+    private void renderLeftColumn(GuiGraphicsExtractor context, int colX, int topY, int bottomY,
                                   int pageWidth, int mouseX, int mouseY, float delta) {
         if (viewState == ViewState.ENTRY_VIEW) {
             renderEntryViewLeftColumn(context, colX, topY, bottomY, pageWidth, mouseX, mouseY, delta);
@@ -673,7 +675,7 @@ public class GuideScreen extends ArdaMapsScreen {
      * Left-column rendering for {@link ViewState#PAGE_LIST}: guide title, separator,
      * and a scrollable list of page toggle buttons.
      */
-    private void renderPageListLeftColumn(GuiGraphics context, int colX, int topY, int bottomY,
+    private void renderPageListLeftColumn(GuiGraphicsExtractor context, int colX, int topY, int bottomY,
                                           int pageWidth, int mouseX, int mouseY, float delta) {
         int y = topY;
         y = renderSectionTitle(context, colX, y, pageWidth, titleGuide) + ModConstants.ROW_SPACING;
@@ -683,7 +685,7 @@ public class GuideScreen extends ArdaMapsScreen {
         leftBottomY = bottomY;
 
         if (loadingBook) {
-            context.drawString(font, textLoading, colX, y, ModConstants.COLOR_DARK_BROWN, false);
+            context.text(font, textLoading, colX, y, ModConstants.COLOR_DARK_BROWN, false);
             return;
         }
 
@@ -702,7 +704,7 @@ public class GuideScreen extends ArdaMapsScreen {
             btn.setX(colX + pageWidth / 2 - btn.getWidth() / 2);
             btn.setY(drawY);
             if (drawY + ModConstants.BUTTON_HEIGHT > y && drawY < bottomY) {
-                btn.render(context, mouseX, mouseY, delta);
+                btn.extractRenderState(context, mouseX, mouseY, delta);
             }
             drawY += stride;
         }
@@ -721,7 +723,7 @@ public class GuideScreen extends ArdaMapsScreen {
      * a separator, a scrollable list of entry buttons, and a back button pinned at the
      * very bottom of the column (always visible, outside the scissor region).
      */
-    private void renderEntryViewLeftColumn(GuiGraphics context, int colX, int topY, int bottomY,
+    private void renderEntryViewLeftColumn(GuiGraphicsExtractor context, int colX, int topY, int bottomY,
                                            int pageWidth, int mouseX, int mouseY, float delta) {
         int y = topY;
 
@@ -740,7 +742,7 @@ public class GuideScreen extends ArdaMapsScreen {
         leftBottomY = listBottomY;
 
         if (entryButtons.isEmpty()) {
-            context.drawString(font, textSelectTopic, colX, y, ModConstants.COLOR_DARK_BROWN, false);
+            context.text(font, textSelectTopic, colX, y, ModConstants.COLOR_DARK_BROWN, false);
         } else {
             int visibleHeight = listBottomY - y;
             if (visibleHeight > 0) {
@@ -758,7 +760,7 @@ public class GuideScreen extends ArdaMapsScreen {
                     btn.setX(colX);
                     btn.setY(drawY);
                     if (drawY + ModConstants.BUTTON_HEIGHT > y && drawY < listBottomY) {
-                        btn.render(context, mouseX, mouseY, delta);
+                        btn.extractRenderState(context, mouseX, mouseY, delta);
                     }
                     drawY += stride;
                 }
@@ -778,7 +780,7 @@ public class GuideScreen extends ArdaMapsScreen {
         backButton.setHeight(ModConstants.BUTTON_HEIGHT);
         backButton.setX(colX + pageWidth / 2 - backButton.getWidth() / 2);
         backButton.setY(bottomY - ModConstants.BUTTON_HEIGHT);
-        backButton.render(context, mouseX, mouseY, delta);
+        backButton.extractRenderState(context, mouseX, mouseY, delta);
     }
 
     /**
@@ -801,7 +803,7 @@ public class GuideScreen extends ArdaMapsScreen {
      * @param delta     partial tick (unused; kept for signature consistency with the caller)
      */
     @SuppressWarnings("unused")
-    private void renderRightColumn(GuiGraphics context, int colX, int topY, int bottomY,
+    private void renderRightColumn(GuiGraphicsExtractor context, int colX, int topY, int bottomY,
                                    int pageWidth, int mouseX, int mouseY, float delta) {
         int y = topY;
 
@@ -818,7 +820,7 @@ public class GuideScreen extends ArdaMapsScreen {
 
         // ENTRY_VIEW
         if (loadingBook || currentPageIndex < 0) {
-            context.drawString(font, textLoading, colX, topY, ModConstants.COLOR_DARK_BROWN, false);
+            context.text(font, textLoading, colX, topY, ModConstants.COLOR_DARK_BROWN, false);
             return;
         }
 
@@ -854,16 +856,16 @@ public class GuideScreen extends ArdaMapsScreen {
      * @return the screen-space Y coordinate immediately below the rendered title,
      * suitable for use as the starting Y of the next element
      */
-    private int renderSectionTitle(GuiGraphics context, int x, int y, int pageWidth, Component title) {
+    private int renderSectionTitle(GuiGraphicsExtractor context, int x, int y, int pageWidth, Component title) {
         float scale = 1.4f;
         int textW = font.width(title);
         int xOffset = (int) (pageWidth / 2f - (textW * scale / 2f));
 
-        context.pose().pushPose();
-        context.pose().translate(x + xOffset, y, 0);
-        context.pose().scale(scale, scale, 1f);
-        context.drawString(font, title, 0, 0, ModConstants.COLOR_DARK_BROWN, false);
-        context.pose().popPose();
+        context.pose().pushMatrix();
+        context.pose().translate(x + xOffset, y);
+        context.pose().scale(scale, scale);
+        context.text(font, title, 0, 0, ModConstants.COLOR_DARK_BROWN, false);
+        context.pose().popMatrix();
 
         return (int) (y + font.lineHeight * scale);
     }
@@ -886,13 +888,13 @@ public class GuideScreen extends ArdaMapsScreen {
      * @param loading  {@code true} while the content is still being fetched/parsed
      * @param content  the parsed content blocks to render, or {@code null}
      */
-    private void renderContentSubColumn(GuiGraphics context, int x, int y,
+    private void renderContentSubColumn(GuiGraphicsExtractor context, int x, int y,
                                         int subWidth, int bottomY,
                                         int mouseX, int mouseY,
                                         boolean loading, @Nullable List<ContentBlock> content) {
         if (loading || content == null) {
             lastHoveredContentStyle = null;
-            context.drawString(font, textLoading, x, y, ModConstants.COLOR_DARK_BROWN, false);
+            context.text(font, textLoading, x, y, ModConstants.COLOR_DARK_BROWN, false);
             return;
         }
 
@@ -924,9 +926,6 @@ public class GuideScreen extends ArdaMapsScreen {
         context.disableScissor();
 
         lastHoveredContentStyle = result.hoveredStyle;
-        if (lastHoveredContentStyle != null && lastHoveredContentStyle.getHoverEvent() != null) {
-            context.renderComponentHoverEffect(font, lastHoveredContentStyle, mouseX, mouseY);
-        }
     }
 
 
@@ -948,7 +947,10 @@ public class GuideScreen extends ArdaMapsScreen {
      * @return {@code true} if the event was consumed, {@code false} otherwise
      */
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         var area = getPaddedContentArea();
         int midX = area.topLeftX() + area.guiWidth() / 2;
 
@@ -959,10 +961,10 @@ public class GuideScreen extends ArdaMapsScreen {
                 && mouseY < rightSubBottomY
                 && lastHoveredContentStyle != null) {
 
-            if (hasShiftDown()
+            if ((event.modifiers() & (GLFW.GLFW_MOD_SHIFT)) != 0
                     && ModConstants.RUN_FONT_CHATCOMMAND.equals(lastHoveredContentStyle.getFont())
                     && lastHoveredContentStyle.getInsertion() != null) {
-                Minecraft.getInstance().setScreen(new ChatScreen(lastHoveredContentStyle.getInsertion()));
+                Minecraft.getInstance().setScreen(new ChatScreen(lastHoveredContentStyle.getInsertion(), false));
                 return true;
             }
 
@@ -992,22 +994,22 @@ public class GuideScreen extends ArdaMapsScreen {
                 // Entry buttons (only in scissored viewport)
                 if (mouseY >= leftListTopY && mouseY < leftBottomY) {
                     for (StyledButtonWidget btn : entryButtons) {
-                        if (btn.mouseClicked(mouseX, mouseY, button)) return true;
+                        if (btn.mouseClicked(event, doubleClick)) return true;
                     }
                 }
                 // Back button (always visible below the list)
-                if (backButton != null && backButton.mouseClicked(mouseX, mouseY, button)) return true;
+                if (backButton != null && backButton.mouseClicked(event, doubleClick)) return true;
             } else {
                 // Page buttons
                 if (mouseY >= leftListTopY && mouseY < leftBottomY) {
                     for (StyledButtonWidget btn : pageButtons) {
-                        if (btn.mouseClicked(mouseX, mouseY, button)) return true;
+                        if (btn.mouseClicked(event, doubleClick)) return true;
                     }
                 }
             }
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     /**
@@ -1028,23 +1030,23 @@ public class GuideScreen extends ArdaMapsScreen {
      * @return {@code true} if the event was consumed, {@code false} otherwise
      */
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         var area = getPaddedContentArea();
         int midX = area.topLeftX() + area.guiWidth() / 2;
 
         if (mouseX < midX) {
             if (mouseY >= leftListTopY && mouseY < leftBottomY) {
                 return viewState == ViewState.ENTRY_VIEW
-                        ? entryScrollbar.scroll(amount)
-                        : leftScrollbar.scroll(amount);
+                        ? entryScrollbar.scroll(verticalAmount)
+                        : leftScrollbar.scroll(verticalAmount);
             }
         } else {
             if (mouseY >= rightSubTopY && mouseY < rightSubBottomY) {
-                return contentScrollbar.scroll(amount);
+                return contentScrollbar.scroll(verticalAmount);
             }
         }
 
-        return super.mouseScrolled(mouseX, mouseY, amount);
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     /**

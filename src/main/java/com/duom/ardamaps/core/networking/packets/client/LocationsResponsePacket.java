@@ -44,7 +44,6 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.zip.GZIPInputStream;
@@ -64,7 +63,7 @@ public record LocationsResponsePacket(UUID requestId, LocationConfig<LocationCli
     private static final int MAX_COMPRESSED_DATA_LENGTH = 8 * 1024 * 1024;
 
     /** Location config type token preserving the LocationClient generic parameter. */
-    private static final Type LOCATION_CONFIG_TYPE = new TypeToken<LocationConfig<LocationClient>>() {
+    private static final java.lang.reflect.Type LOCATION_CONFIG_TYPE = new TypeToken<LocationConfig<LocationClient>>() {
     }.getType();
 
     public static final LocationsResponsePacket EMPTY = new LocationsResponsePacket(null);

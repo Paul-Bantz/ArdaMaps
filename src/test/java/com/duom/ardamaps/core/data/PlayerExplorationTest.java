@@ -86,9 +86,6 @@ class PlayerExplorationTest {
         Minecraft mockClient = Mockito.mock(Minecraft.class);
         mockTextureManager = Mockito.mock(TextureManager.class);
         Mockito.when(mockClient.getTextureManager()).thenReturn(mockTextureManager);
-        Mockito.when(mockTextureManager.register(Mockito.<String>any(), Mockito.any(DynamicTexture.class)))
-                .thenReturn(Identifier.fromNamespaceAndPath("ardamaps", "dummy"));
-
         mockedMinecraftClient = Mockito.mockStatic(Minecraft.class);
         mockedMinecraftClient.when(Minecraft::getInstance).thenReturn(mockClient);
 
@@ -127,7 +124,7 @@ class PlayerExplorationTest {
         PlayerExploration.create(SMALL_DIM, 6, null);
 
         Mockito.verify(mockTextureManager).register(
-                Mockito.eq("fog_of_war_texture_test_small_6"),
+                Mockito.eq(Identifier.fromNamespaceAndPath("ardamaps", "fog_of_war_texture_test_small_6")),
                 Mockito.any(DynamicTexture.class));
     }
 

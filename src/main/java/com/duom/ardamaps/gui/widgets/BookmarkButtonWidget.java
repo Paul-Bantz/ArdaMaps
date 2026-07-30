@@ -27,10 +27,11 @@ package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
-import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 
 /**
@@ -96,13 +97,13 @@ public class BookmarkButtonWidget extends AbstractWidget {
      * {@link BookmarkButtonType}. If the widget is not {@link #visible}, no rendering
      * is performed.</p>
      *
-     * @param context the {@link GuiGraphics} used for all draw calls
+     * @param context the {@link GuiGraphicsExtractor} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
      * @param delta   time delta (in seconds) since the last render call
      */
     @Override
-    protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         if (!visible) return;
 
@@ -121,11 +122,11 @@ public class BookmarkButtonWidget extends AbstractWidget {
      * atlas and overlays the {@link ModConstants#CLOSE_ICON} sprite in a muted red
      * tint (0.76, 0.42, 0.44) when not hovered.</p>
      *
-     * @param context the {@link GuiGraphics} used for all draw calls
+     * @param context the {@link GuiGraphicsExtractor} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
      */
-    private void renderCloseButton(GuiGraphics context, int mouseX, int mouseY) {
+    private void renderCloseButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         renderBookmarkButton(context, mouseX, mouseY, 384, 32, 0.7568f, 0.4235f, 0.4431f, ModConstants.CLOSE_ICON);
     }
@@ -137,11 +138,11 @@ public class BookmarkButtonWidget extends AbstractWidget {
      * atlas and overlays the {@link ModConstants#CONFIGURATION_ICON} sprite in a
      * blue-grey tint (0.53, 0.65, 0.78) when not hovered.</p>
      *
-     * @param context the {@link GuiGraphics} used for all draw calls
+     * @param context the {@link GuiGraphicsExtractor} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
      */
-    private void renderConfigurationButton(GuiGraphics context, int mouseX, int mouseY) {
+    private void renderConfigurationButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         renderBookmarkButton(context, mouseX, mouseY, 288, 32, 0.5333f, 0.6549f, 0.7765f, ModConstants.CONFIGURATION_ICON);
     }
@@ -153,11 +154,11 @@ public class BookmarkButtonWidget extends AbstractWidget {
      * atlas and overlays the {@link ModConstants#GUIDE_ICON} sprite in a blue-grey
      * tint (0.53, 0.65, 0.78) when not hovered.</p>
      *
-     * @param context the {@link GuiGraphics} used for all draw calls
+     * @param context the {@link GuiGraphicsExtractor} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
      */
-    private void renderGuideButton(GuiGraphics context, int mouseX, int mouseY) {
+    private void renderGuideButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         renderBookmarkButton(context, mouseX, mouseY, 384, 128, 0.611f, 0.494f, 0.647f, ModConstants.GUIDE_ICON);
     }
@@ -169,11 +170,11 @@ public class BookmarkButtonWidget extends AbstractWidget {
      * atlas and overlays the {@link ModConstants#MAP_ICON} sprite in a muted green
      * tint (0.38, 0.51, 0.35) when not hovered.</p>
      *
-     * @param context the {@link GuiGraphics} used for all draw calls
+     * @param context the {@link GuiGraphicsExtractor} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
      */
-    private void renderMapButton(GuiGraphics context, int mouseX, int mouseY) {
+    private void renderMapButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         renderBookmarkButton(context, mouseX, mouseY, 288, 128, 0.3843f, 0.5058f, 0.3490f, ModConstants.MAP_ICON);
     }
@@ -194,7 +195,7 @@ public class BookmarkButtonWidget extends AbstractWidget {
      *       after the draw call.</li>
      * </ol>
      *
-     * @param context the {@link GuiGraphics} used for all draw calls
+     * @param context the {@link GuiGraphicsExtractor} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
      * @param u       horizontal texel offset into {@link ModConstants#MAP_GUI_ELEMENTS}
@@ -207,16 +208,17 @@ public class BookmarkButtonWidget extends AbstractWidget {
      * @param icon    {@link Identifier} of the sprite to retrieve from {@link IconSpriteAtlas}
      *                and render as the button icon
      */
-    private void renderBookmarkButton(GuiGraphics context, int mouseX, int mouseY, int u, int v, float r, float g, float b, Identifier icon) {
+    private void renderBookmarkButton(GuiGraphicsExtractor context, int mouseX, int mouseY, int u, int v, float r, float g, float b, Identifier icon) {
 
         var x = getX();
         var y = getY();
 
         context.blit(
+                RenderPipelines.GUI_TEXTURED,
                 ModConstants.MAP_GUI_ELEMENTS,
                 x, y,
-                getWidth(), getHeight(),
                 u, v,
+                getWidth(), getHeight(),
                 96, 96,
                 512, 512);
 
@@ -224,11 +226,9 @@ public class BookmarkButtonWidget extends AbstractWidget {
         var halfIconSize = (int) (iconSize / 2f);
 
         if (!isMouseOver(mouseX, mouseY) && !isFocused())
-            RenderSystem.setShaderColor(r, g, b, 1.0f);
 
-        context.blit(x + halfIconSize, y + halfIconSize, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(icon));
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), x + halfIconSize, y + halfIconSize, iconSize, iconSize);
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1.0f);
     }
 
     /**
@@ -243,12 +243,12 @@ public class BookmarkButtonWidget extends AbstractWidget {
      * @param mouseY current y position of the mouse cursor in screen pixels
      */
     @Override
-    public void onClick(double mouseX, double mouseY) {
+    public void onClick(MouseButtonEvent event, boolean doubleClick) {
 
         if (!visible) return;
 
         onSelect.run();
-        super.onClick(mouseX, mouseY);
+        super.onClick(event, doubleClick);
     }
 
     /**

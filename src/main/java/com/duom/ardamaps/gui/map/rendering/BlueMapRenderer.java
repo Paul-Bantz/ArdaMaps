@@ -31,18 +31,11 @@ import com.duom.ardamaps.core.data.map.cameras.BlueMapCamera;
 import com.duom.ardamaps.core.data.map.providers.BlueMapTileProvider;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.BufferUploader;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Tuple;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL13;
 
 import java.util.*;
 
@@ -115,7 +108,7 @@ public class BlueMapRenderer extends MapRenderable {
      * @param context DrawContext for rendering operations
      */
     @Override
-    public void render(GuiGraphics context) {
+    public void render(GuiGraphicsExtractor context) {
 
         // Handle loading state - if provider is not initialized, show placeholder
         if (provider == null) {
@@ -123,8 +116,8 @@ public class BlueMapRenderer extends MapRenderable {
             return;
         }
 
-        renderMap();
-        renderFogOfWar();
+        renderMap(context);
+        renderFogOfWar(context);
     }
 
     /**
@@ -155,7 +148,7 @@ public class BlueMapRenderer extends MapRenderable {
      * into vertex coordinates rather than using a matrix push/translate/pop.
      * </p>
      */
-    private void renderMap() {
+    private void renderMap(GuiGraphicsExtractor context) {
 
         int coarsestZoom = mapCamera.getCoarsestZoom();
         int primaryZ = mapCamera.getTileSourceClampedZoom();
@@ -203,15 +196,12 @@ public class BlueMapRenderer extends MapRenderable {
         }
 
         // Shared shader setup (once for the whole frame)
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(BlueMapTileShader::blueMapTile);
         BlueMapTileShader.setSunlightStrength(SUNLIGHT_STRENGTH);
         BlueMapTileShader.setAmbientLight(AMBIENT_LIGHT);
 
         // Pass 1: primary LOD tiles (all same lod -> one uniform update)
         if (!primaryTiles.isEmpty()) {
-            drawTilePass(primaryTiles, primaryZ);
+            drawTilePass(context, primaryTiles, primaryZ);
         }
 
         // Pass 2: fallback tiles, grouped by their actual resolved LOD.
@@ -221,10 +211,9 @@ public class BlueMapRenderer extends MapRenderable {
             for (TileDraw tile : fallbackMap.values()) {
                 byLod.computeIfAbsent(tile.lod(), k -> new ArrayList<>()).add(tile);
             }
-            byLod.forEach((lod, tiles) -> drawTilePass(tiles, lod));
+            byLod.forEach((lod, tiles) -> drawTilePass(context, tiles, lod));
         }
 
-        RenderSystem.disableBlend();
     }
 
     /**
@@ -262,42 +251,22 @@ public class BlueMapRenderer extends MapRenderable {
      * @param tiles List of pre-resolved tiles to draw.
      * @param lod   LOD zoom level shared by all tiles in this pass.
      */
-    private void drawTilePass(List<TileDraw> tiles, int lod) {
+    private void drawTilePass(GuiGraphicsExtractor context, List<TileDraw> tiles, int lod) {
 
         int renderSize = getDisplayedTileSize(lod);
         int imageSize = renderSize + 1;   // BlueMap adds a 1-pixel overlap on the right/bottom edge
-        float uMax = (float) renderSize / imageSize;
-        float vMax = (float) renderSize / (imageSize * 2);
         float lodScale = (float) Math.pow(mapCamera.getLodFactor(), lod - 1);
 
         // Set LOD-dependent uniforms once for the whole pass
         BlueMapTileShader.setLodScale(lodScale);
         BlueMapTileShader.setTexelSize(1f / imageSize, 1f / (imageSize * 2));
 
-        var textureManager = Minecraft.getInstance().getTextureManager();
-        Tesselator tessellator = Tesselator.getInstance();
-
         for (TileDraw tile : tiles) {
-
-            // Bind texture and set NEAREST filtering (parameters are stored per GL texture object
-            // so newly loaded tiles also get the correct filter on first bind)
-            RenderSystem.activeTexture(GL13.GL_TEXTURE0);
-            textureManager.bindForSetup(tile.texture());
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
-            RenderSystem.setShaderTexture(0, tile.texture());
-
-            float x0 = tile.x0();
-            float y0 = tile.y0();
-
-            // Sub-pixel offset baked directly into vertex positions — no matrix push/translate/pop
-            BufferBuilder buffer = tessellator.getBuilder();
-            buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-            buffer.vertex(x0, y0 + renderSize, 0).uv(0, vMax).endVertex();
-            buffer.vertex(x0 + renderSize, y0 + renderSize, 0).uv(uMax, vMax).endVertex();
-            buffer.vertex(x0 + renderSize, y0, 0).uv(uMax, 0).endVertex();
-            buffer.vertex(x0, y0, 0).uv(0, 0).endVertex();
-            BufferUploader.drawWithShader(buffer.end());
+            context.blit(RenderPipelines.GUI_TEXTURED, tile.texture(),
+                    (int) tile.x0(), (int) tile.y0(),
+                    0, 0,
+                    renderSize, renderSize,
+                    imageSize, imageSize * 2);
         }
     }
 

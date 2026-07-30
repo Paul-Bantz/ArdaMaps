@@ -50,7 +50,7 @@ public class VectorProjection {
         Camera camera = client.gameRenderer.getMainCamera();
 
         // Calculate the position relative to the camera
-        net.minecraft.world.phys.Vec3 cameraPosition = camera.getPosition();
+        net.minecraft.world.phys.Vec3 cameraPosition = camera.position();
         net.minecraft.world.phys.Vec3 relativePosition = new net.minecraft.world.phys.Vec3(
                 worldPos.x - cameraPosition.x,
                 worldPos.y - cameraPosition.y,
@@ -124,7 +124,7 @@ public class VectorProjection {
     public static float projectToHorizontalAngle(double x, double z) {
 
         Camera camera = Client.mc().gameRenderer.getMainCamera();
-        net.minecraft.world.phys.Vec3 cameraPos = camera.getPosition();
+        net.minecraft.world.phys.Vec3 cameraPos = camera.position();
 
         double dx = x - cameraPos.x;
         double dz = z - cameraPos.z;

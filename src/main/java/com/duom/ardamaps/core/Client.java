@@ -64,7 +64,7 @@ public class Client {
 
         if (world == null) return null;
 
-        return world.dimension().location().toString();
+        return world.dimension().identifier().toString();
     }
 
     /**
@@ -96,7 +96,7 @@ public class Client {
 
         if (world == null) return null;
 
-        var dimensionId = world.dimension().location().toString();
+        var dimensionId = world.dimension().identifier().toString();
 
         if (cachedCurrentDimension == null || !cachedCurrentDimension.getId().equals(dimensionId))
             cachedCurrentDimension = ArdaMapsClient.CONFIG.getDimension(dimensionId);

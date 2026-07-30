@@ -382,10 +382,11 @@ public class HttpImageProvider {
         var idName = getDiskCacheKey(URI.create(url));
         var imageData = imageKey.getA();
 
-        DynamicTexture nativeImage = new DynamicTexture(imageData);
-        Identifier texture = Minecraft.getInstance()
+        DynamicTexture nativeImage = new DynamicTexture(() -> idName, imageData);
+        Identifier texture = com.duom.ardamaps.gui.ModConstants.modId(idName);
+        Minecraft.getInstance()
                 .getTextureManager()
-                .register(idName, nativeImage);
+                .register(texture, nativeImage);
 
         textures.put(url, new TextureData(texture, imageData.getWidth(), imageData.getHeight()));
         loading.remove(url);
@@ -542,7 +543,7 @@ public class HttpImageProvider {
         Pixel[] pixels = img.pixels();
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
-                nativeImage.setPixelRGBA(x, y, argbToAbgr(pixels[y * w + x].argb));
+                nativeImage.setPixel(x, y, argbToAbgr(pixels[y * w + x].argb));
         return nativeImage;
     }
 

@@ -32,20 +32,11 @@ import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.MapCamera;
 import com.duom.ardamaps.gui.ModConstants;
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.BufferUploader;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import lombok.Getter;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL13;
 
 /**
  * Abstract base class for renderable map layers.
@@ -92,7 +83,7 @@ public abstract class MapRenderable {
      *
      * @param context The DrawContext to render with.
      */
-    public abstract void render(GuiGraphics context);
+    public abstract void render(GuiGraphicsExtractor context);
 
     /**
      * Releases resources owned by this renderable.
@@ -106,9 +97,9 @@ public abstract class MapRenderable {
      *
      * @param context The DrawContext to render with.
      */
-    protected void renderLoadingText(GuiGraphics context) {
+    protected void renderLoadingText(GuiGraphicsExtractor context) {
 
-        context.drawCenteredString(
+        context.centeredText(
                 textRenderer,
                 Component.translatable("ardamaps.client.map.screen.loading"),
                 camera.getViewportWidth() / 2,
@@ -119,7 +110,7 @@ public abstract class MapRenderable {
     /**
      * Renders the fog of war overlay on top of the map layer, using a custom shader to combine the paper texture and fog mask.
      */
-    protected void renderFogOfWar() {
+    protected void renderFogOfWar(GuiGraphicsExtractor context) {
 
         if (ArdaMapsClient.CONFIG.isMapRevealAll()) return;
         if (!FogOfWarShader.isLoaded()) return;
@@ -131,49 +122,18 @@ public abstract class MapRenderable {
         var screenX = pos.x();
         var screenY = pos.y();
 
-        try {
-            RenderSystem.setShader(FogOfWarShader::fogOfWar);
+        float scaleX = renderWidth / 256.0f;
+        float scaleY = renderHeight / 256.0f;
+        float centerX = (float) ((camera.getWorldX() - getDimension().getXMin()) / (double) getDimension().getWidth());
+        float centerY = (float) ((camera.getWorldZ() - getDimension().getZMin()) / (double) getDimension().getHeight());
+        FogOfWarShader.setTextureScale(scaleX, scaleY);
+        FogOfWarShader.setZoomCenter(centerX, centerY);
 
-            // Calculate paper tiling (repeat every 256 pixels)
-            float scaleX = renderWidth / 256.0f;
-            float scaleY = renderHeight / 256.0f;
-            float centerX = (float) ((camera.getWorldX() - getDimension().getXMin()) / (double) getDimension().getWidth());
-            float centerY = (float) ((camera.getWorldZ() - getDimension().getZMin()) / (double) getDimension().getHeight());
-            FogOfWarShader.setTextureScale(scaleX, scaleY);
-            FogOfWarShader.setZoomCenter(centerX, centerY);
-
-            var textureManager = Minecraft.getInstance().getTextureManager();
-
-            // Activate texture unit 0 and bind paper texture
-            RenderSystem.activeTexture(GL13.GL_TEXTURE0);
-            textureManager.bindForSetup(ModConstants.FOG_OF_WAR_TEXTURE);
-
-            // Activate texture unit 1 and bind fog mask
-            RenderSystem.activeTexture(GL13.GL_TEXTURE1);
-            textureManager.bindForSetup(exploration.getFogTextureId());
-
-            // Use bilinear filtering so cell edges blur smoothly
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
-
-            RenderSystem.enableBlend();
-            RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
-
-            BufferBuilder buffer = Tesselator.getInstance().getBuilder();
-            buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-
-            buffer.vertex(screenX, screenY + renderHeight, 0).uv(0, 1).endVertex();
-            buffer.vertex(screenX + renderWidth, screenY + renderHeight, 0).uv(1, 1).endVertex();
-            buffer.vertex(screenX + renderWidth, screenY, 0).uv(1, 0).endVertex();
-            buffer.vertex(screenX, screenY, 0).uv(0, 0).endVertex();
-
-            // Draw directly
-            BufferUploader.drawWithShader(buffer.end());
-
-            RenderSystem.disableBlend();
-        } finally {
-            RenderSystem.activeTexture(GL13.GL_TEXTURE0);
-        }
+        context.blit(RenderPipelines.GUI_TEXTURED, exploration.getFogTextureId(),
+                (int) screenX, (int) screenY,
+                0, 0,
+                (int) renderWidth, (int) renderHeight,
+                (int) renderWidth, (int) renderHeight);
     }
 
     /**

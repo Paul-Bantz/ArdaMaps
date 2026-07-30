@@ -27,13 +27,13 @@ package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.gui.ModConstants;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.function.Consumer;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.InputWithModifiers;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 
 /**
@@ -87,50 +87,44 @@ public class CheckboxWidget extends AbstractButton {
      * @param delta   Time delta since last render call
      */
     @Override
-    protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    protected void extractContents(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         int x = this.getX();
         int boxX = this.getX() + (width - size);
         int y = this.getY();
         Font textRenderer = Client.mc().font;
 
         if (!enabled) {
-            PoseStack matrices = context.pose();
-            matrices.pushPose();
-            matrices.translate(0, 0, 2);
-            RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 0.7f);
             context.fill(this.getX(), this.getY(), this.getX() + this.width, this.getY() + this.height, 0xFF48494A);
-            RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-            matrices.popPose();
 
             int textY = y + (height - textRenderer.lineHeight) / 2;
-            context.drawString(textRenderer, text, x, textY, 0xFF48494A);
+            context.text(textRenderer, text, x, textY, 0xFF48494A);
 
             return;
         }
 
         if (this.isHovered()) {
             if (checked) {
-                context.blit(ModConstants.TEXTURE, boxX, y, size, size, 20, 20, 20, 20, 64, 64);
+                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.TEXTURE, boxX, y, 20, 20, size, size, 20, 20, 64, 64);
             } else {
-                context.blit(ModConstants.TEXTURE, boxX, y, size, size, 20, 0, 20, 20, 64, 64);
+                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.TEXTURE, boxX, y, 20, 0, size, size, 20, 20, 64, 64);
             }
         } else {
             if (checked) {
-                context.blit(ModConstants.TEXTURE, boxX, y, size, size, 0, 20, 20, 20, 64, 64);
+                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.TEXTURE, boxX, y, 0, 20, size, size, 20, 20, 64, 64);
             } else {
-                context.blit(ModConstants.TEXTURE, boxX, y, size, size, 0, 0, 20, 20, 64, 64);
+                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.TEXTURE, boxX, y, 0, 0, size, size, 20, 20, 64, 64);
             }
         }
 
         int textY = y + (height - textRenderer.lineHeight) / 2;
-        context.drawString(textRenderer, text, x, textY, ModConstants.COLOR_WHITE);
+        context.text(textRenderer, text, x, textY, ModConstants.COLOR_WHITE);
     }
 
     /**
      * Toggles the checked state of the checkbox when it is pressed and calls the onChange callback with the new state.
      */
     @Override
-    public void onPress() {
+    public void onPress(InputWithModifiers input) {
         checked = !checked;
         if (onChange != null) {
             onChange.accept(checked);

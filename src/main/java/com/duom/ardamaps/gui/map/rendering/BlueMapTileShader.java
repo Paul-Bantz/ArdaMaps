@@ -25,122 +25,84 @@
 
 package com.duom.ardamaps.gui.map.rendering;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.duom.ardamaps.gui.ModConstants;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import net.minecraft.client.renderer.ShaderInstance;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
- * Utility class for managing the BlueMap tile shader.
- * <br/>The shader samples the colour from the top half of a BlueMap PNG tile and
- * applies height-gradient shading and block-light using the metadata stored in
- * the bottom half of the same image.
+ * Static RenderPipeline declaration for BlueMap tile shading.
  */
-public class BlueMapTileShader {
+public final class BlueMapTileShader {
 
-    /** Class logger */
-    private static final Logger LOGGER = LoggerFactory.getLogger(BlueMapTileShader.class);
-    
-    /** The BlueMap tile shader program. */
-    private static ShaderInstance BLUEMAP_TILE;
+    /** Pipeline that shades BlueMap colour/metadata tiles. */
+    public static final RenderPipeline BLUEMAP_TILE = RenderPipelines.register(RenderPipeline.builder(RenderPipelines.GUI_TEXTURED_SNIPPET)
+            .withLocation(ModConstants.modId("pipeline/bluemap_tile"))
+            .withVertexShader(ModConstants.modId("core/bluemap_tile"))
+            .withFragmentShader(ModConstants.modId("core/bluemap_tile"))
+            .withSampler("Sampler0")
+            .withUniform("BlueMapTileUniform", UniformType.UNIFORM_BUFFER)
+            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+            .build());
 
-    /**
-     * Returns the BlueMap tile shader program.
-     * Intended to be used as a method reference with {@link RenderSystem#setShader}.
-     *
-     * @return The shader program, or {@code null} if not yet loaded.
-     */
-    public static ShaderInstance blueMapTile() {
+    private static float sunlightStrength = 0.6F;
+    private static float ambientLight = 0.35F;
+    private static float lodScale = 1.0F;
+    private static float texelSizeX = 1.0F;
+    private static float texelSizeY = 1.0F;
+
+    private BlueMapTileShader() {
+    }
+
+    public static RenderPipeline blueMapTile() {
         return BLUEMAP_TILE;
     }
 
-    /**
-     * @return Whether the BlueMap tile shader is available.
-     */
     public static boolean isLoaded() {
-        return BLUEMAP_TILE != null;
+        return true;
     }
 
-    /**
-     * Loads (or reloads) the BlueMap tile shader from the given resource manager.
-     * Should be called from a {@link net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener}.
-     *
-     * @param resourceManager The resource manager to load the shader from.
-     */
-    public static void load(ResourceManager resourceManager) {
-
-        try {
-            ShaderInstance shader = new ShaderInstance(resourceManager, "bluemap_tile", DefaultVertexFormat.POSITION_TEX);
-            ShaderInstance previous = BLUEMAP_TILE;
-            BLUEMAP_TILE = shader;
-            if (previous != null) previous.close();
-        } catch (IOException e) {
-            LOGGER.error("Unable to load bluemap_tile shader; keeping previous shader if available", e);
-        }
+    public static void load(@SuppressWarnings("unused") ResourceManager resourceManager) {
+        // RenderPipelines are static declarations in 26.x; resources are reloaded by Minecraft's shader pipeline.
     }
 
-    /**
-     * Sets the {@code SunlightStrength} uniform (0.0 = fully block-lit, 1.0 = full sun).
-     *
-     * @param value Sunlight strength in [0, 1].
-     */
     public static void setSunlightStrength(float value) {
-        setUniform1f("SunlightStrength", value);
+        sunlightStrength = value;
     }
 
-    private static void setUniform1f(String name, float value) {
-
-        RenderSystem.getShader();
-
-        if (BLUEMAP_TILE != null) {
-            var uniform = BLUEMAP_TILE.getUniform(name);
-            if (uniform != null) {
-                uniform.set(value);
-            }
-        }
-    }
-
-    /**
-     * Sets the {@code AmbientLight} uniform (minimum brightness when block light = 0, 0.0–1.0).
-     *
-     * @param value Ambient light level in [0, 1].
-     */
     public static void setAmbientLight(float value) {
-        setUniform1f("AmbientLight", value);
+        ambientLight = value;
     }
 
-    /**
-     * Sets the {@code LodScale} uniform used to normalize height-gradient shading across LOD levels.
-     * Typically {@code lodFactor^(lod - 1)}.
-     *
-     * @param value LOD scale factor (1.0 at finest LOD).
-     */
     public static void setLodScale(float value) {
-        setUniform1f("LodScale", value);
+        lodScale = value;
     }
 
-    // --- Internal helpers ---
-
-    /**
-     * Sets the {@code TexelSize} uniform — one texel step in normalized UV space.
-     * Should be {@code (1/imageSize, 1/(imageSize*2))} where {@code imageSize = renderSize + 1}.
-     *
-     * @param x UV step in the horizontal (U) direction.
-     * @param y UV step in the vertical (V) direction.
-     */
     public static void setTexelSize(float x, float y) {
+        texelSizeX = x;
+        texelSizeY = y;
+    }
 
-        RenderSystem.getShader();
+    public static float sunlightStrength() {
+        return sunlightStrength;
+    }
 
-        if (BLUEMAP_TILE != null) {
-            var uniform = BLUEMAP_TILE.getUniform("TexelSize");
-            if (uniform != null) {
-                uniform.set(x, y);
-            }
-        }
+    public static float ambientLight() {
+        return ambientLight;
+    }
+
+    public static float lodScale() {
+        return lodScale;
+    }
+
+    public static float texelSizeX() {
+        return texelSizeX;
+    }
+
+    public static float texelSizeY() {
+        return texelSizeY;
     }
 }

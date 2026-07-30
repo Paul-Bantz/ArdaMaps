@@ -40,7 +40,6 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.loader.api.FabricLoader;
@@ -87,24 +86,24 @@ public class ClientCommands {
     private static void registerCommands(CommandDispatcher<FabricClientCommandSource> dispatcher) {
 
         dispatcher.register(
-                ClientCommandManager.literal(ArdaMaps.MOD_ID)
+                net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal(ArdaMaps.MOD_ID)
                         .executes(ClientCommands::printModInformation)
-                        .then(ClientCommandManager.literal("guide")
-                            .then(ClientCommandManager.argument("link", StringArgumentType.greedyString())
+                        .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("guide")
+                            .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument("link", StringArgumentType.greedyString())
                                 .executes(ClientCommands::openGuideLink)))
-                        .then(ClientCommandManager.literal("waypoint")
-                                .then(ClientCommandManager.argument("waypointCommandArgs", StringArgumentType.greedyString())
+                        .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("waypoint")
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument("waypointCommandArgs", StringArgumentType.greedyString())
                                         .executes(ClientCommands::addChatWaypoint)))
-                        .then(ClientCommandManager.literal("refresh")
-                                .then(ClientCommandManager.literal("locations")
+                        .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("refresh")
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("locations")
                                         .executes(ClientCommands::refreshLocations))
-                                .then(ClientCommandManager.literal("regions")
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("regions")
                                         .executes(ClientCommands::refreshRegions))
-                                .then(ClientCommandManager.literal("configuration")
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("configuration")
                                         .executes(ClientCommands::refreshMaps)))
-                        .then(ClientCommandManager.literal("debug")
+                        .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("debug")
                                 .executes(ClientCommands::debugModState)
-                                .then(ClientCommandManager.literal("exploration_state")
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("exploration_state")
                                         .executes(ClientCommands::dumpExplorationState)
                                 )
                         )

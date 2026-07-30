@@ -27,12 +27,13 @@ package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.gui.ModConstants;
-import com.mojang.blaze3d.systems.RenderSystem;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 
 /**
@@ -97,7 +98,7 @@ public class StyledButtonWidget extends AbstractWidget {
      * @param delta   the time delta since the last frame, used for animations (not utilized in this implementation)
      */
     @Override
-    protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         if (!visible) return;
 
@@ -113,7 +114,7 @@ public class StyledButtonWidget extends AbstractWidget {
      * @param mouseX the mouse x position
      * @param mouseY the mouse y position
      */
-    private void renderDefaultStyle(GuiGraphics context, int mouseX, int mouseY) {
+    private void renderDefaultStyle(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         var u = 16;
         var v = 16;
@@ -124,19 +125,10 @@ public class StyledButtonWidget extends AbstractWidget {
         else if (isMouseOver(mouseX, mouseY)) v += 32;
 
         if (!active) {
-            RenderSystem.setShaderColor(0.85f, 0.85f, 0.85f, 1f);
         }
 
-        context.blitNineSliced(ModConstants.MAP_GUI_ELEMENTS,
-                x, y,
-                width, height,
-                12,
-                9,
-                12,
-                9,
-                128,
-                32,
-                u, v);
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
+                x, y, u, v, width, height, 128, 32, 512, 512);
 
         var text = getMessage();
 
@@ -146,10 +138,9 @@ public class StyledButtonWidget extends AbstractWidget {
             var offsetX = width / 2 - textRenderer.width(text) / 2;
             var offsetY = height / 2 - textRenderer.lineHeight / 2;
 
-            context.drawString(textRenderer, text, x + offsetX, y + offsetY, toggled ? ModConstants.COLOR_LIGHT_BROWN : ModConstants.COLOR_DARK_BROWN, false);
+            context.text(textRenderer, text, x + offsetX, y + offsetY, toggled ? ModConstants.COLOR_LIGHT_BROWN : ModConstants.COLOR_DARK_BROWN, false);
         }
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
     }
 
     /**
@@ -158,7 +149,7 @@ public class StyledButtonWidget extends AbstractWidget {
      * @param mouseX the mouse x position
      * @param mouseY the mouse y position
      */
-    private void renderEdgeStyle(GuiGraphics context, int mouseX, int mouseY) {
+    private void renderEdgeStyle(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         var x = getX();
         var y = getY();
@@ -167,22 +158,20 @@ public class StyledButtonWidget extends AbstractWidget {
         var mouseOver = isMouseOver(mouseX, mouseY);
 
         if (isMouseOver(mouseX, mouseY))
-            RenderSystem.setShaderColor(1f, 1f, 1f, .5f);
 
         if (toggled || mouseOver) {
 
             var indicatorHeight = getHeight();
             var indicatorWidth = indicatorHeight * 14 / 64;
             context.fill(x, y, x + getWidth(), y + getHeight(), ModConstants.COLOR_LIGHT_BROWN);
-            context.blit(ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
                     x + getWidth() - indicatorWidth, y,
-                    indicatorWidth, indicatorHeight,
                     32, 242,
+                    indicatorWidth, indicatorHeight,
                     14, 64,
                     512, 512);
         }
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
 
         if (!text.equals(Component.empty())) {
 
@@ -190,7 +179,7 @@ public class StyledButtonWidget extends AbstractWidget {
             var offsetX = width / 2 - textRenderer.width(text) / 2;
             var offsetY = height / 2 - textRenderer.lineHeight / 2;
 
-            context.drawString(textRenderer, text, x + offsetX, y + offsetY, ModConstants.COLOR_DARK_BROWN, false);
+            context.text(textRenderer, text, x + offsetX, y + offsetY, ModConstants.COLOR_DARK_BROWN, false);
         }
     }
 
@@ -221,10 +210,10 @@ public class StyledButtonWidget extends AbstractWidget {
      * @param mouseY the y position of the mouse cursor at the time of the click
      */
     @Override
-    public void onClick(double mouseX, double mouseY) {
+    public void onClick(MouseButtonEvent event, boolean doubleClick) {
 
         onSelect.run();
-        super.onClick(mouseX, mouseY);
+        super.onClick(event, doubleClick);
     }
 
     /**

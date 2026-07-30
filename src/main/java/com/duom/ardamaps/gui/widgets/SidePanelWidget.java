@@ -47,11 +47,14 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import lombok.Getter;
 import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.navigation.FocusNavigationEvent;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -342,7 +345,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @param mouseX  Current mouse X position
      * @param mouseY  Current mouse Y position
      */
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         if (locationDetails == null) return;
 
@@ -355,22 +358,11 @@ public class SidePanelWidget implements GuiEventListener {
      *
      * @param context The drawing context
      */
-    private void renderBackground(GuiGraphics context) {
+    private void renderBackground(GuiGraphicsExtractor context) {
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        context.blitNineSliced(ModConstants.PAPER_TEXTURE,
-                screenX1, screenY1,
-                screenX2 - screenX1, screenY2 - screenY1,
-                64,
-                64,
-                64,
-                64,
-                256,
-                256,
-                0, 0);
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.PAPER_TEXTURE,
+                screenX1, screenY1, 0, 0, screenX2 - screenX1, screenY2 - screenY1, 256, 256, 512, 512);
 
-        RenderSystem.disableBlend();
     }
 
     /**
@@ -380,7 +372,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @param mouseX  Current mouse X position
      * @param mouseY  Current mouse Y position
      */
-    private void renderGuiElements(GuiGraphics context, int mouseX, int mouseY) {
+    private void renderGuiElements(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         var centerX = (screenX1 + screenX2) / 2;
         var y = screenY1 + ELEMENT_SPACING + PADDING;
@@ -416,22 +408,22 @@ public class SidePanelWidget implements GuiEventListener {
      * @param mouseY  Current mouse Y position
      * @return The height of the rendered title
      */
-    private int renderTitle(GuiGraphics context, int centerX, int y, int mouseX, int mouseY) {
+    private int renderTitle(GuiGraphicsExtractor context, int centerX, int y, int mouseX, int mouseY) {
 
         this.titleWidth = (int) (textRenderer.width(locationDetails.name()) * ModConstants.H1_TEXT_SCALE);
         this.titleHeight = (int) (textRenderer.lineHeight * ModConstants.H1_TEXT_SCALE);
         this.titleX = centerX - (titleWidth / 2);
         this.titleY = y;
 
-        context.pose().pushPose();
-        context.pose().translate(titleX, titleY, 0);
-        context.pose().scale(ModConstants.H1_TEXT_SCALE, ModConstants.H1_TEXT_SCALE, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(titleX, titleY);
+        context.pose().scale(ModConstants.H1_TEXT_SCALE, ModConstants.H1_TEXT_SCALE);
 
         int color = mouseOverTitle(mouseX, mouseY) ?
                 ModConstants.COLOR_BLUE_HIGHLIGHT :
                 ModConstants.COLOR_BLUE;
 
-        context.drawString(
+        context.text(
                 textRenderer,
                 locationDetails.name(),
                 0,
@@ -440,7 +432,7 @@ public class SidePanelWidget implements GuiEventListener {
                 false
         );
 
-        context.pose().popPose();
+        context.pose().popMatrix();
 
         return (int) (textRenderer.lineHeight * ModConstants.H1_TEXT_SCALE);
     }
@@ -459,12 +451,12 @@ public class SidePanelWidget implements GuiEventListener {
      * @param visibleHeight   The visible height for rendering
      * @return The total height occupied by the description area (= visibleHeight)
      */
-    private int renderDescription(GuiGraphics context, double mouseX, double mouseY,
+    private int renderDescription(GuiGraphicsExtractor context, double mouseX, double mouseY,
                                   int usableWidth, int centerX, int y,
                                   int halfUsableWidth, int visibleHeight) {
 
         // Detect rising-edge left-click this frame
-        long handle = Client.mc().getWindow().getWindow();
+        long handle = Client.mc().getWindow().handle();
         boolean leftDown = GLFW.glfwGetMouseButton(handle, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
         boolean clicked = leftDown && !leftMouseButtonWasDown;
         leftMouseButtonWasDown = leftDown;
@@ -493,7 +485,6 @@ public class SidePanelWidget implements GuiEventListener {
         Style hoveredStyle = result.hoveredStyle;
         if (hoveredStyle != null) {
             if (hoveredStyle.getHoverEvent() != null)
-                context.renderComponentHoverEffect(textRenderer, hoveredStyle, (int) mouseX, (int) mouseY);
 
             if (clicked && hoveredStyle.getClickEvent() instanceof ClickEvent.OpenUrl) {
                 handleLinkClick(hoveredStyle.getClickEvent());
@@ -513,10 +504,10 @@ public class SidePanelWidget implements GuiEventListener {
      * @param mouseY  Current mouse Y position
      * @return The height of the rendered button
      */
-    private int renderExploreInDepth(GuiGraphics context, int centerX, int y, int mouseX, int mouseY) {
+    private int renderExploreInDepth(GuiGraphicsExtractor context, int centerX, int y, int mouseX, int mouseY) {
 
         exploreInDepthButton.setPosition(centerX - ModConstants.BUTTON_WIDTH / 2, y);
-        exploreInDepthButton.render(context, mouseX, mouseY, 0);
+        exploreInDepthButton.extractRenderState(context, mouseX, mouseY, 0);
 
         return ModConstants.BUTTON_HEIGHT;
     }
@@ -531,7 +522,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @param mouseX      The current mouse X position
      * @param mouseY      The current mouse Y position
      */
-    private void renderButtons(GuiGraphics context, int usableWidth, int x, int y, int mouseX, int mouseY) {
+    private void renderButtons(GuiGraphicsExtractor context, int usableWidth, int x, int y, int mouseX, int mouseY) {
 
         // Check that the teleport and set waypoint doesn't lead to world origin
         if (displayedLocation.getPosition() != null) {
@@ -550,19 +541,19 @@ public class SidePanelWidget implements GuiEventListener {
             setWaypointButton.setX(x + PADDING + (usableWidth - ModConstants.BUTTON_WIDTH) / 2);
             setWaypointButton.setY(y);
             setWaypointButton.setWidth(ModConstants.BUTTON_WIDTH);
-            setWaypointButton.render(context, mouseX, mouseY, 0f);
+            setWaypointButton.extractRenderState(context, mouseX, mouseY, 0f);
 
         } else {
 
             setWaypointButton.setX(x + PADDING);
             setWaypointButton.setY(y);
             setWaypointButton.setWidth(buttonWidth);
-            setWaypointButton.render(context, mouseX, mouseY, 0f);
+            setWaypointButton.extractRenderState(context, mouseX, mouseY, 0f);
 
             teleportButton.setX(x + PADDING + buttonWidth + ELEMENT_SPACING);
             teleportButton.setY(y);
             teleportButton.setWidth(buttonWidth);
-            teleportButton.render(context, mouseX, mouseY, 0f);
+            teleportButton.extractRenderState(context, mouseX, mouseY, 0f);
         }
     }
 
@@ -611,6 +602,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @return True if the event was handled by the side panel, false otherwise
      */
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        MouseButtonEvent event = new MouseButtonEvent(mouseX, mouseY, new net.minecraft.client.input.MouseButtonInfo(button, 0));
 
         if (mouseOverTitle((int) mouseX, (int) mouseY)) {
 
@@ -618,9 +610,9 @@ public class SidePanelWidget implements GuiEventListener {
             return true;
         }
 
-        return (exploreInDepthButton.mouseClicked(mouseX, mouseY, button))
-                || (teleportButton.mouseClicked(mouseX, mouseY, button))
-                || (setWaypointButton.mouseClicked(mouseX, mouseY, button));
+        return (exploreInDepthButton.mouseClicked(event, false))
+                || (teleportButton.mouseClicked(event, false))
+                || (setWaypointButton.mouseClicked(event, false));
     }
 
     /**
@@ -632,7 +624,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @return False as the event is not handled
      */
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(MouseButtonEvent event) {
         return false;
     }
 
@@ -647,7 +639,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @return False as the event is not handled
      */
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
         return false;
     }
 
@@ -660,11 +652,11 @@ public class SidePanelWidget implements GuiEventListener {
      * @return True if the event was handled
      */
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
 
         if (!isMouseOver(mouseX, mouseY)) return false;
 
-        return scrollbar.scroll(amount);
+        return scrollbar.scroll(verticalAmount);
     }
 
     /**
@@ -689,7 +681,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @return False as the event is not handled
      */
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
         return false;
     }
 
@@ -702,7 +694,7 @@ public class SidePanelWidget implements GuiEventListener {
      * @return False as the event is not handled
      */
     @Override
-    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
+    public boolean keyReleased(KeyEvent event) {
         return false;
     }
 
@@ -713,7 +705,6 @@ public class SidePanelWidget implements GuiEventListener {
      * @param modifiers Any modifier keys that were held during typing
      * @return False as the event is not handled
      */
-    @Override
     public boolean charTyped(char chr, int modifiers) {
         return false;
     }

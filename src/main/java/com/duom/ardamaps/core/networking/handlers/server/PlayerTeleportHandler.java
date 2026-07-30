@@ -34,9 +34,11 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.entity.Relative;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Set;
 import java.util.OptionalDouble;
 
 /**
@@ -80,9 +82,9 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
                 // Search for the world with the matching registry key
                 for (var world : worlds) {
 
-                    if (world.dimension().location().toString().equals(packet.worldId())) {
+                    if (world.dimension().identifier().toString().equals(packet.worldId())) {
 
-                        LOGGER.info("World found: {}", world.dimension().location());
+                        LOGGER.info("World found: {}", world.dimension().identifier());
                         serverWorld = world;
                         break;
                     }
@@ -110,17 +112,17 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
                             LOGGER.info("Safe position found at: {}, {}, {}", x, teleportY, z);
                         }
 
-                        player.teleportTo(serverWorld, x, teleportY, z, player.getYRot(), player.getXRot());
+                        player.teleportTo(serverWorld, x, teleportY, z, Set.<Relative>of(), player.getYRot(), player.getXRot(), true);
                     } else {
 
-                        player.teleportTo(serverWorld, packet.x(), packet.y(), packet.z(), player.getYRot(), player.getXRot());
+                        player.teleportTo(serverWorld, packet.x(), packet.y(), packet.z(), Set.<Relative>of(), player.getYRot(), player.getXRot(), true);
                     }
 
                     return;
                 }
             }
 
-            player.teleportToWithTicket(packet.x(), packet.y(), packet.z());
+            player.teleportTo(packet.x(), packet.y(), packet.z());
 
         });
     }
@@ -135,8 +137,8 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
      * @return The exact standing Y coordinate, or empty if no safe position is found.
      */
     public static OptionalDouble findSafeY(ServerLevel world, ServerPlayer player, double x, double z) {
-        int topY = world.getMaxBuildHeight();
-        int bottomY = world.getMinBuildHeight();
+        int topY = world.getMaxY();
+        int bottomY = world.getMinY();
 
         for (int y = topY - 2; y >= bottomY; y--) {
             OptionalDouble safeY = SafeTeleportScanner.standingHeightAt(world, player, x, y, z);

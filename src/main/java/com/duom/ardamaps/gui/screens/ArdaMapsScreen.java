@@ -39,8 +39,9 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 import java.util.function.Function;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -246,9 +247,9 @@ public abstract class ArdaMapsScreen extends Screen {
      * @param context The DrawContext used for rendering the background.
      */
     @Override
-    public void renderBackground(GuiGraphics context) {
+    public void extractBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
-        super.renderBackground(context);
+        super.extractBackground(context, mouseX, mouseY, delta);
 
         guiBackgroundRenderer.render(context, width, height);
     }
@@ -336,10 +337,12 @@ public abstract class ArdaMapsScreen extends Screen {
      * @return true if the event was consumed, false otherwise
      */
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
+        int keyCode = event.key();
+        int modifiers = event.modifiers();
 
         // Detect Ctrl+F (or Cmd+F on macOS)
-        if (keyCode == GLFW.GLFW_KEY_F && hasControlDown() && isSearchable()) {
+        if (keyCode == GLFW.GLFW_KEY_F && (modifiers & (GLFW.GLFW_MOD_CONTROL | GLFW.GLFW_MOD_SUPER)) != 0 && isSearchable()) {
 
             SearchWidget searchWidget = new SearchWidget(this);
             searchWidget.setSearchFunction(getSearchFunction());
@@ -352,7 +355,7 @@ public abstract class ArdaMapsScreen extends Screen {
             return true;
         }
 
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     /**

@@ -27,7 +27,7 @@ package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.gui.screens.ScreenRenderingUtils;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 
@@ -69,14 +69,14 @@ public class SimpleTextFieldWidget extends EditBox {
      * @param delta   the tick delta
      */
     @Override
-    public void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         var matrices = context.pose();
 
-        matrices.pushPose();
-        matrices.translate(horizontalOffset, verticalOffset, 0);
-        super.renderWidget(context, mouseX, mouseY, delta);
-        matrices.popPose();
+        matrices.pushMatrix();
+        matrices.translate(horizontalOffset, verticalOffset);
+        super.extractWidgetRenderState(context, mouseX, mouseY, delta);
+        matrices.popMatrix();
 
         context.fill(getX() + 4, getY(), getX() + getWidth() - 4, getY() + getHeight(), 0x55000000);
 

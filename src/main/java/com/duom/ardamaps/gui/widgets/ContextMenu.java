@@ -30,7 +30,8 @@ import com.duom.ardamaps.gui.ModConstants;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
@@ -117,20 +118,12 @@ public class ContextMenu {
      * @param mouseX The current x-coordinate of the mouse cursor, used for hover detection.
      * @param mouseY The current y-coordinate of the mouse cursor, used for hover detection.
      */
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         var textRenderer = Client.mc().font;
 
-        context.blitNineSliced(ModConstants.MAP_GUI_ELEMENTS,
-                x, y,
-                width, height,
-                16,
-                16,
-                16,
-                16,
-                64,
-                64,
-                16, 176);
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
+                x, y, 16, 176, width, height, 64, 64, 512, 512);
 
         for (int i = 0; i < entries.size(); i++) {
             int itemY = y + PADDING + i * ITEM_HEIGHT;
@@ -139,19 +132,11 @@ public class ContextMenu {
 
             if (hovered) {
 
-                context.blitNineSliced(ModConstants.MAP_GUI_ELEMENTS,
-                        x, itemY,
-                        width, ITEM_HEIGHT,
-                        16,
-                        1,
-                        16,
-                        1,
-                        64,
-                        64,
-                        80, 176);
+                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
+                        x, itemY, 80, 176, width, ITEM_HEIGHT, 64, 64, 512, 512);
             }
 
-            context.drawString(
+            context.text(
                     Client.mc().font,
                     entries.get(i).label(),
                     x + H_PADDING,

@@ -28,7 +28,7 @@ package com.duom.ardamaps.gui.screens.rendering;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.gui.ModConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 /**
  * Renderer for the frame around the map.
@@ -90,14 +90,11 @@ public class MapFrameRenderer {
      *
      * @param context The draw context
      */
-    public void render(GuiGraphics context, BackgroundRenderer.GuiLayout layout) {
+    public void render(GuiGraphicsExtractor context, BackgroundRenderer.GuiLayout layout) {
 
         updateIfDirty(layout);
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
 
         drawMapFrameTopEdge(context, topLeft, topRight);
         drawMapFrameBottomEdge(context, bottomLeft, bottomRight);
@@ -106,7 +103,6 @@ public class MapFrameRenderer {
 
         drawMapCorners(context, topLeft, topRight, bottomRight, bottomLeft);
 
-        RenderSystem.disableBlend();
     }
 
     /**
@@ -147,7 +143,7 @@ public class MapFrameRenderer {
      * @param topLeft  the screen coordinates of the top-left corner of the frame
      * @param topRight the screen coordinates of the top-right corner of the frame
      */
-    private void drawMapFrameTopEdge(GuiGraphics context, Vec2d topLeft, Vec2d topRight) {
+    private void drawMapFrameTopEdge(GuiGraphicsExtractor context, Vec2d topLeft, Vec2d topRight) {
 
         int x = (int) topLeft.x() + scaledCornerSize - PIXEL_OVERLAP;
         int endX = (int) (topRight.x() - scaledCornerSize + PIXEL_OVERLAP);
@@ -179,7 +175,7 @@ public class MapFrameRenderer {
      * @param bottomLeft  the screen coordinates of the bottom-left corner of the frame
      * @param bottomRight the screen coordinates of the bottom-right corner of the frame
      */
-    private void drawMapFrameBottomEdge(GuiGraphics context, Vec2d bottomLeft, Vec2d bottomRight) {
+    private void drawMapFrameBottomEdge(GuiGraphicsExtractor context, Vec2d bottomLeft, Vec2d bottomRight) {
 
         int x = (int) bottomLeft.x() + scaledCornerSize - PIXEL_OVERLAP;
         int endX = (int) (bottomRight.x() - scaledCornerSize + PIXEL_OVERLAP);
@@ -211,7 +207,7 @@ public class MapFrameRenderer {
      * @param topLeft    the screen coordinates of the top-left corner of the frame
      * @param bottomLeft the screen coordinates of the bottom-left corner of the frame
      */
-    private void drawMapFrameLeftEdge(GuiGraphics context, Vec2d topLeft, Vec2d bottomLeft) {
+    private void drawMapFrameLeftEdge(GuiGraphicsExtractor context, Vec2d topLeft, Vec2d bottomLeft) {
 
         int x = (int) topLeft.x();
         int y = (int) topLeft.y() + scaledCornerSize - PIXEL_OVERLAP;
@@ -243,7 +239,7 @@ public class MapFrameRenderer {
      * @param topRight    the screen coordinates of the top-right corner of the frame
      * @param bottomRight the screen coordinates of the bottom-right corner of the frame
      */
-    private void drawMapFrameRightEdge(GuiGraphics context, Vec2d topRight, Vec2d bottomRight) {
+    private void drawMapFrameRightEdge(GuiGraphicsExtractor context, Vec2d topRight, Vec2d bottomRight) {
 
         int x = (int) topRight.x() - scaledCornerSize;
         int y = (int) topRight.y() + scaledCornerSize - PIXEL_OVERLAP;
@@ -276,7 +272,7 @@ public class MapFrameRenderer {
      * @param bottomRight the screen coordinates of the bottom-right corner of the frame
      * @param bottomLeft  the screen coordinates of the bottom-left corner of the frame
      */
-    private void drawMapCorners(GuiGraphics context, Vec2d topLeft, Vec2d topRight, Vec2d bottomRight, Vec2d bottomLeft) {
+    private void drawMapCorners(GuiGraphicsExtractor context, Vec2d topLeft, Vec2d topRight, Vec2d bottomRight, Vec2d bottomLeft) {
 
         var cornerUv = scaledFrameTextureSize - scaledCornerSize;
 

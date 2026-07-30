@@ -26,7 +26,7 @@
 package com.duom.ardamaps.gui.widgets;
 
 import lombok.Getter;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.util.Mth;
 
 /**
@@ -132,7 +132,7 @@ public class ScrollbarWidget {
      * @param visibleCount Number of visible units (items or pixels)
      * @param totalCount   Total number of units in the content
      */
-    public void render(GuiGraphics context, int trackX, int trackY, int trackHeight,
+    public void render(GuiGraphicsExtractor context, int trackX, int trackY, int trackHeight,
                        int visibleCount, int totalCount) {
 
         // Track background
