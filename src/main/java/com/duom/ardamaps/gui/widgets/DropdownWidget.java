@@ -34,7 +34,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -441,10 +440,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
             collapse();
         }
         super.onClick(event, doubleClick);
-    }
-
-    public void onClick(double mouseX, double mouseY) {
-        onClick(new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(0, 0)), false);
     }
 
     /**

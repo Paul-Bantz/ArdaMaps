@@ -26,6 +26,8 @@
 package com.duom.ardamaps.gui.widgets;
 
 import net.minecraft.network.chat.Component;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -110,9 +112,13 @@ class DropdownWidgetTest {
 
         DropdownWidget<String, TextIdentifierPairItem> widget = widget(DropdownWidget.ExpandDirection.UP_LEFT);
 
-        widget.onClick(10, 100);
-        widget.onClick(10, 65);
+        widget.onClick(mouse(10, 100), false);
+        widget.onClick(mouse(10, 65), false);
 
         assertEquals("c", widget.getSelected());
+    }
+
+    private static MouseButtonEvent mouse(double x, double y) {
+        return new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0));
     }
 }

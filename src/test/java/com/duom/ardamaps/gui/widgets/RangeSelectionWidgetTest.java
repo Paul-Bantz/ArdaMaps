@@ -26,6 +26,8 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.data.config.MapLayerRange;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.Test;
 
@@ -241,8 +243,8 @@ class RangeSelectionWidgetTest {
         List<MapLayerRange> selected = new ArrayList<>();
         RangeSelectionWidget widget = widget(ranges(5), selected);
 
-        widget.onClick(45, 10);
-        widget.onRelease(45, 10);
+        widget.onClick(mouse(45, 10), false);
+        widget.onRelease(mouse(45, 10));
 
         assertEquals(2, widget.getSelectedIndex());
 
@@ -262,9 +264,9 @@ class RangeSelectionWidgetTest {
         List<MapLayerRange> selected = new ArrayList<>();
         RangeSelectionWidget widget = widget(ranges(10), selected);
 
-        widget.onClick(70, 10);
-        widget.onDrag(20, 10, -50, 0);
-        widget.onRelease(20, 10);
+        widget.onClick(mouse(70, 10), false);
+        widget.onDrag(mouse(20, 10), -50, 0);
+        widget.onRelease(mouse(20, 10));
 
         assertEquals(-50, widget.getScrollOffset());
         assertNull(widget.getSelected());
@@ -334,7 +336,7 @@ class RangeSelectionWidgetTest {
 
         widget.setSelected(ranges.get(4));
 
-        assertTrue(widget.mouseScrolled(50, 10, 1));
+        assertTrue(widget.mouseScrolled(50, 10, 0, 1));
         assertEquals(5, widget.getSelectedIndex());
         assertEquals(ranges.get(5), widget.getSelected());
         assertEquals(List.of(ranges.get(5)), selected);
@@ -354,7 +356,7 @@ class RangeSelectionWidgetTest {
 
         widget.setSelected(ranges.get(0));
 
-        assertTrue(widget.mouseScrolled(50, 10, -1));
+        assertTrue(widget.mouseScrolled(50, 10, 0, -1));
         assertEquals(0, widget.getSelectedIndex());
         assertTrue(selected.isEmpty());
     }
@@ -373,7 +375,7 @@ class RangeSelectionWidgetTest {
         widget.centerOn(5);
 
         assertEquals(3, widget.firstVisibleIndex());
-        assertTrue(widget.mouseScrolled(50, 10, 1));
+        assertTrue(widget.mouseScrolled(50, 10, 0, 1));
         assertEquals(4, widget.getSelectedIndex());
         assertEquals(List.of(ranges.get(4)), selected);
     }
@@ -390,7 +392,7 @@ class RangeSelectionWidgetTest {
 
         widget.centerOn(5);
 
-        assertTrue(widget.mouseScrolled(50, 10, 1));
+        assertTrue(widget.mouseScrolled(50, 10, 0, 1));
         assertEquals(-54, widget.getScrollOffset());
         assertNull(widget.getSelected());
         assertTrue(selected.isEmpty());
@@ -422,15 +424,15 @@ class RangeSelectionWidgetTest {
         RangeSelectionWidget widget = widget(ranges(10), selected);
 
         widget.centerOn(9);
-        widget.onClick(widget.stripX() + widget.viewportWidth() - 1, 10);
-        widget.onRelease(widget.stripX() + widget.viewportWidth() - 1, 10);
+        widget.onClick(mouse(widget.stripX() + widget.viewportWidth() - 1, 10), false);
+        widget.onRelease(mouse(widget.stripX() + widget.viewportWidth() - 1, 10));
 
         assertEquals(9, widget.getSelectedIndex());
         assertEquals(9, selected.get(0).index());
 
         widget.centerOn(4);
-        widget.onClick(widget.stripX() + widget.viewportWidth() - 1, 10);
-        widget.onRelease(widget.stripX() + widget.viewportWidth() - 1, 10);
+        widget.onClick(mouse(widget.stripX() + widget.viewportWidth() - 1, 10), false);
+        widget.onRelease(mouse(widget.stripX() + widget.viewportWidth() - 1, 10));
 
         assertNotEquals(-1, widget.getSelectedIndex());
         assertEquals(2, selected.size());
@@ -462,12 +464,12 @@ class RangeSelectionWidgetTest {
 
         widget.centerOn(9);
         assertEquals(widget.minScrollOffset(), widget.getScrollOffset());
-        assertTrue(widget.mouseScrolled(50, 10, -1));
+        assertTrue(widget.mouseScrolled(50, 10, 0, -1));
         assertEquals(widget.minScrollOffset(), widget.getScrollOffset());
 
         widget.centerOn(0);
         assertEquals(0, widget.getScrollOffset());
-        assertTrue(widget.mouseScrolled(50, 10, 1));
+        assertTrue(widget.mouseScrolled(50, 10, 0, 1));
         assertEquals(0, widget.getScrollOffset());
     }
 
@@ -480,8 +482,8 @@ class RangeSelectionWidgetTest {
 
         RangeSelectionWidget widget = widget(ranges(10), new ArrayList<>());
 
-        assertFalse(widget.mouseScrolled(100, 10, 1));
-        assertFalse(widget.mouseScrolled(50, 20, 1));
+        assertFalse(widget.mouseScrolled(100, 10, 0, 1));
+        assertFalse(widget.mouseScrolled(50, 20, 0, 1));
     }
 
     /**
@@ -525,5 +527,9 @@ class RangeSelectionWidgetTest {
 
             return controlDown;
         }
+    }
+
+    private static MouseButtonEvent mouse(double x, double y) {
+        return new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0));
     }
 }

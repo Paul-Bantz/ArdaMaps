@@ -35,7 +35,6 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
@@ -409,10 +408,6 @@ public class RangeSelectionWidget extends AbstractWidget {
         dragMoved = false;
     }
 
-    public void onClick(double mouseX, double mouseY) {
-        onClick(new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(0, 0)), false);
-    }
-
     /**
      * Updates horizontal scrolling while a drag is active.
      *
@@ -426,10 +421,6 @@ public class RangeSelectionWidget extends AbstractWidget {
 
         scrollOffset = clampScrollOffset(dragStartOffset + (event.x() - dragStartMouseX));
         if (Math.abs(event.x() - dragStartMouseX) > DRAG_THRESHOLD) dragMoved = true;
-    }
-
-    protected void onDrag(double mouseX, double mouseY, double deltaX, double deltaY) {
-        onDrag(new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(0, 0)), deltaX, deltaY);
     }
 
     /**
@@ -509,10 +500,6 @@ public class RangeSelectionWidget extends AbstractWidget {
         dragging = false;
     }
 
-    public void onRelease(double mouseX, double mouseY) {
-        onRelease(new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(0, 0)));
-    }
-
     /**
      * Handles wheel input over the strip, either selecting ranges with control held or panning horizontally.
      *
@@ -530,10 +517,6 @@ public class RangeSelectionWidget extends AbstractWidget {
 
         scrollOffset = clampScrollOffset(scrollOffset + verticalAmount * itemWidth);
         return true;
-    }
-
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
-        return mouseScrolled(mouseX, mouseY, 0, amount);
     }
 
     /**
