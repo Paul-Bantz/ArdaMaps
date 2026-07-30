@@ -38,6 +38,7 @@ import org.joml.Matrix3x2f;
 
 /**
  * GUI render state for a single BlueMap tile shader pass.
+ * UV extents exclude BlueMap's duplicated 1-pixel right/bottom overlap.
  */
 public record BlueMapTileRenderState(
         Identifier texture,
@@ -50,6 +51,8 @@ public record BlueMapTileRenderState(
         float ambientLight,
         float lodScale,
         float texelSizeX,
+        float uMax,
+        float vMax,
         ScreenRectangle scissorArea,
         ScreenRectangle bounds
 ) implements GuiElementRenderState {
@@ -65,6 +68,8 @@ public record BlueMapTileRenderState(
             float ambientLight,
             float lodScale,
             float texelSizeX,
+            float uMax,
+            float vMax,
             ScreenRectangle scissorArea
     ) {
         this(
@@ -78,6 +83,8 @@ public record BlueMapTileRenderState(
                 ambientLight,
                 lodScale,
                 texelSizeX,
+                uMax,
+                vMax,
                 scissorArea,
                 bounds(x0, y0, x1, y1, pose, scissorArea));
     }
@@ -86,9 +93,9 @@ public record BlueMapTileRenderState(
     public void buildVertices(VertexConsumer vertexConsumer) {
 
         vertex(vertexConsumer, x0, y0, 0.0F, 0.0F);
-        vertex(vertexConsumer, x0, y1, 0.0F, 0.5F);
-        vertex(vertexConsumer, x1, y1, 1.0F, 0.5F);
-        vertex(vertexConsumer, x1, y0, 1.0F, 0.0F);
+        vertex(vertexConsumer, x0, y1, 0.0F, vMax);
+        vertex(vertexConsumer, x1, y1, uMax, vMax);
+        vertex(vertexConsumer, x1, y0, uMax, 0.0F);
     }
 
     @Override
@@ -101,7 +108,7 @@ public record BlueMapTileRenderState(
     public TextureSetup textureSetup() {
 
         var textureView = Minecraft.getInstance().getTextureManager().getTexture(texture).getTextureView();
-        return TextureSetup.singleTexture(textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+        return TextureSetup.singleTexture(textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
     }
 
     private void vertex(VertexConsumer vertexConsumer, float x, float y, float u, float v) {

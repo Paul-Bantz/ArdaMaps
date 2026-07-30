@@ -248,6 +248,8 @@ public class BlueMapRenderer extends MapRenderable {
 
         int renderSize = getDisplayedTileSize(lod);
         int imageSize = renderSize + 1;   // BlueMap adds a 1-pixel overlap on the right/bottom edge
+        float uMax = (float) renderSize / imageSize;
+        float vMax = (float) renderSize / (imageSize * 2);
         float lodScale = (float) Math.pow(mapCamera.getLodFactor(), lod - 1);
         float texelSizeX = 1f / imageSize;
         Matrix3x2f pose = new Matrix3x2f(context.pose());
@@ -265,6 +267,8 @@ public class BlueMapRenderer extends MapRenderable {
                     AMBIENT_LIGHT,
                     lodScale,
                     texelSizeX,
+                    uMax,
+                    vMax,
                     scissorArea));
         }
     }
