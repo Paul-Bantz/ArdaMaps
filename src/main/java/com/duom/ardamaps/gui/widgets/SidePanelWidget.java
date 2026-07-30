@@ -495,8 +495,7 @@ public class SidePanelWidget implements GuiEventListener {
             if (hoveredStyle.getHoverEvent() != null)
                 context.renderComponentHoverEffect(textRenderer, hoveredStyle, (int) mouseX, (int) mouseY);
 
-            if (clicked && hoveredStyle.getClickEvent() != null
-                    && hoveredStyle.getClickEvent().getAction() == ClickEvent.Action.OPEN_URL) {
+            if (clicked && hoveredStyle.getClickEvent() instanceof ClickEvent.OpenUrl) {
                 handleLinkClick(hoveredStyle.getClickEvent());
             }
         }
@@ -588,9 +587,9 @@ public class SidePanelWidget implements GuiEventListener {
      */
     private void handleLinkClick(ClickEvent clickEvent) {
 
-        if (parent != null && parent instanceof MapScreen) {
+        if (parent instanceof MapScreen && clickEvent instanceof ClickEvent.OpenUrl openUrl) {
 
-            ((MapScreen) parent).panAndSelectLocation(ArdaMapsClient.CONFIG.getLocation(clickEvent.getValue()), false);
+            ((MapScreen) parent).panAndSelectLocation(ArdaMapsClient.CONFIG.getLocation(openUrl.uri().toString()), false);
         }
     }
 

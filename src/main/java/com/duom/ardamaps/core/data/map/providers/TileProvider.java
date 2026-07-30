@@ -33,7 +33,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.Optional;
 import java.util.Set;
@@ -49,11 +49,11 @@ public abstract class TileProvider<T extends TileKey> {
     protected static final int MAX_CACHE_SIZE = 256;
 
     /** Removal listener that destroys dynamic textures evicted from the in-memory cache. */
-    private final RemovalListener<T, ResourceLocation> textureRemovalListener =
+    private final RemovalListener<T, Identifier> textureRemovalListener =
             (ignoredKey, texture, ignoredCause) -> destroyTexture(texture);
 
     /** Caffeine LRU cache for tile textures */
-    protected final Cache<T, ResourceLocation> textures = Caffeine.newBuilder()
+    protected final Cache<T, Identifier> textures = Caffeine.newBuilder()
             .maximumSize(MAX_CACHE_SIZE)
             .removalListener(textureRemovalListener)
             .build();
@@ -100,7 +100,7 @@ public abstract class TileProvider<T extends TileKey> {
         Minecraft.getInstance().execute(() -> {
             DynamicTexture tex = new DynamicTexture(image);
 
-            ResourceLocation id = Minecraft.getInstance()
+            Identifier id = Minecraft.getInstance()
                     .getTextureManager()
                     .register(prefix + key.z + "_" + key.x + "_" + key.y, tex);
 
@@ -117,9 +117,9 @@ public abstract class TileProvider<T extends TileKey> {
      * @param key The tile key
      * @return An Optional containing the texture identifier if loaded, or empty if loading is initiated
      */
-    public Optional<ResourceLocation> get(T key) {
+    public Optional<Identifier> get(T key) {
 
-        ResourceLocation cached = textures.getIfPresent(key);
+        Identifier cached = textures.getIfPresent(key);
         if (cached != null) return Optional.of(cached);
 
         long now = System.currentTimeMillis();
@@ -228,7 +228,7 @@ public abstract class TileProvider<T extends TileKey> {
      *
      * @param texture The texture identifier to destroy.
      */
-    protected void destroyTexture(ResourceLocation texture) {
+    protected void destroyTexture(Identifier texture) {
 
         if (texture == null) return;
 

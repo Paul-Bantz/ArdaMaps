@@ -35,7 +35,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -66,7 +66,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
     protected final Component placeholderText;
 
     /** Icon to display when no item is selected */
-    protected final ResourceLocation placeholderIcon;
+    protected final Identifier placeholderIcon;
 
     /** Direction in which the dropdown expands */
     protected final ExpandDirection expandDirection;
@@ -143,7 +143,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
             int height,
             Component title,
             Component nullValueText,
-            ResourceLocation placeholderIcon,
+            Identifier placeholderIcon,
             List<T> options,
             Function<T, E> optionDisplay,
             @Nullable T selected,

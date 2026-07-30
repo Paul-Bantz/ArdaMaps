@@ -28,6 +28,8 @@ package com.duom.ardamaps.core.items;
 import com.duom.ardamaps.gui.ModConstants;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.Item;
 
 /**
@@ -35,15 +37,18 @@ import net.minecraft.world.item.Item;
  */
 public class ModItems {
 
+    private static final ResourceKey<Item> GUIDEBOOK_KEY =
+            ResourceKey.create(Registries.ITEM, ModConstants.modId("guidebook"));
+
     /** The Toposcope item - held in hand to enable the toposcope HUD overlay. */
     public static final GuideBookItem GUIDEBOOK = new GuideBookItem(
-            new Item.Properties().stacksTo(1)
+            new Item.Properties().setId(GUIDEBOOK_KEY).stacksTo(1)
     );
 
     /**
      * Registers all mod items. Must be called during mod initialization.
      */
     public static void register() {
-        Registry.register(BuiltInRegistries.ITEM, ModConstants.modId("guidebook"), GUIDEBOOK);
+        Registry.register(BuiltInRegistries.ITEM, GUIDEBOOK_KEY.identifier(), GUIDEBOOK);
     }
 }

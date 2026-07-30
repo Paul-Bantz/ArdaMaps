@@ -33,7 +33,7 @@ import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -66,7 +66,7 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
 
     /** The unique identifier for the response packet channel, constructed using the mod ID and a specific channel name. */
     @Getter
-    private final ResourceLocation responseChannelId;
+    private final Identifier responseChannelId;
 
     /** A function that reads a packet of type U from a PacketByteBuf. This is used to deserialize incoming packets on the client side. */
     private final Function<FriendlyByteBuf, U> responseReader;

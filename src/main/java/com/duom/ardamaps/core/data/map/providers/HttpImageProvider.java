@@ -38,7 +38,7 @@ import com.sksamuel.scrimage.pixels.Pixel;
 import com.sksamuel.scrimage.webp.WebpImageReader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Tuple;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -286,7 +286,7 @@ public class HttpImageProvider {
      * @param path The URL of the texture
      * @return The texture identifier, or null if not yet loaded
      */
-    public ResourceLocation getTexture(String path) {
+    public Identifier getTexture(String path) {
 
         if (path == null || path.isEmpty()) return null;
 
@@ -383,7 +383,7 @@ public class HttpImageProvider {
         var imageData = imageKey.getA();
 
         DynamicTexture nativeImage = new DynamicTexture(imageData);
-        ResourceLocation texture = Minecraft.getInstance()
+        Identifier texture = Minecraft.getInstance()
                 .getTextureManager()
                 .register(idName, nativeImage);
 
@@ -581,6 +581,6 @@ public class HttpImageProvider {
     }
 
     /** Record to hold texture data */
-    private record TextureData(ResourceLocation image, int width, int height) {
+    private record TextureData(Identifier image, int width, int height) {
     }
 }

@@ -26,13 +26,13 @@
 package com.duom.ardamaps.gui.widgets;
 
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * A simple data class that holds a text and an identifier, used for displaying a list of items with associated icons in the map GUI.
  * This class is immutable and provides a convenient way to pair a text label with an image identifier for rendering in the GUI.
  */
-public record TextIdentifierPairItem(Component text, ResourceLocation image) {
+public record TextIdentifierPairItem(Component text, Identifier image) {
 
     /**
      * Constructs a new TextIdentifierPairItem with the specified text and image identifier.
@@ -41,7 +41,7 @@ public record TextIdentifierPairItem(Component text, ResourceLocation image) {
      * @param text  the text label for this item, can be null (defaults to empty)
      * @param image the identifier for the associated image/icon
      */
-    public TextIdentifierPairItem(String text, ResourceLocation image) {
+    public TextIdentifierPairItem(String text, Identifier image) {
 
         this(text != null ? Component.literal(text) : Component.empty(), image);
     }

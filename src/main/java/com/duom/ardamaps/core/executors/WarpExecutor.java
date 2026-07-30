@@ -29,7 +29,7 @@ import com.duom.ardamaps.core.integration.WarpService;
 import com.duom.ardamaps.gui.ModConstants;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -50,7 +50,12 @@ public class WarpExecutor implements WarpService {
             }
 
             var warp = warpOpt.get();
-            ResourceLocation dimensionId = ModConstants.id(warp.getWorld().getName());
+            Identifier dimensionId = Identifier.tryParse(warp.getWorld().getName());
+            if (dimensionId == null) {
+                onFailure.run();
+                return;
+            }
+
             ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, dimensionId);
 
             ServerLevel serverWorld = server.getLevel(key);

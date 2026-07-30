@@ -32,7 +32,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
 
@@ -79,7 +79,7 @@ public final class TextContentBlockRenderer {
      *
      * @param relX  x-offset from the start of the line (px)
      * @param width advance width of this glyph (px)
-     * @param type  run type: identified via the sentinel font {@link ResourceLocation} embedded in the style
+     * @param type  run type: identified via the sentinel font {@link Identifier} embedded in the style
      *              by {@code HtmlConverter} ({@link ModConstants#RUN_FONT_CHATCOMMAND} /
      *              {@link ModConstants#RUN_FONT_KEYBIND})
      * @param style the {@link Style} of this glyph (carries insertion text for keybind labels)
@@ -477,7 +477,7 @@ public final class TextContentBlockRenderer {
 
         if (drawY + imageHeight >= topY && drawY <= bottomY) {
 
-            ResourceLocation texture = GuideImageCache.getTexture(imgBlock.src());
+            Identifier texture = GuideImageCache.getTexture(imgBlock.src());
 
             if (texture != null) {
                 int imgX = switch (imgBlock.align()) {
@@ -720,7 +720,7 @@ public final class TextContentBlockRenderer {
 
     /**
      * Returns the special run type for a given {@link Style} by inspecting the sentinel
-     * font {@link ResourceLocation} embedded by {@code HtmlConverter}:
+     * font {@link Identifier} embedded by {@code HtmlConverter}:
      * <ul>
      *   <li>{@code 1} – chatcommand ({@link ModConstants#RUN_FONT_CHATCOMMAND})</li>
      *   <li>{@code 2} – keybind    ({@link ModConstants#RUN_FONT_KEYBIND})</li>
@@ -728,7 +728,7 @@ public final class TextContentBlockRenderer {
      * </ul>
      */
     private int detectSpecialRunType(Style style) {
-        ResourceLocation font = style.getFont();
+        Identifier font = style.getFont();
         if (ModConstants.RUN_FONT_CHATCOMMAND.equals(font)) return 1;
         if (ModConstants.RUN_FONT_KEYBIND.equals(font))     return 2;
         return 0;

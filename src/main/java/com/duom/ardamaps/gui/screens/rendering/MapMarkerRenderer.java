@@ -44,7 +44,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -367,7 +367,7 @@ public class MapMarkerRenderer {
         var iconXPos = xPos + MARKER_ICON_X_OFFSET;
         var iconYPos = yPos + MARKER_ICON_Y_OFFSET;
 
-        ResourceLocation icon = location.getIcon();
+        Identifier icon = location.getIcon();
         int color = outOfRange ? withOpacity(location.getColor()) : location.getColor();
         int highlightColor = outOfRange ? withOpacity(location.getHighlightColor()) : location.getHighlightColor();
         float markerOpacity = outOfRange ? MARKER_OUT_OF_RANGE_OPACITY : 1f;

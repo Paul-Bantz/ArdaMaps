@@ -44,7 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 
@@ -60,8 +60,8 @@ import net.minecraft.server.packs.resources.ResourceManager;
  * @param defaultType             the name of the default marker type
  * @param types                   a map of marker type names to their corresponding {@link MarkerType} definitions
  */
-public record MarkersDefinition(@SerializedName("marker_background") ResourceLocation markerBackground,
-                                @SerializedName("marker_background_visited") ResourceLocation markerBackgroundVisited,
+public record MarkersDefinition(@SerializedName("marker_background") Identifier markerBackground,
+                                @SerializedName("marker_background_visited") Identifier markerBackgroundVisited,
                                 @SerializedName("map_marker_background_size") int mapMarkerBackgroundSize,
                                 @SerializedName("map_marker_icon_size") int mapMarkerIconSize,
                                 @SerializedName("map_marker_icon_x_offset") float mapMarkerIconXOffset,
@@ -74,7 +74,7 @@ public record MarkersDefinition(@SerializedName("marker_background") ResourceLoc
     private static final Logger LOGGER = LoggerFactory.getLogger(MarkersDefinition.class);
 
     /** Marker label for undiscovered locations */
-    private static final ResourceLocation MARKERS_JSON = ModConstants.modId("markers.json");
+    private static final Identifier MARKERS_JSON = ModConstants.modId("markers.json");
 
     /**
      * Loads the markers definition from the `markers.json` resource file.
@@ -86,7 +86,7 @@ public record MarkersDefinition(@SerializedName("marker_background") ResourceLoc
 
         MarkersDefinition markersDefinition = createDefault();
         Gson gson = new GsonBuilder()
-                .registerTypeAdapter(ResourceLocation.class, new SpriteTypeAdapter())
+                .registerTypeAdapter(Identifier.class, new SpriteTypeAdapter())
                 .registerTypeAdapter(MarkerType.class, new MarkerTypeTypeAdapter())
                 .registerTypeAdapter(MarkersDefinition.class, new MarkersDefinitionTypeAdapter())
                 .create();

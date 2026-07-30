@@ -30,7 +30,7 @@ import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.client.resources.TextureAtlasHolder;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * Holds the sprite atlas for map icons.
@@ -40,7 +40,7 @@ import net.minecraft.resources.ResourceLocation;
 public class IconSpriteAtlas extends TextureAtlasHolder implements IdentifiableResourceReloadListener {
 
     /** Runtime GPU texture storage location. Never read from disk. */
-    public static final ResourceLocation ATLAS_ID = ModConstants.modId("textures/atlas/map_icons.png");
+    public static final Identifier ATLAS_ID = ModConstants.modId("textures/atlas/map_icons.png");
 
     /** Singleton instance of the atlas. Initialized at runtime. */
     private static IconSpriteAtlas INSTANCE;
@@ -69,7 +69,7 @@ public class IconSpriteAtlas extends TextureAtlasHolder implements IdentifiableR
      * @param id the identifier of the sprite to retrieve.
      * @return the sprite from the atlas.
      */
-    public static TextureAtlasSprite retrieveSprite(ResourceLocation id) {
+    public static TextureAtlasSprite retrieveSprite(Identifier id) {
         if (INSTANCE == null) throw new IllegalStateException("IconSpriteAtlas not initialized");
         return INSTANCE.getSprite(id);
     }
@@ -78,7 +78,7 @@ public class IconSpriteAtlas extends TextureAtlasHolder implements IdentifiableR
      * @return the unique identifier for this resource reload listener, used for logging and debugging.
      */
     @Override
-    public ResourceLocation getFabricId() {
+    public Identifier getFabricId() {
         return ModConstants.modId("icon_sprite_atlas");
     }
 }

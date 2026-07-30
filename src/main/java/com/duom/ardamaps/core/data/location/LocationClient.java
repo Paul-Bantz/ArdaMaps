@@ -33,7 +33,7 @@ import com.duom.ardamaps.gui.ModConstants;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -67,7 +67,7 @@ public class LocationClient extends BasicLocation implements Serializable {
      * Transient - this field is set at runtime based on the representing Marker's icon, and is not serialized.
      */
     @Setter
-    private transient ResourceLocation icon = ModConstants.LANDMARK_ICON;
+    private transient Identifier icon = ModConstants.LANDMARK_ICON;
 
     /**
      * Whether the location has been visited by the player. This field is hydrated when client progress is loaded.
@@ -90,7 +90,7 @@ public class LocationClient extends BasicLocation implements Serializable {
     /**
      * @return The identifier for the marker icon texture.  Depending on the exploration state of the location
      */
-    public ResourceLocation getIcon() {
+    public Identifier getIcon() {
         return (isRevealed() || isVisited()) ? icon : ModConstants.id(MarkersManager.get().unknownType().icon());
     }
 

@@ -973,8 +973,8 @@ public class GuideScreen extends ArdaMapsScreen {
             }
 
             ClickEvent clickEvent = lastHoveredContentStyle.getClickEvent();
-            if (clickEvent != null && clickEvent.getAction() == ClickEvent.Action.OPEN_URL) {
-                String url = clickEvent.getValue();
+            if (clickEvent instanceof ClickEvent.OpenUrl openUrl) {
+                String url = openUrl.uri().toString();
                 if (!url.isBlank()) {
                     Minecraft mc = Minecraft.getInstance();
                     mc.setScreen(new ConfirmLinkScreen(confirmed -> {

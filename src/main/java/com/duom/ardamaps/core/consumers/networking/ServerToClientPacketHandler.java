@@ -33,7 +33,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import java.util.function.Function;
 
@@ -48,7 +48,7 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
 
     /** The unique identifier for the packet channel, constructed using the mod ID and a specific channel name. */
     @Getter
-    private final ResourceLocation channelId;
+    private final Identifier channelId;
 
     /** A function that reads a packet of type T from a PacketByteBuf. This is used to deserialize incoming packets on the client side. */
     private final Function<FriendlyByteBuf, T> reader;
@@ -61,7 +61,7 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
      */
     @SuppressWarnings("SameParameterValue")
     protected ServerToClientPacketHandler(String channel, Function<FriendlyByteBuf, T> reader) {
-        this.channelId = ResourceLocation.tryBuild(ArdaMaps.MOD_ID, channel);
+        this.channelId = Identifier.tryBuild(ArdaMaps.MOD_ID, channel);
         this.reader = reader;
     }
 

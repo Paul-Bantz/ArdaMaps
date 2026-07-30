@@ -36,7 +36,6 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.event.player.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.InteractionResultHolder;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
@@ -113,8 +112,8 @@ public class Toposcope {
         // Suppress vanilla right-click: item use in air
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (shouldSuppressRightClick())
-                return InteractionResultHolder.fail(player.getItemInHand(hand));
-            return InteractionResultHolder.pass(player.getItemInHand(hand));
+                return InteractionResult.FAIL;
+            return InteractionResult.PASS;
         });
     }
 

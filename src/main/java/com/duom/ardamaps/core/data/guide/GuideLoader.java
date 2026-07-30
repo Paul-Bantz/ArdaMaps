@@ -41,7 +41,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Supplier;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 
@@ -58,7 +58,7 @@ public final class GuideLoader {
     private static final String DEFAULT_LOCALE = "en_us";
 
     /** Identifier for the guide index JSON file. */
-    private static final ResourceLocation GUIDE_JSON_ID = ModConstants.modId("guide/guide.json");
+    private static final Identifier GUIDE_JSON_ID = ModConstants.modId("guide/guide.json");
 
     /** Gson instance shared for guide deserialization. */
     private static final Gson GSON = new Gson();
@@ -229,7 +229,7 @@ public final class GuideLoader {
                 });
 
                 if (!resourceMap.isEmpty()) {
-                    ResourceLocation foundId = resourceMap.keySet().iterator().next();
+                    Identifier foundId = resourceMap.keySet().iterator().next();
                     return resourceManager.getResource(foundId);
                 }
             } catch (Exception e) {

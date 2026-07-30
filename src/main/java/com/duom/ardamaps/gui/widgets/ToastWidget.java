@@ -30,7 +30,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -73,7 +73,7 @@ public class ToastWidget {
 
     /** Optional icon, rendered left of the message. */
     @Nullable
-    private final ResourceLocation icon;
+    private final Identifier icon;
 
     /** Red component of the icon for tinting */
     private final float iconR;
@@ -93,7 +93,7 @@ public class ToastWidget {
      * @param message the text to display
      * @param icon    optional icon identifier (nullable)
      */
-    public ToastWidget(Component message, @Nullable ResourceLocation icon) {
+    public ToastWidget(Component message, @Nullable Identifier icon) {
 
         this(message, icon, System.currentTimeMillis());
     }
@@ -107,7 +107,7 @@ public class ToastWidget {
      * @param g          green component of the icon tint (0.0-1.0)
      * @param b          blue component of the icon tint (0.0-1).
      */
-    public ToastWidget(Component message, @Nullable ResourceLocation icon, float r, float g, float b) {
+    public ToastWidget(Component message, @Nullable Identifier icon, float r, float g, float b) {
 
         this(message, icon, System.currentTimeMillis(),  r, g, b);
     }
@@ -119,7 +119,7 @@ public class ToastWidget {
      * @param icon        optional icon identifier (nullable)
      * @param startTimeMs the toast display start time
      */
-    public ToastWidget(Component message, @Nullable ResourceLocation icon, long startTimeMs) {
+    public ToastWidget(Component message, @Nullable Identifier icon, long startTimeMs) {
         this(message, icon, startTimeMs, 1.0f, 1.0f, 1.0f);
     }
 
@@ -133,7 +133,7 @@ public class ToastWidget {
      * @param g          green component of the icon tint (0.0-1.0)
      * @param b          blue component of the icon tint (0.0-1).
      */
-    public ToastWidget(Component message, @Nullable ResourceLocation icon, long startTimeMs, float r, float g, float b) {
+    public ToastWidget(Component message, @Nullable Identifier icon, long startTimeMs, float r, float g, float b) {
         this.message = message;
         this.icon = icon;
         this.startTimeMs = startTimeMs;

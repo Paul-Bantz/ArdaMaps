@@ -31,7 +31,7 @@ import com.duom.ardamaps.gui.screens.rendering.TextContentBlockRenderer;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.*;
-import net.minecraft.util.FastColor;
+import net.minecraft.util.ARGB;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -40,6 +40,8 @@ import org.jsoup.nodes.TextNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -381,7 +383,7 @@ public class HtmlConverter {
         }
 
         var text = buildKeybindText(label);
-        text.withStyle(style -> style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.translatable("ardamaps.client.generic.keybind_options"))));
+        text.withStyle(style -> style.withHoverEvent(new HoverEvent.ShowText(Component.translatable("ardamaps.client.generic.keybind_options"))));
 
         buf.append(text);
     }
@@ -445,7 +447,7 @@ public class HtmlConverter {
                             style = style.withColor(textColor);
                             style = style.withFont(ModConstants.RUN_FONT_CHATCOMMAND);
                             style = style.withInsertion(text);
-                            style = style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.translatable("ardamaps.client.generic.run_command")));
+                            style = style.withHoverEvent(new HoverEvent.ShowText(Component.translatable("ardamaps.client.generic.run_command")));
                             return style;
                         }));
 
@@ -591,17 +593,13 @@ public class HtmlConverter {
     private static MutableComponent processExternalLinkType(Element element) {
 
         var href = element.attr("href");
+        var clickEvent = openUrlClickEvent(href);
 
         return Component.literal(element.text())
                 .withStyle(style -> style
-                        .withColor(FastColor.ARGB32.color(255, 48, 79, 110))
-                        .withClickEvent(new ClickEvent(
-                                ClickEvent.Action.OPEN_URL,
-                                href
-                        ))
-                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                Component.translatable("ardamaps.client.generic.open_external_link", href))
-                        )
+                        .withColor(ARGB.color(255, 48, 79, 110))
+                        .withClickEvent(clickEvent.orElse(null))
+                        .withHoverEvent(new HoverEvent.ShowText(Component.translatable("ardamaps.client.generic.open_external_link", href)))
                 );
     }
 
@@ -665,16 +663,22 @@ public class HtmlConverter {
 
             return Component.literal(element.text())
                     .withStyle(style -> style
-                            .withColor(FastColor.ARGB32.color(255, 48, 79, 110))
-                            .withClickEvent(new ClickEvent(
-                                    ClickEvent.Action.OPEN_URL,
-                                    resolvedLink
-                            ))
-                            .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, resolvedTooltip))
+                            .withColor(ARGB.color(255, 48, 79, 110))
+                            .withClickEvent(openUrlClickEvent(resolvedLink).orElse(null))
+                            .withHoverEvent(new HoverEvent.ShowText(resolvedTooltip))
                     );
         }
 
         return null;
+    }
+
+    private static Optional<ClickEvent.OpenUrl> openUrlClickEvent(String href) {
+        try {
+            return Optional.of(new ClickEvent.OpenUrl(new URI(href)));
+        } catch (URISyntaxException e) {
+            LOGGER.warn("[HtmlConverter] Link href is not a valid URI: {}", href);
+            return Optional.empty();
+        }
     }
 
     /**

@@ -46,7 +46,7 @@ import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Tuple;
 
 /**
@@ -174,7 +174,7 @@ public class PmTilesRenderer extends MapRenderable {
 
         for (PmTileKey key : tilesToDisplay) {
 
-            Optional<ResourceLocation> tex = tileProvider.get(key);
+            Optional<Identifier> tex = tileProvider.get(key);
 
             PmTileKey renderKey = key;
 
@@ -192,7 +192,7 @@ public class PmTilesRenderer extends MapRenderable {
             int roundedX = (int) Math.round(screenPos.x());
             int roundedY = (int) Math.round(screenPos.y());
 
-            ResourceLocation currentTexture = tex.get();
+            Identifier currentTexture = tex.get();
             RenderSystem.activeTexture(GL13.GL_TEXTURE0);
             textureManager.bindForSetup(currentTexture);
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
@@ -225,7 +225,7 @@ public class PmTilesRenderer extends MapRenderable {
      * @param minZoom the minimum zoom level to stop at
      * @return the key of the fallback tile if found, or null if no fallback tile is available
      */
-    private Tuple<PmTileKey, Optional<ResourceLocation>> findFallbackTile(PmTileKey key, int minZoom) {
+    private Tuple<PmTileKey, Optional<Identifier>> findFallbackTile(PmTileKey key, int minZoom) {
 
         PmTileKey current = key;
 
@@ -236,7 +236,7 @@ public class PmTilesRenderer extends MapRenderable {
                     current.y >> 1
             );
 
-            Optional<ResourceLocation> tex = tileProvider.get(current);
+            Optional<Identifier> tex = tileProvider.get(current);
             if (tex.isPresent()) return new Tuple<>(current, tex);
 
         }

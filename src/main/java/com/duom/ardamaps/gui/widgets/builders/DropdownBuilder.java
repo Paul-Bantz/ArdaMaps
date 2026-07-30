@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * Builder class for constructing {@link DropdownWidget} instances with a fluent API.
@@ -78,7 +78,7 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
     protected Component placeholderText = Component.literal("None");
 
     /** icon displayed when no item is selected in the dropdown widget */
-    protected ResourceLocation placeholderIcon = null;
+    protected Identifier placeholderIcon = null;
 
     /** whether the dropdown widget should start in an expanded state when created */
     protected final boolean expanded = false;
@@ -232,7 +232,7 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
      * @param placeholderIcon The placeholder icon
      * @return This builder for method chaining
      */
-    public DropdownBuilder<T, E> setPlaceholderIcon(ResourceLocation placeholderIcon) {
+    public DropdownBuilder<T, E> setPlaceholderIcon(Identifier placeholderIcon) {
         this.placeholderIcon = placeholderIcon;
         return this;
     }

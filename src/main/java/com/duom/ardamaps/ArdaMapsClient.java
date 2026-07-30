@@ -74,10 +74,10 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.util.profiling.ProfilerFiller;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
 import org.lwjgl.glfw.GLFW;
@@ -675,7 +675,7 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         /** The identifier for this resource reload listener, used to distinguish it from other listeners. */
         @Override
-        public ResourceLocation getFabricId() {
+        public Identifier getFabricId() {
             return ModConstants.modId("markers_loader");
         }
 
@@ -694,7 +694,7 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         /** The identifier for this resource reload listener, used to distinguish it from other listeners. */
         @Override
-        public ResourceLocation getFabricId() {
+        public Identifier getFabricId() {
             return ModConstants.modId("shader_loader");
         }
 
@@ -717,21 +717,22 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         /** Returns the identifier for this resource reload listener, which is used to distinguish it from other listeners. */
         @Override
-        public ResourceLocation getFabricId() {
+        public Identifier getFabricId() {
             return ModConstants.modId("icon_sprite_atlas");
         }
 
         /** Reloads the icon sprite atlas when client resources are reloaded, ensuring that any changes to the icons are reflected in the mod's HUD and map rendering. */
         @Override
         public @NonNull CompletableFuture<Void> reload(
-                PreparationBarrier synchronizer, ResourceManager manager,
-                ProfilerFiller prepareProfiler, ProfilerFiller applyProfiler,
-                Executor prepareExecutor, Executor applyExecutor) {
+                PreparableReloadListener.SharedState sharedState,
+                Executor prepareExecutor,
+                PreparationBarrier synchronizer,
+                Executor applyExecutor) {
 
             if (atlas == null) {
                 atlas = IconSpriteAtlas.create(Minecraft.getInstance().getTextureManager());
             }
-            return atlas.reload(synchronizer, manager, prepareProfiler, applyProfiler, prepareExecutor, applyExecutor);
+            return atlas.reload(sharedState, prepareExecutor, synchronizer, applyExecutor);
         }
     }
 
@@ -742,7 +743,7 @@ public class ArdaMapsClient implements ClientModInitializer {
     private static class GuideImageCacheReloadListener implements SimpleSynchronousResourceReloadListener {
 
         @Override
-        public ResourceLocation getFabricId() {
+        public Identifier getFabricId() {
             return ModConstants.modId("guide_image_cache");
         }
 

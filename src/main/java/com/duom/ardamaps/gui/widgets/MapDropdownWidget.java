@@ -35,7 +35,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * A custom dropdown widget for the map GUI that supports displaying options with both text and icons.
@@ -83,7 +83,7 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
             int height,
             Component title,
             Component nullValueText,
-            ResourceLocation placeholderIcon,
+            Identifier placeholderIcon,
             List<T> options,
             Function<T, E> optionDisplay,
             @Nullable T selected,

@@ -34,7 +34,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,7 +118,7 @@ public class PlayerExploration implements Serializable {
 
     /** The identifier of the fog-of-war texture in Minecraft's texture manager, used for rendering. */
     @Getter
-    private transient ResourceLocation fogTextureId;
+    private transient Identifier fogTextureId;
 
     /**
      * Creates a new {@link PlayerExploration} for the given dimension.

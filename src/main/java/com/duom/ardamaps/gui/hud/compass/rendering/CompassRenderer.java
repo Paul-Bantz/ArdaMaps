@@ -42,7 +42,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
@@ -437,7 +437,7 @@ public class CompassRenderer {
      * @param textureToDraw the texture to draw
      * @param zOffset       the z offset on which to draw the icon
      */
-    private static void drawLocationIcon(GuiGraphics context, float alpha, float x, ResourceLocation textureToDraw, int zOffset) {
+    private static void drawLocationIcon(GuiGraphics context, float alpha, float x, Identifier textureToDraw, int zOffset) {
 
         if (textureToDraw == null) return;
 

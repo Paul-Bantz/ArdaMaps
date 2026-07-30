@@ -27,7 +27,7 @@ package com.duom.ardamaps.gui;
 
 import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.gui.screens.rendering.TextContentBlockRenderer;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * A utility class that holds constants for the map GUI, such as button dimensions and texture identifiers.
@@ -35,16 +35,16 @@ import net.minecraft.resources.ResourceLocation;
  */
 public class ModConstants {
 
-    public static ResourceLocation id(String path) {
+    public static Identifier id(String path) {
         if (path == null) return UNKNOWN_ICON;
-        return new ResourceLocation(path);
+        return Identifier.parse(path);
     }
 
-    public static ResourceLocation id(String namespace, String path) {
-        return new ResourceLocation(namespace, path);
+    public static Identifier id(String namespace, String path) {
+        return Identifier.fromNamespaceAndPath(namespace, path);
     }
 
-    public static ResourceLocation modId(String path) {
+    public static Identifier modId(String path) {
         return id(ArdaMaps.MOD_ID, path);
     }
 
@@ -58,35 +58,35 @@ public class ModConstants {
     public static final int ROW_SPACING = 12;
 
     /** Texture identifiers for various GUI elements, such as the fog of war overlay, paper background, and map GUI elements. */
-    public static final ResourceLocation FOG_OF_WAR_TEXTURE = modId("textures/gui/fog_of_war_texture.png");
-    public static final ResourceLocation PAPER_TEXTURE = modId("textures/gui/paper_tex_9slices_512px.png");
-    public static final ResourceLocation MAP_GUI_ELEMENTS = modId("textures/gui/gui_tex_map_elements_9slices_512px.png");
-    public static final ResourceLocation GUI_TEXTURE = modId("textures/gui/gui_tex_book_9slices_512px.png");
-    public static final ResourceLocation TEXTURE = id("textures/gui/checkbox.png");
+    public static final Identifier FOG_OF_WAR_TEXTURE = modId("textures/gui/fog_of_war_texture.png");
+    public static final Identifier PAPER_TEXTURE = modId("textures/gui/paper_tex_9slices_512px.png");
+    public static final Identifier MAP_GUI_ELEMENTS = modId("textures/gui/gui_tex_map_elements_9slices_512px.png");
+    public static final Identifier GUI_TEXTURE = modId("textures/gui/gui_tex_book_9slices_512px.png");
+    public static final Identifier TEXTURE = id("textures/gui/checkbox.png");
 
-    public static final ResourceLocation ARDACRAFT_LOGO = modId("textures/icons/icon_ardacraft_gradient_128px.png");
+    public static final Identifier ARDACRAFT_LOGO = modId("textures/icons/icon_ardacraft_gradient_128px.png");
 
     /** Texture identifiers for various icons used in the map GUI, such as the close button, map icon, configuration icon, and others. */
-    public static final ResourceLocation CLOSE_ICON = modId("icons/icon_close");
-    public static final ResourceLocation MAP_ICON = modId("icons/icon_map");
-    public static final ResourceLocation CONFIGURATION_ICON = modId("icons/icon_configuration");
-    public static final ResourceLocation GUIDE_ICON = modId("icons/icon_guide");
-    public static final ResourceLocation LANDMARK_ICON = modId("icons/icon_landmark");
-    public static final ResourceLocation UNKNOWN_ICON = modId("icons/icon_unknown");
-    public static final ResourceLocation MAP_MARKER_ICON = modId("icons/map_marker");
-    public static final ResourceLocation MAP_MARKER_VISITED_ICON = modId("icons/map_marker_visited");
-    public static final ResourceLocation ICON_WAYPOINT = modId("icons/icon_waypoint");
+    public static final Identifier CLOSE_ICON = modId("icons/icon_close");
+    public static final Identifier MAP_ICON = modId("icons/icon_map");
+    public static final Identifier CONFIGURATION_ICON = modId("icons/icon_configuration");
+    public static final Identifier GUIDE_ICON = modId("icons/icon_guide");
+    public static final Identifier LANDMARK_ICON = modId("icons/icon_landmark");
+    public static final Identifier UNKNOWN_ICON = modId("icons/icon_unknown");
+    public static final Identifier MAP_MARKER_ICON = modId("icons/map_marker");
+    public static final Identifier MAP_MARKER_VISITED_ICON = modId("icons/map_marker_visited");
+    public static final Identifier ICON_WAYPOINT = modId("icons/icon_waypoint");
 
-    public static final ResourceLocation ICON_MOUSE_LEFT_CLICK = modId("icons/icon_mouse_left_click");
-    public static final ResourceLocation ICON_MOUSE_RIGHT_CLICK = modId("icons/icon_mouse_right_click");
-    public static final ResourceLocation ICON_CARDINAL_NORTH = modId("icons/icon_compass_north");
-    public static final ResourceLocation ICON_CARDINAL_SOUTH = modId("icons/icon_compass_south");
-    public static final ResourceLocation ICON_CARDINAL_EAST = modId("icons/icon_compass_east");
-    public static final ResourceLocation ICON_CARDINAL_WEST = modId("icons/icon_compass_west");
-    public static final ResourceLocation COMPASS_BACKGROUND = modId("textures/gui/compass_texture.png");
-    public static final ResourceLocation ICON_ALL = modId("icons/icon_all");
-    public static final ResourceLocation ICON_BOOK = modId("icons/icon_book");
-    public static final ResourceLocation ICON_KEYBIND = modId("textures/icons/icon_keybind.png");
+    public static final Identifier ICON_MOUSE_LEFT_CLICK = modId("icons/icon_mouse_left_click");
+    public static final Identifier ICON_MOUSE_RIGHT_CLICK = modId("icons/icon_mouse_right_click");
+    public static final Identifier ICON_CARDINAL_NORTH = modId("icons/icon_compass_north");
+    public static final Identifier ICON_CARDINAL_SOUTH = modId("icons/icon_compass_south");
+    public static final Identifier ICON_CARDINAL_EAST = modId("icons/icon_compass_east");
+    public static final Identifier ICON_CARDINAL_WEST = modId("icons/icon_compass_west");
+    public static final Identifier COMPASS_BACKGROUND = modId("textures/gui/compass_texture.png");
+    public static final Identifier ICON_ALL = modId("icons/icon_all");
+    public static final Identifier ICON_BOOK = modId("icons/icon_book");
+    public static final Identifier ICON_KEYBIND = modId("textures/icons/icon_keybind.png");
 
     /** Text color constants */
     public static final int COLOR_WHITE = 0xFFFFFFFF;
@@ -108,20 +108,20 @@ public class ModConstants {
     public static final float H3_TEXT_SCALE = 1.25f;
 
     /**
-     * Sentinel font {@link ResourceLocation} written into the {@link net.minecraft.network.chat.Style} of every
+     * Sentinel font {@link Identifier} written into the {@link net.minecraft.network.chat.Style} of every
      * {@code <chatcommand>} glyph by {@code HtmlConverter}.
      * {@link TextContentBlockRenderer} reads {@code Style.getFont()} and compares it against this
      * value to identify chatcommand runs – no colour-sniffing required.
      */
-    public static final ResourceLocation RUN_FONT_CHATCOMMAND = modId("run/chatcommand");
+    public static final Identifier RUN_FONT_CHATCOMMAND = modId("run/chatcommand");
 
     /**
-     * Sentinel font {@link ResourceLocation} written into the {@link net.minecraft.network.chat.Style} of every
+     * Sentinel font {@link Identifier} written into the {@link net.minecraft.network.chat.Style} of every
      * {@code <keybind>} glyph by {@code HtmlConverter}.
      * {@link TextContentBlockRenderer} reads {@code Style.getFont()} and compares it against this
      * value to identify keybind runs – no colour-sniffing required.
      */
-    public static final ResourceLocation RUN_FONT_KEYBIND = modId("run/keybind");
+    public static final Identifier RUN_FONT_KEYBIND = modId("run/keybind");
 
     /**
      * Padding in pixels applied around the background rectangle of both

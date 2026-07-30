@@ -31,7 +31,7 @@ import com.google.common.reflect.TypeToken;
 import com.google.gson.*;
 import java.lang.reflect.Type;
 import java.util.Map;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * Custom TypeAdapter for deserializing MarkersDefinition from JSON.
@@ -51,8 +51,8 @@ public class MarkersDefinitionTypeAdapter implements JsonDeserializer<MarkersDef
     public MarkersDefinition deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
         JsonObject obj = JsonAdapterUtils.object(json, "markers definition");
 
-        ResourceLocation markerBackground = context.deserialize(JsonAdapterUtils.required(obj, "marker_background"), ResourceLocation.class);
-        ResourceLocation markerVisitedBackground = context.deserialize(JsonAdapterUtils.required(obj, "marker_background_visited"), ResourceLocation.class);
+        Identifier markerBackground = context.deserialize(JsonAdapterUtils.required(obj, "marker_background"), Identifier.class);
+        Identifier markerVisitedBackground = context.deserialize(JsonAdapterUtils.required(obj, "marker_background_visited"), Identifier.class);
         int mapMarkerBackgroundSize = JsonAdapterUtils.required(obj, "map_marker_background_size").getAsInt();
         int mapMarkerIconSize = JsonAdapterUtils.required(obj, "map_marker_icon_size").getAsInt();
         float mapMarkerIconXOffset = JsonAdapterUtils.required(obj, "map_marker_icon_x_offset").getAsFloat();

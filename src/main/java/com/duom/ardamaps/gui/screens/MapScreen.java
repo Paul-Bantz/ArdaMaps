@@ -62,7 +62,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -1502,6 +1502,6 @@ public class MapScreen extends ArdaMapsScreen {
      * @param color          The colour associated with the marker type, used for rendering the marker background or tint
      * @param highlightColor The colour used for highlighting the marker (e.g., on hover), used for rendering effects when the marker is interacted with
      */
-    private record MarkerInfo(String key, String displayName, ResourceLocation icon, int color, int highlightColor) {
+    private record MarkerInfo(String key, String displayName, Identifier icon, int color, int highlightColor) {
     }
 }

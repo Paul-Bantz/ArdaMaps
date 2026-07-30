@@ -33,7 +33,7 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.SimpleTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.client.resources.DefaultPlayerSkin;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,14 +53,14 @@ public class PlayerIcon {
     public static final int ICON_SIZE = 48;
 
     /** The player's head icon as a BufferedImage */
-    private static ResourceLocation playerIcon;
+    private static Identifier playerIcon;
 
     /**
      * Get the player's head icon as a BufferedImage.
      *
      * @return The player's head icon
      */
-    public static ResourceLocation getPlayerIcon() {
+    public static Identifier getPlayerIcon() {
 
         if (playerIcon == null) {
             initialize();
@@ -78,7 +78,7 @@ public class PlayerIcon {
 
         if (player == null) return;
 
-        ResourceLocation skinId = player.getSkinTextureLocation();
+        Identifier skinId = player.getSkinTextureLocation();
 
         TextureManager textureManager = Client.mc().getTextureManager();
         AbstractTexture texture = textureManager.getTexture(skinId);
@@ -118,7 +118,7 @@ public class PlayerIcon {
      * @param id The identifier of the texture to load
      * @return The loaded NativeImage, or null if loading failed
      */
-    private static @Nullable com.mojang.blaze3d.platform.NativeImage loadResourceTexture(ResourceLocation id) {
+    private static @Nullable com.mojang.blaze3d.platform.NativeImage loadResourceTexture(Identifier id) {
 
         if (Client.mc().getResourceManager().getResource(id).isPresent()) {
 
@@ -146,7 +146,7 @@ public class PlayerIcon {
      * @param skin The player's skin image
      * @return The player head icon identifier
      */
-    private static ResourceLocation getIcon(com.mojang.blaze3d.platform.NativeImage skin) {
+    private static Identifier getIcon(com.mojang.blaze3d.platform.NativeImage skin) {
 
         // Final 48x48 head image
         com.mojang.blaze3d.platform.NativeImage head = new com.mojang.blaze3d.platform.NativeImage(ICON_SIZE, ICON_SIZE, true);
@@ -158,7 +158,7 @@ public class PlayerIcon {
         blit(skin, head, 40, 8, 8, 8, 0, 0, 48, 48);
 
         DynamicTexture texture = new DynamicTexture(head);
-        ResourceLocation id = ModConstants.modId("player_head_map_marker");
+        Identifier id = ModConstants.modId("player_head_map_marker");
         Client.mc().getTextureManager().register(id, texture);
 
         return id;

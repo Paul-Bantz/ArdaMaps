@@ -37,7 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
 
 /**
@@ -50,7 +50,7 @@ import net.minecraft.server.packs.resources.Resource;
  * <p>Loading is intentionally synchronous: resource-pack assets are local files and
  * are normally small, so the latency is negligible.  The texture is registered with
  * Minecraft's {@link net.minecraft.client.renderer.texture.TextureManager} on the first call
- * and every subsequent call returns the cached {@link ResourceLocation} instantly.</p>
+ * and every subsequent call returns the cached {@link Identifier} instantly.</p>
  *
  * <p>Call {@link #clear()} when client resources reload so stale entries are evicted
  * and images are re-read from the updated pack.</p>
@@ -64,12 +64,12 @@ public final class GuideImageCache {
      * {@code Optional.empty()} marks a path that was already attempted and failed,
      * preventing repeated filesystem lookups for known-missing resources.
      */
-    private static final Map<String, Optional<ResourceLocation>> CACHE = new HashMap<>();
+    private static final Map<String, Optional<Identifier>> CACHE = new HashMap<>();
 
     private GuideImageCache() {}
 
     /**
-     * Returns the registered {@link ResourceLocation} for the texture at {@code src},
+     * Returns the registered {@link Identifier} for the texture at {@code src},
      * loading and registering it on the first access.
      *
      * <p>Must be called from the render thread because
@@ -81,13 +81,13 @@ public final class GuideImageCache {
      * @return the registered texture identifier, or {@code null} if the resource is
      *         missing or could not be loaded (a warning is logged in that case)
      */
-    public static ResourceLocation getTexture(String src) {
+    public static Identifier getTexture(String src) {
 
         if (CACHE.containsKey(src)) {
             return CACHE.get(src).orElse(null);
         }
 
-        ResourceLocation resourceId = ModConstants.modId(src);
+        Identifier resourceId = ModConstants.modId(src);
         Optional<Resource> resource = Minecraft.getInstance()
                 .getResourceManager()
                 .getResource(resourceId);
@@ -107,7 +107,7 @@ public final class GuideImageCache {
 
             // Sanitize path characters that are illegal in dynamic texture names
             String sanitised = src.replace('/', '_').replace('.', '_');
-            ResourceLocation registered = Minecraft.getInstance()
+            Identifier registered = Minecraft.getInstance()
                     .getTextureManager()
                     .register("ardamaps_guide_" + sanitised, tex);
 

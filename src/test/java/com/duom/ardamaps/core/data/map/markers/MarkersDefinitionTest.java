@@ -30,7 +30,7 @@ import com.duom.ardamaps.core.data.json.MarkersDefinitionTypeAdapter;
 import com.duom.ardamaps.core.data.json.SpriteTypeAdapter;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -69,7 +69,7 @@ class MarkersDefinitionTest {
     void fromJson_bareTypeIconPaths_areQualified() {
 
         Gson gson = new GsonBuilder()
-                .registerTypeAdapter(ResourceLocation.class, new SpriteTypeAdapter())
+                .registerTypeAdapter(Identifier.class, new SpriteTypeAdapter())
                 .registerTypeAdapter(MarkerType.class, new MarkerTypeTypeAdapter())
                 .registerTypeAdapter(MarkersDefinition.class, new MarkersDefinitionTypeAdapter())
                 .create();

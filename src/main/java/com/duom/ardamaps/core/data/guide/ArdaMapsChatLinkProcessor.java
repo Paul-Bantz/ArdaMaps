@@ -136,13 +136,8 @@ public final class ArdaMapsChatLinkProcessor {
                     .withStyle(style -> style
                             .withColor(ModConstants.COLOR_BLUE)
                             .withUnderlined(true)
-                            .withHoverEvent(new HoverEvent(
-                                    HoverEvent.Action.SHOW_TEXT,
-                                    Component.literal(waypoint.get().text())))
-                            .withClickEvent(new ClickEvent(
-                                    ClickEvent.Action.RUN_COMMAND,
-                                    "/ardamaps waypoint " + waypointJsonString
-                            ))
+                            .withHoverEvent(new HoverEvent.ShowText(Component.literal(waypoint.get().text())))
+                            .withClickEvent(new ClickEvent.RunCommand("/ardamaps waypoint " + waypointJsonString))
                     );
             result.append(stringBeginning);
             result.append(link);
@@ -194,14 +189,8 @@ public final class ArdaMapsChatLinkProcessor {
                     .withStyle(style -> style
                             .withColor(ModConstants.COLOR_BLUE)
                             .withUnderlined(true)
-                            .withHoverEvent(new HoverEvent(
-                                    HoverEvent.Action.SHOW_TEXT,
-                                    Component.translatable("ardamaps.client.chat.guide_link")
-                            ))
-                            .withClickEvent(new ClickEvent(
-                                    ClickEvent.Action.RUN_COMMAND,
-                                    "/ardamaps guide " + token
-                            ))
+                            .withHoverEvent(new HoverEvent.ShowText(Component.translatable("ardamaps.client.chat.guide_link")))
+                            .withClickEvent(new ClickEvent.RunCommand("/ardamaps guide " + token))
                     );
             result.append(link);
             lastEnd = guideMatcher.end();
@@ -215,4 +204,3 @@ public final class ArdaMapsChatLinkProcessor {
         return result;
     }
 }
-

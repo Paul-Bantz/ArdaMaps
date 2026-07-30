@@ -31,7 +31,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * A styled button widget that displays an image.
@@ -204,10 +204,10 @@ public class BookmarkButtonWidget extends AbstractWidget {
      * @param r       red component of the icon tint applied when not hovered (0.0–1.0)
      * @param g       green component of the icon tint applied when not hovered (0.0–1.0)
      * @param b       blue component of the icon tint applied when not hovered (0.0–1.0)
-     * @param icon    {@link ResourceLocation} of the sprite to retrieve from {@link IconSpriteAtlas}
+     * @param icon    {@link Identifier} of the sprite to retrieve from {@link IconSpriteAtlas}
      *                and render as the button icon
      */
-    private void renderBookmarkButton(GuiGraphics context, int mouseX, int mouseY, int u, int v, float r, float g, float b, ResourceLocation icon) {
+    private void renderBookmarkButton(GuiGraphics context, int mouseX, int mouseY, int u, int v, float r, float g, float b, Identifier icon) {
 
         var x = getX();
         var y = getY();

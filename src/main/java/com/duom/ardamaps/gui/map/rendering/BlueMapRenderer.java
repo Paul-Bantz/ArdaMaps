@@ -39,7 +39,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Tuple;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
@@ -178,14 +178,14 @@ public class BlueMapRenderer extends MapRenderable {
 
         for (PmTileKey key : tilesToDisplay) {
 
-            Optional<ResourceLocation> tex = provider.get(key);
+            Optional<Identifier> tex = provider.get(key);
 
             if (tex.isPresent()) {
                 var screenPos = mapCamera.tilePositionOnViewport(key.x, key.y, key.z);
                 primaryTiles.add(new TileDraw(tex.get(), (float) screenPos.x(), (float) screenPos.y(), key.z));
 
             } else {
-                Tuple<PmTileKey, Optional<ResourceLocation>> fallback =
+                Tuple<PmTileKey, Optional<Identifier>> fallback =
                         findFallbackTile(key, coarsestZoom, mapCamera.getLodFactor());
 
                 PmTileKey fbKey = fallback.getA();
@@ -235,7 +235,7 @@ public class BlueMapRenderer extends MapRenderable {
      * @param lodFactor The factor by which each LOD level reduces resolution (e.g. 2 means each level halves resolution)
      * @return A pair containing the fallback tile key and its texture identifier if found, or empty if no fallback is loaded
      */
-    private Tuple<PmTileKey, Optional<ResourceLocation>> findFallbackTile(PmTileKey key, int maxLod, double lodFactor) {
+    private Tuple<PmTileKey, Optional<Identifier>> findFallbackTile(PmTileKey key, int maxLod, double lodFactor) {
         PmTileKey current = key;
         if (lodFactor < 1.0) lodFactor = 1.0;
 
@@ -246,7 +246,7 @@ public class BlueMapRenderer extends MapRenderable {
                     (int) Math.floor(current.y / lodFactor)
             );
 
-            Optional<ResourceLocation> tex = provider.get(current);
+            Optional<Identifier> tex = provider.get(current);
             if (tex.isPresent()) return new Tuple<>(current, tex);
 
         }
@@ -320,6 +320,6 @@ public class BlueMapRenderer extends MapRenderable {
      * @param y0      Top edge of the quad in screen pixels (floating-point for sub-pixel accuracy).
      * @param lod     Actual LOD zoom level of this tile — drives quad size, UV extents and shader uniforms.
      */
-    private record TileDraw(ResourceLocation texture, float x0, float y0, int lod) {
+    private record TileDraw(Identifier texture, float x0, float y0, int lod) {
     }
 }

@@ -26,7 +26,7 @@
 package com.duom.ardamaps.core.consumers.networking;
 
 import com.duom.ardamaps.ArdaMaps;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * Abstract base class for packet handlers, providing common functionality.
@@ -34,7 +34,7 @@ import net.minecraft.resources.ResourceLocation;
  */
 public abstract class PacketHandler implements IPacketHandler {
     /** The unique identifier for the packet channel, constructed using the mod ID and a specific channel name. */
-    private final ResourceLocation channelId;
+    private final Identifier channelId;
 
     /**
      * Constructs a new PacketHandler with the specified channel name.
@@ -42,14 +42,14 @@ public abstract class PacketHandler implements IPacketHandler {
      * @param channelId The name of the packet channel, which will be combined with the mod ID to create a unique Identifier.
      */
     public PacketHandler(final String channelId) {
-        this.channelId = ResourceLocation.tryBuild(ArdaMaps.MOD_ID, channelId);
+        this.channelId = Identifier.tryBuild(ArdaMaps.MOD_ID, channelId);
     }
 
     /**
      * @return The unique Identifier for the packet channel that this handler is responsible for. This Identifier is used to register the handler and send packets on the correct channel.
      */
     @Override
-    public ResourceLocation getChannelId() {
+    public Identifier getChannelId() {
         return channelId;
     }
 }

@@ -34,7 +34,7 @@ import net.minecraft.client.Minecraft;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,7 +80,7 @@ class ClientProgressTest {
         TextureManager mockTextureManager = Mockito.mock(TextureManager.class);
         Mockito.when(mockClient.getTextureManager()).thenReturn(mockTextureManager);
         Mockito.when(mockTextureManager.register(Mockito.<String>any(), Mockito.any(DynamicTexture.class)))
-                .thenReturn(new ResourceLocation("ardamaps", "dummy"));
+                .thenReturn(Identifier.fromNamespaceAndPath("ardamaps", "dummy"));
 
         mockedMinecraftClient = Mockito.mockStatic(Minecraft.class);
         mockedMinecraftClient.when(Minecraft::getInstance).thenReturn(mockClient);

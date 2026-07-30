@@ -49,7 +49,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -336,7 +336,7 @@ public class ClientCommands {
         for (var entry : progress.getExplorationState().entrySet()) {
 
             TextureManager textureManager = Client.mc().getTextureManager();
-            ResourceLocation textureId = entry.getValue().getFogTextureId();
+            Identifier textureId = entry.getValue().getFogTextureId();
             DynamicTexture texture = (DynamicTexture) textureManager.getTexture(textureId);
 
             try {
