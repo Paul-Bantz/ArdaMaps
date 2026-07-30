@@ -26,9 +26,10 @@
 package com.duom.ardamaps.gui.icons;
 
 import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.client.rendering.v1.AtlasRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.renderer.texture.TextureManager;
+import net.minecraft.client.resources.model.sprite.AtlasManager;
 import net.minecraft.client.resources.model.sprite.SpriteId;
 import net.minecraft.resources.Identifier;
 
@@ -40,22 +41,16 @@ public class IconSpriteAtlas {
     /** Runtime GPU texture storage location. Never read from disk. */
     public static final Identifier ATLAS_ID = ModConstants.modId("textures/atlas/map_icons.png");
 
-    /** Singleton instance of the atlas facade. Initialized at runtime. */
-    private static IconSpriteAtlas INSTANCE;
+    private static final Identifier ATLAS_DEFINITION = ModConstants.modId("map_icons");
 
-    /** Private constructor to enforce singleton pattern. */
-    public IconSpriteAtlas(@SuppressWarnings("unused") TextureManager textureManager) {
+    private IconSpriteAtlas() {
     }
 
-    public static IconSpriteAtlas create(TextureManager textureManager) {
-        if (INSTANCE == null) {
-            INSTANCE = new IconSpriteAtlas(textureManager);
-        }
-        return INSTANCE;
+    public static void register() {
+        AtlasRegistry.register(new AtlasManager.AtlasConfig(ATLAS_ID, ATLAS_DEFINITION, false));
     }
 
     public static TextureAtlasSprite retrieveSprite(Identifier id) {
-        if (INSTANCE == null) throw new IllegalStateException("IconSpriteAtlas not initialized");
         return Minecraft.getInstance().getAtlasManager().get(new SpriteId(ATLAS_ID, id));
     }
 }

@@ -67,7 +67,6 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.DeltaTracker;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
 import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
 import net.minecraft.client.Minecraft;
@@ -78,17 +77,13 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.jetbrains.annotations.NotNull;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -177,6 +172,7 @@ public class ArdaMapsClient implements ClientModInitializer {
         CONFIG = CONFIG_MANAGER.getConfig();
 
         KeyBinds.register();
+        IconSpriteAtlas.register();
 
         this.registerModItems();
         this.registerResourceListeners();
@@ -218,9 +214,6 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         ResourceManagerHelper.get(PackType.CLIENT_RESOURCES)
                 .registerReloadListener(new ShaderLoaderReloadListener());
-
-        ResourceManagerHelper.get(PackType.CLIENT_RESOURCES)
-                .registerReloadListener(new IconSpriteAtlasReloadListener());
 
         ResourceManagerHelper.get(PackType.CLIENT_RESOURCES)
                 .registerReloadListener(new GuideImageCacheReloadListener());
@@ -706,35 +699,6 @@ public class ArdaMapsClient implements ClientModInitializer {
 
             FogOfWarShader.load(manager);
             BlueMapTileShader.load(manager);
-        }
-    }
-
-    /**
-     * A resource reload listener that manages the icon sprite atlas, ensuring it is reloaded when client resources are reloaded.
-     */
-    private static class IconSpriteAtlasReloadListener implements IdentifiableResourceReloadListener {
-
-        /** The icon sprite atlas instance, which is responsible for managing the icons used in the mod's HUD and map rendering. */
-        private IconSpriteAtlas atlas;
-
-        /** Returns the identifier for this resource reload listener, which is used to distinguish it from other listeners. */
-        @Override
-        public Identifier getFabricId() {
-            return ModConstants.modId("icon_sprite_atlas");
-        }
-
-        /** Reloads the icon sprite atlas when client resources are reloaded, ensuring that any changes to the icons are reflected in the mod's HUD and map rendering. */
-        @Override
-        public @NonNull CompletableFuture<Void> reload(
-                PreparableReloadListener.SharedState sharedState,
-                Executor prepareExecutor,
-                PreparationBarrier synchronizer,
-                Executor applyExecutor) {
-
-            if (atlas == null) {
-                atlas = IconSpriteAtlas.create(Minecraft.getInstance().getTextureManager());
-            }
-            return synchronizer.wait(null);
         }
     }
 
