@@ -28,10 +28,8 @@ package com.duom.ardamaps.core.networking.handlers.server;
 import com.duom.ardamaps.core.consumers.networking.ServerPacketHandler;
 import com.duom.ardamaps.core.integration.Warps;
 import com.duom.ardamaps.core.networking.packets.server.PlayerWarpPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,14 +54,12 @@ public class PlayerWarpHandler extends ServerPacketHandler<PlayerWarpPacket> {
     /**
      * Handles the PlayerWarpPacket by warping the player to the specified warp location.
      *
-     * @param server  The Minecraft server instance.
-     * @param player  The player to teleport.
-     * @param handler The network handler.
-     * @param packet  The PlayerWarpPacket containing warp data.
-     * @param sender  The packet sender.
+     * @param server The Minecraft server instance.
+     * @param player The player to teleport.
+     * @param packet The PlayerWarpPacket containing warp data.
      */
     @Override
-    protected void handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler, PlayerWarpPacket packet, PacketSender sender) {
+    protected void handle(MinecraftServer server, ServerPlayer player, PlayerWarpPacket packet) {
 
         server.execute(() -> Warps.warpTo(server, player, packet.warpName(),
                 () -> LOGGER.warn("Unable to warp player {} to '{}'", player.getStringUUID(), packet.warpName())));

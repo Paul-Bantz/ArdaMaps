@@ -31,10 +31,8 @@ import com.duom.ardamaps.core.integration.Regions;
 import com.duom.ardamaps.core.integration.Warps;
 import com.duom.ardamaps.core.networking.packets.client.MapSourceResponsePacket;
 import com.duom.ardamaps.core.networking.packets.server.MapSourcesRequestPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 /**
  * A packet sent from the client to the server to request map source data.
@@ -59,15 +57,13 @@ public class MapSourcesRequestHandler extends RespondablePacketHandler<MapSource
     /**
      * Handles the incoming EmptyPacket by retrieving the map source configuration and responding with a MapSourceResponsePacket containing the configuration in JSON format.
      *
-     * @param server  The Minecraft server instance.
-     * @param player  The player who sent the request.
-     * @param handler The network handler for the player's connection.
-     * @param packet  The EmptyPacket containing the request data (empty in this case).
-     * @param sender  The packet sender to send the response back to the client.
+     * @param server The Minecraft server instance.
+     * @param player The player who sent the request.
+     * @param packet The MapSourcesRequestPacket containing the request data.
      * @return A MapSourceResponsePacket containing the map source configuration in JSON format.
      */
     @Override
-    public MapSourceResponsePacket handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler, MapSourcesRequestPacket packet, PacketSender sender) {
+    public MapSourceResponsePacket handle(MinecraftServer server, ServerPlayer player, MapSourcesRequestPacket packet) {
 
         return new MapSourceResponsePacket(Warps.isAvailable(), Regions.isAvailable(), ArdaMaps.CONFIG.getDimensions());
     }

@@ -31,13 +31,11 @@ import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.networking.packets.client.PlayerTeleportResponsePacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerRangedTeleportPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,18 +74,15 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
      * Resolves the destination world and dimension configuration, scans for a valid teleport position within the
      * specified Y range, and either teleports the player or sends an error message.
      *
-     * @param server  The Minecraft server instance.
-     * @param player  The player to teleport.
-     * @param handler The network handler for this player connection.
-     * @param packet  The PlayerRangedTeleportPacket containing the target coordinates and Y scan range.
-     * @param sender  The packet sender for responses.
+     * @param server The Minecraft server instance.
+     * @param player The player to teleport.
+     * @param packet The PlayerRangedTeleportPacket containing the target coordinates and Y scan range.
      * @param responder Callback that sends the teleport response and must be called exactly once inside the server task.
      * @return Null because the response is sent asynchronously from the server thread.
      */
     @Override
     protected PlayerTeleportResponsePacket handle(MinecraftServer server, ServerPlayer player,
-                                                  ServerGamePacketListenerImpl handler, PlayerRangedTeleportPacket packet,
-                                                  PacketSender sender,
+                                                  PlayerRangedTeleportPacket packet,
                                                   Consumer<PlayerTeleportResponsePacket> responder) {
 
         server.execute(() -> {

@@ -35,7 +35,6 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,17 +117,14 @@ public abstract class RespondablePacketHandler<T extends IRespondablePacket<T>, 
     /**
      * Handles an incoming request packet on the server side. This method reads the request data from the PacketByteBuf using the provided reader function, processes the request by calling the async-capable handle method, and sends an immediate response when one is returned. Implementations that return null must call the provided responder exactly once later.
      *
-     * @param server  The MinecraftServer instance representing the server on which the packet was received.
-     * @param player  The ServerPlayerEntity representing the player who sent the packet.
-     * @param handler The ServerPlayNetworkHandler responsible for managing the network connection for the player.
-     * @param buf     The PacketByteBuf containing the raw data of the incoming request packet, which will be read and deserialized into an instance of T using the reader function.
-     * @param sender  The PacketSender used to send responses back to the client if necessary, allowing for communication between the server and client based on the received request packet.
+     * @param packet  The deserialized request packet.
+     * @param context The Fabric networking context for this server-side receive.
      */
     @Override
     public void receive(T packet, net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.Context context) {
         UUID requestId = packet.requestId();
         Consumer<U> responder = response -> respond(context.responseSender(), requestId, response);
-        U immediate = handle(context.server(), context.player(), null, packet, context.responseSender(), responder);
+        U immediate = handle(context.server(), context.player(), packet, responder);
 
         if (immediate != null) responder.accept(immediate);
     }
@@ -154,14 +150,12 @@ public abstract class RespondablePacketHandler<T extends IRespondablePacket<T>, 
      * <p>
      * Subclasses must override either this method or the async-capable overload with a responder callback.
      *
-     * @param ignoredServer  The MinecraftServer instance representing the server on which the packet was received.
-     * @param ignoredPlayer  The ServerPlayerEntity representing the player who sent the packet.
-     * @param ignoredHandler The ServerPlayNetworkHandler responsible for managing the network connection for the player.
-     * @param packet         The deserialized request packet of type T that needs to be processed by the server.
-     * @param ignoredSender  The PacketSender used to send responses back to the client if necessary.
+     * @param ignoredServer The MinecraftServer instance representing the server on which the packet was received.
+     * @param ignoredPlayer The ServerPlayerEntity representing the player who sent the packet.
+     * @param packet        The deserialized request packet of type T that needs to be processed by the server.
      * @return A response packet to send immediately.
      */
-    protected U handle(MinecraftServer ignoredServer, ServerPlayer ignoredPlayer, ServerGamePacketListenerImpl ignoredHandler, T packet, PacketSender ignoredSender) {
+    protected U handle(MinecraftServer ignoredServer, ServerPlayer ignoredPlayer, T packet) {
 
         throw new UnsupportedOperationException("Subclasses must override one of the two handle overloads");
     }
@@ -175,25 +169,20 @@ public abstract class RespondablePacketHandler<T extends IRespondablePacket<T>, 
      *
      * @param server The MinecraftServer instance representing the server on which the packet was received.
      * @param player The ServerPlayerEntity representing the player who sent the packet.
-     * @param handler The ServerPlayNetworkHandler responsible for managing the network connection for the player.
      * @param packet The deserialized request packet of type T that needs to be processed by the server.
-     * @param sender The PacketSender used to send responses back to the client if necessary.
      * @param responder Callback that sends the response for this request and must be called exactly once for deferred responses.
      * @return A response packet to send immediately, or {@code null} when {@code responder} will be called later.
      */
-    protected U handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler,
-                       T packet, PacketSender sender, Consumer<U> responder) {
+    protected U handle(MinecraftServer server, ServerPlayer player, T packet, Consumer<U> responder) {
 
-        return handle(server, player, handler, packet, sender);
+        return handle(server, player, packet);
     }
 
     /**
-     * Handles an incoming response packet on the client side. This method reads the response data from the PacketByteBuf using the provided responseReader function, retrieves the corresponding consumer for the original request using the request ID, and then calls the consumer with the deserialized response packet of type U. This allows for asynchronous processing of responses on the client side based on the original requests that were sent.
+     * Handles an incoming response packet on the client side.
      *
-     * @param client  The MinecraftClient instance representing the client receiving the packet, which can be used to access client-side resources and perform actions in response to the packet.
-     * @param handler The ClientPlayNetworkHandler that manages network communication on the client side, which can be used to send additional packets or manage network state if needed while processing the response.
-     * @param buf     The PacketByteBuf containing the raw data of the incoming response packet, which will be read and deserialized into an instance of U using the responseReader function. This buffer should contain a UUID at the beginning that matches the request ID of the original request, followed by the serialized response packet data.
-     * @param sender  The PacketSender that can be used to send responses back to the server if needed, allowing for communication between the client and server based on the received response packet. This can be used within this method to send additional packets if needed while processing the response.
+     * @param packet  The deserialized response packet.
+     * @param context The Fabric networking context for this client-side receive.
      */
     @Override
     public void receive(U packet, net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.Context context) {

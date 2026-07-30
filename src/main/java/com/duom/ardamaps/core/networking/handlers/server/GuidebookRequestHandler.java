@@ -28,10 +28,8 @@ package com.duom.ardamaps.core.networking.handlers.server;
 import com.duom.ardamaps.core.consumers.networking.ServerPacketHandler;
 import com.duom.ardamaps.core.items.ModItems;
 import com.duom.ardamaps.core.networking.packets.EmptyPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.item.ItemStack;
 
 public class GuidebookRequestHandler extends ServerPacketHandler<EmptyPacket> {
@@ -49,14 +47,12 @@ public class GuidebookRequestHandler extends ServerPacketHandler<EmptyPacket> {
     /**
      * Handles the PlayerTeleportPacket by teleporting the player to the specified coordinates.
      *
-     * @param server  The Minecraft server instance.
-     * @param player  The player to teleport.
-     * @param handler The network handler.
-     * @param packet  The PlayerTeleportPacket containing teleportation data.
-     * @param sender  The packet sender.
+     * @param server The Minecraft server instance.
+     * @param player The player to teleport.
+     * @param packet The PlayerTeleportPacket containing teleportation data.
      */
     @Override
-    protected void handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler, EmptyPacket packet, PacketSender sender) {
+    protected void handle(MinecraftServer server, ServerPlayer player, EmptyPacket packet) {
 
         server.execute(() -> giveGuidebook(player));
     }

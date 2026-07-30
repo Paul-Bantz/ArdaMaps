@@ -25,13 +25,11 @@
 
 package com.duom.ardamaps.core.consumers.networking;
 
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 /**
  * Abstract base class for handling server-side packets.
@@ -52,27 +50,22 @@ public abstract class ServerPacketHandler<T extends IPacket> extends PacketHandl
     }
 
     /**
-     * Handles an incoming packet on the server side. This method reads the packet data from the PacketByteBuf using the provided reader function and then calls the abstract handle method to process the packet.
+     * Handles an incoming packet on the server side.
      *
-     * @param server  The MinecraftServer instance representing the server on which the packet was received.
-     * @param player  The ServerPlayerEntity representing the player who sent the packet.
-     * @param handler The ServerPlayNetworkHandler responsible for managing the network connection for the player.
-     * @param buf     The PacketByteBuf containing the raw data of the incoming packet, which will be read and deserialized into an instance of T using the reader function.
-     * @param sender  The PacketSender used to send responses back to the client if necessary.
+     * @param packet  The deserialized packet payload.
+     * @param context The Fabric networking context for this server-side receive.
      */
     @Override
     public void receive(T packet, net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.Context context) {
-        handle(context.server(), context.player(), null, packet, context.responseSender());
+        handle(context.server(), context.player(), packet);
     }
 
     /**
      * Abstract method to process the deserialized packet of type T. Subclasses must implement this method to define the specific behaviour for handling the packet on the server side.
      *
-     * @param server         The MinecraftServer instance representing the server on which the packet was received.
-     * @param player         The ServerPlayerEntity representing the player who sent the packet.
-     * @param ignoredHandler The ServerPlayNetworkHandler responsible for managing the network connection for the player.
-     * @param packet         The deserialized packet of type T that was read from the PacketByteBuf, which contains the data sent by the client and needs to be processed by the server.
-     * @param ignoredSender  The PacketSender used to send responses back to the client if necessary, allowing for communication between the server and client based on the received packet.
+     * @param server The MinecraftServer instance representing the server on which the packet was received.
+     * @param player The ServerPlayerEntity representing the player who sent the packet.
+     * @param packet The deserialized packet of type T that contains the data sent by the client.
      */
-    protected abstract void handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl ignoredHandler, T packet, PacketSender ignoredSender);
+    protected abstract void handle(MinecraftServer server, ServerPlayer player, T packet);
 }
