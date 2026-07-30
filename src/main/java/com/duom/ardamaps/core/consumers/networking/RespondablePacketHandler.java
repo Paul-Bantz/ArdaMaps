@@ -30,13 +30,13 @@ import lombok.Getter;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,14 +62,14 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
     private final Map<UUID, Consumer<U>> responseConsumers = new ConcurrentHashMap<>();
 
     /** A function that reads a packet of type T from a PacketByteBuf. This is used to deserialize incoming packets on the server side. */
-    private final Function<PacketByteBuf, T> reader;
+    private final Function<FriendlyByteBuf, T> reader;
 
     /** The unique identifier for the response packet channel, constructed using the mod ID and a specific channel name. */
     @Getter
-    private final Identifier responseChannelId;
+    private final ResourceLocation responseChannelId;
 
     /** A function that reads a packet of type U from a PacketByteBuf. This is used to deserialize incoming packets on the client side. */
-    private final Function<PacketByteBuf, U> responseReader;
+    private final Function<FriendlyByteBuf, U> responseReader;
 
     /**
      * Constructs a new RespondablePacketHandler with the specified channel names and packet reader functions for both request and response packets.
@@ -81,9 +81,9 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
      */
     public RespondablePacketHandler(
             final String channel,
-            final Function<PacketByteBuf, T> reader,
+            final Function<FriendlyByteBuf, T> reader,
             final String responseChannel,
-            final Function<PacketByteBuf, U> responseReader
+            final Function<FriendlyByteBuf, U> responseReader
     ) {
         super(channel);
         this.reader = reader;
@@ -99,9 +99,9 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
      */
     public void send(final T packet, final Consumer<U> consumer) {
         UUID id = UUID.randomUUID();
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeUuid(id);
-        PacketByteBuf packetBuf = packet.build();
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeUUID(id);
+        FriendlyByteBuf packetBuf = packet.build();
         buf.writeBytes(packetBuf);
         if (consumer != null) {
             responseConsumers.put(id, consumer);
@@ -128,8 +128,8 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
      * @param sender  The PacketSender used to send responses back to the client if necessary, allowing for communication between the server and client based on the received request packet.
      */
     @Override
-    public void handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PacketByteBuf buf, PacketSender sender) {
-        UUID requestId = buf.readUuid();
+    public void handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler, FriendlyByteBuf buf, PacketSender sender) {
+        UUID requestId = buf.readUUID();
         T packet = reader.apply(buf);
         Consumer<U> responder = response -> respond(sender, requestId, response);
 
@@ -150,7 +150,7 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
     protected void respond(PacketSender sender, UUID requestId, U response) {
 
         try {
-            PacketByteBuf responseBuf = PacketByteBufs.create().writeUuid(requestId);
+            FriendlyByteBuf responseBuf = PacketByteBufs.create().writeUUID(requestId);
             responseBuf.writeBytes(response.build());
             sender.sendPacket(responseChannelId, responseBuf);
         } catch (RuntimeException e) {
@@ -170,7 +170,7 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
      * @param ignoredSender  The PacketSender used to send responses back to the client if necessary.
      * @return A response packet to send immediately.
      */
-    protected U handle(MinecraftServer ignoredServer, ServerPlayerEntity ignoredPlayer, ServerPlayNetworkHandler ignoredHandler, T packet, PacketSender ignoredSender) {
+    protected U handle(MinecraftServer ignoredServer, ServerPlayer ignoredPlayer, ServerGamePacketListenerImpl ignoredHandler, T packet, PacketSender ignoredSender) {
 
         throw new UnsupportedOperationException("Subclasses must override one of the two handle overloads");
     }
@@ -190,7 +190,7 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
      * @param responder Callback that sends the response for this request and must be called exactly once for deferred responses.
      * @return A response packet to send immediately, or {@code null} when {@code responder} will be called later.
      */
-    protected U handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler,
+    protected U handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler,
                        T packet, PacketSender sender, Consumer<U> responder) {
 
         return handle(server, player, handler, packet, sender);
@@ -205,8 +205,8 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
      * @param sender  The PacketSender that can be used to send responses back to the server if needed, allowing for communication between the client and server based on the received response packet. This can be used within this method to send additional packets if needed while processing the response.
      */
     @Override
-    public void handle(MinecraftClient client, ClientPlayNetworkHandler handler, PacketByteBuf buf, PacketSender sender) {
-        UUID requestId = buf.readUuid();
+    public void handle(Minecraft client, ClientPacketListener handler, FriendlyByteBuf buf, PacketSender sender) {
+        UUID requestId = buf.readUUID();
         U packet = responseReader.apply(buf);
         Consumer<U> consumer = responseConsumers.remove(requestId);
         if (consumer != null) {

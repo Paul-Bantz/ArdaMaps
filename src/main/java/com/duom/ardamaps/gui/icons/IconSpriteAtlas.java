@@ -27,20 +27,20 @@ package com.duom.ardamaps.gui.icons;
 
 import com.duom.ardamaps.gui.ModConstants;
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
-import net.minecraft.client.texture.Sprite;
-import net.minecraft.client.texture.SpriteAtlasHolder;
-import net.minecraft.client.texture.TextureManager;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureManager;
+import net.minecraft.client.resources.TextureAtlasHolder;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Holds the sprite atlas for map icons.
  * Atlas ID: ardamaps:map_icons
  * Sprite IDs follow the pattern: ardamaps:icons/<name>
  */
-public class IconSpriteAtlas extends SpriteAtlasHolder implements IdentifiableResourceReloadListener {
+public class IconSpriteAtlas extends TextureAtlasHolder implements IdentifiableResourceReloadListener {
 
     /** Runtime GPU texture storage location. Never read from disk. */
-    public static final Identifier ATLAS_ID = ModConstants.modId("textures/atlas/map_icons.png");
+    public static final ResourceLocation ATLAS_ID = ModConstants.modId("textures/atlas/map_icons.png");
 
     /** Singleton instance of the atlas. Initialized at runtime. */
     private static IconSpriteAtlas INSTANCE;
@@ -69,7 +69,7 @@ public class IconSpriteAtlas extends SpriteAtlasHolder implements IdentifiableRe
      * @param id the identifier of the sprite to retrieve.
      * @return the sprite from the atlas.
      */
-    public static Sprite retrieveSprite(Identifier id) {
+    public static TextureAtlasSprite retrieveSprite(ResourceLocation id) {
         if (INSTANCE == null) throw new IllegalStateException("IconSpriteAtlas not initialized");
         return INSTANCE.getSprite(id);
     }
@@ -78,7 +78,7 @@ public class IconSpriteAtlas extends SpriteAtlasHolder implements IdentifiableRe
      * @return the unique identifier for this resource reload listener, used for logging and debugging.
      */
     @Override
-    public Identifier getFabricId() {
+    public ResourceLocation getFabricId() {
         return ModConstants.modId("icon_sprite_atlas");
     }
 }

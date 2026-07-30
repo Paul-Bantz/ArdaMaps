@@ -117,7 +117,7 @@ public class ClientProgress implements Serializable {
 
         // Reset ArdaRegions progress
         if (!autoGenOnly && ArdaMapsClient.CONFIG.isArdaRegionsAvailable() && Client.player() != null)
-            Client.player().networkHandler.sendChatCommand("ardaregions resetprogress");
+            Client.player().connection.sendCommand("ardaregions resetprogress");
     }
 
     /**

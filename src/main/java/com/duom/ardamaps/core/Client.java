@@ -33,9 +33,9 @@ import com.duom.ardamaps.gui.screens.ArdaMapsScreen;
 import com.duom.ardamaps.gui.widgets.SearchWidget;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.world.ClientWorld;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.LocalPlayer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -64,14 +64,14 @@ public class Client {
 
         if (world == null) return null;
 
-        return world.getRegistryKey().getValue().toString();
+        return world.dimension().location().toString();
     }
 
     /**
      * @return The client's world, or null if not available
      */
-    public static @Nullable ClientWorld world() {
-        return mc().world;
+    public static @Nullable ClientLevel world() {
+        return mc().level;
     }
 
     /**
@@ -81,8 +81,8 @@ public class Client {
      *
      * @return The Minecraft client instance
      */
-    public static @NotNull MinecraftClient mc() {
-        return MinecraftClient.getInstance();
+    public static @NotNull Minecraft mc() {
+        return Minecraft.getInstance();
     }
 
     /**
@@ -96,7 +96,7 @@ public class Client {
 
         if (world == null) return null;
 
-        var dimensionId = world.getRegistryKey().getValue().toString();
+        var dimensionId = world.dimension().location().toString();
 
         if (cachedCurrentDimension == null || !cachedCurrentDimension.getId().equals(dimensionId))
             cachedCurrentDimension = ArdaMapsClient.CONFIG.getDimension(dimensionId);
@@ -116,7 +116,7 @@ public class Client {
      */
     public static @NotNull Vec2d playerPosition2d() {
 
-        ClientPlayerEntity player = player();
+        LocalPlayer player = player();
         if (player != null) {
             return new Vec2d(player.getX(), player.getZ());
         }
@@ -126,7 +126,7 @@ public class Client {
     /**
      * @return The client's player, or null if not available
      */
-    public static @Nullable ClientPlayerEntity player() {
+    public static @Nullable LocalPlayer player() {
         return mc().player;
     }
 
@@ -135,7 +135,7 @@ public class Client {
      */
     public static @Nullable Double playerPositionY() {
 
-        ClientPlayerEntity player = player();
+        LocalPlayer player = player();
         if (player != null) return player.getY();
 
         return null;
@@ -145,9 +145,9 @@ public class Client {
      * @return True if the Arda Maps screen is currently being shown, otherwise false
      */
     public static boolean isShowingMapScreen() {
-        return mc().currentScreen != null
-                && mc().currentScreen instanceof ArdaMapsScreen
-                || mc().currentScreen instanceof SearchWidget;
+        return mc().screen != null
+                && mc().screen instanceof ArdaMapsScreen
+                || mc().screen instanceof SearchWidget;
     }
 
     /**
@@ -161,7 +161,7 @@ public class Client {
      * @return The scaled width of the game window
      */
     public static int getScaledWindowWidth() {
-        return mc().getWindow().getScaledWidth();
+        return mc().getWindow().getGuiScaledWidth();
     }
 
     /**
@@ -175,7 +175,7 @@ public class Client {
      * @return The scaled height of the game window
      */
     public static int getScaledWindowHeight() {
-        return mc().getWindow().getScaledHeight();
+        return mc().getWindow().getGuiScaledHeight();
     }
 
     /**
@@ -200,14 +200,14 @@ public class Client {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     public static Path runtimeDirectory() {
 
-        var modPath = mc().runDirectory.toPath()
+        var modPath = mc().gameDirectory.toPath()
                 .resolve(ArdaMaps.MOD_ID);
 
         if (!modPath.toFile().exists()) {
             modPath.toFile().mkdirs();
         }
 
-        return mc().runDirectory.toPath()
+        return mc().gameDirectory.toPath()
                 .resolve(ArdaMaps.MOD_ID);
     }
 }

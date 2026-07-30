@@ -28,23 +28,22 @@ package com.duom.ardamaps.gui.widgets;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.gui.ModConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.widget.PressableWidget;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.text.Text;
-
+import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.function.Consumer;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractButton;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.network.chat.Component;
 
 /**
  * A checkbox widget that can be toggled on or off.
  * Displays a text label next to the checkbox.
  */
-public class CheckboxWidget extends PressableWidget {
+public class CheckboxWidget extends AbstractButton {
 
     /** Text label displayed next to the checkbox */
-    private final Text text;
+    private final Component text;
 
     /** Size of the checkbox square (the actual box that is checked/unchecked) */
     private final int size;
@@ -70,7 +69,7 @@ public class CheckboxWidget extends PressableWidget {
      * @param enabled  Whether the checkbox should be enabled or disabled
      * @param onChange Callback function to call when the checkbox state changes
      */
-    public CheckboxWidget(int x, int y, int width, int height, Text text, boolean checked, boolean enabled, Consumer<Boolean> onChange) {
+    public CheckboxWidget(int x, int y, int width, int height, Component text, boolean checked, boolean enabled, Consumer<Boolean> onChange) {
         super(x, y, width, height, null);
         this.text = text;
         this.checked = checked;
@@ -88,43 +87,43 @@ public class CheckboxWidget extends PressableWidget {
      * @param delta   Time delta since last render call
      */
     @Override
-    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
         int x = this.getX();
         int boxX = this.getX() + (width - size);
         int y = this.getY();
-        TextRenderer textRenderer = Client.mc().textRenderer;
+        Font textRenderer = Client.mc().font;
 
         if (!enabled) {
-            MatrixStack matrices = context.getMatrices();
-            matrices.push();
+            PoseStack matrices = context.pose();
+            matrices.pushPose();
             matrices.translate(0, 0, 2);
             RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 0.7f);
             context.fill(this.getX(), this.getY(), this.getX() + this.width, this.getY() + this.height, 0xFF48494A);
             RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-            matrices.pop();
+            matrices.popPose();
 
-            int textY = y + (height - textRenderer.fontHeight) / 2;
-            context.drawTextWithShadow(textRenderer, text, x, textY, 0xFF48494A);
+            int textY = y + (height - textRenderer.lineHeight) / 2;
+            context.drawString(textRenderer, text, x, textY, 0xFF48494A);
 
             return;
         }
 
         if (this.isHovered()) {
             if (checked) {
-                context.drawTexture(ModConstants.TEXTURE, boxX, y, size, size, 20, 20, 20, 20, 64, 64);
+                context.blit(ModConstants.TEXTURE, boxX, y, size, size, 20, 20, 20, 20, 64, 64);
             } else {
-                context.drawTexture(ModConstants.TEXTURE, boxX, y, size, size, 20, 0, 20, 20, 64, 64);
+                context.blit(ModConstants.TEXTURE, boxX, y, size, size, 20, 0, 20, 20, 64, 64);
             }
         } else {
             if (checked) {
-                context.drawTexture(ModConstants.TEXTURE, boxX, y, size, size, 0, 20, 20, 20, 64, 64);
+                context.blit(ModConstants.TEXTURE, boxX, y, size, size, 0, 20, 20, 20, 64, 64);
             } else {
-                context.drawTexture(ModConstants.TEXTURE, boxX, y, size, size, 0, 0, 20, 20, 64, 64);
+                context.blit(ModConstants.TEXTURE, boxX, y, size, size, 0, 0, 20, 20, 64, 64);
             }
         }
 
-        int textY = y + (height - textRenderer.fontHeight) / 2;
-        context.drawTextWithShadow(textRenderer, text, x, textY, ModConstants.COLOR_WHITE);
+        int textY = y + (height - textRenderer.lineHeight) / 2;
+        context.drawString(textRenderer, text, x, textY, ModConstants.COLOR_WHITE);
     }
 
     /**
@@ -144,8 +143,8 @@ public class CheckboxWidget extends PressableWidget {
      * @param builder The NarrationMessageBuilder to append messages to
      */
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {
-        this.appendDefaultNarrations(builder);
+    protected void updateWidgetNarration(NarrationElementOutput builder) {
+        this.defaultButtonNarrationText(builder);
     }
 
     /**

@@ -35,11 +35,6 @@ import com.duom.ardamaps.core.data.map.providers.TileProvider;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
 import com.duom.ardamaps.gui.ModConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Pair;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.slf4j.Logger;
@@ -48,6 +43,11 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.Set;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Tuple;
 
 /**
  * A map viewer that renders map tiles from PMTiles files.
@@ -72,7 +72,7 @@ public class PmTilesRenderer extends MapRenderable {
      * @param textRenderer The text renderer for displaying loading text or other information.
      * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public PmTilesRenderer(PmTilesMapCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
+    public PmTilesRenderer(PmTilesMapCamera camera, Font textRenderer, PlayerExploration exploration) {
 
         super(camera, textRenderer, exploration);
         this.mapCamera = camera;
@@ -122,7 +122,7 @@ public class PmTilesRenderer extends MapRenderable {
      * @param context the draw context
      */
     @Override
-    public void render(DrawContext context) {
+    public void render(GuiGraphics context) {
 
         if (tileProvider == null) {
             super.renderLoadingText(context);
@@ -153,7 +153,7 @@ public class PmTilesRenderer extends MapRenderable {
      *
      * @param context the draw context
      */
-    private void renderMap(DrawContext context) {
+    private void renderMap(GuiGraphics context) {
 
         int minZoom = tileProvider.getMinZoom();
 
@@ -170,19 +170,19 @@ public class PmTilesRenderer extends MapRenderable {
         RenderSystem.defaultBlendFunc();
 
         boolean debugMode = ArdaMapsClient.CONFIG.isMapDebugDisplay();
-        var textureManager = MinecraftClient.getInstance().getTextureManager();
+        var textureManager = Minecraft.getInstance().getTextureManager();
 
         for (PmTileKey key : tilesToDisplay) {
 
-            Optional<Identifier> tex = tileProvider.get(key);
+            Optional<ResourceLocation> tex = tileProvider.get(key);
 
             PmTileKey renderKey = key;
 
             if (tex.isEmpty()) {
 
                 var fallbackTile = findFallbackTile(key, minZoom);
-                renderKey = fallbackTile.getLeft();
-                tex = fallbackTile.getRight();
+                renderKey = fallbackTile.getA();
+                tex = fallbackTile.getB();
 
                 if (tex.isEmpty()) continue; // fallback not loaded yet either
             }
@@ -192,27 +192,27 @@ public class PmTilesRenderer extends MapRenderable {
             int roundedX = (int) Math.round(screenPos.x());
             int roundedY = (int) Math.round(screenPos.y());
 
-            Identifier currentTexture = tex.get();
+            ResourceLocation currentTexture = tex.get();
             RenderSystem.activeTexture(GL13.GL_TEXTURE0);
-            textureManager.bindTexture(currentTexture);
+            textureManager.bindForSetup(currentTexture);
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
             RenderSystem.setShaderTexture(0, currentTexture);
 
-            var matrices = context.getMatrices();
-            matrices.push();
+            var matrices = context.pose();
+            matrices.pushPose();
             double offsetX = screenPos.x() - roundedX;
             double offsetY = screenPos.y() - roundedY;
             matrices.translate(offsetX, offsetY, 0);
 
-            context.drawTexture(
+            context.blit(
                     currentTexture,
                     roundedX, roundedY,
                     0, 0,
                     renderSize, renderSize,
                     renderSize, renderSize
             );
-            matrices.pop();
+            matrices.popPose();
 
             if (debugMode) drawDebugLines(context, renderKey, roundedX, roundedY, renderSize);
         }
@@ -225,7 +225,7 @@ public class PmTilesRenderer extends MapRenderable {
      * @param minZoom the minimum zoom level to stop at
      * @return the key of the fallback tile if found, or null if no fallback tile is available
      */
-    private Pair<PmTileKey, Optional<Identifier>> findFallbackTile(PmTileKey key, int minZoom) {
+    private Tuple<PmTileKey, Optional<ResourceLocation>> findFallbackTile(PmTileKey key, int minZoom) {
 
         PmTileKey current = key;
 
@@ -236,12 +236,12 @@ public class PmTilesRenderer extends MapRenderable {
                     current.y >> 1
             );
 
-            Optional<Identifier> tex = tileProvider.get(current);
-            if (tex.isPresent()) return new Pair<>(current, tex);
+            Optional<ResourceLocation> tex = tileProvider.get(current);
+            if (tex.isPresent()) return new Tuple<>(current, tex);
 
         }
 
-        return new Pair<>(key, Optional.empty());
+        return new Tuple<>(key, Optional.empty());
     }
 
     /**
@@ -263,14 +263,14 @@ public class PmTilesRenderer extends MapRenderable {
      * @param screenY    screen Y position of the tile
      * @param renderSize size of the rendered tile
      */
-    private void drawDebugLines(DrawContext context, PmTileKey key, int screenX, int screenY, int renderSize) {
+    private void drawDebugLines(GuiGraphics context, PmTileKey key, int screenX, int screenY, int renderSize) {
 
         // Draw red outline
-        context.drawBorder(screenX, screenY, renderSize, renderSize, ModConstants.COLOR_RED);
+        context.renderOutline(screenX, screenY, renderSize, renderSize, ModConstants.COLOR_RED);
 
         // Draw tile ID text
         String tileId = String.format("Z:%d X:%d Y:%d", key.z, key.x, key.y);
-        context.drawText(
+        context.drawString(
                 textRenderer,
                 tileId,
                 screenX + 5,

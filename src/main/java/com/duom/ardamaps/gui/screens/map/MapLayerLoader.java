@@ -37,7 +37,7 @@ import com.duom.ardamaps.core.data.map.cameras.PmTilesMapCamera;
 import com.duom.ardamaps.gui.map.rendering.*;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.Font;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -172,6 +172,6 @@ public class MapLayerLoader {
             int startingCameraX,
             int startingCameraZ,
             @Nullable Double playerY,
-            TextRenderer textRenderer) {
+            Font textRenderer) {
     }
 }

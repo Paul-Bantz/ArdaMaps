@@ -32,8 +32,8 @@ import com.duom.ardamaps.core.networking.packets.client.LocationDetailsResponseP
 import com.duom.ardamaps.core.networking.packets.server.LocationDetailsRequestPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 /**
  * A packet handler that processes LocationDetailsRequestPacket sent from the client and responds with a LocationDetailsResponsePacket containing detailed information about a specific location.
@@ -64,7 +64,7 @@ public class LocationDetailsRequestHandler extends RespondablePacketHandler<Loca
      * @return A LocationDetailsResponsePacket containing detailed information about the requested location, or default values if the location is not found.
      */
     @Override
-    public LocationDetailsResponsePacket handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, LocationDetailsRequestPacket packet, PacketSender sender) {
+    public LocationDetailsResponsePacket handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler, LocationDetailsRequestPacket packet, PacketSender sender) {
 
         var locations = ArdaMaps.CONFIG.getLocations();
         var location = locations.stream()

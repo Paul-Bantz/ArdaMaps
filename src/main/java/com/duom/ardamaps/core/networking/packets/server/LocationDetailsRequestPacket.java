@@ -27,20 +27,20 @@ package com.duom.ardamaps.core.networking.packets.server;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 
 public record LocationDetailsRequestPacket(String locationIdentifier) implements IPacket {
     @Override
-    public PacketByteBuf build() {
+    public FriendlyByteBuf build() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeString(locationIdentifier);
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeUtf(locationIdentifier);
         return buf;
     }
 
-    public static LocationDetailsRequestPacket read(PacketByteBuf buf) {
+    public static LocationDetailsRequestPacket read(FriendlyByteBuf buf) {
 
-        var location = buf.readString();
+        var location = buf.readUtf();
 
         return new LocationDetailsRequestPacket(location);
     }

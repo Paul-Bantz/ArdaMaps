@@ -26,10 +26,10 @@
 package com.duom.ardamaps.core;
 
 import com.duom.ardamaps.ArdaMaps;
+import com.mojang.blaze3d.platform.InputConstants;
 import lombok.Getter;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
+import net.minecraft.client.KeyMapping;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,20 +54,20 @@ public final class KeyBinds {
     private static final String CATEGORY = "key.categories." + ArdaMaps.MOD_ID;
 
     /** Opens the Arda Maps map screen. */
-    public static final KeyBinding OPEN_MAP = KeyBindingHelper.registerKeyBinding(
-            new KeyBinding(
+    public static final KeyMapping OPEN_MAP = KeyBindingHelper.registerKeyBinding(
+            new KeyMapping(
                     "key." + ArdaMaps.MOD_ID + ".open_map",
-                    InputUtil.Type.KEYSYM,
+                    InputConstants.Type.KEYSYM,
                     GLFW.GLFW_KEY_M,
                     CATEGORY
             )
     );
 
     /** Toggles the toposcope HUD overlay. */
-    public static final KeyBinding TOGGLE_TOPOSCOPE = KeyBindingHelper.registerKeyBinding(
-            new KeyBinding(
+    public static final KeyMapping TOGGLE_TOPOSCOPE = KeyBindingHelper.registerKeyBinding(
+            new KeyMapping(
                     "key." + ArdaMaps.MOD_ID + ".toggle_toposcope",
-                    InputUtil.Type.KEYSYM,
+                    InputConstants.Type.KEYSYM,
                     GLFW.GLFW_KEY_F,
                     CATEGORY
             )
@@ -99,7 +99,7 @@ public final class KeyBinds {
     public static void tick() {
 
         // Consume every queued press of V and flip the toggle once per logical press.
-        while (TOGGLE_TOPOSCOPE.wasPressed())
+        while (TOGGLE_TOPOSCOPE.consumeClick())
             toposcopeEnabled = !toposcopeEnabled;
     }
 
@@ -111,7 +111,7 @@ public final class KeyBinds {
      * @return {@code true} if the map key was pressed.
      */
     public static boolean consumeMapPress() {
-        return OPEN_MAP.wasPressed();
+        return OPEN_MAP.consumeClick();
     }
 
 }

@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.core.consumers.networking;
 
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Interface for handling network packets.
@@ -35,5 +35,5 @@ public interface IPacketHandler {
     /**
      * Get the channel ID for this packet handler.
      */
-    Identifier getChannelId();
+    ResourceLocation getChannelId();
 }

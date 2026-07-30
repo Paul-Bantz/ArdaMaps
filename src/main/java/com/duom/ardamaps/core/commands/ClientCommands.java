@@ -45,11 +45,11 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.client.texture.TextureManager;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.renderer.texture.TextureManager;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,14 +127,14 @@ public class ClientCommands {
 
         var contextSource = context.getSource();
 
-        contextSource.sendFeedback(Text.literal("ArdaMaps - Version " + version));
-        contextSource.sendFeedback(Text.literal("Commands: "));
-        contextSource.sendFeedback(Text.literal("/" + ArdaMaps.MOD_ID).formatted(Formatting.AQUA).append(Text.literal(" - Print mod information").formatted(Formatting.GRAY)));
-        contextSource.sendFeedback(Text.literal("/" + ArdaMaps.MOD_ID + " refresh locations").formatted(Formatting.AQUA).append(Text.literal(" - Re-synchronizes the location data from the server").formatted(Formatting.GRAY)));
-        contextSource.sendFeedback(Text.literal("/" + ArdaMaps.MOD_ID + " refresh regions").formatted(Formatting.AQUA).append(Text.literal(" - Re-synchronizes the regions LUT from the server").formatted(Formatting.GRAY)));
-        contextSource.sendFeedback(Text.literal("/" + ArdaMaps.MOD_ID + " refresh configuration").formatted(Formatting.AQUA).append(Text.literal(" - Re-synchronizes the maps configuration from the server").formatted(Formatting.GRAY)));
-        contextSource.sendFeedback(Text.literal("/" + ArdaMaps.MOD_ID + " debug").formatted(Formatting.AQUA).append(Text.literal(" - Print information on the current state of the mod for debugging purposes").formatted(Formatting.GRAY)));
-        contextSource.sendFeedback(Text.literal("/" + ArdaMaps.MOD_ID + " debug exploration_state").formatted(Formatting.AQUA).append(Text.literal(" - Dump the current Exploration fog texture to disk for debugging purposes").formatted(Formatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("ArdaMaps - Version " + version));
+        contextSource.sendFeedback(Component.literal("Commands: "));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID).withStyle(ChatFormatting.AQUA).append(Component.literal(" - Print mod information").withStyle(ChatFormatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " refresh locations").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Re-synchronizes the location data from the server").withStyle(ChatFormatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " refresh regions").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Re-synchronizes the regions LUT from the server").withStyle(ChatFormatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " refresh configuration").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Re-synchronizes the maps configuration from the server").withStyle(ChatFormatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " debug").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Print information on the current state of the mod for debugging purposes").withStyle(ChatFormatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " debug exploration_state").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Dump the current Exploration fog texture to disk for debugging purposes").withStyle(ChatFormatting.GRAY)));
 
         // Give the player a guidebook if they don't have one, or switch to it if they do
         PacketRegistry.GUIDEBOOK_REQUEST_HANDLER.send(new EmptyPacket());
@@ -203,71 +203,71 @@ public class ClientCommands {
         var contextSource = context.getSource();
         var dimensions = ArdaMapsClient.CONFIG.getDimensions();
 
-        contextSource.sendFeedback(Text.literal("ArdaMaps - Mod State"));
+        contextSource.sendFeedback(Component.literal("ArdaMaps - Mod State"));
 
         // Dimension data
-        contextSource.sendFeedback(Text.literal(Integer.toString(dimensions.size())).formatted(Formatting.YELLOW).append(Text.literal(" Dimensions loaded\n{").formatted(Formatting.WHITE)));
+        contextSource.sendFeedback(Component.literal(Integer.toString(dimensions.size())).withStyle(ChatFormatting.YELLOW).append(Component.literal(" Dimensions loaded\n{").withStyle(ChatFormatting.WHITE)));
 
         for (var dimension : dimensions) {
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- Dimension ID: ")
-                    .append(Text.literal(dimension.getId()).formatted(Formatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Dimension ID: ")
+                    .append(Component.literal(dimension.getId()).withStyle(ChatFormatting.AQUA)));
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- Auto Generated: ")
-                    .append(Text.literal(Boolean.toString(dimension.isAutoGenerated())).formatted(Formatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Auto Generated: ")
+                    .append(Component.literal(Boolean.toString(dimension.isAutoGenerated())).withStyle(ChatFormatting.AQUA)));
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- min_x {").append(Text.literal(Integer.toString(dimension.getXMin())).formatted(Formatting.AQUA)).append("}")
-                    .append(", min_z {").append(Text.literal(Integer.toString(dimension.getZMin())).formatted(Formatting.AQUA)).append("}")
-                    .append(", max_x {").append(Text.literal(Integer.toString(dimension.getXMax())).formatted(Formatting.AQUA)).append("}")
-                    .append(", max_z {").append(Text.literal(Integer.toString(dimension.getZMax())).formatted(Formatting.AQUA)).append("}")
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- min_x {").append(Component.literal(Integer.toString(dimension.getXMin())).withStyle(ChatFormatting.AQUA)).append("}")
+                    .append(", min_z {").append(Component.literal(Integer.toString(dimension.getZMin())).withStyle(ChatFormatting.AQUA)).append("}")
+                    .append(", max_x {").append(Component.literal(Integer.toString(dimension.getXMax())).withStyle(ChatFormatting.AQUA)).append("}")
+                    .append(", max_z {").append(Component.literal(Integer.toString(dimension.getZMax())).withStyle(ChatFormatting.AQUA)).append("}")
             );
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- Width {").append(Text.literal(Integer.toString(dimension.getWidth())).formatted(Formatting.AQUA)).append("}")
-                    .append(", Height {").append(Text.literal(Integer.toString(dimension.getHeight())).formatted(Formatting.AQUA)).append("}"));
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Width {").append(Component.literal(Integer.toString(dimension.getWidth())).withStyle(ChatFormatting.AQUA)).append("}")
+                    .append(", Height {").append(Component.literal(Integer.toString(dimension.getHeight())).withStyle(ChatFormatting.AQUA)).append("}"));
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- Scale ").append(Text.literal(Float.toString(dimension.getScale())).formatted(Formatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Scale ").append(Component.literal(Float.toString(dimension.getScale())).withStyle(ChatFormatting.AQUA)));
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- Map Layers :"));
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Map Layers :"));
 
             for (var layer : dimension.getMapLayers()) {
 
-                contextSource.sendFeedback(Text.literal(DOUBLE_TAB_SPACING + "- Name: ")
-                        .append(Text.literal(layer.layer()).formatted(Formatting.AQUA)));
+                contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Name: ")
+                        .append(Component.literal(layer.layer()).withStyle(ChatFormatting.AQUA)));
 
-                contextSource.sendFeedback(Text.literal(DOUBLE_TAB_SPACING + "- Type: ")
-                        .append(Text.literal(layer.type().toString()).formatted(Formatting.AQUA)));
+                contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Type: ")
+                        .append(Component.literal(layer.type().toString()).withStyle(ChatFormatting.AQUA)));
 
-                contextSource.sendFeedback(Text.literal(DOUBLE_TAB_SPACING + "- Remote: ")
-                        .append(Text.literal(Boolean.toString(layer.remote())).formatted(Formatting.AQUA)));
+                contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Remote: ")
+                        .append(Component.literal(Boolean.toString(layer.remote())).withStyle(ChatFormatting.AQUA)));
             }
-            contextSource.sendFeedback(Text.literal("\n"));
+            contextSource.sendFeedback(Component.literal("\n"));
         }
-        contextSource.sendFeedback(Text.literal("}"));
+        contextSource.sendFeedback(Component.literal("}"));
 
         var progress = ArdaMapsClient.CONFIG.getClientProgress();
-        contextSource.sendFeedback(Text.literal("Exploration state for ").append(Text.literal(Integer.toString(progress.getExplorationState().size())).formatted(Formatting.YELLOW)).append(" dimensions : \n{"));
+        contextSource.sendFeedback(Component.literal("Exploration state for ").append(Component.literal(Integer.toString(progress.getExplorationState().size())).withStyle(ChatFormatting.YELLOW)).append(" dimensions : \n{"));
 
         for (var entry : progress.getExplorationState().entrySet()) {
 
             var exploration = entry.getValue();
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- Dimension ID: ")
-                    .append(Text.literal(entry.getKey()).formatted(Formatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Dimension ID: ")
+                    .append(Component.literal(entry.getKey()).withStyle(ChatFormatting.AQUA)));
 
-            contextSource.sendFeedback(Text.literal(DOUBLE_TAB_SPACING + "- Auto-generated: ")
-                    .append(Text.literal(Boolean.toString(exploration.isAutoGenerated())).formatted(Formatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Auto-generated: ")
+                    .append(Component.literal(Boolean.toString(exploration.isAutoGenerated())).withStyle(ChatFormatting.AQUA)));
 
-            contextSource.sendFeedback(Text.literal(DOUBLE_TAB_SPACING + "- Cell Size: ")
-                    .append(Text.literal(Integer.toString(exploration.getCellSize())).formatted(Formatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Cell Size: ")
+                    .append(Component.literal(Integer.toString(exploration.getCellSize())).withStyle(ChatFormatting.AQUA)));
 
-            contextSource.sendFeedback(Text.literal(DOUBLE_TAB_SPACING + "- Mask size : {")
-                    .append(Text.literal(Integer.toString(exploration.getNbCellsX())).formatted(Formatting.AQUA))
-                    .append(Text.literal(","))
-                    .append(Text.literal(Integer.toString(exploration.getNbCellsY())).formatted(Formatting.AQUA))
-                    .append(Text.literal("}"))
+            contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Mask size : {")
+                    .append(Component.literal(Integer.toString(exploration.getNbCellsX())).withStyle(ChatFormatting.AQUA))
+                    .append(Component.literal(","))
+                    .append(Component.literal(Integer.toString(exploration.getNbCellsY())).withStyle(ChatFormatting.AQUA))
+                    .append(Component.literal("}"))
             );
         }
-        contextSource.sendFeedback(Text.literal("}"));
+        contextSource.sendFeedback(Component.literal("}"));
 
         return Command.SINGLE_SUCCESS;
     }
@@ -336,25 +336,25 @@ public class ClientCommands {
         for (var entry : progress.getExplorationState().entrySet()) {
 
             TextureManager textureManager = Client.mc().getTextureManager();
-            Identifier textureId = entry.getValue().getFogTextureId();
-            NativeImageBackedTexture texture = (NativeImageBackedTexture) textureManager.getTexture(textureId);
+            ResourceLocation textureId = entry.getValue().getFogTextureId();
+            DynamicTexture texture = (DynamicTexture) textureManager.getTexture(textureId);
 
             try {
-                Path dir = Client.mc().runDirectory.toPath().resolve("ardamaps");
+                Path dir = Client.mc().gameDirectory.toPath().resolve("ardamaps");
                 Files.createDirectories(dir);
 
                 Path output = dir.resolve("fov_dump.png");
-                if (texture.getImage() != null) texture.getImage().writeTo(output);
+                if (texture.getPixels() != null) texture.getPixels().writeToFile(output);
                 else LOGGER.error("FoW texture image is null");
 
             } catch (IOException e) {
                 LOGGER.error("Failed to dump FoW texture", e);
             }
 
-            Client.mc().getTextureManager().destroyTexture(textureId);
+            Client.mc().getTextureManager().release(textureId);
         }
 
-        context.getSource().sendFeedback(Text.literal("FoW texture dumped to disk"));
+        context.getSource().sendFeedback(Component.literal("FoW texture dumped to disk"));
 
         return Command.SINGLE_SUCCESS;
     }

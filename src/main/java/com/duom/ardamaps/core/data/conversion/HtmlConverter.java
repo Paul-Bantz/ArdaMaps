@@ -28,10 +28,10 @@ package com.duom.ardamaps.core.data.conversion;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.screens.rendering.TextContentBlockRenderer;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.text.*;
-import net.minecraft.util.math.ColorHelper;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.*;
+import net.minecraft.util.FastColor;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -48,7 +48,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Singleton-Utility class for converting HTML strings into Minecraft {@link MutableText} objects.
+ * Singleton-Utility class for converting HTML strings into Minecraft {@link MutableComponent} objects.
  *
  * <p>This is a simplified HTML parser that supports a curated subset of tags:
  * <ul>
@@ -156,7 +156,7 @@ public class HtmlConverter {
                 if (stripLeading || rawText.startsWith("\n")) rawText = rawText.stripLeading();
                 if (stripTrailing) rawText = rawText.stripTrailing();
 
-                buf.append(Text.literal(rawText).styled(s -> s.withColor(color)));
+                buf.append(Component.literal(rawText).withStyle(s -> s.withColor(color)));
             }
 
             return;
@@ -292,7 +292,7 @@ public class HtmlConverter {
      */
     private static void collectLinkNode(ParseBuffer buf, Element element) {
         var linkType = element.attr("type");
-        MutableText linkText = linkType.equals("external")
+        MutableComponent linkText = linkType.equals("external")
                 ? processExternalLinkType(element)
                 : processInternalLinkType(element);
         if (linkText != null) buf.append(linkText);
@@ -314,13 +314,13 @@ public class HtmlConverter {
 
         // Collect <li> children into a ListBlock
         buf.flushTo(blocks);
-        List<MutableText> items = new ArrayList<>();
+        List<MutableComponent> items = new ArrayList<>();
 
         for (Node child : element.childNodes()) {
 
             if (child instanceof Element li && li.tagName().equals("li")) {
 
-                MutableText itemText = Text.empty();
+                MutableComponent itemText = Component.empty();
 
                 for (Node liChild : li.childNodes()) {
 
@@ -342,16 +342,16 @@ public class HtmlConverter {
 
     /**
      * Processes a {@code <username>} element by resolving the currently authenticated
-     * player's username from {@link MinecraftClient#getSession()} and appending it to
+     * player's username from {@link Minecraft#getUser()} and appending it to
      * {@code buf} in medium-blue.
      *
      * @param buf the mutable text buffer to append the username fragment to
      */
     private static void collectUsernameNode(ParseBuffer buf) {
         // Self-closing: resolve the current player's name in medium-blue
-        String username = MinecraftClient.getInstance().getSession().getUsername();
-        buf.append(Text.literal(username)
-                .styled(s -> s.withColor(TextColor.fromRgb(ModConstants.COLOR_BLUE))));
+        String username = Minecraft.getInstance().getUser().getName();
+        buf.append(Component.literal(username)
+                .withStyle(s -> s.withColor(TextColor.fromRgb(ModConstants.COLOR_BLUE))));
     }
 
     /**
@@ -381,7 +381,7 @@ public class HtmlConverter {
         }
 
         var text = buildKeybindText(label);
-        text.styled(style -> style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.translatable("ardamaps.client.generic.keybind_options"))));
+        text.withStyle(style -> style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.translatable("ardamaps.client.generic.keybind_options"))));
 
         buf.append(text);
     }
@@ -405,7 +405,7 @@ public class HtmlConverter {
             if (child instanceof TextNode textNode && !textNode.isBlank()) {
 
                 var text = textNode.text();
-                buf.append(Text.literal(text).styled(style -> style.withColor(textColor)));
+                buf.append(Component.literal(text).withStyle(style -> style.withColor(textColor)));
 
             } else {
 
@@ -440,12 +440,12 @@ public class HtmlConverter {
             if (child instanceof TextNode textNode && !textNode.isBlank()) {
 
                 var text = textNode.text();
-                buf.append(Text.literal(text)
-                        .styled(style -> {
+                buf.append(Component.literal(text)
+                        .withStyle(style -> {
                             style = style.withColor(textColor);
                             style = style.withFont(ModConstants.RUN_FONT_CHATCOMMAND);
                             style = style.withInsertion(text);
-                            style = style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.translatable("ardamaps.client.generic.run_command")));
+                            style = style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.translatable("ardamaps.client.generic.run_command")));
                             return style;
                         }));
 
@@ -500,7 +500,7 @@ public class HtmlConverter {
             if (b instanceof ContentBlock.TextBlock tb) {
                 blocks.add(new ContentBlock.BlockquoteBlock(tb.text()));
             } else if (b instanceof ContentBlock.LineBreakBlock) {
-                blocks.add(new ContentBlock.BlockquoteBlock(Text.literal("\n")));
+                blocks.add(new ContentBlock.BlockquoteBlock(Component.literal("\n")));
             } else {
                 // Images or other block-level content nested inside a blockquote are passed through as-is.
                 blocks.add(b);
@@ -579,28 +579,28 @@ public class HtmlConverter {
     }
 
     /**
-     * Builds a styled {@link MutableText} for an external link ({@code type="external"}).
+     * Builds a styled {@link MutableComponent} for an external link ({@code type="external"}).
      *
      * <p>The resulting text is rendered in dark-blue and carries both a
      * {@link ClickEvent} that opens {@code href} in the system browser and a
      * {@link HoverEvent} that displays the URL as a tooltip.</p>
      *
      * @param element the {@code <a type="external">} element to process
-     * @return a fully styled {@link MutableText} representing the external link
+     * @return a fully styled {@link MutableComponent} representing the external link
      */
-    private static MutableText processExternalLinkType(Element element) {
+    private static MutableComponent processExternalLinkType(Element element) {
 
         var href = element.attr("href");
 
-        return Text.literal(element.text())
-                .styled(style -> style
-                        .withColor(ColorHelper.Argb.getArgb(255, 48, 79, 110))
+        return Component.literal(element.text())
+                .withStyle(style -> style
+                        .withColor(FastColor.ARGB32.color(255, 48, 79, 110))
                         .withClickEvent(new ClickEvent(
                                 ClickEvent.Action.OPEN_URL,
                                 href
                         ))
                         .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                Text.translatable("ardamaps.client.generic.open_external_link", href))
+                                Component.translatable("ardamaps.client.generic.open_external_link", href))
                         )
                 );
     }
@@ -617,14 +617,14 @@ public class HtmlConverter {
      * @return the MutableText representing the link, or {@code null} if the {@code href}
      * could not be parsed
      */
-    private static MutableText processInternalLinkType(Element element) {
+    private static MutableComponent processInternalLinkType(Element element) {
 
         var link = parseLocationLinkTarget(element.attr("href"));
 
         if (link.isPresent()) {
 
             var value = link.get();
-            var tooltip = Text.translatable("ardamaps.location.unknown");
+            var tooltip = Component.translatable("ardamaps.location.unknown");
             var linkValue = "";
 
             var location = ArdaMapsClient.CONFIG.getLocations()
@@ -645,17 +645,17 @@ public class HtmlConverter {
 
                         if (resolvedLocation.isVisited()) {
 
-                            tooltip = Text.translatable("ardamaps.client.generic.more.information");
+                            tooltip = Component.translatable("ardamaps.client.generic.more.information");
                             linkValue = value.id();
                         } else {
 
-                            tooltip = Text.translatable("ardamaps.location.not_visited");
+                            tooltip = Component.translatable("ardamaps.location.not_visited");
                         }
                     }
 
                 } else {
 
-                    tooltip = Text.translatable("ardamaps.client.generic.more.information");
+                    tooltip = Component.translatable("ardamaps.client.generic.more.information");
                     linkValue = value.id();
                 }
             }
@@ -663,9 +663,9 @@ public class HtmlConverter {
             final var resolvedLink = linkValue;
             final var resolvedTooltip = tooltip;
 
-            return Text.literal(element.text())
-                    .styled(style -> style
-                            .withColor(ColorHelper.Argb.getArgb(255, 48, 79, 110))
+            return Component.literal(element.text())
+                    .withStyle(style -> style
+                            .withColor(FastColor.ARGB32.color(255, 48, 79, 110))
                             .withClickEvent(new ClickEvent(
                                     ClickEvent.Action.OPEN_URL,
                                     resolvedLink
@@ -706,28 +706,28 @@ public class HtmlConverter {
      * Resolves a keybind translation key to the human-readable name of the currently
      * bound key.
      *
-     * <p>Searches {@link net.minecraft.client.option.GameOptions#allKeys} for the
-     * {@link KeyBinding} whose translation key matches {@code keyId}. Falls back to
+     * <p>Searches {@link net.minecraft.client.Options#keyMappings} for the
+     * {@link KeyMapping} whose translation key matches {@code keyId}. Falls back to
      * {@code "?"} (with a warning) when no matching binding is found.</p>
      *
      * @param keyId the keybind translation key, e.g. {@code "key.ardamaps.open_map"}
      * @return the localized key name (e.g. {@code "M"}), or {@code "?"} on failure
      */
     private static String resolveKeyLabel(String keyId) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc != null && mc.options != null) {
-            for (KeyBinding kb : mc.options.allKeys) {
-                if (kb.getTranslationKey().equals(keyId)) {
-                    return kb.getBoundKeyLocalizedText().getString();
-                }
+        Minecraft mc = Minecraft.getInstance();
+
+        for (KeyMapping kb : mc.options.keyMappings) {
+            if (kb.getName().equals(keyId)) {
+                return kb.getTranslatedKeyMessage().getString();
             }
         }
+
         LOGGER.warn("[HtmlConverter] <keybind type=\"{}\"> – no matching KeyBinding found, using fallback.", keyId);
         return "?";
     }
 
     /**
-     * Builds a fixed-width placeholder {@link MutableText} for a keybind label.
+     * Builds a fixed-width placeholder {@link MutableComponent} for a keybind label.
      *
      * <p>The text consists of space characters sized so the run is at least
      * {@link ModConstants#MIN_KEYBIND_SLOT_PX} pixels wide and wide enough to contain
@@ -741,28 +741,25 @@ public class HtmlConverter {
      * input system, so that behaviour is never triggered here.</p>
      *
      * @param label the visible key name (e.g. {@code "M"}, {@code "CTRL"})
-     * @return a space-filled {@link MutableText} carrying the label in its {@link Style}
+     * @return a space-filled {@link MutableComponent} carrying the label in its {@link Style}
      */
-    private static MutableText buildKeybindText(String label) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+    private static MutableComponent buildKeybindText(String label) {
+        Minecraft mc = Minecraft.getInstance();
 
         int labelWidth;
         int spaceWidth;
-        if (mc != null && mc.textRenderer != null) {
-            labelWidth = mc.textRenderer.getWidth(label);
-            spaceWidth = mc.textRenderer.getWidth(" ");
-        } else {
-            labelWidth = label.length() * 6; // conservative fallback
-            spaceWidth = 4;
-        }
+
+        labelWidth = mc.font.width(label);
+        spaceWidth = mc.font.width(" ");
+
         if (spaceWidth <= 0) spaceWidth = 4;
 
         int slotWidth = Math.max(ModConstants.MIN_KEYBIND_SLOT_PX, labelWidth);
         int numSpaces = Math.max(2, (int) Math.ceil((double) slotWidth / spaceWidth));
         String placeholder = " ".repeat(numSpaces);
 
-        return Text.literal(placeholder)
-                .styled(s -> s
+        return Component.literal(placeholder)
+                .withStyle(s -> s
                         .withFont(ModConstants.RUN_FONT_KEYBIND)
                         .withInsertion(label));
     }
@@ -783,12 +780,12 @@ public class HtmlConverter {
      */
     private static final class ParseBuffer {
 
-        private MutableText text = Text.empty();
+        private MutableComponent text = Component.empty();
 
         private boolean hasContent = false;
 
         /** Appends a pre-styled fragment and marks the buffer as non-empty. */
-        void append(MutableText fragment) {
+        void append(MutableComponent fragment) {
             text.append(fragment);
             hasContent = true;
         }
@@ -802,7 +799,7 @@ public class HtmlConverter {
         void flushTo(List<ContentBlock> blocks) {
             if (hasContent) {
                 blocks.add(new ContentBlock.TextBlock(text));
-                text = Text.empty();
+                text = Component.empty();
                 hasContent = false;
             }
         }

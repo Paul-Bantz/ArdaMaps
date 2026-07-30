@@ -31,9 +31,9 @@ import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.FlatMapCamera;
 import com.duom.ardamaps.core.data.map.providers.HttpImageProvider;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 
@@ -57,7 +57,7 @@ public class WebpRenderer extends MapRenderable {
      * @param textRenderer The text renderer for displaying loading text or other information.
      * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public WebpRenderer(FlatMapCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
+    public WebpRenderer(FlatMapCamera camera, Font textRenderer, PlayerExploration exploration) {
 
         super(camera, textRenderer, exploration);
         this.mapCamera = camera;
@@ -89,7 +89,7 @@ public class WebpRenderer extends MapRenderable {
      * @param context The drawing context.
      */
     @Override
-    public void render(DrawContext context) {
+    public void render(GuiGraphics context) {
 
         renderMap(context);
         renderFogOfWar();
@@ -104,7 +104,7 @@ public class WebpRenderer extends MapRenderable {
      *
      * @param context The drawing context.
      */
-    private void renderMap(DrawContext context) {
+    private void renderMap(GuiGraphics context) {
 
         double scale = mapCamera.scale();
         var renderWidth = mapCamera.getWorldTextureWidth();
@@ -136,17 +136,17 @@ public class WebpRenderer extends MapRenderable {
         RenderSystem.defaultBlendFunc();
 
         RenderSystem.activeTexture(GL13.GL_TEXTURE0);
-        MinecraftClient.getInstance().getTextureManager().bindTexture(texture);
+        Minecraft.getInstance().getTextureManager().bindForSetup(texture);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
         RenderSystem.setShaderTexture(0, texture);
 
         // Translate for sub-pixel accuracy
-        var matrices = context.getMatrices();
-        matrices.push();
+        var matrices = context.pose();
+        matrices.pushPose();
         matrices.translate(screenX - Math.floor(screenX), screenY - Math.floor(screenY), 0);
 
-        context.drawTexture(
+        context.blit(
                 texture,
                 (int) Math.floor(screenX),
                 (int) Math.floor(screenY),
@@ -158,7 +158,7 @@ public class WebpRenderer extends MapRenderable {
                 renderHeight
         );
 
-        matrices.pop();
+        matrices.popPose();
         RenderSystem.disableBlend();
     }
 

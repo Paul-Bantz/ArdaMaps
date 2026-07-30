@@ -28,7 +28,7 @@ package com.duom.ardamaps.core.networking.packets.client;
 import com.duom.ardamaps.core.consumers.networking.IPacket;
 import com.duom.ardamaps.core.data.location.LocationDetails;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * A packet sent from the server to the client containing detailed information about a specific location.
@@ -43,9 +43,9 @@ public record LocationDetailsResponsePacket(LocationDetails details) implements 
      * @param buf The PacketByteBuf to read from.
      * @return A new LocationDetailsResponsePacket instance.
      */
-    public static LocationDetailsResponsePacket read(PacketByteBuf buf) {
+    public static LocationDetailsResponsePacket read(FriendlyByteBuf buf) {
 
-        return new LocationDetailsResponsePacket(new LocationDetails(buf.readString(),  buf.readBoolean(), buf.readString(), buf.readString()));
+        return new LocationDetailsResponsePacket(new LocationDetails(buf.readUtf(),  buf.readBoolean(), buf.readUtf(), buf.readUtf()));
     }
 
     /**
@@ -54,14 +54,14 @@ public record LocationDetailsResponsePacket(LocationDetails details) implements 
      * @return A PacketByteBuf representing this LocationDetailsResponsePacket.
      */
     @Override
-    public PacketByteBuf build() {
+    public FriendlyByteBuf build() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = PacketByteBufs.create();
 
-        buf.writeString(details.name() != null ? details.name() : "");
+        buf.writeUtf(details.name() != null ? details.name() : "");
         buf.writeBoolean(details.canon());
-        buf.writeString(details.description() != null ? details.description() : "");
-        buf.writeString(details.externalUrl() != null ? details.externalUrl() : "");
+        buf.writeUtf(details.description() != null ? details.description() : "");
+        buf.writeUtf(details.externalUrl() != null ? details.externalUrl() : "");
 
         return buf;
     }

@@ -26,9 +26,8 @@
 package com.duom.ardamaps.gui.widgets.builders;
 
 import com.duom.ardamaps.gui.widgets.CheckboxWidget;
-import net.minecraft.text.Text;
-
 import java.util.function.Consumer;
+import net.minecraft.network.chat.Component;
 
 /**
  * Builder class for creating CheckboxWidget instances with a fluent interface.
@@ -42,7 +41,7 @@ public class CheckboxBuilder {
     private int height;
 
     /** text label of the checkbox */
-    private Text text = Text.empty();
+    private Component text = Component.empty();
 
     /** whether the checkbox is checked or not */
     private boolean checked = false;
@@ -79,7 +78,7 @@ public class CheckboxBuilder {
      * @return the current instance of CheckboxBuilder for method chaining
      */
     @SuppressWarnings("unused")
-    public CheckboxBuilder setText(Text text) {
+    public CheckboxBuilder setText(Component text) {
         this.text = text;
         return this;
     }

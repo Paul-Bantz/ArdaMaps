@@ -30,16 +30,16 @@ import com.duom.ardamaps.gui.ModConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.network.chat.Component;
 
 /**
  * A styled button widget that displays text.
  * This button type is meant to be displayed on top of the GUI.
  */
-public class StyledButtonWidget extends ClickableWidget {
+public class StyledButtonWidget extends AbstractWidget {
 
     /** On select runnable */
     private final Runnable onSelect;
@@ -76,15 +76,15 @@ public class StyledButtonWidget extends ClickableWidget {
                               int height,
                               Runnable onClick,
                               Style style,
-                              Text text) {
+                              Component text) {
 
-        super(x, y, width, height, Text.empty());
+        super(x, y, width, height, Component.empty());
 
         this.onSelect = onClick;
         this.width = width;
         this.height = height;
         this.style = style;
-        this.setMessage(text != null ? text : Text.empty());
+        this.setMessage(text != null ? text : Component.empty());
     }
 
     /**
@@ -97,7 +97,7 @@ public class StyledButtonWidget extends ClickableWidget {
      * @param delta   the time delta since the last frame, used for animations (not utilized in this implementation)
      */
     @Override
-    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
 
         if (!visible) return;
 
@@ -113,7 +113,7 @@ public class StyledButtonWidget extends ClickableWidget {
      * @param mouseX the mouse x position
      * @param mouseY the mouse y position
      */
-    private void renderDefaultStyle(DrawContext context, int mouseX, int mouseY) {
+    private void renderDefaultStyle(GuiGraphics context, int mouseX, int mouseY) {
 
         var u = 16;
         var v = 16;
@@ -127,7 +127,7 @@ public class StyledButtonWidget extends ClickableWidget {
             RenderSystem.setShaderColor(0.85f, 0.85f, 0.85f, 1f);
         }
 
-        context.drawNineSlicedTexture(ModConstants.MAP_GUI_ELEMENTS,
+        context.blitNineSliced(ModConstants.MAP_GUI_ELEMENTS,
                 x, y,
                 width, height,
                 12,
@@ -140,13 +140,13 @@ public class StyledButtonWidget extends ClickableWidget {
 
         var text = getMessage();
 
-        if (!text.equals(Text.empty())) {
+        if (!text.equals(Component.empty())) {
 
-            var textRenderer = Client.mc().textRenderer;
-            var offsetX = width / 2 - textRenderer.getWidth(text) / 2;
-            var offsetY = height / 2 - textRenderer.fontHeight / 2;
+            var textRenderer = Client.mc().font;
+            var offsetX = width / 2 - textRenderer.width(text) / 2;
+            var offsetY = height / 2 - textRenderer.lineHeight / 2;
 
-            context.drawText(textRenderer, text, x + offsetX, y + offsetY, toggled ? ModConstants.COLOR_LIGHT_BROWN : ModConstants.COLOR_DARK_BROWN, false);
+            context.drawString(textRenderer, text, x + offsetX, y + offsetY, toggled ? ModConstants.COLOR_LIGHT_BROWN : ModConstants.COLOR_DARK_BROWN, false);
         }
 
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
@@ -158,7 +158,7 @@ public class StyledButtonWidget extends ClickableWidget {
      * @param mouseX the mouse x position
      * @param mouseY the mouse y position
      */
-    private void renderEdgeStyle(DrawContext context, int mouseX, int mouseY) {
+    private void renderEdgeStyle(GuiGraphics context, int mouseX, int mouseY) {
 
         var x = getX();
         var y = getY();
@@ -174,7 +174,7 @@ public class StyledButtonWidget extends ClickableWidget {
             var indicatorHeight = getHeight();
             var indicatorWidth = indicatorHeight * 14 / 64;
             context.fill(x, y, x + getWidth(), y + getHeight(), ModConstants.COLOR_LIGHT_BROWN);
-            context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(ModConstants.MAP_GUI_ELEMENTS,
                     x + getWidth() - indicatorWidth, y,
                     indicatorWidth, indicatorHeight,
                     32, 242,
@@ -184,13 +184,13 @@ public class StyledButtonWidget extends ClickableWidget {
 
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
 
-        if (!text.equals(Text.empty())) {
+        if (!text.equals(Component.empty())) {
 
-            var textRenderer = Client.mc().textRenderer;
-            var offsetX = width / 2 - textRenderer.getWidth(text) / 2;
-            var offsetY = height / 2 - textRenderer.fontHeight / 2;
+            var textRenderer = Client.mc().font;
+            var offsetX = width / 2 - textRenderer.width(text) / 2;
+            var offsetY = height / 2 - textRenderer.lineHeight / 2;
 
-            context.drawText(textRenderer, text, x + offsetX, y + offsetY, ModConstants.COLOR_DARK_BROWN, false);
+            context.drawString(textRenderer, text, x + offsetX, y + offsetY, ModConstants.COLOR_DARK_BROWN, false);
         }
     }
 
@@ -233,7 +233,7 @@ public class StyledButtonWidget extends ClickableWidget {
      * @param builder the NarrationMessageBuilder to append messages to
      */
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {
-        appendDefaultNarrations(builder);
+    protected void updateWidgetNarration(NarrationElementOutput builder) {
+        defaultButtonNarrationText(builder);
     }
 }

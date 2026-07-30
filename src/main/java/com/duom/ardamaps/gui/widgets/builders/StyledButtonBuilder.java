@@ -26,7 +26,7 @@
 package com.duom.ardamaps.gui.widgets.builders;
 
 import com.duom.ardamaps.gui.widgets.StyledButtonWidget;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 /**
  * Builder class for constructing {@link StyledButtonWidget} instances with a fluent API.
@@ -42,7 +42,7 @@ public class StyledButtonBuilder {
     private int height;
 
     /** text displayed on the button widget */
-    private Text text = Text.empty();
+    private Component text = Component.empty();
 
     /** Button style */
     private StyledButtonWidget.Style style = StyledButtonWidget.Style.DEFAULT;
@@ -85,7 +85,7 @@ public class StyledButtonBuilder {
      * @param text displayed on the button widget
      * @return the current instance of StyledButtonBuilder for method chaining
      */
-    public StyledButtonBuilder setText(Text text) {
+    public StyledButtonBuilder setText(Component text) {
         this.text = text;
         return this;
     }

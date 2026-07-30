@@ -30,8 +30,8 @@ import com.duom.ardamaps.core.integration.Warps;
 import com.duom.ardamaps.core.networking.packets.server.PlayerWarpPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,9 +63,9 @@ public class PlayerWarpHandler extends ServerPacketHandler<PlayerWarpPacket> {
      * @param sender  The packet sender.
      */
     @Override
-    protected void handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PlayerWarpPacket packet, PacketSender sender) {
+    protected void handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler, PlayerWarpPacket packet, PacketSender sender) {
 
         server.execute(() -> Warps.warpTo(server, player, packet.warpName(),
-                () -> LOGGER.warn("Unable to warp player {} to '{}'", player.getUuidAsString(), packet.warpName())));
+                () -> LOGGER.warn("Unable to warp player {} to '{}'", player.getStringUUID(), packet.warpName())));
     }
 }

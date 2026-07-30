@@ -30,11 +30,11 @@ import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.config.MapLayerSource;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.client.texture.TextureManager;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.renderer.texture.TextureManager;
+import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,10 +61,10 @@ class ClientProgressTest {
     private MockedConstruction<NativeImage> mockedNativeImage;
 
     /** Mocked texture construction used to isolate dynamic texture registration from the Minecraft runtime. */
-    private MockedConstruction<NativeImageBackedTexture> mockedNativeImageBackedTexture;
+    private MockedConstruction<DynamicTexture> mockedNativeImageBackedTexture;
 
-    /** Mocked static accessor for {@link MinecraftClient} so tests can provide a fake texture manager. */
-    private MockedStatic<MinecraftClient> mockedMinecraftClient;
+    /** Mocked static accessor for {@link Minecraft} so tests can provide a fake texture manager. */
+    private MockedStatic<Minecraft> mockedMinecraftClient;
 
     /**
      * Installs the minimal mocked Minecraft client environment required for exploration texture creation.
@@ -74,16 +74,16 @@ class ClientProgressTest {
     void setUp() {
 
         mockedNativeImage = Mockito.mockConstruction(NativeImage.class);
-        mockedNativeImageBackedTexture = Mockito.mockConstruction(NativeImageBackedTexture.class);
+        mockedNativeImageBackedTexture = Mockito.mockConstruction(DynamicTexture.class);
 
-        MinecraftClient mockClient = Mockito.mock(MinecraftClient.class);
+        Minecraft mockClient = Mockito.mock(Minecraft.class);
         TextureManager mockTextureManager = Mockito.mock(TextureManager.class);
         Mockito.when(mockClient.getTextureManager()).thenReturn(mockTextureManager);
-        Mockito.when(mockTextureManager.registerDynamicTexture(Mockito.any(), Mockito.any()))
-                .thenReturn(Identifier.of("ardamaps", "dummy"));
+        Mockito.when(mockTextureManager.register(Mockito.<String>any(), Mockito.any(DynamicTexture.class)))
+                .thenReturn(new ResourceLocation("ardamaps", "dummy"));
 
-        mockedMinecraftClient = Mockito.mockStatic(MinecraftClient.class);
-        mockedMinecraftClient.when(MinecraftClient::getInstance).thenReturn(mockClient);
+        mockedMinecraftClient = Mockito.mockStatic(Minecraft.class);
+        mockedMinecraftClient.when(Minecraft::getInstance).thenReturn(mockClient);
 
         ClientConfig config = new ClientConfig();
         config.setDimensions(List.of(rangedDimension()));

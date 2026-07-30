@@ -28,12 +28,12 @@ package com.duom.ardamaps.gui.screens.rendering;
 import com.duom.ardamaps.core.data.conversion.ContentBlock;
 import com.duom.ardamaps.core.data.guide.GuideImageCache;
 import com.duom.ardamaps.gui.ModConstants;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -71,7 +71,7 @@ public final class TextContentBlockRenderer {
     /** Total horizontal indent per list item (bullet + gap). */
     private static final int LIST_INDENT = BULLET_SIZE + BULLET_GAP;
 
-    private final TextRenderer textRenderer;
+    private final Font textRenderer;
     private final int defaultColor;
 
     /**
@@ -79,15 +79,15 @@ public final class TextContentBlockRenderer {
      *
      * @param relX  x-offset from the start of the line (px)
      * @param width advance width of this glyph (px)
-     * @param type  run type: identified via the sentinel font {@link Identifier} embedded in the style
+     * @param type  run type: identified via the sentinel font {@link ResourceLocation} embedded in the style
      *              by {@code HtmlConverter} ({@link ModConstants#RUN_FONT_CHATCOMMAND} /
      *              {@link ModConstants#RUN_FONT_KEYBIND})
      * @param style the {@link Style} of this glyph (carries insertion text for keybind labels)
      */
     private record GlyphRun(int relX, int width, int type, Style style) {}
 
-    /** An {@link OrderedText} line together with its pre-parsed {@link GlyphRun} list. */
-    private record LineLayout(OrderedText line, List<GlyphRun> glyphRuns) {}
+    /** An {@link FormattedCharSequence} line together with its pre-parsed {@link GlyphRun} list. */
+    private record LineLayout(FormattedCharSequence line, List<GlyphRun> glyphRuns) {}
 
     /** Sealed hierarchy mirroring {@link ContentBlock} – one entry per block in the layout cache. */
     private sealed interface BlockLayout permits BlockquoteLayout, ImageLayout, LineBreakLayout, ListLayout, TextLayout, TitleLayout {}
@@ -96,7 +96,7 @@ public final class TextContentBlockRenderer {
     private record TextLayout(List<LineLayout> lines, int height) implements BlockLayout {}
 
     /** Cached layout for a {@link ContentBlock.TitleBlock}*/
-    private record TitleLayout(Text line, float scale, int height) implements BlockLayout {}
+    private record TitleLayout(Component line, float scale, int height) implements BlockLayout {}
 
     /**
      * Cached layout for a {@link ContentBlock.ImageBlock}.
@@ -107,7 +107,7 @@ public final class TextContentBlockRenderer {
      * @param height       total pixel height: image + optional caption gap + caption lines
      */
     private record ImageLayout(ContentBlock.ImageBlock block, int imageHeight,
-                               List<OrderedText> captionLines, int height) implements BlockLayout {}
+                               List<FormattedCharSequence> captionLines, int height) implements BlockLayout {}
 
     /**
      * Cached layout for a {@link ContentBlock.ListBlock}.
@@ -144,7 +144,7 @@ public final class TextContentBlockRenderer {
      * @param textRenderer     the underlying text renderer
      * @param defaultTextColor default text colour
      */
-    public TextContentBlockRenderer(TextRenderer textRenderer, int defaultTextColor) {
+    public TextContentBlockRenderer(Font textRenderer, int defaultTextColor) {
         this.textRenderer = textRenderer;
         this.defaultColor = defaultTextColor;
     }
@@ -155,13 +155,13 @@ public final class TextContentBlockRenderer {
      *
      * <p>Performs all expensive work that depends on {@code wrapWidth}:</p>
      * <ul>
-     *   <li>Text wrapping via {@link TextRenderer#wrapLines}.</li>
+     *   <li>Text wrapping via {@link Font#split}.</li>
      *   <li>Per-glyph width measurement via {@link #parseGlyphRuns} (O(n) per line).</li>
      * </ul>
      */
     private void buildLayouts(List<ContentBlock> blocks, int wrapWidth) {
 
-        int fontHeight    = textRenderer.fontHeight;
+        int fontHeight    = textRenderer.lineHeight;
         int itemWrapWidth = wrapWidth - LIST_INDENT;
 
         List<BlockLayout> layouts = new ArrayList<>(blocks.size());
@@ -204,10 +204,10 @@ public final class TextContentBlockRenderer {
 
     private void addBlockQuoteLayout(int wrapWidth, ContentBlock.BlockquoteBlock bqBlock, int fontHeight, List<BlockLayout> layouts) {
         int bqWrapWidth = wrapWidth - ModConstants.BLOCKQUOTE_INDENT;
-        List<OrderedText> wrappedLines = textRenderer.wrapLines(bqBlock.text(), bqWrapWidth);
+        List<FormattedCharSequence> wrappedLines = textRenderer.split(bqBlock.text(), bqWrapWidth);
         List<LineLayout>  lineLayouts  = new ArrayList<>(wrappedLines.size());
 
-        for (OrderedText line : wrappedLines) {
+        for (FormattedCharSequence line : wrappedLines) {
             lineLayouts.add(new LineLayout(line, parseGlyphRuns(line)));
         }
 
@@ -221,10 +221,10 @@ public final class TextContentBlockRenderer {
 
         for (var item : listBlock.items()) {
 
-            List<OrderedText> wrappedLines = textRenderer.wrapLines(item, itemWrapWidth);
+            List<FormattedCharSequence> wrappedLines = textRenderer.split(item, itemWrapWidth);
             List<LineLayout>  lineLayouts  = new ArrayList<>(wrappedLines.size());
 
-            for (OrderedText line : wrappedLines) {
+            for (FormattedCharSequence line : wrappedLines) {
                 lineLayouts.add(new LineLayout(line, parseGlyphRuns(line)));
             }
 
@@ -237,12 +237,12 @@ public final class TextContentBlockRenderer {
 
     private void addImageBlockLayout(int wrapWidth, ContentBlock.ImageBlock imgBlock, int fontHeight, List<BlockLayout> layouts) {
         // Caption wrapping
-        List<OrderedText> captionLines = List.of();
+        List<FormattedCharSequence> captionLines = List.of();
         int captionHeight = 0;
         if (imgBlock.caption() != null && !imgBlock.caption().isBlank()) {
-            net.minecraft.text.MutableText captionText = net.minecraft.text.Text.literal(imgBlock.caption())
-                    .styled(s -> s.withItalic(true));
-            captionLines  = textRenderer.wrapLines(captionText, wrapWidth);
+            net.minecraft.network.chat.MutableComponent captionText = net.minecraft.network.chat.Component.literal(imgBlock.caption())
+                    .withStyle(s -> s.withItalic(true));
+            captionLines  = textRenderer.split(captionText, wrapWidth);
             captionHeight = 2 + captionLines.size() * (fontHeight + LINE_GAP); // 2 px gap above caption
         }
 
@@ -250,10 +250,10 @@ public final class TextContentBlockRenderer {
     }
 
     private void addContentBlockLayout(int wrapWidth, ContentBlock.TextBlock textBlock, int fontHeight, List<BlockLayout> layouts) {
-        List<OrderedText> wrappedLines = textRenderer.wrapLines(textBlock.text(), wrapWidth);
+        List<FormattedCharSequence> wrappedLines = textRenderer.split(textBlock.text(), wrapWidth);
         List<LineLayout>  lineLayouts  = new ArrayList<>(wrappedLines.size());
 
-        for (OrderedText line : wrappedLines) {
+        for (FormattedCharSequence line : wrappedLines) {
             lineLayouts.add(new LineLayout(line, parseGlyphRuns(line)));
         }
 
@@ -264,7 +264,7 @@ public final class TextContentBlockRenderer {
 
     private void addTitleBlockLayout(ContentBlock.TitleBlock titleBlock, int fontHeight, List<BlockLayout> layouts) {
 
-        Text title = Text.literal(titleBlock.title()).styled(s -> s.withColor(titleBlock.type().getColor()));
+        Component title = Component.literal(titleBlock.title()).withStyle(s -> s.withColor(titleBlock.type().getColor()));
 
         float scale = titleBlock.type().getScale();
         int height = (int) (fontHeight * scale);
@@ -273,10 +273,10 @@ public final class TextContentBlockRenderer {
     }
 
     /**
-     * Parses a single {@link OrderedText} line into a list of {@link GlyphRun}s.
+     * Parses a single {@link FormattedCharSequence} line into a list of {@link GlyphRun}s.
      *
      * <p>Uses the same prefix-width approach as the original renderer: for each glyph,
-     * {@link TextRenderer#getWidth} is called on the accumulated prefix string, giving the
+     * {@link Font#width} is called on the accumulated prefix string, giving the
      * exact pixel x-offset that Minecraft would compute for that character. This is O(n²)
      * per line but is only ever called at cache-build time (once per {@code wrapWidth}
      * change), never during rendering.</p>
@@ -288,16 +288,16 @@ public final class TextContentBlockRenderer {
      * @param line the line to parse
      * @return ordered list of glyph runs (one per code-point in {@code line})
      */
-    private List<GlyphRun> parseGlyphRuns(OrderedText line) {
+    private List<GlyphRun> parseGlyphRuns(FormattedCharSequence line) {
 
         List<GlyphRun> runs = new ArrayList<>();
         StringBuilder seen = new StringBuilder();
 
         line.accept((index, style, codePoint) -> {
             String charStr = new String(Character.toChars(codePoint));
-            int xBefore = textRenderer.getWidth(seen.toString());
+            int xBefore = textRenderer.width(seen.toString());
             seen.append(charStr);
-            int xAfter  = textRenderer.getWidth(seen.toString());
+            int xAfter  = textRenderer.width(seen.toString());
             int width   = xAfter - xBefore;
             runs.add(new GlyphRun(xBefore, width, detectSpecialRunType(style), style));
             return true;
@@ -326,7 +326,7 @@ public final class TextContentBlockRenderer {
      * and the {@link Style} under the mouse cursor (or {@code null} if none)
      */
     public RenderResult render(
-            DrawContext context,
+            GuiGraphics context,
             List<ContentBlock> blocks,
             int topX,
             int topY,
@@ -387,13 +387,13 @@ public final class TextContentBlockRenderer {
      * @param mouseY       mouse Y coordinate
      * @param renderResult the rendering result
      */
-    private void renderTextLayout(DrawContext context,
+    private void renderTextLayout(GuiGraphics context,
                                   TextLayout layout,
                                   int topX, int topY, int startY, int bottomY,
                                   int mouseX, int mouseY,
                                   RenderResult renderResult) {
 
-        int fontHeight = textRenderer.fontHeight;
+        int fontHeight = textRenderer.lineHeight;
 
         for (LineLayout lineLayout : layout.lines()) {
 
@@ -418,21 +418,21 @@ public final class TextContentBlockRenderer {
      * @param bottomY      bottom Y of the viewport
      * @param renderResult the rendering result
      */
-    private void renderTitleLayout(DrawContext context,
+    private void renderTitleLayout(GuiGraphics context,
                                   TitleLayout layout,
                                   int topX, int topY, int startY, int bottomY,
                                   RenderResult renderResult) {
 
-        int titleHeight = (int)(textRenderer.fontHeight * layout.scale);
+        int titleHeight = (int)(textRenderer.lineHeight * layout.scale);
         int drawY = startY + renderResult.totalHeight;
 
         if (drawY + titleHeight >= topY && drawY <= bottomY) {
 
-            context.getMatrices().push();
-            context.getMatrices().translate(topX, drawY, 0);
-            context.getMatrices().scale(layout.scale, layout.scale, 1.0f);
+            context.pose().pushPose();
+            context.pose().translate(topX, drawY, 0);
+            context.pose().scale(layout.scale, layout.scale, 1.0f);
 
-            context.drawText(
+            context.drawString(
                     textRenderer,
                     layout.line,
                     0,
@@ -441,7 +441,7 @@ public final class TextContentBlockRenderer {
                     false
             );
 
-            context.getMatrices().pop();
+            context.pose().popPose();
         }
 
         renderResult.totalHeight += titleHeight;
@@ -459,7 +459,7 @@ public final class TextContentBlockRenderer {
      * @param bottomY      bottom Y of the viewport
      * @param renderResult the rendering result
      */
-    private void renderImageLayout(DrawContext context,
+    private void renderImageLayout(GuiGraphics context,
                                    ImageLayout layout,
                                    int wrapWidth,
                                    int topX, int topY, int startY, int bottomY,
@@ -477,7 +477,7 @@ public final class TextContentBlockRenderer {
 
         if (drawY + imageHeight >= topY && drawY <= bottomY) {
 
-            Identifier texture = GuideImageCache.getTexture(imgBlock.src());
+            ResourceLocation texture = GuideImageCache.getTexture(imgBlock.src());
 
             if (texture != null) {
                 int imgX = switch (imgBlock.align()) {
@@ -485,7 +485,7 @@ public final class TextContentBlockRenderer {
                     case CENTER -> topX + (wrapWidth - imageWidth) / 2;
                     case RIGHT  -> topX + wrapWidth - imageWidth;
                 };
-                context.drawTexture(texture,
+                context.blit(texture,
                         imgX, drawY,
                         0, 0,
                         imageWidth, imageHeight,
@@ -498,17 +498,17 @@ public final class TextContentBlockRenderer {
         // Render caption lines, if any
         if (!layout.captionLines().isEmpty()) {
 
-            int fontHeight = textRenderer.fontHeight;
+            int fontHeight = textRenderer.lineHeight;
             renderResult.totalHeight += 2; // gap between image and caption
 
-            for (OrderedText captionLine : layout.captionLines()) {
+            for (FormattedCharSequence captionLine : layout.captionLines()) {
 
                 int captionDrawY = startY + renderResult.totalHeight;
 
                 if (captionDrawY + fontHeight >= topY && captionDrawY <= bottomY) {
-                    int lineWidth = textRenderer.getWidth(captionLine);
+                    int lineWidth = textRenderer.width(captionLine);
                     int captionX  = topX + (wrapWidth - lineWidth) / 2;
-                    context.drawText(textRenderer, captionLine, captionX, captionDrawY + LINE_GAP,
+                    context.drawString(textRenderer, captionLine, captionX, captionDrawY + LINE_GAP,
                             ModConstants.COLOR_DARK_BROWN, false);
                 }
 
@@ -530,13 +530,13 @@ public final class TextContentBlockRenderer {
      * @param mouseY       mouse Y coordinate
      * @param renderResult the rendering result
      */
-    private void renderListLayout(DrawContext context,
+    private void renderListLayout(GuiGraphics context,
                                   ListLayout layout,
                                   int topX, int topY, int startY, int bottomY,
                                   int mouseX, int mouseY,
                                   RenderResult renderResult) {
 
-        int fontHeight = textRenderer.fontHeight;
+        int fontHeight = textRenderer.lineHeight;
 
         for (List<LineLayout> itemLines : layout.items()) {
 
@@ -583,13 +583,13 @@ public final class TextContentBlockRenderer {
      * @param mouseY       mouse Y coordinate
      * @param renderResult the rendering result
      */
-    private void renderBlockquoteLayout(DrawContext context,
+    private void renderBlockquoteLayout(GuiGraphics context,
                                         BlockquoteLayout layout,
                                         int topX, int topY, int startY, int bottomY,
                                         int mouseX, int mouseY,
                                         RenderResult renderResult) {
 
-        int fontHeight = textRenderer.fontHeight;
+        int fontHeight = textRenderer.lineHeight;
         int bqColor    = ModConstants.COLOR_BLUE | 0xFF000000;
 
         // Accent bar – spans the full pixel height of the content lines
@@ -612,7 +612,7 @@ public final class TextContentBlockRenderer {
 
             if (drawY + fontHeight >= topY && drawY <= bottomY) {
                 drawSpecialRunBackgrounds(context, lineLayout.glyphRuns(), textX, drawY);
-                context.drawText(textRenderer, lineLayout.line(), textX, drawY + LINE_GAP, bqColor, false);
+                context.drawString(textRenderer, lineLayout.line(), textX, drawY + LINE_GAP, bqColor, false);
                 renderResult.hoveredStyle = pickHoverStyle(mouseX, mouseY, fontHeight,
                         lineLayout.line(), drawY, textX, renderResult.hoveredStyle);
             }
@@ -633,12 +633,12 @@ public final class TextContentBlockRenderer {
      * @param mouseY       mouse Y coordinate
      * @param fontHeight   the font height
      */
-    private void drawLine(DrawContext context, LineLayout lineLayout, int x, int y,
+    private void drawLine(GuiGraphics context, LineLayout lineLayout, int x, int y,
                           RenderResult renderResult, int mouseX, int mouseY, int fontHeight) {
 
         drawSpecialRunBackgrounds(context, lineLayout.glyphRuns(), x, y);
 
-        context.drawText(textRenderer, lineLayout.line(), x, y + LINE_GAP, defaultColor, false);
+        context.drawString(textRenderer, lineLayout.line(), x, y + LINE_GAP, defaultColor, false);
 
         renderResult.hoveredStyle = pickHoverStyle(mouseX, mouseY, fontHeight,
                 lineLayout.line(), y, x, renderResult.hoveredStyle);
@@ -653,14 +653,14 @@ public final class TextContentBlockRenderer {
      * @param startX     left edge X of the text line in screen coordinates
      * @param drawY      top edge Y of the text line in screen coordinates
      */
-    private void drawSpecialRunBackgrounds(DrawContext context,
+    private void drawSpecialRunBackgrounds(GuiGraphics context,
                                            List<GlyphRun> glyphRuns,
                                            int startX,
                                            int drawY) {
 
         if (glyphRuns.isEmpty()) return;
 
-        int fontHeight = textRenderer.fontHeight;
+        int fontHeight = textRenderer.lineHeight;
         int padding    = ModConstants.COMMAND_PADDING;
 
         int i = 0;
@@ -695,23 +695,23 @@ public final class TextContentBlockRenderer {
                 String label = glyphRuns.get(i).style().getInsertion();
                 if (label == null || label.isBlank()) label = "?";
 
-                int labelWidth = textRenderer.getWidth(label);
+                int labelWidth = textRenderer.width(label);
                 int faceWidth  = backgroundEndX - backgroundX;
                 int faceHeight = backgroundEndY - backgroundY;
-                int keycapY    = backgroundY - textRenderer.fontHeight / 2;
+                int keycapY    = backgroundY - textRenderer.lineHeight / 2;
 
                 // Key-cap face (three drawTexture slices: left cap, centre stretch, right cap)
-                context.drawTexture(ModConstants.ICON_KEYBIND,
+                context.blit(ModConstants.ICON_KEYBIND,
                         backgroundX,                keycapY, 4,             16,  0, 0,  4, 16, 16, 16);
-                context.drawTexture(ModConstants.ICON_KEYBIND,
+                context.blit(ModConstants.ICON_KEYBIND,
                         backgroundX + 4,            keycapY, faceWidth - 8, 16,  4, 0,  8, 16, 16, 16);
-                context.drawTexture(ModConstants.ICON_KEYBIND,
+                context.blit(ModConstants.ICON_KEYBIND,
                         backgroundX + faceWidth - 4, keycapY, 4,            16, 12, 0,  4, 16, 16, 16);
 
                 // Label centred inside the face rect
                 int labelX = backgroundX + (faceWidth  - labelWidth) / 2;
                 int labelY = backgroundY + (faceHeight - fontHeight)  / 2;
-                context.drawText(textRenderer, label, labelX, labelY, ModConstants.KEYBIND_LABEL_COLOR, false);
+                context.drawString(textRenderer, label, labelX, labelY, ModConstants.KEYBIND_LABEL_COLOR, false);
             }
 
             i = j;
@@ -720,7 +720,7 @@ public final class TextContentBlockRenderer {
 
     /**
      * Returns the special run type for a given {@link Style} by inspecting the sentinel
-     * font {@link Identifier} embedded by {@code HtmlConverter}:
+     * font {@link ResourceLocation} embedded by {@code HtmlConverter}:
      * <ul>
      *   <li>{@code 1} – chatcommand ({@link ModConstants#RUN_FONT_CHATCOMMAND})</li>
      *   <li>{@code 2} – keybind    ({@link ModConstants#RUN_FONT_KEYBIND})</li>
@@ -728,7 +728,7 @@ public final class TextContentBlockRenderer {
      * </ul>
      */
     private int detectSpecialRunType(Style style) {
-        Identifier font = style.getFont();
+        ResourceLocation font = style.getFont();
         if (ModConstants.RUN_FONT_CHATCOMMAND.equals(font)) return 1;
         if (ModConstants.RUN_FONT_KEYBIND.equals(font))     return 2;
         return 0;
@@ -740,12 +740,12 @@ public final class TextContentBlockRenderer {
      */
     private @Nullable Style pickHoverStyle(int mouseX, int mouseY,
                                             int fontHeight,
-                                            OrderedText line,
+                                            FormattedCharSequence line,
                                             int drawY, int startX,
                                             @Nullable Style previous) {
 
         if (mouseY >= drawY && mouseY < drawY + fontHeight && mouseX >= startX) {
-            Style s = textRenderer.getTextHandler().getStyleAt(line, mouseX - startX);
+            Style s = textRenderer.getSplitter().componentStyleAtWidth(line, mouseX - startX);
             if (s != null) return s;
         }
         return previous;

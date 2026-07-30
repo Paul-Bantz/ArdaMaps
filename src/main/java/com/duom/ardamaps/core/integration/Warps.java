@@ -31,7 +31,7 @@ import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -62,7 +62,7 @@ public final class Warps {
      * @param warpName  the configured warp name
      * @param onFailure fallback action for missing or invalid warp targets
      */
-    public static void warpTo(MinecraftServer server, ServerPlayerEntity player, String warpName, Runnable onFailure) {
+    public static void warpTo(MinecraftServer server, ServerPlayer player, String warpName, Runnable onFailure) {
         WarpService warpService = resolve();
         if (warpService != null) warpService.warpTo(server, player, warpName, onFailure);
         else onFailure.run();

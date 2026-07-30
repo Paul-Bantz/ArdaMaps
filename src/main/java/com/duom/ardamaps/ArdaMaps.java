@@ -150,16 +150,16 @@ public class ArdaMaps implements ModInitializer {
 
         List<ServerWorldDefinition> definitions = new ArrayList<>();
 
-        for (var world : server.getWorlds()) {
-            var dimensionId = world.getRegistryKey().getValue();
+        for (var world : server.getAllLevels()) {
+            var dimensionId = world.dimension().location();
             var border = world.getWorldBorder();
             definitions.add(new ServerWorldDefinition(
                     dimensionId.toString(),
                     dimensionId.getPath(),
-                    border.getBoundWest(),
-                    border.getBoundEast(),
-                    border.getBoundNorth(),
-                    border.getBoundSouth()
+                    border.getMinX(),
+                    border.getMaxX(),
+                    border.getMinZ(),
+                    border.getMaxZ()
             ));
         }
 

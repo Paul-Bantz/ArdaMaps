@@ -26,8 +26,8 @@
 package com.duom.ardamaps.gui.widgets;
 
 import lombok.Getter;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.util.Mth;
 
 /**
  * A reusable scrollbar widget that encapsulates scroll state and rendering.
@@ -89,7 +89,7 @@ public class ScrollbarWidget {
      */
     public void setMaxOffset(int maxOffset) {
         this.maxOffset = Math.max(0, maxOffset);
-        this.scrollOffset = MathHelper.clamp(scrollOffset, 0, this.maxOffset);
+        this.scrollOffset = Mth.clamp(scrollOffset, 0, this.maxOffset);
     }
 
     /**
@@ -114,7 +114,7 @@ public class ScrollbarWidget {
         if (maxOffset <= 0) return false;
 
         int prev = scrollOffset;
-        scrollOffset = MathHelper.clamp(scrollOffset - (int) (delta * scrollSpeed), 0, maxOffset);
+        scrollOffset = Mth.clamp(scrollOffset - (int) (delta * scrollSpeed), 0, maxOffset);
 
         return scrollOffset != prev;
     }
@@ -132,7 +132,7 @@ public class ScrollbarWidget {
      * @param visibleCount Number of visible units (items or pixels)
      * @param totalCount   Total number of units in the content
      */
-    public void render(DrawContext context, int trackX, int trackY, int trackHeight,
+    public void render(GuiGraphics context, int trackX, int trackY, int trackHeight,
                        int visibleCount, int totalCount) {
 
         // Track background

@@ -25,13 +25,13 @@
 
 package com.duom.ardamaps.core.data.guide;
 
-import net.minecraft.client.MinecraftClient;
 import org.jetbrains.annotations.Nullable;
 import org.jsoup.Jsoup;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
+import net.minecraft.client.Minecraft;
 
 /**
  * Session-scoped guide search index used by {@link com.duom.ardamaps.gui.screens.GuideScreen}.
@@ -309,7 +309,7 @@ public final class GuideSearchIndex {
     }
 
     private static String buildSearchIndexSignature(GuideBook book) {
-        String locale = MinecraftClient.getInstance().getLanguageManager().getLanguage();
+        String locale = Minecraft.getInstance().getLanguageManager().getSelected();
         StringBuilder signature = new StringBuilder(256).append(locale).append('|');
 
         var pages = book.getPages();

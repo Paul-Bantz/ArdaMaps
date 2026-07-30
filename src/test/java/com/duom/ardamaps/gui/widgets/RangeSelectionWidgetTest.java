@@ -26,7 +26,7 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.data.config.MapLayerRange;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -138,7 +138,7 @@ class RangeSelectionWidgetTest {
                 0,
                 100,
                 20,
-                Text.empty(),
+                Component.empty(),
                 ranges,
                 20,
                 selected::add,
@@ -507,7 +507,7 @@ class RangeSelectionWidgetTest {
          * @param onSelect    callback invoked when a range is selected
          * @param controlDown whether the control key should be reported as pressed
          */
-        TestRangeSelectionWidget(int x, int y, int width, int height, Text label, List<MapLayerRange> ranges,
+        TestRangeSelectionWidget(int x, int y, int width, int height, Component label, List<MapLayerRange> ranges,
                                  int itemWidth, java.util.function.Consumer<MapLayerRange> onSelect,
                                  boolean controlDown) {
 

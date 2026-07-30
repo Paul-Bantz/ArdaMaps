@@ -31,7 +31,7 @@ import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.config.MapLayerSource;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +66,7 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
      * @param buf The PacketByteBuf to read from
      * @return The MapSourceResponsePacket read from the buffer
      */
-    public static MapSourceResponsePacket read(PacketByteBuf buf) {
+    public static MapSourceResponsePacket read(FriendlyByteBuf buf) {
 
         var warpsAvailable = buf.readBoolean();
         var ardaRegionsAvailable = buf.readBoolean();
@@ -76,8 +76,8 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
         for (int idx = 0; idx < dimensionsCount; idx++) {
 
             var scaleFactor = buf.readFloat();
-            var name = buf.readString();
-            var id = buf.readString();
+            var name = buf.readUtf();
+            var id = buf.readUtf();
             var ardaRegions = buf.readBoolean();
             var xMin = buf.readInt();
             var xMax = buf.readInt();
@@ -90,8 +90,8 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
             var layersCount = readCount(buf, "map layers", MAX_LAYERS_PER_DIMENSION);
             for (int jdx = 0; jdx < layersCount; jdx++) {
 
-                var layerName = buf.readString();
-                var typeName = buf.readString();
+                var layerName = buf.readUtf();
+                var typeName = buf.readUtf();
                 var type = parseMapLayerSource(typeName);
                 var remote = buf.readBoolean();
                 var identityZoom = buf.readInt();
@@ -103,8 +103,8 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
                 var maxZoom = buf.readInt();
                 var tileSize = buf.readInt();
                 var scale = buf.readDouble();
-                var path = buf.readBoolean() ? buf.readString() : null;
-                var icon = buf.readString();
+                var path = buf.readBoolean() ? buf.readUtf() : null;
+                var icon = buf.readUtf();
 
                 var rangesCount = readCount(buf, "map layer ranges", MAX_RANGES_PER_LAYER);
                 List<MapLayerRange> ranges = null;
@@ -115,7 +115,7 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
                     for (int kdx = 0; kdx < rangesCount; kdx++) {
                         ranges.add(new MapLayerRange(
                                 buf.readInt(),
-                                buf.readString(),
+                                buf.readUtf(),
                                 buf.readInt(),
                                 buf.readInt()));
                     }
@@ -142,9 +142,9 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
      * @return The PacketByteBuf representing this MapSourceResponsePacket
      */
     @Override
-    public PacketByteBuf build() {
+    public FriendlyByteBuf build() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = PacketByteBufs.create();
 
         buf.writeBoolean(warpsAvailable);
         buf.writeBoolean(ardaRegionsAvailable);
@@ -156,8 +156,8 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
 
             var dimension = dimensions.get(idx);
             buf.writeFloat(dimension.getScaleFactor());
-            buf.writeString(dimension.getName());
-            buf.writeString(dimension.getId());
+            buf.writeUtf(dimension.getName());
+            buf.writeUtf(dimension.getId());
             buf.writeBoolean(dimension.isSupportsArdaRegions());
             buf.writeInt(dimension.getXMin());
             buf.writeInt(dimension.getXMax());
@@ -172,8 +172,8 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
             for (int jdx = 0; jdx < layersCount; jdx++) {
 
                 var layer = layers.get(jdx);
-                buf.writeString(layer.layer());
-                buf.writeString(layer.type().name());
+                buf.writeUtf(layer.layer());
+                buf.writeUtf(layer.type().name());
                 buf.writeBoolean(layer.remote());
                 buf.writeInt(layer.identityZoom());
                 buf.writeDouble(layer.preferredZoom());
@@ -185,8 +185,8 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
                 buf.writeInt(layer.tileSize());
                 buf.writeDouble(layer.scale());
                 buf.writeBoolean(layer.path() != null);
-                if (layer.path() != null) buf.writeString(layer.path());
-                buf.writeString(layer.icon());
+                if (layer.path() != null) buf.writeUtf(layer.path());
+                buf.writeUtf(layer.icon());
 
                 var ranges = layer.ranges();
                 var rangesCount = ranges == null || ranges.isEmpty() ? 0 : ranges.size();
@@ -195,7 +195,7 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
                 for (int kdx = 0; kdx < rangesCount; kdx++) {
                     var range = ranges.get(kdx);
                     buf.writeInt(range.index());
-                    buf.writeString(range.path());
+                    buf.writeUtf(range.path());
                     buf.writeInt(range.rangeMinY());
                     buf.writeInt(range.rangeMaxY());
                 }
@@ -213,7 +213,7 @@ public record MapSourceResponsePacket(boolean warpsAvailable,
      * @param max   Maximum accepted count.
      * @return The validated count.
      */
-    private static int readCount(PacketByteBuf buf, String label, int max) {
+    private static int readCount(FriendlyByteBuf buf, String label, int max) {
 
         int count = buf.readInt();
 

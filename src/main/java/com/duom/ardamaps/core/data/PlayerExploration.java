@@ -28,13 +28,13 @@ package com.duom.ardamaps.core.data;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.config.Dimension;
+import com.mojang.blaze3d.platform.NativeImage;
 import lombok.Getter;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,11 +114,11 @@ public class PlayerExploration implements Serializable {
     private transient NativeImage fogMask;
 
     /** The GPU texture for the fog-of-war, created from {@link #fogMask}. */
-    private transient NativeImageBackedTexture fogTexture;
+    private transient DynamicTexture fogTexture;
 
     /** The identifier of the fog-of-war texture in Minecraft's texture manager, used for rendering. */
     @Getter
-    private transient Identifier fogTextureId;
+    private transient ResourceLocation fogTextureId;
 
     /**
      * Creates a new {@link PlayerExploration} for the given dimension.
@@ -230,10 +230,10 @@ public class PlayerExploration implements Serializable {
 
         fogMask = new NativeImage(nbCellsX, nbCellsY, true);
 
-        fogTexture = new NativeImageBackedTexture(fogMask);
-        fogTextureId = MinecraftClient.getInstance()
+        fogTexture = new DynamicTexture(fogMask);
+        fogTextureId = Minecraft.getInstance()
                 .getTextureManager()
-                .registerDynamicTexture(textureName(), fogTexture);
+                .register(textureName(), fogTexture);
     }
 
     /**
@@ -275,7 +275,7 @@ public class PlayerExploration implements Serializable {
         for (int idx : dirtyCells) {
             int x = idx % nbCellsX;
             int y = idx / nbCellsX;
-            fogMask.setColor(x, y, grid.stateAt(x, y).getColor());
+            fogMask.setPixelRGBA(x, y, grid.stateAt(x, y).getColor());
         }
 
         dirtyCells.clear();
@@ -469,7 +469,7 @@ public class PlayerExploration implements Serializable {
             if (fogTextureId != null) {
 
                 Client.mc().getTextureManager()
-                        .destroyTexture(fogTextureId);
+                        .release(fogTextureId);
 
                 fogTextureId = null;
             }

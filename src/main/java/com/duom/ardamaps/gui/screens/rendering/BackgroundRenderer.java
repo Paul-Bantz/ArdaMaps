@@ -27,10 +27,10 @@ package com.duom.ardamaps.gui.screens.rendering;
 
 import com.duom.ardamaps.gui.ModConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.render.Tessellator;
+import com.mojang.blaze3d.vertex.Tesselator;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.GameRenderer;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -126,7 +126,7 @@ public class BackgroundRenderer {
      * @param screenWidth  current screen width in pixels, used to detect when to recalculate layout
      * @param screenHeight current screen height in pixels, used to detect when to recalculate layout
      */
-    public void render(DrawContext context, int screenWidth, int screenHeight) {
+    public void render(GuiGraphics context, int screenWidth, int screenHeight) {
         invalidate(screenWidth, screenHeight);
         drawNineSliceGui(context);
     }
@@ -176,9 +176,9 @@ public class BackgroundRenderer {
      *
      * @param context the DrawContext to render with, provided by the caller's render method
      */
-    private void drawNineSliceGui(DrawContext context) {
+    private void drawNineSliceGui(GuiGraphics context) {
         // Enable nearest-neighbor filtering for crisp pixel rendering
-        MinecraftClient.getInstance().getTextureManager().bindTexture(ModConstants.GUI_TEXTURE);
+        Minecraft.getInstance().getTextureManager().bindForSetup(ModConstants.GUI_TEXTURE);
         RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
         RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
 
@@ -187,7 +187,7 @@ public class BackgroundRenderer {
         drawRightPage(context, spineX, guiTopLeftY);
 
         // Restore linear filtering
-        MinecraftClient.getInstance().getTextureManager().bindTexture(ModConstants.GUI_TEXTURE);
+        Minecraft.getInstance().getTextureManager().bindForSetup(ModConstants.GUI_TEXTURE);
         RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
         RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
     }
@@ -199,7 +199,7 @@ public class BackgroundRenderer {
      *
      * @param context the DrawContext to render with, provided by the caller's render method
      */
-    private void drawLeftPage(DrawContext context) {
+    private void drawLeftPage(GuiGraphics context) {
         // Screen bounds of the left page
         int x = guiTopLeftX;
         int rx = guiTopLeftX + pageWidth;
@@ -233,23 +233,23 @@ public class BackgroundRenderer {
      * @param x       the X coordinate of the top-left corner of the right page (including border)
      * @param y       the Y coordinate of the top-left corner of the right page (including border)
      */
-    private void drawRightPage(DrawContext context, int x, int y) {
+    private void drawRightPage(GuiGraphics context, int x, int y) {
         int x2 = x + SCALED_CORNER + innerW; // start of right corner column
         int y2 = y + SCALED_CORNER + innerH; // start of bottom corner row
 
         // Corners
-        context.drawTexture(ModConstants.GUI_TEXTURE, x, y, SCALED_CORNER, SCALED_CORNER, 0, 0, CORNER_SIZE, CORNER_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
-        context.drawTexture(ModConstants.GUI_TEXTURE, x2, y, SCALED_CORNER, SCALED_CORNER, 384, 0, CORNER_SIZE, CORNER_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
-        context.drawTexture(ModConstants.GUI_TEXTURE, x, y2, SCALED_CORNER, SCALED_CORNER, 0, 384, CORNER_SIZE, CORNER_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
-        context.drawTexture(ModConstants.GUI_TEXTURE, x2, y2, SCALED_CORNER, SCALED_CORNER, 384, 384, CORNER_SIZE, CORNER_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
+        context.blit(ModConstants.GUI_TEXTURE, x, y, SCALED_CORNER, SCALED_CORNER, 0, 0, CORNER_SIZE, CORNER_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
+        context.blit(ModConstants.GUI_TEXTURE, x2, y, SCALED_CORNER, SCALED_CORNER, 384, 0, CORNER_SIZE, CORNER_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
+        context.blit(ModConstants.GUI_TEXTURE, x, y2, SCALED_CORNER, SCALED_CORNER, 0, 384, CORNER_SIZE, CORNER_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
+        context.blit(ModConstants.GUI_TEXTURE, x2, y2, SCALED_CORNER, SCALED_CORNER, 384, 384, CORNER_SIZE, CORNER_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
 
         // Top & bottom edges - stretched horizontally
-        context.drawTexture(ModConstants.GUI_TEXTURE, x + SCALED_CORNER, y, innerW, SCALED_CORNER, 128, 0, SIDE_SIZE, CORNER_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
-        context.drawTexture(ModConstants.GUI_TEXTURE, x + SCALED_CORNER, y2, innerW, SCALED_CORNER, 128, 384, SIDE_SIZE, CORNER_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
+        context.blit(ModConstants.GUI_TEXTURE, x + SCALED_CORNER, y, innerW, SCALED_CORNER, 128, 0, SIDE_SIZE, CORNER_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
+        context.blit(ModConstants.GUI_TEXTURE, x + SCALED_CORNER, y2, innerW, SCALED_CORNER, 128, 384, SIDE_SIZE, CORNER_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
 
         // Left & right edges - stretched vertically
-        context.drawTexture(ModConstants.GUI_TEXTURE, x, y + SCALED_CORNER, SCALED_CORNER, innerH, 0, 128, CORNER_SIZE, SIDE_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
-        context.drawTexture(ModConstants.GUI_TEXTURE, x2, y + SCALED_CORNER, SCALED_CORNER, innerH, 384, 128, CORNER_SIZE, SIDE_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
+        context.blit(ModConstants.GUI_TEXTURE, x, y + SCALED_CORNER, SCALED_CORNER, innerH, 0, 128, CORNER_SIZE, SIDE_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
+        context.blit(ModConstants.GUI_TEXTURE, x2, y + SCALED_CORNER, SCALED_CORNER, innerH, 384, 128, CORNER_SIZE, SIDE_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
 
         // Centre - tiled
         tileBookTexture(context, x + SCALED_CORNER, y + SCALED_CORNER, innerW, innerH, 128, 128, CENTER_SIZE, CENTER_SIZE);
@@ -269,10 +269,10 @@ public class BackgroundRenderer {
      * @param srcW    the width of the source texture patch in the texture image
      * @param srcH    the height of the source texture patch in the texture image
      */
-    private void drawTextureH(DrawContext context,
+    private void drawTextureH(GuiGraphics context,
                               int x, int y, int w, int h,
                               int u, int v, int srcW, int srcH) {
-        var matrix = context.getMatrices().peek().getPositionMatrix();
+        var matrix = context.pose().last().pose();
         float u0 = (u + srcW) / (float) TEXTURE_SIZE;  // flipped: u+srcW on left
         float u1 = u / (float) TEXTURE_SIZE;  // flipped: u on right
         float v0 = v / (float) TEXTURE_SIZE;
@@ -282,15 +282,15 @@ public class BackgroundRenderer {
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         RenderSystem.setShaderTexture(0, ModConstants.GUI_TEXTURE);
-        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
-        var buf = Tessellator.getInstance().getBuffer();
-        buf.begin(net.minecraft.client.render.VertexFormat.DrawMode.QUADS,
-                net.minecraft.client.render.VertexFormats.POSITION_TEXTURE);
-        buf.vertex(matrix, x, y, 0).texture(u0, v0).next();
-        buf.vertex(matrix, x, y + h, 0).texture(u0, v1).next();
-        buf.vertex(matrix, x + w, y + h, 0).texture(u1, v1).next();
-        buf.vertex(matrix, x + w, y, 0).texture(u1, v0).next();
-        net.minecraft.client.render.BufferRenderer.drawWithGlobalProgram(buf.end());
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        var buf = Tesselator.getInstance().getBuilder();
+        buf.begin(com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS,
+                com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX);
+        buf.vertex(matrix, x, y, 0).uv(u0, v0).endVertex();
+        buf.vertex(matrix, x, y + h, 0).uv(u0, v1).endVertex();
+        buf.vertex(matrix, x + w, y + h, 0).uv(u1, v1).endVertex();
+        buf.vertex(matrix, x + w, y, 0).uv(u1, v0).endVertex();
+        com.mojang.blaze3d.vertex.BufferUploader.drawWithShader(buf.end());
     }
 
     /**
@@ -309,7 +309,7 @@ public class BackgroundRenderer {
      * @param srcH              the height of the source texture patch in the texture image
      */
     @SuppressWarnings("SameParameterValue")
-    private void tileBookTextureH(DrawContext context,
+    private void tileBookTextureH(GuiGraphics context,
                                   int destinationX, int destinationY,
                                   int destinationWidth, int destinationHeight,
                                   int u, int v, int srcW, int srcH) {
@@ -347,7 +347,7 @@ public class BackgroundRenderer {
      * @param srcH              the height of the source texture patch in the texture image
      */
     @SuppressWarnings("SameParameterValue")
-    private void tileBookTexture(DrawContext context,
+    private void tileBookTexture(GuiGraphics context,
                                  int destinationX, int destinationY,
                                  int destinationWidth, int destinationHeight,
                                  int u, int v, int srcW, int srcH) {
@@ -362,7 +362,7 @@ public class BackgroundRenderer {
             for (int dx = 0; dx < destinationWidth; dx += tileW) {
                 int drawW = Math.min(tileW, destinationWidth - dx);
                 int partSrcW = drawW < tileW ? Math.round(srcW * ((float) drawW / tileW)) : srcW;
-                context.drawTexture(ModConstants.GUI_TEXTURE,
+                context.blit(ModConstants.GUI_TEXTURE,
                         destinationX + dx, destinationY + dy, drawW, drawH,
                         u, v, partSrcW, partSrcH, TEXTURE_SIZE, TEXTURE_SIZE);
             }

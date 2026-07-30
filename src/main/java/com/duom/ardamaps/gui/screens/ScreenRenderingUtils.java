@@ -26,7 +26,7 @@
 package com.duom.ardamaps.gui.screens;
 
 import com.duom.ardamaps.gui.ModConstants;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 /**
  * Utility class for rendering operations in ArdaMaps screens.
@@ -42,7 +42,7 @@ public class ScreenRenderingUtils {
      * @param y       Vertical position of the separator
      * @return the separator height
      */
-    public static int renderSeparator(DrawContext context, int width, int x, int y) {
+    public static int renderSeparator(GuiGraphics context, int width, int x, int y) {
 
         return renderSeparator(context, width, x, y, true);
     }
@@ -56,7 +56,7 @@ public class ScreenRenderingUtils {
      * @param y       Vertical position of the separator
      * @return the separator height
      */
-    public static int renderSeparator(DrawContext context, int width, int x, int y, boolean displayCenterSeparator) {
+    public static int renderSeparator(GuiGraphics context, int width, int x, int y, boolean displayCenterSeparator) {
 
         int separatorSize = 9;
         int xOffset = x;
@@ -68,7 +68,7 @@ public class ScreenRenderingUtils {
         }
 
         // Left end
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(ModConstants.MAP_GUI_ELEMENTS,
                 xOffset, y,
                 separatorSize, separatorSize,
                 32, 224,
@@ -76,7 +76,7 @@ public class ScreenRenderingUtils {
                 512, 512);
 
         // Left line
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(ModConstants.MAP_GUI_ELEMENTS,
                 xOffset += separatorSize, y,
                 lineWidth, separatorSize,
                 50, 224,
@@ -85,7 +85,7 @@ public class ScreenRenderingUtils {
 
         if (displayCenterSeparator) {
             // Center
-            context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(ModConstants.MAP_GUI_ELEMENTS,
                     xOffset += lineWidth, y,
                     separatorSize * 2, separatorSize,
                     142, 224,
@@ -96,7 +96,7 @@ public class ScreenRenderingUtils {
         }
 
         // Right line
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(ModConstants.MAP_GUI_ELEMENTS,
                 xOffset += separatorSize * 2, y,
                 lineWidth, separatorSize,
                 50, 224,
@@ -104,7 +104,7 @@ public class ScreenRenderingUtils {
                 512, 512);
 
         // Right end
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(ModConstants.MAP_GUI_ELEMENTS,
                 xOffset + lineWidth, y,
                 separatorSize, separatorSize,
                 270, 224,

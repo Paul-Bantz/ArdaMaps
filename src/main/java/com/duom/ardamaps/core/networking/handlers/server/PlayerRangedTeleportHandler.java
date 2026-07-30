@@ -32,12 +32,12 @@ import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.networking.packets.client.PlayerTeleportResponsePacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerRangedTeleportPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,15 +83,15 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
      * @return Null because the response is sent asynchronously from the server thread.
      */
     @Override
-    protected PlayerTeleportResponsePacket handle(MinecraftServer server, ServerPlayerEntity player,
-                                                  ServerPlayNetworkHandler handler, PlayerRangedTeleportPacket packet,
+    protected PlayerTeleportResponsePacket handle(MinecraftServer server, ServerPlayer player,
+                                                  ServerGamePacketListenerImpl handler, PlayerRangedTeleportPacket packet,
                                                   PacketSender sender,
                                                   Consumer<PlayerTeleportResponsePacket> responder) {
 
         server.execute(() -> {
 
             // Resolve the destination world
-            ServerWorld serverWorld = resolveWorld(server, packet.worldId());
+            ServerLevel serverWorld = resolveWorld(server, packet.worldId());
 
             if (serverWorld == null) {
                 LOGGER.warn("Unable to resolve ranged teleport world: {}", packet.worldId());
@@ -101,7 +101,7 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
 
             // Get the dimension configuration and calculate effective scan bounds
             Dimension dimension = resolveDimension(packet.worldId());
-            VerticalBounds overallBounds = effectiveOverallBounds(dimension, serverWorld.getBottomY(), serverWorld.getTopY());
+            VerticalBounds overallBounds = effectiveOverallBounds(dimension, serverWorld.getMinBuildHeight(), serverWorld.getMaxBuildHeight());
             double x = SafeTeleportScanner.blockCenter(packet.x());
             double z = SafeTeleportScanner.blockCenter(packet.z());
 
@@ -111,14 +111,14 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
 
             if (candidateY.isPresent()) {
                 double y = candidateY.getAsDouble();
-                player.teleport(serverWorld, x, y, z, player.getYaw(), player.getPitch());
+                player.teleportTo(serverWorld, x, y, z, player.getYRot(), player.getXRot());
                 responder.accept(new PlayerTeleportResponsePacket(true, x, y, z));
                 return;
             }
 
             // Send error message if no safe position found
-            player.sendMessage(Text.literal(String.format("Invalid teleport position at %s %s", (int)packet.x(), (int)packet.z()))
-                    .formatted(Formatting.RED), false);
+            player.displayClientMessage(Component.literal(String.format("Invalid teleport position at %s %s", (int)packet.x(), (int)packet.z()))
+                    .withStyle(ChatFormatting.RED), false);
             responder.accept(PlayerTeleportResponsePacket.failed());
         });
 
@@ -132,12 +132,12 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
      * @param worldId The world identifier string (e.g., "minecraft:overworld").
      * @return The matching ServerWorld, or null if not found or worldId is null.
      */
-    private static ServerWorld resolveWorld(MinecraftServer server, String worldId) {
+    private static ServerLevel resolveWorld(MinecraftServer server, String worldId) {
 
         if (worldId == null) return null;
 
-        for (ServerWorld world : server.getWorlds()) {
-            if (world.getRegistryKey().getValue().toString().equals(worldId)) return world;
+        for (ServerLevel world : server.getAllLevels()) {
+            if (world.dimension().location().toString().equals(worldId)) return world;
         }
 
         return null;

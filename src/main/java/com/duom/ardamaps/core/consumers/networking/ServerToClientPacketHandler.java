@@ -30,12 +30,11 @@ import lombok.Getter;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
-
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import java.util.function.Function;
 
 /**
@@ -49,10 +48,10 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
 
     /** The unique identifier for the packet channel, constructed using the mod ID and a specific channel name. */
     @Getter
-    private final Identifier channelId;
+    private final ResourceLocation channelId;
 
     /** A function that reads a packet of type T from a PacketByteBuf. This is used to deserialize incoming packets on the client side. */
-    private final Function<PacketByteBuf, T> reader;
+    private final Function<FriendlyByteBuf, T> reader;
 
     /**
      * Constructs a new ServerToClientPacketHandler with the specified channel name and packet reader function.
@@ -61,8 +60,8 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
      * @param reader  A function that takes a PacketByteBuf and returns an instance of T, used to read incoming packets on the client side.
      */
     @SuppressWarnings("SameParameterValue")
-    protected ServerToClientPacketHandler(String channel, Function<PacketByteBuf, T> reader) {
-        this.channelId = Identifier.of(ArdaMaps.MOD_ID, channel);
+    protected ServerToClientPacketHandler(String channel, Function<FriendlyByteBuf, T> reader) {
+        this.channelId = ResourceLocation.tryBuild(ArdaMaps.MOD_ID, channel);
         this.reader = reader;
     }
 
@@ -72,9 +71,9 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
      * @param player The ServerPlayerEntity representing the player to send the packet to.
      * @param packet The packet of type T to be sent to the client, which will be serialized and transmitted over the network.
      */
-    public void send(ServerPlayerEntity player, T packet) {
-        PacketByteBuf buf = PacketByteBufs.create();
-        PacketByteBuf packetBuf = packet.build();
+    public void send(ServerPlayer player, T packet) {
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf packetBuf = packet.build();
         buf.writeBytes(packetBuf);
         ServerPlayNetworking.send(player, channelId, buf);
     }
@@ -88,7 +87,7 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
      * @param sender  The PacketSender that can be used to send responses back to the server if needed.
      */
     @Override
-    public void handle(MinecraftClient client, ClientPlayNetworkHandler handler, PacketByteBuf buf, PacketSender sender) {
+    public void handle(Minecraft client, ClientPacketListener handler, FriendlyByteBuf buf, PacketSender sender) {
         T packet = reader.apply(buf);
         client.execute(() -> handle(client, packet));
     }
@@ -99,5 +98,5 @@ public abstract class ServerToClientPacketHandler<T extends IPacket> implements 
      * @param client The MinecraftClient instance representing the client receiving the packet, which can be used to access client-side resources and perform actions in response to the packet.
      * @param packet The packet of type T that was received and deserialized from the incoming PacketByteBuf, which contains the data that needs to be processed according to the specific handling logic defined in the subclass implementation.
      */
-    protected abstract void handle(MinecraftClient client, T packet);
+    protected abstract void handle(Minecraft client, T packet);
 }

@@ -28,12 +28,12 @@ package com.duom.ardamaps.core.networking.handlers.server;
 import com.duom.ardamaps.core.consumers.networking.ServerPacketHandler;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.Heightmap;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.world.level.levelgen.Heightmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,21 +68,21 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
      * @param sender  The packet sender.
      */
     @Override
-    protected void handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PlayerTeleportPacket packet, PacketSender sender) {
+    protected void handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler, PlayerTeleportPacket packet, PacketSender sender) {
 
         server.execute(() -> {
 
             if (packet.worldId() != null) {
 
-                var worlds = server.getWorlds();
-                ServerWorld serverWorld = null;
+                var worlds = server.getAllLevels();
+                ServerLevel serverWorld = null;
 
                 // Search for the world with the matching registry key
                 for (var world : worlds) {
 
-                    if (world.getRegistryKey().getValue().toString().equals(packet.worldId())) {
+                    if (world.dimension().location().toString().equals(packet.worldId())) {
 
-                        LOGGER.info("World found: {}", world.getRegistryKey().getValue());
+                        LOGGER.info("World found: {}", world.dimension().location());
                         serverWorld = world;
                         break;
                     }
@@ -99,9 +99,9 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
 
                         if (safeY.isEmpty()) {
 
-                            BlockPos pos = serverWorld.getTopPosition(
-                                    Heightmap.Type.MOTION_BLOCKING_NO_LEAVES,
-                                    BlockPos.ofFloored(x, 0, z)
+                            BlockPos pos = serverWorld.getHeightmapPos(
+                                    Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                                    BlockPos.containing(x, 0, z)
                             );
                             teleportY = pos.getY() + 1;
                         } else {
@@ -110,17 +110,17 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
                             LOGGER.info("Safe position found at: {}, {}, {}", x, teleportY, z);
                         }
 
-                        player.teleport(serverWorld, x, teleportY, z, player.getYaw(), player.getPitch());
+                        player.teleportTo(serverWorld, x, teleportY, z, player.getYRot(), player.getXRot());
                     } else {
 
-                        player.teleport(serverWorld, packet.x(), packet.y(), packet.z(), player.getYaw(), player.getPitch());
+                        player.teleportTo(serverWorld, packet.x(), packet.y(), packet.z(), player.getYRot(), player.getXRot());
                     }
 
                     return;
                 }
             }
 
-            player.teleport(packet.x(), packet.y(), packet.z());
+            player.teleportToWithTicket(packet.x(), packet.y(), packet.z());
 
         });
     }
@@ -134,9 +134,9 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
      * @param z     The snapped Z coordinate to check.
      * @return The exact standing Y coordinate, or empty if no safe position is found.
      */
-    public static OptionalDouble findSafeY(ServerWorld world, ServerPlayerEntity player, double x, double z) {
-        int topY = world.getTopY();
-        int bottomY = world.getBottomY();
+    public static OptionalDouble findSafeY(ServerLevel world, ServerPlayer player, double x, double z) {
+        int topY = world.getMaxBuildHeight();
+        int bottomY = world.getMinBuildHeight();
 
         for (int y = topY - 2; y >= bottomY; y--) {
             OptionalDouble safeY = SafeTeleportScanner.standingHeightAt(world, player, x, y, z);

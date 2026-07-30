@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.gui.widgets;
 
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -69,8 +69,8 @@ class DropdownWidgetTest {
                 100,
                 80,
                 20,
-                Text.empty(),
-                Text.empty(),
+                Component.empty(),
+                Component.empty(),
                 null,
                 List.of("a", "b", "c", "d", "e"),
                 value -> new TextIdentifierPairItem(value, null),

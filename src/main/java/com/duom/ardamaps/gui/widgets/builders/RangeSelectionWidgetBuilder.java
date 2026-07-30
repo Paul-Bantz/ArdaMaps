@@ -27,10 +27,9 @@ package com.duom.ardamaps.gui.widgets.builders;
 
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.gui.widgets.RangeSelectionWidget;
-import net.minecraft.text.Text;
-
 import java.util.List;
 import java.util.function.Consumer;
+import net.minecraft.network.chat.Component;
 
 /**
  * Builder class for constructing {@link RangeSelectionWidget} instances with a fluent API.
@@ -46,7 +45,7 @@ public class RangeSelectionWidgetBuilder {
     private int height;
 
     /** fixed label displayed before range cells */
-    private Text label = Text.empty();
+    private Component label = Component.empty();
 
     /** ranges displayed by the range selection widget */
     private List<MapLayerRange> ranges = List.of();
@@ -85,7 +84,7 @@ public class RangeSelectionWidgetBuilder {
      * @param label fixed label displayed before range cells
      * @return the current instance of RangeSelectionWidgetBuilder for method chaining
      */
-    public RangeSelectionWidgetBuilder setLabel(Text label) {
+    public RangeSelectionWidgetBuilder setLabel(Component label) {
         this.label = label;
         return this;
     }

@@ -175,11 +175,11 @@ class MapSourceResponsePacketTest {
      *
      * @param buf The packet buffer to write to.
      */
-    private static void writeDimensionHeader(net.minecraft.network.PacketByteBuf buf) {
+    private static void writeDimensionHeader(net.minecraft.network.FriendlyByteBuf buf) {
 
         buf.writeFloat(1f);
-        buf.writeString("Test");
-        buf.writeString("test:dimension");
+        buf.writeUtf("Test");
+        buf.writeUtf("test:dimension");
         buf.writeBoolean(false);
         buf.writeInt(0);
         buf.writeInt(1000);
@@ -196,10 +196,10 @@ class MapSourceResponsePacketTest {
      * @param typeName Serialized layer type.
      */
     @SuppressWarnings("SameParameterValue")
-    private static void writeLayer(net.minecraft.network.PacketByteBuf buf, String name, String typeName) {
+    private static void writeLayer(net.minecraft.network.FriendlyByteBuf buf, String name, String typeName) {
 
-        buf.writeString(name);
-        buf.writeString(typeName);
+        buf.writeUtf(name);
+        buf.writeUtf(typeName);
         buf.writeBoolean(true);
         buf.writeInt(8);
         buf.writeDouble(7d);
@@ -211,8 +211,8 @@ class MapSourceResponsePacketTest {
         buf.writeInt(512);
         buf.writeDouble(1.25);
         buf.writeBoolean(true);
-        buf.writeString("fallback.pmtiles");
-        buf.writeString("fallback.png");
+        buf.writeUtf("fallback.pmtiles");
+        buf.writeUtf("fallback.png");
         buf.writeInt(0);
     }
 }

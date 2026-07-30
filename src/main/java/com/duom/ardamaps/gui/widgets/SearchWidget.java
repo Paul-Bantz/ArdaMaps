@@ -28,16 +28,16 @@ package com.duom.ardamaps.gui.widgets;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.screens.ArdaMapsScreen;
 import lombok.Setter;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.HoveredTooltipPositioner;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.TextWidget;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.tooltip.DefaultTooltipPositioner;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.FormattedCharSequence;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.*;
@@ -78,10 +78,10 @@ public class SearchWidget extends Screen {
     private SimpleTextFieldWidget searchField;
 
     /** Rendered result elements currently attached to this screen. */
-    private final List<Element> searchResults;
+    private final List<GuiEventListener> searchResults;
 
     /** Tooltip text associated with each rendered result button. */
-    private final Map<ButtonWidget, Text> resultTooltips;
+    private final Map<Button, Component> resultTooltips;
 
     /** Parent screen rendered underneath this overlay. */
     private final ArdaMapsScreen parent;
@@ -96,7 +96,7 @@ public class SearchWidget extends Screen {
      */
     public SearchWidget(ArdaMapsScreen parent) {
 
-        super(Text.translatable("ardamaps.client.generic.search"));
+        super(Component.translatable("ardamaps.client.generic.search"));
 
         this.parent = parent;
         this.searchResults = new ArrayList<>();
@@ -114,23 +114,23 @@ public class SearchWidget extends Screen {
         var x = (parent.width / 2) - (ModConstants.BUTTON_WIDTH);
         var y = (parent.height / 2) - (ModConstants.BUTTON_HEIGHT / 2);
 
-        this.searchField = new SimpleTextFieldWidget(textRenderer, x, y, ModConstants.BUTTON_WIDTH * 2, ModConstants.SMALL_SQUARED_BUTTON_SIZE, Text.empty());
-        this.searchField.setPlaceholder(Text.translatable("ardamaps.client.generic.search"));
-        this.searchField.setChangedListener(this::onSearchChanged);
+        this.searchField = new SimpleTextFieldWidget(font, x, y, ModConstants.BUTTON_WIDTH * 2, ModConstants.SMALL_SQUARED_BUTTON_SIZE, Component.empty());
+        this.searchField.setHint(Component.translatable("ardamaps.client.generic.search"));
+        this.searchField.setResponder(this::onSearchChanged);
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("X"),
-                        (buttonWidget) -> close())
+        addRenderableWidget(Button.builder(Component.literal("X"),
+                        (buttonWidget) -> onClose())
                 .size(ModConstants.SMALL_SQUARED_BUTTON_SIZE, ModConstants.SMALL_SQUARED_BUTTON_SIZE)
-                .position(width - ModConstants.SMALL_SQUARED_BUTTON_SIZE - 10, 10)
+                .pos(width - ModConstants.SMALL_SQUARED_BUTTON_SIZE - 10, 10)
                 .build());
 
-        var title = new TextWidget(Text.translatable("ardamaps.client.generic.search"), textRenderer);
+        var title = new StringWidget(Component.translatable("ardamaps.client.generic.search"), font);
         title.setPosition(x, y - ModConstants.BUTTON_HEIGHT / 2);
 
-        addDrawableChild(title);
-        addDrawableChild(searchField);
+        addRenderableWidget(title);
+        addRenderableWidget(searchField);
 
-        this.focusOn(searchField);
+        this.magicalSpecialHackyFocus(searchField);
     }
 
     /**
@@ -147,14 +147,14 @@ public class SearchWidget extends Screen {
 
         // Exit fast if fewer than 2 characters
         if (searchString == null || searchString.length() < 2) {
-            this.searchResults.forEach(this::remove);
+            this.searchResults.forEach(this::removeWidget);
             this.searchResults.clear();
             this.resultTooltips.clear();
             return;
         }
 
         List<?> foundElements = this.searchFunction.apply(searchString);
-        this.searchResults.forEach(this::remove);
+        this.searchResults.forEach(this::removeWidget);
         this.searchResults.clear();
         this.resultTooltips.clear();
 
@@ -169,7 +169,7 @@ public class SearchWidget extends Screen {
             int maxChars = (ModConstants.BUTTON_WIDTH * 2) / 6;
             elementString = ellipseAroundMatch(elementString, searchString, maxChars);
 
-            MutableText text = buildHighlightedText(elementString, searchString, ModConstants.COLOR_BLUE_EMPHASIZED);
+            MutableComponent text = buildHighlightedText(elementString, searchString, ModConstants.COLOR_BLUE_EMPHASIZED);
 
             var resultButton = buildSearchResultButton(text, element, resultIndex);
             if (elementAsTooltip != null) {
@@ -179,21 +179,21 @@ public class SearchWidget extends Screen {
                 }
             }
             this.searchResults.add(resultButton);
-            addDrawableChild(resultButton);
+            addRenderableWidget(resultButton);
 
             resultIndex++;
         }
 
         if (foundElements.size() > MAX_RESULTS) {
 
-            var moreElementsTextWidget = new TextWidget(Text.literal("..."), textRenderer);
+            var moreElementsTextWidget = new StringWidget(Component.literal("..."), font);
 
             var xPosition = width / 2 - moreElementsTextWidget.getWidth() / 2;
             var yPosition = searchField.getY() + 5 + resultIndex * ModConstants.SMALL_SQUARED_BUTTON_SIZE;
 
             moreElementsTextWidget.setPosition(xPosition, yPosition);
             this.searchResults.add(moreElementsTextWidget);
-            addDrawableChild(moreElementsTextWidget);
+            addRenderableWidget(moreElementsTextWidget);
         }
     }
 
@@ -233,15 +233,15 @@ public class SearchWidget extends Screen {
      * @param resultIndex vertical slot index for button placement
      * @return configured result button
      */
-    private ButtonWidget buildSearchResultButton(Text result, Object element, int resultIndex) {
+    private Button buildSearchResultButton(Component result, Object element, int resultIndex) {
 
         var height = ModConstants.SMALL_SQUARED_BUTTON_SIZE;
 
-        return ButtonWidget.builder(
+        return Button.builder(
                         result,
                         button -> this.resultSelected(element))
                 .size(ModConstants.BUTTON_WIDTH * 2, height)
-                .position(searchField.getX(), searchField.getY() + 5 + resultIndex * height)
+                .pos(searchField.getX(), searchField.getY() + 5 + resultIndex * height)
                 .build();
     }
 
@@ -255,7 +255,7 @@ public class SearchWidget extends Screen {
         if (onSearchResultSelected != null)
             onSearchResultSelected.apply(selectedElement);
 
-        close();
+        onClose();
     }
 
     /**
@@ -272,7 +272,7 @@ public class SearchWidget extends Screen {
 
         if (keyCode == GLFW.GLFW_KEY_ENTER
                 && !searchResults.isEmpty()
-                && searchResults.get(0) instanceof ButtonWidget buttonWidget) {
+                && searchResults.get(0) instanceof Button buttonWidget) {
 
             buttonWidget.onPress();
             return true;
@@ -290,7 +290,7 @@ public class SearchWidget extends Screen {
             return super.mouseClicked(mouseX, mouseY, button);
 
         // Player clicked outside any button, close the search overlay
-        close();
+        onClose();
         return true;
     }
 
@@ -298,10 +298,10 @@ public class SearchWidget extends Screen {
      * Closes this overlay and restores the parent screen.
      */
     @Override
-    public void close() {
+    public void onClose() {
 
-        assert this.client != null;
-        this.client.setScreen(parent);
+        assert this.minecraft != null;
+        this.minecraft.setScreen(parent);
     }
 
     /**
@@ -312,7 +312,7 @@ public class SearchWidget extends Screen {
      * @param height new window height
      */
     @Override
-    public void resize(MinecraftClient client, int width, int height) {
+    public void resize(Minecraft client, int width, int height) {
 
         if (parent != null) parent.resize(client, width, height);
 
@@ -327,7 +327,7 @@ public class SearchWidget extends Screen {
      * @param mouseY  mouse y position
      * @param delta   frame delta time
      */
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
 
         // Render this screen as an overlay - force mouse position to -1 so that mouse events don't interact
         if (parent != null)
@@ -339,8 +339,8 @@ public class SearchWidget extends Screen {
 
         for (var tooltipEntry : resultTooltips.entrySet()) {
             if (tooltipEntry.getKey().isMouseOver(mouseX, mouseY)) {
-                List<OrderedText> wrappedTooltip = textRenderer.wrapLines(tooltipEntry.getValue(), TOOLTIP_MAX_WIDTH);
-                context.drawTooltip(textRenderer, wrappedTooltip, HoveredTooltipPositioner.INSTANCE, mouseX, mouseY);
+                List<FormattedCharSequence> wrappedTooltip = font.split(tooltipEntry.getValue(), TOOLTIP_MAX_WIDTH);
+                context.renderTooltip(font, wrappedTooltip, DefaultTooltipPositioner.INSTANCE, mouseX, mouseY);
                 break;
             }
         }
@@ -369,27 +369,27 @@ public class SearchWidget extends Screen {
      * is highlighted with the provided colour.
      */
     @SuppressWarnings("SameParameterValue")
-    private static MutableText buildHighlightedText(String source, String searchString, int highlightColor) {
+    private static MutableComponent buildHighlightedText(String source, String searchString, int highlightColor) {
         String safeSource = source == null ? "" : source;
         if (searchString == null || searchString.isEmpty()) {
-            return Text.literal(safeSource);
+            return Component.literal(safeSource);
         }
 
         String lowerSource = safeSource.toLowerCase();
         String lowerSearch = searchString.toLowerCase();
 
-        MutableText text = Text.empty();
+        MutableComponent text = Component.empty();
         int start = 0;
         int index;
 
         while ((index = lowerSource.indexOf(lowerSearch, start)) != -1) {
-            text.append(Text.literal(safeSource.substring(start, index)));
-            text.append(Text.literal(safeSource.substring(index, index + searchString.length()))
-                    .styled(style -> style.withColor(highlightColor)));
+            text.append(Component.literal(safeSource.substring(start, index)));
+            text.append(Component.literal(safeSource.substring(index, index + searchString.length()))
+                    .withStyle(style -> style.withColor(highlightColor)));
             start = index + searchString.length();
         }
 
-        text.append(Text.literal(safeSource.substring(start)));
+        text.append(Component.literal(safeSource.substring(start)));
         return text;
     }
 

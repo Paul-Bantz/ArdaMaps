@@ -28,12 +28,11 @@ package com.duom.ardamaps.gui.widgets.builders;
 import com.duom.ardamaps.gui.widgets.DropdownWidget;
 import com.duom.ardamaps.gui.widgets.MapDropdownWidget;
 import com.duom.ardamaps.gui.widgets.TextIdentifierPairItem;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Builder class for constructing {@link MapDropdownWidget} instances with a fluent API.
@@ -163,7 +162,7 @@ public class MapDropdownBuilder<T, E extends TextIdentifierPairItem> extends Dro
      * @param placeholderText The placeholder text
      * @return This builder for method chaining
      */
-    public MapDropdownBuilder<T, E> setPlaceholderText(Text placeholderText) {
+    public MapDropdownBuilder<T, E> setPlaceholderText(Component placeholderText) {
         this.placeholderText = placeholderText;
         return this;
     }
@@ -174,7 +173,7 @@ public class MapDropdownBuilder<T, E extends TextIdentifierPairItem> extends Dro
      * @param placeholderIcon The placeholder icon
      * @return This builder for method chaining
      */
-    public MapDropdownBuilder<T, E> setPlaceholderIcon(Identifier placeholderIcon) {
+    public MapDropdownBuilder<T, E> setPlaceholderIcon(ResourceLocation placeholderIcon) {
         this.placeholderIcon = placeholderIcon;
         return this;
     }

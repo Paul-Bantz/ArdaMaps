@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.gui.widgets;
 
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -49,10 +49,10 @@ class ToastWidgetTest {
     }
 
     /**
-     * Use a mocked Text to avoid triggering Minecraft's text serialization stack in tests.
+     * Use a mocked Component to avoid triggering Minecraft's text serialization stack in tests.
      */
-    private static Text text() {
-        return mock(Text.class);
+    private static Component text() {
+        return mock(Component.class);
     }
 
     /**
@@ -124,7 +124,7 @@ class ToastWidgetTest {
     @Test
     void getAlpha_midFadeIn_returnsInterpolatedValue() throws Exception {
 
-        Text text = mock(Text.class);
+        Component text = mock(Component.class);
 
         /*
          *  Mockito instrumentation on the first mock() call in the JVM can take hundreds of ms.

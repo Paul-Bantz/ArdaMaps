@@ -40,7 +40,7 @@ import mc.ardacraft.ardaregions.api.ArdaRegionsApiEntrypoint;
 import mc.ardacraft.ardaregions.api.data.ApiRegion;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,7 +139,7 @@ public class ArdaRegionsConsumer implements ArdaRegionsApiEntrypoint, RegionProv
 
             if (apiRegion.isEmpty()) return;
 
-            ServerPlayerEntity playerEntity = ArdaMaps.SERVER.getPlayerManager().getPlayer(player);
+            ServerPlayer playerEntity = ArdaMaps.SERVER.getPlayerList().getPlayer(player);
             if (playerEntity == null) return;
 
             ApiRegion resolvedRegion = apiRegion.get();

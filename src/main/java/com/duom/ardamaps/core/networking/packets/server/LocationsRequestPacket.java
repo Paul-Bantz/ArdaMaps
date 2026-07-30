@@ -27,8 +27,7 @@ package com.duom.ardamaps.core.networking.packets.server;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
-
+import net.minecraft.network.FriendlyByteBuf;
 import java.util.Date;
 
 /**
@@ -44,7 +43,7 @@ public record LocationsRequestPacket(Date date) implements IPacket {
      * @param buf The PacketByteBuf to read from.
      * @return A new LocationsRequestPacket instance.
      */
-    public static LocationsRequestPacket read(PacketByteBuf buf) {
+    public static LocationsRequestPacket read(FriendlyByteBuf buf) {
 
         var hasData = buf.readBoolean();
         Date updateDate = null;
@@ -59,8 +58,8 @@ public record LocationsRequestPacket(Date date) implements IPacket {
      * @return A PacketByteBuf representing this LocationsRequestPacket.
      */
     @Override
-    public PacketByteBuf build() {
-        PacketByteBuf buf = PacketByteBufs.create();
+    public FriendlyByteBuf build() {
+        FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeBoolean(date != null);
         if (date != null) buf.writeDate(date);
         return buf;

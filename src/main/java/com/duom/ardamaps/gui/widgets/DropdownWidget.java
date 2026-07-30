@@ -28,14 +28,14 @@ package com.duom.ardamaps.gui.widgets;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
+import com.mojang.blaze3d.vertex.PoseStack;
 import lombok.Getter;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -51,7 +51,7 @@ import java.util.function.Function;
  * @param <T> The type of items stored in the dropdown
  * @param <E> The type of display pair (must extend {@link TextIdentifierPairItem})
  */
-public class DropdownWidget<T, E extends TextIdentifierPairItem> extends ClickableWidget {
+public class DropdownWidget<T, E extends TextIdentifierPairItem> extends AbstractWidget {
 
     /** Margin around text inside the dropdown items */
     protected static final int TEXT_MARGIN = 4;
@@ -63,10 +63,10 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     protected final int maxVisibleOptions;
 
     /** Text to display when no item is selected */
-    protected final Text placeholderText;
+    protected final Component placeholderText;
 
     /** Icon to display when no item is selected */
-    protected final Identifier placeholderIcon;
+    protected final ResourceLocation placeholderIcon;
 
     /** Direction in which the dropdown expands */
     protected final ExpandDirection expandDirection;
@@ -141,9 +141,9 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
             int y,
             int width,
             int height,
-            Text title,
-            Text nullValueText,
-            Identifier placeholderIcon,
+            Component title,
+            Component nullValueText,
+            ResourceLocation placeholderIcon,
             List<T> options,
             Function<T, E> optionDisplay,
             @Nullable T selected,
@@ -187,7 +187,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
 
         super.render(context, mouseX, mouseY, delta);
 
@@ -196,13 +196,13 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
 
         if (expanded) {
 
-            MatrixStack matrices = context.getMatrices();
-            matrices.push();
+            PoseStack matrices = context.pose();
+            matrices.pushPose();
             matrices.translate(0, 0, 200);
 
             renderExpandedDropdown(context, allItems, mouseX, mouseY);
 
-            matrices.pop();
+            matrices.popPose();
         }
     }
 
@@ -211,15 +211,16 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
      *
      * @param context The drawing context
      */
-    private void renderTitle(DrawContext context) {
+    @SuppressWarnings("ConstantValue")
+    private void renderTitle(GuiGraphics context) {
 
-        Text title = getMessage();
+        Component title = getMessage();
 
         if (title != null) {
 
-            TextRenderer textRenderer = Client.mc().textRenderer;
-            int titleY = getY() - (textRenderer.fontHeight / 2) - 8;
-            context.drawTextWithShadow(textRenderer, title, getX(), titleY, ModConstants.COLOR_WHITE);
+            Font textRenderer = Client.mc().font;
+            int titleY = getY() - (textRenderer.lineHeight / 2) - 8;
+            context.drawString(textRenderer, title, getX(), titleY, ModConstants.COLOR_WHITE);
         }
     }
 
@@ -231,7 +232,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
      * @param mouseX  Current mouse X position
      * @param mouseY  Current mouse Y position
      */
-    protected void renderExpandedDropdown(DrawContext context, List<T> items, int mouseX, int mouseY) {
+    protected void renderExpandedDropdown(GuiGraphics context, List<T> items, int mouseX, int mouseY) {
 
         var dropDownItems = computeDropdownItems(items);
         int visibleCount = getVisibleDropdownItemCount(dropDownItems);
@@ -327,21 +328,10 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
         return (item == null && selected == null) || (item != null && item.equals(selected));
     }
 
-    /**
-     * Gets the top Y coordinate of the dropdown list.
-     *
-     * @param totalItems Total number of items in the dropdown
-     * @return Top Y coordinate
-     */
-    public int getDropDownTopY(int totalItems) {
-        int visibleCount = Math.min(totalItems, maxVisibleOptions);
-        return getDropdownListTopY(visibleCount);
-    }
-
     @Override
-    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
 
-        TextRenderer textRenderer = Client.mc().textRenderer;
+        Font textRenderer = Client.mc().font;
         int x = getX();
         int y = getY();
 
@@ -367,9 +357,9 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
      * @param isHovered  Whether the mouse is hovering over this item
      * @param isSelected whether this item is selected
      */
-    private void renderDropdownItem(DrawContext context, int x, int y, T item, boolean isHovered, boolean isSelected) {
+    private void renderDropdownItem(GuiGraphics context, int x, int y, T item, boolean isHovered, boolean isSelected) {
 
-        TextRenderer textRenderer = Client.mc().textRenderer;
+        Font textRenderer = Client.mc().font;
 
         E itemPair = optionDisplay.apply(item);
 
@@ -384,9 +374,9 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
             if (icon != null) {
 
                 if (displayAsSprite)
-                    context.drawSprite(x + buttonPadding, y + (originalHeight - iconSize) / 2, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(icon));
+                    context.blit(x + buttonPadding, y + (originalHeight - iconSize) / 2, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(icon));
                 else
-                    context.drawTexture(icon, x + buttonPadding, y + (originalHeight - iconSize) / 2, 0, 0, iconSize, iconSize, iconSize, iconSize);
+                    context.blit(icon, x + buttonPadding, y + (originalHeight - iconSize) / 2, 0, 0, iconSize, iconSize, iconSize, iconSize);
 
                 hasIcon = true;
             }
@@ -394,14 +384,14 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
 
         if (displayLabels) {
 
-            Text display = (item == null) ? placeholderText : itemPair.text();
+            Component display = (item == null) ? placeholderText : itemPair.text();
             int textX = x + TEXT_MARGIN;
 
             if (hasIcon)
                 textX += iconSize + TEXT_MARGIN;
 
-            int textY = y + (originalHeight - textRenderer.fontHeight) / 2;
-            context.drawText(textRenderer, display, textX, textY, getLabelColor(), false);
+            int textY = y + (originalHeight - textRenderer.lineHeight) / 2;
+            context.drawString(textRenderer, display, textX, textY, getLabelColor(), false);
         }
     }
 
@@ -413,26 +403,26 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
      * @param x            Button X position
      * @param y            Button Y position
      */
-    private void renderExpandArrow(DrawContext context, TextRenderer textRenderer, int x, int y) {
+    private void renderExpandArrow(GuiGraphics context, Font textRenderer, int x, int y) {
         boolean isUpDirection = expandDirection == ExpandDirection.UP_LEFT ||
                 expandDirection == ExpandDirection.UP_RIGHT;
         String arrow = expanded
                 ? (isUpDirection ? "▼" : "▲")
                 : (isUpDirection ? "▲" : "▼");
 
-        int arrowX = x + originalWidth - textRenderer.getWidth(arrow) - 4;
-        int arrowY = y + (originalHeight - textRenderer.fontHeight) / 2;
-        context.drawTextWithShadow(textRenderer, Text.literal(arrow), arrowX, arrowY, ModConstants.COLOR_WHITE);
+        int arrowX = x + originalWidth - textRenderer.width(arrow) - 4;
+        int arrowY = y + (originalHeight - textRenderer.lineHeight) / 2;
+        context.drawString(textRenderer, Component.literal(arrow), arrowX, arrowY, ModConstants.COLOR_WHITE);
     }
 
-    protected void drawListSlice(DrawContext context, int x, int y, boolean isHovered, boolean isSelected) {
+    protected void drawListSlice(GuiGraphics context, int x, int y, boolean isHovered, boolean isSelected) {
 
         int v = 46;
 
         if (isHovered) v += 40;
         else if (isSelected) v += 20;
 
-        context.drawNineSlicedTexture(WIDGETS_TEXTURE, x, y,
+        context.blitNineSliced(WIDGETS_LOCATION, x, y,
                 originalWidth, originalHeight,
                 20,
                 4,
@@ -630,8 +620,8 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
      * @param builder The narration message builder to which narration messages should be appended
      */
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {
-        appendDefaultNarrations(builder);
+    protected void updateWidgetNarration(NarrationElementOutput builder) {
+        defaultButtonNarrationText(builder);
     }
 
     /**

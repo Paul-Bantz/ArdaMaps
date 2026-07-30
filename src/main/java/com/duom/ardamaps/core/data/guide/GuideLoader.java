@@ -29,10 +29,6 @@ import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.core.Client;
 import com.google.gson.Gson;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.resource.Resource;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +40,10 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Supplier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
  * Utility class for loading guide data from the mod's resource pack.
@@ -58,7 +58,7 @@ public final class GuideLoader {
     private static final String DEFAULT_LOCALE = "en_us";
 
     /** Identifier for the guide index JSON file. */
-    private static final Identifier GUIDE_JSON_ID = ModConstants.modId("guide/guide.json");
+    private static final ResourceLocation GUIDE_JSON_ID = ModConstants.modId("guide/guide.json");
 
     /** Gson instance shared for guide deserialization. */
     private static final Gson GSON = new Gson();
@@ -91,7 +91,7 @@ public final class GuideLoader {
      * @return the current client locale
      */
     private static String getClientLocale() {
-        return Client.mc().getLanguageManager().getLanguage();
+        return Client.mc().getLanguageManager().getSelected();
     }
 
     /**
@@ -131,7 +131,7 @@ public final class GuideLoader {
                 return new GuideBook();
             }
 
-            try (Reader reader = new InputStreamReader(resource.get().getInputStream(), StandardCharsets.UTF_8)) {
+            try (Reader reader = new InputStreamReader(resource.get().open(), StandardCharsets.UTF_8)) {
 
                 return GSON.fromJson(reader, GuideBook.class);
             }
@@ -202,7 +202,7 @@ public final class GuideLoader {
             String guidePath = "guide";
 
             try {
-                var resourceMap = resourceManager.findResources(guidePath, id -> {
+                var resourceMap = resourceManager.listResources(guidePath, id -> {
 
                     String path = id.getPath();
 
@@ -229,7 +229,7 @@ public final class GuideLoader {
                 });
 
                 if (!resourceMap.isEmpty()) {
-                    Identifier foundId = resourceMap.keySet().iterator().next();
+                    ResourceLocation foundId = resourceMap.keySet().iterator().next();
                     return resourceManager.getResource(foundId);
                 }
             } catch (Exception e) {
@@ -264,7 +264,7 @@ public final class GuideLoader {
             return titles;
         }
 
-        try (Reader reader = new InputStreamReader(resource.get().getInputStream(), StandardCharsets.UTF_8)) {
+        try (Reader reader = new InputStreamReader(resource.get().open(), StandardCharsets.UTF_8)) {
 
             titles = GSON.fromJson(reader, Map.class);
         } catch (Exception e) {
@@ -290,7 +290,7 @@ public final class GuideLoader {
             if (link == null || link.isBlank()) return "";
 
             try {
-                var resourceManager = MinecraftClient.getInstance().getResourceManager();
+                var resourceManager = Minecraft.getInstance().getResourceManager();
                 Optional<Resource> resource = resolveLocale(resourceManager, link);
 
                 if (resource.isEmpty()) {
@@ -299,7 +299,7 @@ public final class GuideLoader {
                     return "";
                 }
 
-                try (var stream = resource.get().getInputStream()) {
+                try (var stream = resource.get().open()) {
                     return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
                 }
 

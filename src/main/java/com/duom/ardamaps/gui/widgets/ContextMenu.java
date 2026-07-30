@@ -29,9 +29,9 @@ import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.gui.ModConstants;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -48,7 +48,7 @@ public class ContextMenu {
      * @param label The text label of the menu entry.
      * @param action The action to execute when the entry is clicked, represented as a Runnable.
      */
-    public record Entry(Text label, Runnable action) {}
+    public record Entry(Component label, Runnable action) {}
 
     /** Context menu item height */
     private static final int ITEM_HEIGHT = 16;
@@ -103,7 +103,7 @@ public class ContextMenu {
         this.entries = entries;
 
         this.width = entries.stream()
-                .mapToInt(e -> MinecraftClient.getInstance().textRenderer.getWidth(e.label()))
+                .mapToInt(e -> Minecraft.getInstance().font.width(e.label()))
                 .max()
                 .orElse(40) + H_PADDING * 2;
 
@@ -117,11 +117,11 @@ public class ContextMenu {
      * @param mouseX The current x-coordinate of the mouse cursor, used for hover detection.
      * @param mouseY The current y-coordinate of the mouse cursor, used for hover detection.
      */
-    public void render(DrawContext context, int mouseX, int mouseY) {
+    public void render(GuiGraphics context, int mouseX, int mouseY) {
 
-        var textRenderer = Client.mc().textRenderer;
+        var textRenderer = Client.mc().font;
 
-        context.drawNineSlicedTexture(ModConstants.MAP_GUI_ELEMENTS,
+        context.blitNineSliced(ModConstants.MAP_GUI_ELEMENTS,
                 x, y,
                 width, height,
                 16,
@@ -139,7 +139,7 @@ public class ContextMenu {
 
             if (hovered) {
 
-                context.drawNineSlicedTexture(ModConstants.MAP_GUI_ELEMENTS,
+                context.blitNineSliced(ModConstants.MAP_GUI_ELEMENTS,
                         x, itemY,
                         width, ITEM_HEIGHT,
                         16,
@@ -151,11 +151,11 @@ public class ContextMenu {
                         80, 176);
             }
 
-            context.drawText(
-                    Client.mc().textRenderer,
+            context.drawString(
+                    Client.mc().font,
                     entries.get(i).label(),
                     x + H_PADDING,
-                    itemY + textRenderer.fontHeight / 2,
+                    itemY + textRenderer.lineHeight / 2,
                     ModConstants.COLOR_DARK_BROWN,
                     false
             );

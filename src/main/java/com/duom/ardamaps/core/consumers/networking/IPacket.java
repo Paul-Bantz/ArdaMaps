@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.core.consumers.networking;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * Interface for network packets.
@@ -38,12 +38,12 @@ public interface IPacket {
      * @param buf The packet byte buffer to read
      */
     @SuppressWarnings("unused")
-    static <T> T read(PacketByteBuf buf) {
+    static <T> T read(FriendlyByteBuf buf) {
         return null;
     }
 
     /**
      * Build the packet.
      */
-    PacketByteBuf build();
+    FriendlyByteBuf build();
 }

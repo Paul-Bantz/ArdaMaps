@@ -27,7 +27,7 @@ package com.duom.ardamaps.core.networking.packets.server;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * Packet sent by the server to teleport the player to a specific location, optionally in a specific world.
@@ -56,12 +56,12 @@ public record PlayerTeleportPacket(double x, double y, double z, String worldId)
      * @param buf The PacketByteBuf to read from.
      * @return A new PlayerTeleportPacket instance.
      */
-    public static PlayerTeleportPacket read(PacketByteBuf buf) {
+    public static PlayerTeleportPacket read(FriendlyByteBuf buf) {
 
         final double x = buf.readDouble();
         final double y = buf.readDouble();
         final double z = buf.readDouble();
-        final String worldId = buf.readString();
+        final String worldId = buf.readUtf();
 
         return new PlayerTeleportPacket(x, y, z, worldId);
     }
@@ -72,13 +72,13 @@ public record PlayerTeleportPacket(double x, double y, double z, String worldId)
      * @return The PacketByteBuf containing the packet data.
      */
     @Override
-    public PacketByteBuf build() {
+    public FriendlyByteBuf build() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeDouble(x);
         buf.writeDouble(y);
         buf.writeDouble(z);
-        buf.writeString(worldId);
+        buf.writeUtf(worldId);
 
         return buf;
     }

@@ -28,10 +28,10 @@ package com.duom.ardamaps.gui.widgets;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * A styled button widget that displays an image.
@@ -49,7 +49,7 @@ import net.minecraft.util.Identifier;
  * <p>The button tint is only applied when the cursor is <em>not</em> hovering over it;
  * while hovered the icon is rendered at full white (1, 1, 1) to provide a highlight effect.</p>
  */
-public class BookmarkButtonWidget extends ClickableWidget {
+public class BookmarkButtonWidget extends AbstractWidget {
 
     /** Runnable executed when the button is clicked. */
     private final Runnable onSelect;
@@ -96,13 +96,13 @@ public class BookmarkButtonWidget extends ClickableWidget {
      * {@link BookmarkButtonType}. If the widget is not {@link #visible}, no rendering
      * is performed.</p>
      *
-     * @param context the {@link DrawContext} used for all draw calls
+     * @param context the {@link GuiGraphics} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
      * @param delta   time delta (in seconds) since the last render call
      */
     @Override
-    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
 
         if (!visible) return;
 
@@ -121,11 +121,11 @@ public class BookmarkButtonWidget extends ClickableWidget {
      * atlas and overlays the {@link ModConstants#CLOSE_ICON} sprite in a muted red
      * tint (0.76, 0.42, 0.44) when not hovered.</p>
      *
-     * @param context the {@link DrawContext} used for all draw calls
+     * @param context the {@link GuiGraphics} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
      */
-    private void renderCloseButton(DrawContext context, int mouseX, int mouseY) {
+    private void renderCloseButton(GuiGraphics context, int mouseX, int mouseY) {
 
         renderBookmarkButton(context, mouseX, mouseY, 384, 32, 0.7568f, 0.4235f, 0.4431f, ModConstants.CLOSE_ICON);
     }
@@ -137,11 +137,11 @@ public class BookmarkButtonWidget extends ClickableWidget {
      * atlas and overlays the {@link ModConstants#CONFIGURATION_ICON} sprite in a
      * blue-grey tint (0.53, 0.65, 0.78) when not hovered.</p>
      *
-     * @param context the {@link DrawContext} used for all draw calls
+     * @param context the {@link GuiGraphics} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
      */
-    private void renderConfigurationButton(DrawContext context, int mouseX, int mouseY) {
+    private void renderConfigurationButton(GuiGraphics context, int mouseX, int mouseY) {
 
         renderBookmarkButton(context, mouseX, mouseY, 288, 32, 0.5333f, 0.6549f, 0.7765f, ModConstants.CONFIGURATION_ICON);
     }
@@ -153,11 +153,11 @@ public class BookmarkButtonWidget extends ClickableWidget {
      * atlas and overlays the {@link ModConstants#GUIDE_ICON} sprite in a blue-grey
      * tint (0.53, 0.65, 0.78) when not hovered.</p>
      *
-     * @param context the {@link DrawContext} used for all draw calls
+     * @param context the {@link GuiGraphics} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
      */
-    private void renderGuideButton(DrawContext context, int mouseX, int mouseY) {
+    private void renderGuideButton(GuiGraphics context, int mouseX, int mouseY) {
 
         renderBookmarkButton(context, mouseX, mouseY, 384, 128, 0.611f, 0.494f, 0.647f, ModConstants.GUIDE_ICON);
     }
@@ -169,11 +169,11 @@ public class BookmarkButtonWidget extends ClickableWidget {
      * atlas and overlays the {@link ModConstants#MAP_ICON} sprite in a muted green
      * tint (0.38, 0.51, 0.35) when not hovered.</p>
      *
-     * @param context the {@link DrawContext} used for all draw calls
+     * @param context the {@link GuiGraphics} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
      */
-    private void renderMapButton(DrawContext context, int mouseX, int mouseY) {
+    private void renderMapButton(GuiGraphics context, int mouseX, int mouseY) {
 
         renderBookmarkButton(context, mouseX, mouseY, 288, 128, 0.3843f, 0.5058f, 0.3490f, ModConstants.MAP_ICON);
     }
@@ -194,7 +194,7 @@ public class BookmarkButtonWidget extends ClickableWidget {
      *       after the draw call.</li>
      * </ol>
      *
-     * @param context the {@link DrawContext} used for all draw calls
+     * @param context the {@link GuiGraphics} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
      * @param u       horizontal texel offset into {@link ModConstants#MAP_GUI_ELEMENTS}
@@ -204,15 +204,15 @@ public class BookmarkButtonWidget extends ClickableWidget {
      * @param r       red component of the icon tint applied when not hovered (0.0–1.0)
      * @param g       green component of the icon tint applied when not hovered (0.0–1.0)
      * @param b       blue component of the icon tint applied when not hovered (0.0–1.0)
-     * @param icon    {@link Identifier} of the sprite to retrieve from {@link IconSpriteAtlas}
+     * @param icon    {@link ResourceLocation} of the sprite to retrieve from {@link IconSpriteAtlas}
      *                and render as the button icon
      */
-    private void renderBookmarkButton(DrawContext context, int mouseX, int mouseY, int u, int v, float r, float g, float b, Identifier icon) {
+    private void renderBookmarkButton(GuiGraphics context, int mouseX, int mouseY, int u, int v, float r, float g, float b, ResourceLocation icon) {
 
         var x = getX();
         var y = getY();
 
-        context.drawTexture(
+        context.blit(
                 ModConstants.MAP_GUI_ELEMENTS,
                 x, y,
                 getWidth(), getHeight(),
@@ -226,7 +226,7 @@ public class BookmarkButtonWidget extends ClickableWidget {
         if (!isMouseOver(mouseX, mouseY) && !isFocused())
             RenderSystem.setShaderColor(r, g, b, 1.0f);
 
-        context.drawSprite(x + halfIconSize, y + halfIconSize, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(icon));
+        context.blit(x + halfIconSize, y + halfIconSize, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(icon));
 
         RenderSystem.setShaderColor(1f, 1f, 1f, 1.0f);
     }
@@ -235,7 +235,7 @@ public class BookmarkButtonWidget extends ClickableWidget {
      * Handles mouse click events on the button.
      *
      * <p>Executes the {@link #onSelect} runnable and then delegates to
-     * {@link ClickableWidget#onClick(double, double)} for default click processing
+     * {@link AbstractWidget#onClick(double, double)} for default click processing
      * (e.g. playing the click sound). If the widget is not {@link #visible} the
      * click is silently ignored.</p>
      *
@@ -254,13 +254,13 @@ public class BookmarkButtonWidget extends ClickableWidget {
     /**
      * Appends narration messages for accessibility.
      *
-     * <p>Delegates to {@link #appendDefaultNarrations(NarrationMessageBuilder)} so
+     * <p>Delegates to {@link #defaultButtonNarrationText(NarrationElementOutput)} so
      * that screen readers receive the widget's default title and usage hint text.</p>
      *
-     * @param builder the {@link NarrationMessageBuilder} to append messages to
+     * @param builder the {@link NarrationElementOutput} to append messages to
      */
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {
-        appendDefaultNarrations(builder);
+    protected void updateWidgetNarration(NarrationElementOutput builder) {
+        defaultButtonNarrationText(builder);
     }
 }

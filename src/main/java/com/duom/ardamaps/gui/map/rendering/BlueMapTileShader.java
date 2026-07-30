@@ -26,13 +26,13 @@
 package com.duom.ardamaps.gui.map.rendering;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.gl.ShaderProgram;
-import net.minecraft.client.render.VertexFormats;
-import net.minecraft.resource.ResourceManager;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
  * Utility class for managing the BlueMap tile shader.
@@ -46,7 +46,7 @@ public class BlueMapTileShader {
     private static final Logger LOGGER = LoggerFactory.getLogger(BlueMapTileShader.class);
     
     /** The BlueMap tile shader program. */
-    private static ShaderProgram BLUEMAP_TILE;
+    private static ShaderInstance BLUEMAP_TILE;
 
     /**
      * Returns the BlueMap tile shader program.
@@ -54,7 +54,7 @@ public class BlueMapTileShader {
      *
      * @return The shader program, or {@code null} if not yet loaded.
      */
-    public static ShaderProgram blueMapTile() {
+    public static ShaderInstance blueMapTile() {
         return BLUEMAP_TILE;
     }
 
@@ -74,8 +74,8 @@ public class BlueMapTileShader {
     public static void load(ResourceManager resourceManager) {
 
         try {
-            ShaderProgram shader = new ShaderProgram(resourceManager, "bluemap_tile", VertexFormats.POSITION_TEXTURE);
-            ShaderProgram previous = BLUEMAP_TILE;
+            ShaderInstance shader = new ShaderInstance(resourceManager, "bluemap_tile", DefaultVertexFormat.POSITION_TEX);
+            ShaderInstance previous = BLUEMAP_TILE;
             BLUEMAP_TILE = shader;
             if (previous != null) previous.close();
         } catch (IOException e) {

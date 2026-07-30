@@ -29,17 +29,18 @@ import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.gui.ModConstants;
 import lombok.Getter;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.tooltip.TooltipPositioner;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2i;
 import org.joml.Vector2ic;
+import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -47,7 +48,7 @@ import java.util.function.Consumer;
 /**
  * A compact horizontally scrolling selector for vertically ranged map layers.
  */
-public class RangeSelectionWidget extends ClickableWidget {
+public class RangeSelectionWidget extends AbstractWidget {
 
     /** Background colour used behind the full strip. */
     private static final int BACKGROUND_COLOR = 0x70000000;
@@ -92,7 +93,7 @@ public class RangeSelectionWidget extends ClickableWidget {
 
     /** Fixed label drawn to the left of the selectable range cells. */
     @Getter
-    private Text label = Text.empty();
+    private Component label = Component.empty();
 
     /** Cached pixel width occupied by the label and its horizontal margins. */
     private int labelWidth = 0;
@@ -134,7 +135,7 @@ public class RangeSelectionWidget extends ClickableWidget {
      * @param onSelect  Callback invoked when a range is selected by click.
      */
     public RangeSelectionWidget(int x, int y, int width, int height,
-                                @Nullable Text label, List<MapLayerRange> ranges, int itemWidth,
+                                @Nullable Component label, List<MapLayerRange> ranges, int itemWidth,
                                 Consumer<MapLayerRange> onSelect) {
 
         this(x, y, width, height, label, ranges, itemWidth, onSelect, false);
@@ -154,10 +155,10 @@ public class RangeSelectionWidget extends ClickableWidget {
      * @param autoItemWidth Whether the item width should be recomputed on range changes.
      */
     private RangeSelectionWidget(int x, int y, int width, int height,
-                                 @Nullable Text label, List<MapLayerRange> ranges, int itemWidth,
+                                 @Nullable Component label, List<MapLayerRange> ranges, int itemWidth,
                                  Consumer<MapLayerRange> onSelect, boolean autoItemWidth) {
 
-        super(x, y, width, height, Text.empty());
+        super(x, y, width, height, Component.empty());
         this.ranges = List.copyOf(ranges);
         this.itemWidth = Math.max(1, itemWidth);
         this.onSelect = onSelect;
@@ -177,7 +178,7 @@ public class RangeSelectionWidget extends ClickableWidget {
      * @param onSelect Callback invoked when a range is selected by click.
      */
     public RangeSelectionWidget(int x, int y, int width, int height,
-                                @Nullable Text label, List<MapLayerRange> ranges,
+                                @Nullable Component label, List<MapLayerRange> ranges,
                                 Consumer<MapLayerRange> onSelect) {
 
         this(x, y, width, height, label, ranges, computeDefaultItemWidth(ranges), onSelect, true);
@@ -287,20 +288,20 @@ public class RangeSelectionWidget extends ClickableWidget {
      * @param delta   The frame delta.
      */
     @Override
-    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
 
         if (!visible) return;
 
         int hoveredIndex = dragging ? -1 : indexAt(mouseX, mouseY);
-        TextRenderer textRenderer = Client.mc().textRenderer;
+        Font textRenderer = Client.mc().font;
         int contentX = contentX();
         int stripX = stripX();
 
         renderBackground(context);
 
         if (labelWidth > 0) {
-            int labelTextY = getY() + height / 2 - textRenderer.fontHeight / 2;
-            context.drawTextWithShadow(textRenderer, label, contentX + LABEL_MARGIN, labelTextY, ModConstants.COLOR_WHITE);
+            int labelTextY = getY() + height / 2 - textRenderer.lineHeight / 2;
+            context.drawString(textRenderer, label, contentX + LABEL_MARGIN, labelTextY, ModConstants.COLOR_WHITE);
         }
 
         int scissorRight = stripX + viewportWidth();
@@ -314,10 +315,10 @@ public class RangeSelectionWidget extends ClickableWidget {
                 }
 
                 String itemLabel = label(ranges.get(index));
-                int textX = itemX + itemWidth / 2 - textRenderer.getWidth(itemLabel) / 2;
-                int textY = getY() + height / 2 - textRenderer.fontHeight / 2;
+                int textX = itemX + itemWidth / 2 - textRenderer.width(itemLabel) / 2;
+                int textY = getY() + height / 2 - textRenderer.lineHeight / 2;
                 int color = index == selectedIndex ? ModConstants.COLOR_BLUE_EMPHASIZED : ModConstants.COLOR_WHITE;
-                context.drawTextWithShadow(textRenderer, itemLabel, textX, textY, color);
+                context.drawString(textRenderer, itemLabel, textX, textY, color);
             }
 
             context.disableScissor();
@@ -333,7 +334,7 @@ public class RangeSelectionWidget extends ClickableWidget {
      *
      * @param context The drawing context.
      */
-    private void renderBackground(DrawContext context) {
+    private void renderBackground(GuiGraphics context) {
 
         int contentX = contentX();
         int widgetTop = getY();
@@ -356,23 +357,23 @@ public class RangeSelectionWidget extends ClickableWidget {
      * @param context      The drawing context.
      * @param textRenderer The text renderer used for ellipsis measurement.
      */
-    private void renderEllipses(DrawContext context, TextRenderer textRenderer) {
+    private void renderEllipses(GuiGraphics context, Font textRenderer) {
 
         if (!showCaps()) return;
 
-        int textY = getY() + height / 2 - textRenderer.fontHeight / 2;
-        int textWidth = textRenderer.getWidth(ELLIPSIS);
+        int textY = getY() + height / 2 - textRenderer.lineHeight / 2;
+        int textWidth = textRenderer.width(ELLIPSIS);
 
         if (scrollOffset < 0) {
             int capX = contentX() + labelWidth;
             int textX = capX + ELLIPSIS_CAP_WIDTH / 2 - textWidth / 2;
-            context.drawTextWithShadow(textRenderer, ELLIPSIS, textX, textY, ModConstants.COLOR_WHITE);
+            context.drawString(textRenderer, ELLIPSIS, textX, textY, ModConstants.COLOR_WHITE);
         }
 
         if (scrollOffset > minScrollOffset()) {
             int capX = stripX() + viewportWidth();
             int textX = capX + ELLIPSIS_CAP_WIDTH / 2 - textWidth / 2;
-            context.drawTextWithShadow(textRenderer, ELLIPSIS, textX, textY, ModConstants.COLOR_WHITE);
+            context.drawString(textRenderer, ELLIPSIS, textX, textY, ModConstants.COLOR_WHITE);
         }
     }
 
@@ -383,13 +384,13 @@ public class RangeSelectionWidget extends ClickableWidget {
      * @param textRenderer The text renderer used for tooltip layout.
      * @param hoveredIndex The hovered range index.
      */
-    private void renderTooltip(DrawContext context, TextRenderer textRenderer, int hoveredIndex) {
+    private void renderTooltip(GuiGraphics context, Font textRenderer, int hoveredIndex) {
 
         MapLayerRange range = ranges.get(hoveredIndex);
         int anchorX = clampTooltipAnchorX((int) itemXAt(hoveredIndex) + itemWidth / 2, stripX(), stripX() + viewportWidth());
         int anchorY = getY() - TOOLTIP_GAP;
-        List<OrderedText> tooltip = List.of(Text.literal(tooltipLabel(range)).asOrderedText());
-        context.drawTooltip(textRenderer, tooltip, AboveAnchorTooltipPositioner.INSTANCE, anchorX, anchorY);
+        List<FormattedCharSequence> tooltip = List.of(Component.literal(tooltipLabel(range)).getVisualOrderText());
+        context.renderTooltip(textRenderer, tooltip, AboveAnchorTooltipPositioner.INSTANCE, anchorX, anchorY);
     }
 
     /**
@@ -584,9 +585,9 @@ public class RangeSelectionWidget extends ClickableWidget {
      * @param builder The narration message builder.
      */
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {
+    protected void updateWidgetNarration(NarrationElementOutput builder) {
 
-        appendDefaultNarrations(builder);
+        defaultButtonNarrationText(builder);
     }
 
     /**
@@ -617,9 +618,9 @@ public class RangeSelectionWidget extends ClickableWidget {
      *
      * @param label The replacement label, or null for no label.
      */
-    public void setLabel(@Nullable Text label) {
+    public void setLabel(@Nullable Component label) {
 
-        this.label = label == null ? Text.empty() : label;
+        this.label = label == null ? Component.empty() : label;
         if (this.label.getString().isEmpty()) {
             labelWidth = 0;
             if (selectedIndex >= 0) centerOn(selectedIndex);
@@ -627,7 +628,7 @@ public class RangeSelectionWidget extends ClickableWidget {
             return;
         }
 
-        labelWidth = Client.mc().textRenderer.getWidth(this.label) + LABEL_MARGIN * 2;
+        labelWidth = Client.mc().font.width(this.label) + LABEL_MARGIN * 2;
         if (selectedIndex >= 0) centerOn(selectedIndex);
         else scrollOffset = clampScrollOffset(scrollOffset);
     }
@@ -655,11 +656,11 @@ public class RangeSelectionWidget extends ClickableWidget {
      */
     private static int computeDefaultItemWidth(List<MapLayerRange> ranges) {
 
-        TextRenderer textRenderer = Client.mc().textRenderer;
+        Font textRenderer = Client.mc().font;
         int maxWidth = 0;
 
         for (MapLayerRange range : ranges) {
-            maxWidth = Math.max(maxWidth, textRenderer.getWidth(label(range)));
+            maxWidth = Math.max(maxWidth, textRenderer.width(label(range)));
         }
 
         return Math.max(1, maxWidth + ITEM_HORIZONTAL_MARGIN * 2);
@@ -800,7 +801,7 @@ public class RangeSelectionWidget extends ClickableWidget {
     /**
      * Tooltip positioner that centres the tooltip above the supplied anchor point.
      */
-    private static final class AboveAnchorTooltipPositioner implements TooltipPositioner {
+    private static final class AboveAnchorTooltipPositioner implements ClientTooltipPositioner {
 
         /** Shared instance reused for all hovered range tooltips. */
         private static final AboveAnchorTooltipPositioner INSTANCE = new AboveAnchorTooltipPositioner();
@@ -817,7 +818,7 @@ public class RangeSelectionWidget extends ClickableWidget {
          * @return The tooltip's top-left screen coordinate.
          */
         @Override
-        public Vector2ic getPosition(int screenWidth, int screenHeight, int x, int y, int width, int height) {
+        public @NonNull Vector2ic positionTooltip(int screenWidth, int screenHeight, int x, int y, int width, int height) {
 
             return new Vector2i(tooltipLeft(screenWidth, x, width), tooltipTop(y, height));
         }

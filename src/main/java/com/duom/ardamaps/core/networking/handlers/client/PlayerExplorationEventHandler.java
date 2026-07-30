@@ -31,11 +31,11 @@ import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.networking.packets.client.PlayerExplorationPacket;
-import net.minecraft.client.MinecraftClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import net.minecraft.client.Minecraft;
 
 /**
  * Handles incoming {@link PlayerExplorationPacket} packets from the server, updates the client's
@@ -54,7 +54,7 @@ public class PlayerExplorationEventHandler extends ServerToClientPacketHandler<P
     }
 
     @Override
-    protected void handle(MinecraftClient client, PlayerExplorationPacket packet) {
+    protected void handle(Minecraft client, PlayerExplorationPacket packet) {
         client.execute(() -> {
 
             // Discard packet if empty or null

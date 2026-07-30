@@ -26,9 +26,9 @@
 package com.duom.ardamaps.core.consumers.networking;
 
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * Interface for handling incoming packets on the client.
@@ -38,5 +38,5 @@ public interface IClientPacketHandler extends IPacketHandler {
     /**
      * Handle an incoming packet on the client.
      */
-    void handle(MinecraftClient client, ClientPlayNetworkHandler ignoredHandler, PacketByteBuf buf, PacketSender ignoredSender);
+    void handle(Minecraft client, ClientPacketListener ignoredHandler, FriendlyByteBuf buf, PacketSender ignoredSender);
 }

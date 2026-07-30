@@ -27,11 +27,7 @@ package com.duom.ardamaps.core.data.guide;
 
 import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.gui.ModConstants;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.resource.Resource;
-import net.minecraft.util.Identifier;
+import com.mojang.blaze3d.platform.NativeImage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +35,10 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
 
 /**
  * Synchronous, session-scoped cache for guide images loaded from the mod resource pack.
@@ -49,8 +49,8 @@ import java.util.Optional;
  *
  * <p>Loading is intentionally synchronous: resource-pack assets are local files and
  * are normally small, so the latency is negligible.  The texture is registered with
- * Minecraft's {@link net.minecraft.client.texture.TextureManager} on the first call
- * and every subsequent call returns the cached {@link Identifier} instantly.</p>
+ * Minecraft's {@link net.minecraft.client.renderer.texture.TextureManager} on the first call
+ * and every subsequent call returns the cached {@link ResourceLocation} instantly.</p>
  *
  * <p>Call {@link #clear()} when client resources reload so stale entries are evicted
  * and images are re-read from the updated pack.</p>
@@ -64,16 +64,16 @@ public final class GuideImageCache {
      * {@code Optional.empty()} marks a path that was already attempted and failed,
      * preventing repeated filesystem lookups for known-missing resources.
      */
-    private static final Map<String, Optional<Identifier>> CACHE = new HashMap<>();
+    private static final Map<String, Optional<ResourceLocation>> CACHE = new HashMap<>();
 
     private GuideImageCache() {}
 
     /**
-     * Returns the registered {@link Identifier} for the texture at {@code src},
+     * Returns the registered {@link ResourceLocation} for the texture at {@code src},
      * loading and registering it on the first access.
      *
      * <p>Must be called from the render thread because
-     * {@link net.minecraft.client.texture.TextureManager#registerDynamicTexture} requires
+     * {@link net.minecraft.client.renderer.texture.TextureManager#register} requires
      * an active GL context.</p>
      *
      * @param src path relative to {@code assets/ardamaps/}
@@ -81,14 +81,14 @@ public final class GuideImageCache {
      * @return the registered texture identifier, or {@code null} if the resource is
      *         missing or could not be loaded (a warning is logged in that case)
      */
-    public static Identifier getTexture(String src) {
+    public static ResourceLocation getTexture(String src) {
 
         if (CACHE.containsKey(src)) {
             return CACHE.get(src).orElse(null);
         }
 
-        Identifier resourceId = ModConstants.modId(src);
-        Optional<Resource> resource = MinecraftClient.getInstance()
+        ResourceLocation resourceId = ModConstants.modId(src);
+        Optional<Resource> resource = Minecraft.getInstance()
                 .getResourceManager()
                 .getResource(resourceId);
 
@@ -100,16 +100,16 @@ public final class GuideImageCache {
             return null;
         }
 
-        try (var is = resource.get().getInputStream()) {
+        try (var is = resource.get().open()) {
 
             NativeImage img = NativeImage.read(is);
-            NativeImageBackedTexture tex = new NativeImageBackedTexture(img);
+            DynamicTexture tex = new DynamicTexture(img);
 
             // Sanitize path characters that are illegal in dynamic texture names
             String sanitised = src.replace('/', '_').replace('.', '_');
-            Identifier registered = MinecraftClient.getInstance()
+            ResourceLocation registered = Minecraft.getInstance()
                     .getTextureManager()
-                    .registerDynamicTexture("ardamaps_guide_" + sanitised, tex);
+                    .register("ardamaps_guide_" + sanitised, tex);
 
             CACHE.put(src, Optional.of(registered));
             return registered;

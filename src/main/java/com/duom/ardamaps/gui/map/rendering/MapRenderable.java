@@ -34,12 +34,16 @@ import com.duom.ardamaps.core.data.map.cameras.MapCamera;
 import com.duom.ardamaps.gui.ModConstants;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import lombok.Getter;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.*;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 
@@ -49,7 +53,7 @@ import org.lwjgl.opengl.GL13;
 public abstract class MapRenderable {
 
     /** Text renderer for rendering placeholder text */
-    protected final TextRenderer textRenderer;
+    protected final Font textRenderer;
 
     /** The camera used for coordinate conversions and viewport queries. Injected externally - MapScreen owns and builds it. */
     @Getter
@@ -68,7 +72,7 @@ public abstract class MapRenderable {
      * @param textRenderer The text renderer for drawing the placeholder text.
      * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public MapRenderable(MapCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
+    public MapRenderable(MapCamera camera, Font textRenderer, PlayerExploration exploration) {
 
         this.camera = camera;
         this.textRenderer = textRenderer;
@@ -88,7 +92,7 @@ public abstract class MapRenderable {
      *
      * @param context The DrawContext to render with.
      */
-    public abstract void render(DrawContext context);
+    public abstract void render(GuiGraphics context);
 
     /**
      * Releases resources owned by this renderable.
@@ -102,11 +106,11 @@ public abstract class MapRenderable {
      *
      * @param context The DrawContext to render with.
      */
-    protected void renderLoadingText(DrawContext context) {
+    protected void renderLoadingText(GuiGraphics context) {
 
-        context.drawCenteredTextWithShadow(
+        context.drawCenteredString(
                 textRenderer,
-                Text.translatable("ardamaps.client.map.screen.loading"),
+                Component.translatable("ardamaps.client.map.screen.loading"),
                 camera.getViewportWidth() / 2,
                 camera.getViewportHeight() / 2,
                 ModConstants.COLOR_WHITE);
@@ -138,33 +142,33 @@ public abstract class MapRenderable {
             FogOfWarShader.setTextureScale(scaleX, scaleY);
             FogOfWarShader.setZoomCenter(centerX, centerY);
 
-            var textureManager = MinecraftClient.getInstance().getTextureManager();
+            var textureManager = Minecraft.getInstance().getTextureManager();
 
             // Activate texture unit 0 and bind paper texture
             RenderSystem.activeTexture(GL13.GL_TEXTURE0);
-            textureManager.bindTexture(ModConstants.FOG_OF_WAR_TEXTURE);
+            textureManager.bindForSetup(ModConstants.FOG_OF_WAR_TEXTURE);
 
             // Activate texture unit 1 and bind fog mask
             RenderSystem.activeTexture(GL13.GL_TEXTURE1);
-            textureManager.bindTexture(exploration.getFogTextureId());
+            textureManager.bindForSetup(exploration.getFogTextureId());
 
             // Use bilinear filtering so cell edges blur smoothly
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
 
             RenderSystem.enableBlend();
-            RenderSystem.blendFunc(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
+            RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
 
-            BufferBuilder buffer = Tessellator.getInstance().getBuffer();
-            buffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+            BufferBuilder buffer = Tesselator.getInstance().getBuilder();
+            buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
 
-            buffer.vertex(screenX, screenY + renderHeight, 0).texture(0, 1).next();
-            buffer.vertex(screenX + renderWidth, screenY + renderHeight, 0).texture(1, 1).next();
-            buffer.vertex(screenX + renderWidth, screenY, 0).texture(1, 0).next();
-            buffer.vertex(screenX, screenY, 0).texture(0, 0).next();
+            buffer.vertex(screenX, screenY + renderHeight, 0).uv(0, 1).endVertex();
+            buffer.vertex(screenX + renderWidth, screenY + renderHeight, 0).uv(1, 1).endVertex();
+            buffer.vertex(screenX + renderWidth, screenY, 0).uv(1, 0).endVertex();
+            buffer.vertex(screenX, screenY, 0).uv(0, 0).endVertex();
 
             // Draw directly
-            BufferRenderer.drawWithGlobalProgram(buffer.end());
+            BufferUploader.drawWithShader(buffer.end());
 
             RenderSystem.disableBlend();
         } finally {

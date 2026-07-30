@@ -25,17 +25,16 @@
 
 package com.duom.ardamaps.core.networking.handlers.server;
 
-import net.minecraft.entity.Dismounting;
-import net.minecraft.entity.EntityPose;
-import net.minecraft.registry.tag.BlockTags;
-import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-
 import java.util.OptionalDouble;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.vehicle.DismountHelper;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Resolves map teleport requests against vanilla collision shapes instead of whole-block solidity flags.
@@ -51,9 +50,9 @@ public final class SafeTeleportScanner {
     /**
      * Returns the exact Y coordinate a player can stand at for an integer feet block candidate.
      * <p>
-     * The result uses {@link net.minecraft.world.BlockView#getDismountHeight(BlockPos)} for shape-aware standing
-     * height, {@link Dismounting#canPlaceEntityAt(net.minecraft.world.CollisionView, Vec3d,
-     * net.minecraft.entity.LivingEntity, EntityPose)} for the real standing bounding box check, and an explicit
+     * The result uses {@link net.minecraft.world.level.BlockGetter#getBlockFloorHeight(BlockPos)} for shape-aware standing
+     * height, {@link DismountHelper#canDismountTo(net.minecraft.world.level.CollisionGetter, Vec3,
+     * net.minecraft.world.entity.LivingEntity, Pose)} for the real standing bounding box check, and an explicit
      * fluid/fire hazard pass because those hazards can have empty collision shapes.
      *
      * @param world The destination world to inspect for collision, fluid, and fire hazards.
@@ -63,25 +62,25 @@ public final class SafeTeleportScanner {
      * @param z The snapped Z coordinate for the destination column.
      * @return The fractional standing Y coordinate, or empty when the candidate cannot safely hold the player.
      */
-    public static OptionalDouble standingHeightAt(ServerWorld world, ServerPlayerEntity player,
+    public static OptionalDouble standingHeightAt(ServerLevel world, ServerPlayer player,
                                                   double x, int feetY, double z) {
 
-        BlockPos feet = BlockPos.ofFloored(x, feetY, z);
-        OptionalDouble standY = resolveStandY(feetY, world.getDismountHeight(feet),
-                world.getFluidState(feet).isIn(FluidTags.WATER));
+        BlockPos feet = BlockPos.containing(x, feetY, z);
+        OptionalDouble standY = resolveStandY(feetY, world.getBlockFloorHeight(feet),
+                world.getFluidState(feet).is(FluidTags.WATER));
 
         if (standY.isEmpty()) return OptionalDouble.empty();
 
         double y = standY.getAsDouble();
-        if (!Dismounting.canPlaceEntityAt(world, new Vec3d(x, y, z), player, EntityPose.STANDING)) {
+        if (!DismountHelper.canDismountTo(world, new Vec3(x, y, z), player, Pose.STANDING)) {
             return OptionalDouble.empty();
         }
 
-        if (world.getFluidState(eyeBlock(player, x, y, z)).isIn(FluidTags.WATER)) {
+        if (world.getFluidState(eyeBlock(player, x, y, z)).is(FluidTags.WATER)) {
             return OptionalDouble.empty();
         }
 
-        if (containsHazard(world, player.getDimensions(EntityPose.STANDING).getBoxAt(x, y, z))) {
+        if (containsHazard(world, player.getDimensions(Pose.STANDING).makeBoundingBox(x, y, z))) {
             return OptionalDouble.empty();
         }
 
@@ -91,7 +90,7 @@ public final class SafeTeleportScanner {
     /**
      * Resolves the standing Y from the vanilla dismount height for a candidate feet block.
      * <p>
-     * This intentionally inlines {@link Dismounting#canDismountInBlock(double)} as
+     * This intentionally inlines {@link DismountHelper#isBlockFloorValid(double)} as
      * {@code !Double.isInfinite(height) && height < 1.0} so unit tests can exercise the pure logic without a
      * Minecraft bootstrap.
      *
@@ -131,9 +130,9 @@ public final class SafeTeleportScanner {
      * @param z The destination Z coordinate.
      * @return The block position containing the player's eyes.
      */
-    private static BlockPos eyeBlock(ServerPlayerEntity player, double x, double standY, double z) {
+    private static BlockPos eyeBlock(ServerPlayer player, double x, double standY, double z) {
 
-        return BlockPos.ofFloored(x, standY + player.getEyeHeight(EntityPose.STANDING), z);
+        return BlockPos.containing(x, standY + player.getEyeHeight(Pose.STANDING), z);
     }
 
     /**
@@ -143,9 +142,9 @@ public final class SafeTeleportScanner {
      * @param playerBox The player's standing bounding box at the candidate destination.
      * @return True if lava or fire intersects the standing box, false otherwise.
      */
-    private static boolean containsHazard(ServerWorld world, Box playerBox) {
+    private static boolean containsHazard(ServerLevel world, AABB playerBox) {
 
-        return BlockPos.stream(playerBox).anyMatch(pos ->
-                world.getFluidState(pos).isIn(FluidTags.LAVA) || world.getBlockState(pos).isIn(BlockTags.FIRE));
+        return BlockPos.betweenClosedStream(playerBox).anyMatch(pos ->
+                world.getFluidState(pos).is(FluidTags.LAVA) || world.getBlockState(pos).is(BlockTags.FIRE));
     }
 }

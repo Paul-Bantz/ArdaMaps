@@ -32,7 +32,7 @@ import com.duom.ardamaps.core.data.location.LocationClient;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +67,7 @@ public record LocationsResponsePacket(LocationConfig<LocationClient> data) imple
      * @param buf The PacketByteBuf to read from
      * @return The MapSourceResponsePacket read from the buffer
      */
-    public static LocationsResponsePacket read(PacketByteBuf buf) {
+    public static LocationsResponsePacket read(FriendlyByteBuf buf) {
 
         var dataLength = buf.readInt();
 
@@ -102,8 +102,8 @@ public record LocationsResponsePacket(LocationConfig<LocationClient> data) imple
      * @return The PacketByteBuf representing this packet
      */
     @Override
-    public PacketByteBuf build() {
-        PacketByteBuf buf = PacketByteBufs.create();
+    public FriendlyByteBuf build() {
+        FriendlyByteBuf buf = PacketByteBufs.create();
 
         var hasData = data != null && data.getLastUpdate() != null;
 

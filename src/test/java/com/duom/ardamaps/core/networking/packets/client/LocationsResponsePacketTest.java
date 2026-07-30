@@ -30,7 +30,7 @@ import com.duom.ardamaps.core.data.location.BasicLocation;
 import com.duom.ardamaps.core.data.config.LocationConfig;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import org.junit.jupiter.api.Test;
 
 import java.util.Date;
@@ -83,7 +83,7 @@ class LocationsResponsePacketTest {
     @Test
     void read_negativeDataLength_rejectsBeforeAllocation() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeInt(-1);
         buf.readerIndex(0);
 
@@ -96,7 +96,7 @@ class LocationsResponsePacketTest {
     @Test
     void read_oversizedDataLength_rejectsBeforeAllocation() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeInt(8 * 1024 * 1024 + 1);
         buf.readerIndex(0);
 

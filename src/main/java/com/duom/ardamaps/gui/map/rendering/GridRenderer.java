@@ -29,8 +29,8 @@ import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.GridCamera;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
 
 /**
  * A simple renderer that renders a simple grid and provides dimension data to the map screen.
@@ -67,7 +67,7 @@ public class GridRenderer extends MapRenderable {
      * @param textRenderer The text renderer for loading / info text.
      * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public GridRenderer(GridCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
+    public GridRenderer(GridCamera camera, Font textRenderer, PlayerExploration exploration) {
         super(camera, textRenderer, exploration);
         this.camera = camera;
     }
@@ -92,14 +92,14 @@ public class GridRenderer extends MapRenderable {
      * @param context The draw context for the current frame.
      */
     @Override
-    public void render(DrawContext context) {
+    public void render(GuiGraphics context) {
         renderBackground(context);
         renderGrid(context);
         renderFogOfWar();
     }
 
     /** Fill the entire viewport with the background colour. */
-    private void renderBackground(DrawContext context) {
+    private void renderBackground(GuiGraphics context) {
         context.fill(0, 0, camera.getViewportWidth(), camera.getViewportHeight(), COLOR_BACKGROUND);
     }
 
@@ -107,7 +107,7 @@ public class GridRenderer extends MapRenderable {
      * Draw an adaptive grid whose cell size (in blocks) is the smallest entry in {@link #GRID_STEPS}
      * that produces cells of at least {@link #MIN_CELL_PX} pixels on screen.
      */
-    private void renderGrid(DrawContext context) {
+    private void renderGrid(GuiGraphics context) {
 
         double scale = camera.scale(); // pixels per block
 

@@ -35,8 +35,8 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,22 +73,23 @@ public class ServerCommands {
      *
      * @param dispatcher The command dispatcher to register commands with.
      */
-    private static void registerCommands(CommandDispatcher<ServerCommandSource> dispatcher) {
+    @SuppressWarnings("ConstantValue")
+    private static void registerCommands(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
-                CommandManager.literal(ArdaMaps.MOD_ID)
+                Commands.literal(ArdaMaps.MOD_ID)
                         .requires(source -> source.getServer() != null)
-                        .then(CommandManager.literal("refresh")
-                                .then(CommandManager.literal("configuration")
+                        .then(Commands.literal("refresh")
+                                .then(Commands.literal("configuration")
                                         .executes(ServerCommands::refreshConfiguration)))
-                        .then(CommandManager.literal("refresh")
-                                .then(CommandManager.literal("locations")
+                        .then(Commands.literal("refresh")
+                                .then(Commands.literal("locations")
                                         .executes(ServerCommands::refreshLocationData)))
-                        .then(CommandManager.literal("refresh")
-                                .then(CommandManager.literal("regions")
+                        .then(Commands.literal("refresh")
+                                .then(Commands.literal("regions")
                                         .executes(ServerCommands::refreshRegionLookupData)))
-                        .then(CommandManager.literal("debug")
+                        .then(Commands.literal("debug")
                                 .executes(ServerCommands::debugRefreshSchedule)
-                                .then(CommandManager.literal("regions")
+                                .then(Commands.literal("regions")
                                         .executes(ServerCommands::debugRegionLookupData))));
     }
 
@@ -98,7 +99,7 @@ public class ServerCommands {
      * @param ignoredServerCommandSourceCommandContext The command context.
      * @return The result of the command execution.
      */
-    private static int refreshConfiguration(CommandContext<ServerCommandSource> ignoredServerCommandSourceCommandContext) {
+    private static int refreshConfiguration(CommandContext<CommandSourceStack> ignoredServerCommandSourceCommandContext) {
 
         LOGGER.info("Refreshing configuration");
 
@@ -116,7 +117,7 @@ public class ServerCommands {
      * @param ignoredCommandSource The command context.
      * @return The result of the command execution.
      */
-    private static int refreshRegionLookupData(CommandContext<ServerCommandSource> ignoredCommandSource) {
+    private static int refreshRegionLookupData(CommandContext<CommandSourceStack> ignoredCommandSource) {
 
         LOGGER.info("Refreshing region lookup texture data");
 
@@ -162,7 +163,7 @@ public class ServerCommands {
      * @param ignoredCommandSource The command context.
      * @return The result of the command execution.
      */
-    private static int debugRegionLookupData(CommandContext<ServerCommandSource> ignoredCommandSource) {
+    private static int debugRegionLookupData(CommandContext<CommandSourceStack> ignoredCommandSource) {
 
         LOGGER.info("Dumping region lookup texture data to file");
 
@@ -190,7 +191,7 @@ public class ServerCommands {
      * @param ignoredCtx The command context.
      * @return {@link Command#SINGLE_SUCCESS}.
      */
-    private static int debugRefreshSchedule(CommandContext<ServerCommandSource> ignoredCtx) {
+    private static int debugRefreshSchedule(CommandContext<CommandSourceStack> ignoredCtx) {
 
         // Last refresh: prefer the in-memory ZDT set after each run; fall back to the
         // persisted Date inside LocationConfig for pre-startup history.
@@ -231,7 +232,7 @@ public class ServerCommands {
      * @return The result of the command execution.
      */
     @SuppressWarnings("SameReturnValue")
-    private static int refreshLocationData(CommandContext<ServerCommandSource> ignoredCommandSource) {
+    private static int refreshLocationData(CommandContext<CommandSourceStack> ignoredCommandSource) {
 
         ExternalLocationSource.fetchLocations().thenAccept(ServerCommands::saveLocationData)
                 .exceptionally(ex -> {

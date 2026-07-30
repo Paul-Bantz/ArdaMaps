@@ -27,19 +27,19 @@ package com.duom.ardamaps.core.data.guide;
 
 import com.duom.ardamaps.core.data.map.Waypoint;
 import com.duom.ardamaps.gui.ModConstants;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
 
 /**
- * Scans incoming chat {@link Text} objects for ArdaMaps links (waypoints of guide deep-link tokens) and
+ * Scans incoming chat {@link Component} objects for ArdaMaps links (waypoints of guide deep-link tokens) and
  * re-styles each matching token as a clickable, underlined, blue hyperlink.
  *
  * <h3>Supported token formats</h3>
@@ -75,15 +75,15 @@ public final class ArdaMapsChatLinkProcessor {
 
     /**
      * Processes a received chat or game message and replaces every guide deep-link token
-     * it contains with a styled, clickable {@link Text} run.
+     * it contains with a styled, clickable {@link Component} run.
      *
      * @param message the incoming chat text, never {@code null}
      * @return the original {@code message} if no guide or waypoints links are found, otherwise a new
-     *         {@link MutableText} containing plain and styled segments
+     *         {@link MutableComponent} containing plain and styled segments
      */
-    public static Text process(Text message) {
+    public static Component process(Component message) {
 
-        Text result = processGuideLink(message);
+        Component result = processGuideLink(message);
 
         if (Objects.equals(result, message)) {
 
@@ -96,7 +96,7 @@ public final class ArdaMapsChatLinkProcessor {
 
     /**
      * Processes a received chat or game message and replaces every waypoint token
-     * it contains with a styled, clickable {@link Text} run.
+     * it contains with a styled, clickable {@link Component} run.
      *
      * <p>If the message contains no tokens matching ":waypoint" the
      * original {@code message} object is returned unchanged, avoiding unnecessary
@@ -105,16 +105,16 @@ public final class ArdaMapsChatLinkProcessor {
      * <p>The surrounding (non-link) text fragments are preserved as plain literal segments;
      * the original formatting of those segments is intentionally kept minimal because
      * most server chat messages consist of flat literal text. If the original message
-     * carries complex sibling trees, only the top-level {@link Text#getString()} pass-through
+     * carries complex sibling trees, only the top-level {@link Component#getString()} pass-through
      * is used - the tree is not walked recursively.</p>
      *
      * @param message the incoming chat text, never {@code null}
      * @return the original {@code message} if no waypoint links are found, otherwise a new
-     *         {@link MutableText} containing plain and styled segments
+     *         {@link MutableComponent} containing plain and styled segments
      */
-    public static @NotNull Text processWaypointLink(@NotNull Text message) {
+    public static @NotNull Component processWaypointLink(@NotNull Component message) {
 
-        MutableText result = Text.empty();
+        MutableComponent result = Component.empty();
         String raw = message.getString();
 
         if (!raw.contains("waypoint:")) return message;
@@ -132,13 +132,13 @@ public final class ArdaMapsChatLinkProcessor {
 
         if (waypoint.isPresent()) {
 
-            MutableText link = Text.literal("waypoint")
-                    .styled(style -> style
+            MutableComponent link = Component.literal("waypoint")
+                    .withStyle(style -> style
                             .withColor(ModConstants.COLOR_BLUE)
-                            .withUnderline(true)
+                            .withUnderlined(true)
                             .withHoverEvent(new HoverEvent(
                                     HoverEvent.Action.SHOW_TEXT,
-                                    Text.literal(waypoint.get().text())))
+                                    Component.literal(waypoint.get().text())))
                             .withClickEvent(new ClickEvent(
                                     ClickEvent.Action.RUN_COMMAND,
                                     "/ardamaps waypoint " + waypointJsonString
@@ -153,7 +153,7 @@ public final class ArdaMapsChatLinkProcessor {
 
     /**
      * Processes a received chat or game message and replaces every guide deep-link token
-     * it contains with a styled, clickable {@link Text} run.
+     * it contains with a styled, clickable {@link Component} run.
      *
      * <p>If the message contains no tokens matching {@link #GUIDE_LINK_PATTERN} the
      * original {@code message} object is returned unchanged, avoiding unnecessary
@@ -162,16 +162,16 @@ public final class ArdaMapsChatLinkProcessor {
      * <p>The surrounding (non-link) text fragments are preserved as plain literal segments;
      * the original formatting of those segments is intentionally kept minimal because
      * most server chat messages consist of flat literal text. If the original message
-     * carries complex sibling trees, only the top-level {@link Text#getString()} pass-through
+     * carries complex sibling trees, only the top-level {@link Component#getString()} pass-through
      * is used - the tree is not walked recursively.</p>
      *
      * @param message the incoming chat text, never {@code null}
      * @return the original {@code message} if no guide links are found, otherwise a new
-     *         {@link MutableText} containing plain and styled segments
+     *         {@link MutableComponent} containing plain and styled segments
      */
-    public static @NotNull Text processGuideLink(@NotNull Text message) {
+    public static @NotNull Component processGuideLink(@NotNull Component message) {
 
-        MutableText result = Text.empty();
+        MutableComponent result = Component.empty();
         String raw = message.getString();
         Matcher guideMatcher = GUIDE_LINK_PATTERN.matcher(raw);
 
@@ -185,18 +185,18 @@ public final class ArdaMapsChatLinkProcessor {
 
             // Plain text before this match
             if (guideMatcher.start() > lastEnd) {
-                result.append(Text.literal(raw.substring(lastEnd, guideMatcher.start())));
+                result.append(Component.literal(raw.substring(lastEnd, guideMatcher.start())));
             }
 
             // Styled guide-link run
             String token = guideMatcher.group();
-            MutableText link = Text.literal(token)
-                    .styled(style -> style
+            MutableComponent link = Component.literal(token)
+                    .withStyle(style -> style
                             .withColor(ModConstants.COLOR_BLUE)
-                            .withUnderline(true)
+                            .withUnderlined(true)
                             .withHoverEvent(new HoverEvent(
                                     HoverEvent.Action.SHOW_TEXT,
-                                    Text.translatable("ardamaps.client.chat.guide_link")
+                                    Component.translatable("ardamaps.client.chat.guide_link")
                             ))
                             .withClickEvent(new ClickEvent(
                                     ClickEvent.Action.RUN_COMMAND,
@@ -209,7 +209,7 @@ public final class ArdaMapsChatLinkProcessor {
 
         // Trailing plain text
         if (lastEnd < raw.length()) {
-            result.append(Text.literal(raw.substring(lastEnd)));
+            result.append(Component.literal(raw.substring(lastEnd)));
         }
 
         return result;

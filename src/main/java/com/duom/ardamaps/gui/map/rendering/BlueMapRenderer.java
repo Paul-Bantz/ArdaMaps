@@ -31,12 +31,16 @@ import com.duom.ardamaps.core.data.map.cameras.BlueMapCamera;
 import com.duom.ardamaps.core.data.map.providers.BlueMapTileProvider;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.*;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Pair;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Tuple;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 
@@ -72,7 +76,7 @@ public class BlueMapRenderer extends MapRenderable {
      * @param textRenderer TextRenderer instance for rendering loading text when tiles are not yet available.
      * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public BlueMapRenderer(BlueMapCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
+    public BlueMapRenderer(BlueMapCamera camera, Font textRenderer, PlayerExploration exploration) {
 
         super(camera, textRenderer, exploration);
         this.mapCamera = camera;
@@ -111,7 +115,7 @@ public class BlueMapRenderer extends MapRenderable {
      * @param context DrawContext for rendering operations
      */
     @Override
-    public void render(DrawContext context) {
+    public void render(GuiGraphics context) {
 
         // Handle loading state - if provider is not initialized, show placeholder
         if (provider == null) {
@@ -174,24 +178,24 @@ public class BlueMapRenderer extends MapRenderable {
 
         for (PmTileKey key : tilesToDisplay) {
 
-            Optional<Identifier> tex = provider.get(key);
+            Optional<ResourceLocation> tex = provider.get(key);
 
             if (tex.isPresent()) {
                 var screenPos = mapCamera.tilePositionOnViewport(key.x, key.y, key.z);
                 primaryTiles.add(new TileDraw(tex.get(), (float) screenPos.x(), (float) screenPos.y(), key.z));
 
             } else {
-                Pair<PmTileKey, Optional<Identifier>> fallback =
+                Tuple<PmTileKey, Optional<ResourceLocation>> fallback =
                         findFallbackTile(key, coarsestZoom, mapCamera.getLodFactor());
 
-                PmTileKey fbKey = fallback.getLeft();
+                PmTileKey fbKey = fallback.getA();
                 // Store fbKey.z as the tile's actual LOD — findFallbackTile returns the *first*
                 // loaded ancestor which can be at any intermediate LOD, not necessarily coarsestZoom.
                 // Using the wrong LOD produces incorrect quad size, UV extents, LodScale and TexelSize.
-                if (fallback.getRight().isPresent() && !fallbackMap.containsKey(fbKey)) {
+                if (fallback.getB().isPresent() && !fallbackMap.containsKey(fbKey)) {
                     var fbPos = mapCamera.tilePositionOnViewport(fbKey.x, fbKey.y, fbKey.z);
                     fallbackMap.put(fbKey, new TileDraw(
-                            fallback.getRight().get(),
+                            fallback.getB().get(),
                             (float) fbPos.x(), (float) fbPos.y(),
                             fbKey.z));
                 }
@@ -231,7 +235,7 @@ public class BlueMapRenderer extends MapRenderable {
      * @param lodFactor The factor by which each LOD level reduces resolution (e.g. 2 means each level halves resolution)
      * @return A pair containing the fallback tile key and its texture identifier if found, or empty if no fallback is loaded
      */
-    private Pair<PmTileKey, Optional<Identifier>> findFallbackTile(PmTileKey key, int maxLod, double lodFactor) {
+    private Tuple<PmTileKey, Optional<ResourceLocation>> findFallbackTile(PmTileKey key, int maxLod, double lodFactor) {
         PmTileKey current = key;
         if (lodFactor < 1.0) lodFactor = 1.0;
 
@@ -242,12 +246,12 @@ public class BlueMapRenderer extends MapRenderable {
                     (int) Math.floor(current.y / lodFactor)
             );
 
-            Optional<Identifier> tex = provider.get(current);
-            if (tex.isPresent()) return new Pair<>(current, tex);
+            Optional<ResourceLocation> tex = provider.get(current);
+            if (tex.isPresent()) return new Tuple<>(current, tex);
 
         }
 
-        return new Pair<>(key, Optional.empty());
+        return new Tuple<>(key, Optional.empty());
     }
 
     /**
@@ -270,15 +274,15 @@ public class BlueMapRenderer extends MapRenderable {
         BlueMapTileShader.setLodScale(lodScale);
         BlueMapTileShader.setTexelSize(1f / imageSize, 1f / (imageSize * 2));
 
-        var textureManager = MinecraftClient.getInstance().getTextureManager();
-        Tessellator tessellator = Tessellator.getInstance();
+        var textureManager = Minecraft.getInstance().getTextureManager();
+        Tesselator tessellator = Tesselator.getInstance();
 
         for (TileDraw tile : tiles) {
 
             // Bind texture and set NEAREST filtering (parameters are stored per GL texture object
             // so newly loaded tiles also get the correct filter on first bind)
             RenderSystem.activeTexture(GL13.GL_TEXTURE0);
-            textureManager.bindTexture(tile.texture());
+            textureManager.bindForSetup(tile.texture());
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
             RenderSystem.setShaderTexture(0, tile.texture());
@@ -287,13 +291,13 @@ public class BlueMapRenderer extends MapRenderable {
             float y0 = tile.y0();
 
             // Sub-pixel offset baked directly into vertex positions — no matrix push/translate/pop
-            BufferBuilder buffer = tessellator.getBuffer();
-            buffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
-            buffer.vertex(x0, y0 + renderSize, 0).texture(0, vMax).next();
-            buffer.vertex(x0 + renderSize, y0 + renderSize, 0).texture(uMax, vMax).next();
-            buffer.vertex(x0 + renderSize, y0, 0).texture(uMax, 0).next();
-            buffer.vertex(x0, y0, 0).texture(0, 0).next();
-            BufferRenderer.drawWithGlobalProgram(buffer.end());
+            BufferBuilder buffer = tessellator.getBuilder();
+            buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+            buffer.vertex(x0, y0 + renderSize, 0).uv(0, vMax).endVertex();
+            buffer.vertex(x0 + renderSize, y0 + renderSize, 0).uv(uMax, vMax).endVertex();
+            buffer.vertex(x0 + renderSize, y0, 0).uv(uMax, 0).endVertex();
+            buffer.vertex(x0, y0, 0).uv(0, 0).endVertex();
+            BufferUploader.drawWithShader(buffer.end());
         }
     }
 
@@ -316,6 +320,6 @@ public class BlueMapRenderer extends MapRenderable {
      * @param y0      Top edge of the quad in screen pixels (floating-point for sub-pixel accuracy).
      * @param lod     Actual LOD zoom level of this tile — drives quad size, UV extents and shader uniforms.
      */
-    private record TileDraw(Identifier texture, float x0, float y0, int lod) {
+    private record TileDraw(ResourceLocation texture, float x0, float y0, int lod) {
     }
 }

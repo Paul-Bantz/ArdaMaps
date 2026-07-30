@@ -29,11 +29,11 @@ import com.duom.ardamaps.core.data.map.tiles.TileKey;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalListener;
+import com.mojang.blaze3d.platform.NativeImage;
 import lombok.Getter;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.Optional;
 import java.util.Set;
@@ -49,11 +49,11 @@ public abstract class TileProvider<T extends TileKey> {
     protected static final int MAX_CACHE_SIZE = 256;
 
     /** Removal listener that destroys dynamic textures evicted from the in-memory cache. */
-    private final RemovalListener<T, Identifier> textureRemovalListener =
+    private final RemovalListener<T, ResourceLocation> textureRemovalListener =
             (ignoredKey, texture, ignoredCause) -> destroyTexture(texture);
 
     /** Caffeine LRU cache for tile textures */
-    protected final Cache<T, Identifier> textures = Caffeine.newBuilder()
+    protected final Cache<T, ResourceLocation> textures = Caffeine.newBuilder()
             .maximumSize(MAX_CACHE_SIZE)
             .removalListener(textureRemovalListener)
             .build();
@@ -97,12 +97,12 @@ public abstract class TileProvider<T extends TileKey> {
             return;
         }
 
-        MinecraftClient.getInstance().execute(() -> {
-            NativeImageBackedTexture tex = new NativeImageBackedTexture(image);
+        Minecraft.getInstance().execute(() -> {
+            DynamicTexture tex = new DynamicTexture(image);
 
-            Identifier id = MinecraftClient.getInstance()
+            ResourceLocation id = Minecraft.getInstance()
                     .getTextureManager()
-                    .registerDynamicTexture(prefix + key.z + "_" + key.x + "_" + key.y, tex);
+                    .register(prefix + key.z + "_" + key.x + "_" + key.y, tex);
 
             textures.put(key, id);
             loading.remove(key);
@@ -117,9 +117,9 @@ public abstract class TileProvider<T extends TileKey> {
      * @param key The tile key
      * @return An Optional containing the texture identifier if loaded, or empty if loading is initiated
      */
-    public Optional<Identifier> get(T key) {
+    public Optional<ResourceLocation> get(T key) {
 
-        Identifier cached = textures.getIfPresent(key);
+        ResourceLocation cached = textures.getIfPresent(key);
         if (cached != null) return Optional.of(cached);
 
         long now = System.currentTimeMillis();
@@ -228,13 +228,12 @@ public abstract class TileProvider<T extends TileKey> {
      *
      * @param texture The texture identifier to destroy.
      */
-    protected void destroyTexture(Identifier texture) {
+    protected void destroyTexture(ResourceLocation texture) {
 
         if (texture == null) return;
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null) return;
+        Minecraft client = Minecraft.getInstance();
 
-        client.execute(() -> MinecraftClient.getInstance().getTextureManager().destroyTexture(texture));
+        client.execute(() -> Minecraft.getInstance().getTextureManager().release(texture));
     }
 }

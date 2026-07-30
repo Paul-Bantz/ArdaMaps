@@ -30,7 +30,7 @@ import com.duom.ardamaps.core.data.config.ConfigManager;
 import com.duom.ardamaps.core.data.map.RegionLookupTexture;
 import com.google.gson.JsonSyntaxException;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,7 +61,7 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
      * @param buf The PacketByteBuf to read from
      * @return The RegionsLutResponsePacket read from the buffer
      */
-    public static RegionsLutResponsePacket read(PacketByteBuf buf) {
+    public static RegionsLutResponsePacket read(FriendlyByteBuf buf) {
 
         var dataLength = buf.readInt();
 
@@ -96,9 +96,9 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
      * @return A PacketByteBuf representing this RegionsLutResponsePacket
      */
     @Override
-    public PacketByteBuf build() {
+    public FriendlyByteBuf build() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = PacketByteBufs.create();
 
         var hasData = data != null && data.lastUpdate() != null;
 

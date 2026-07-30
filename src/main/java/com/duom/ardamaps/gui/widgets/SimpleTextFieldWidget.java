@@ -26,15 +26,15 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.gui.screens.ScreenRenderingUtils;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.network.chat.Component;
 
 /**
  * A plain simple text field widget that renders an input box on a semi opaque black background.
  */
-public class SimpleTextFieldWidget extends TextFieldWidget {
+public class SimpleTextFieldWidget extends EditBox {
 
     /** Extra vertical offset to compensate for {@code drawsBackground=false} */
     private final int verticalOffset;
@@ -52,11 +52,11 @@ public class SimpleTextFieldWidget extends TextFieldWidget {
      * @param height       the height
      * @param text         the placeholder text
      */
-    public SimpleTextFieldWidget(TextRenderer textRenderer, int x, int y, int width, int height, Text text) {
+    public SimpleTextFieldWidget(Font textRenderer, int x, int y, int width, int height, Component text) {
 
         super(textRenderer, x, y, width, height, text);
-        this.setDrawsBackground(false);
-        this.verticalOffset = (height - textRenderer.fontHeight) / 2;
+        this.setBordered(false);
+        this.verticalOffset = (height - textRenderer.lineHeight) / 2;
         this.horizontalOffset = 8;
     }
 
@@ -69,14 +69,14 @@ public class SimpleTextFieldWidget extends TextFieldWidget {
      * @param delta   the tick delta
      */
     @Override
-    public void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
 
-        var matrices = context.getMatrices();
+        var matrices = context.pose();
 
-        matrices.push();
+        matrices.pushPose();
         matrices.translate(horizontalOffset, verticalOffset, 0);
-        super.renderButton(context, mouseX, mouseY, delta);
-        matrices.pop();
+        super.renderWidget(context, mouseX, mouseY, delta);
+        matrices.popPose();
 
         context.fill(getX() + 4, getY(), getX() + getWidth() - 4, getY() + getHeight(), 0x55000000);
 

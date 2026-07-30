@@ -25,10 +25,11 @@
 
 package com.duom.ardamaps.core.items;
 
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A custom item representing a Toposcope - a map-reading device used to display
@@ -42,7 +43,7 @@ public class GuideBookItem extends Item {
      *
      * @param settings The item settings to apply to this item.
      */
-    public GuideBookItem(Settings settings) {
+    public GuideBookItem(Properties settings) {
         super(settings);
     }
 
@@ -53,8 +54,8 @@ public class GuideBookItem extends Item {
      * @return The styled display name of the item.
      */
     @Override
-    public Text getName(ItemStack stack) {
-        return Text.translatable("ardamaps.mod.item.name")
+    public @NonNull Component getName(ItemStack stack) {
+        return Component.translatable("ardamaps.mod.item.name")
                 .setStyle(Style.EMPTY.withColor(0xD4A017).withItalic(false));
     }
 }

@@ -27,12 +27,11 @@ package com.duom.ardamaps.gui.widgets.builders;
 
 import com.duom.ardamaps.gui.widgets.DropdownWidget;
 import com.duom.ardamaps.gui.widgets.TextIdentifierPairItem;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Builder class for constructing {@link DropdownWidget} instances with a fluent API.
@@ -58,7 +57,7 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
     protected int height;
 
     /** title text displayed above the dropdown widget */
-    protected Text title;
+    protected Component title;
 
     /** list of options available in the dropdown widget */
     protected List<T> options = List.of();
@@ -76,10 +75,10 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
     protected boolean allowNull = false;
 
     /** text displayed when no item is selected in the dropdown widget */
-    protected Text placeholderText = Text.literal("None");
+    protected Component placeholderText = Component.literal("None");
 
     /** icon displayed when no item is selected in the dropdown widget */
-    protected Identifier placeholderIcon = null;
+    protected ResourceLocation placeholderIcon = null;
 
     /** whether the dropdown widget should start in an expanded state when created */
     protected final boolean expanded = false;
@@ -222,7 +221,7 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
      * @param placeholderText The placeholder text
      * @return This builder for method chaining
      */
-    public DropdownBuilder<T, E> setPlaceholderText(Text placeholderText) {
+    public DropdownBuilder<T, E> setPlaceholderText(Component placeholderText) {
         this.placeholderText = placeholderText;
         return this;
     }
@@ -233,7 +232,7 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
      * @param placeholderIcon The placeholder icon
      * @return This builder for method chaining
      */
-    public DropdownBuilder<T, E> setPlaceholderIcon(Identifier placeholderIcon) {
+    public DropdownBuilder<T, E> setPlaceholderIcon(ResourceLocation placeholderIcon) {
         this.placeholderIcon = placeholderIcon;
         return this;
     }

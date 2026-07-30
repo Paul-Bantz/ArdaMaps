@@ -27,7 +27,7 @@ package com.duom.ardamaps.core.data.conversion;
 
 import com.duom.ardamaps.gui.ModConstants;
 import lombok.Getter;
-import net.minecraft.text.MutableText;
+import net.minecraft.network.chat.MutableComponent;
 
 import java.util.List;
 
@@ -49,7 +49,7 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
      *
      * @param text the pre-styled, wrappable text to render
      */
-    record TextBlock(MutableText text) implements ContentBlock {}
+    record TextBlock(MutableComponent text) implements ContentBlock {}
 
     /**
      * An image loaded from the mod's resource pack that occupies its own horizontal row
@@ -153,7 +153,7 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
      *
      * @param items the pre-styled text for each list item
      */
-    record ListBlock(List<MutableText> items) implements ContentBlock {}
+    record ListBlock(List<MutableComponent> items) implements ContentBlock {}
 
     /**
      * A block that renders as an indented blockquote with a left accent bar and
@@ -161,7 +161,7 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
      *
      * @param text the pre-styled text content of the quotation
      */
-    record BlockquoteBlock(MutableText text) implements ContentBlock {}
+    record BlockquoteBlock(MutableComponent text) implements ContentBlock {}
 
     /**
      * A pure vertical spacer block that represents an explicit {@code <br>} line break

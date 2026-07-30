@@ -34,15 +34,15 @@ import com.duom.ardamaps.gui.widgets.BookmarkButtonType;
 import com.duom.ardamaps.gui.widgets.BookmarkButtonWidget;
 import com.duom.ardamaps.gui.widgets.SearchWidget;
 import com.duom.ardamaps.gui.widgets.builders.BookmarkButtonBuilder;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.text.Text;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 import java.util.function.Function;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 
 /**
  * The ArdaMapsScreen class serves as a base for all screens in the ArdaMaps mod, providing common functionality such as background rendering and static button management.
@@ -92,7 +92,7 @@ public abstract class ArdaMapsScreen extends Screen {
      * @param ignoredParent The parent screen that opened this screen.
      * @param title         The title of the screen, displayed at the top of the GUI.
      */
-    protected ArdaMapsScreen(Screen ignoredParent, Text title) {
+    protected ArdaMapsScreen(Screen ignoredParent, Component title) {
 
         super(title);
         guiBackgroundRenderer = new BackgroundRenderer();
@@ -152,20 +152,20 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureExitButton() {
 
-        assert client != null;
+        assert minecraft != null;
 
         this.exitButton = BookmarkButtonBuilder.create()
                 .setButtonStyle(BookmarkButtonType.BOOKMARK_CLOSE)
                 .setOnClick(() -> {
-                    this.close();
-                    client.setScreen(null);
+                    this.onClose();
+                    minecraft.setScreen(null);
                 })
                 .setSize(ModConstants.SQUARED_BUTTON_SIZE, ModConstants.SQUARED_BUTTON_SIZE)
                 .setPosition(0, 0).build();
 
-        this.exitButton.setTooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.generic.close")));
+        this.exitButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.generic.close")));
 
-        addDrawableChild(exitButton);
+        addRenderableWidget(exitButton);
     }
 
     /**
@@ -173,20 +173,20 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureMapButton() {
 
-        assert client != null;
+        assert minecraft != null;
 
         this.mapButton = BookmarkButtonBuilder.create()
                 .setButtonStyle(BookmarkButtonType.BOOKMARK_MAP)
                 .setOnClick(() -> {
                     ArdaMapsClient.CONFIG.setLastPage(GuideScreenLink.GUIDE_MAP);
-                    client.setScreen(new MapScreen(this));
+                    minecraft.setScreen(new MapScreen(this));
                 })
                 .setSize(ModConstants.SQUARED_BUTTON_SIZE, ModConstants.SQUARED_BUTTON_SIZE)
                 .setPosition(0, 0).build();
 
-        this.mapButton.setTooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.map.tooltip")));
+        this.mapButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.map.tooltip")));
 
-        addDrawableChild(mapButton);
+        addRenderableWidget(mapButton);
 
     }
 
@@ -195,20 +195,20 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureConfigurationButton() {
 
-        assert client != null;
+        assert minecraft != null;
 
         this.configurationButton = BookmarkButtonBuilder.create()
                 .setButtonStyle(BookmarkButtonType.BOOKMARK_CONFIGURATION)
                 .setOnClick(() -> {
                     ArdaMapsClient.CONFIG.setLastPage(GuideScreenLink.GUIDE_CONFIG);
-                    client.setScreen(new ConfigurationScreen(this));
+                    minecraft.setScreen(new ConfigurationScreen(this));
                 })
                 .setSize(ModConstants.SQUARED_BUTTON_SIZE, ModConstants.SQUARED_BUTTON_SIZE)
                 .setPosition(0, 0).build();
 
-        this.configurationButton.setTooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.configuration.tooltip")));
+        this.configurationButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.configuration.tooltip")));
 
-        addDrawableChild(configurationButton);
+        addRenderableWidget(configurationButton);
     }
 
     /**
@@ -216,17 +216,17 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureGuideButton() {
 
-        assert client != null;
+        assert minecraft != null;
 
         this.guideButton = BookmarkButtonBuilder.create()
                 .setButtonStyle(BookmarkButtonType.BOOKMARK_GUIDE)
-                .setOnClick(() -> client.setScreen(new GuideScreen(this, ArdaMapsClient.CONFIG.getLastPage())))
+                .setOnClick(() -> minecraft.setScreen(new GuideScreen(this, ArdaMapsClient.CONFIG.getLastPage())))
                 .setSize(ModConstants.SQUARED_BUTTON_SIZE, ModConstants.SQUARED_BUTTON_SIZE)
                 .setPosition(0, 0).build();
 
-        this.guideButton.setTooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.guide.tooltip")));
+        this.guideButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.guide.tooltip")));
 
-        addDrawableChild(guideButton);
+        addRenderableWidget(guideButton);
     }
 
     /**
@@ -246,7 +246,7 @@ public abstract class ArdaMapsScreen extends Screen {
      * @param context The DrawContext used for rendering the background.
      */
     @Override
-    public void renderBackground(DrawContext context) {
+    public void renderBackground(GuiGraphics context) {
 
         super.renderBackground(context);
 

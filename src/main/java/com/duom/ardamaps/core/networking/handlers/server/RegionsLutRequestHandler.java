@@ -32,8 +32,8 @@ import com.duom.ardamaps.core.networking.packets.client.RegionsLutResponsePacket
 import com.duom.ardamaps.core.networking.packets.server.RegionsLutRequestPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,7 +71,7 @@ public class RegionsLutRequestHandler extends RespondablePacketHandler<RegionsLu
      * @return A RegionsLutResponsePacket containing the updated region LUT data if the client's data is outdated, or an empty response if the client's data is up-to-date.
      */
     @Override
-    public RegionsLutResponsePacket handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, RegionsLutRequestPacket packet, PacketSender sender) {
+    public RegionsLutResponsePacket handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler, RegionsLutRequestPacket packet, PacketSender sender) {
 
         Date lastClientUpdate = packet.date();
         RegionLookupTexture serverRegionLut = ArdaMaps.CONFIG.getRegionLookupTexture();

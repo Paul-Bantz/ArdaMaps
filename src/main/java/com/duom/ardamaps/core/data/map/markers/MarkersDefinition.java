@@ -34,10 +34,6 @@ import com.duom.ardamaps.gui.ModConstants;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.SerializedName;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.resource.Resource;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +43,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
  * Defines the configuration for map markers, including visual properties and available marker types.
@@ -60,8 +60,8 @@ import java.util.Optional;
  * @param defaultType             the name of the default marker type
  * @param types                   a map of marker type names to their corresponding {@link MarkerType} definitions
  */
-public record MarkersDefinition(@SerializedName("marker_background") Identifier markerBackground,
-                                @SerializedName("marker_background_visited") Identifier markerBackgroundVisited,
+public record MarkersDefinition(@SerializedName("marker_background") ResourceLocation markerBackground,
+                                @SerializedName("marker_background_visited") ResourceLocation markerBackgroundVisited,
                                 @SerializedName("map_marker_background_size") int mapMarkerBackgroundSize,
                                 @SerializedName("map_marker_icon_size") int mapMarkerIconSize,
                                 @SerializedName("map_marker_icon_x_offset") float mapMarkerIconXOffset,
@@ -74,7 +74,7 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
     private static final Logger LOGGER = LoggerFactory.getLogger(MarkersDefinition.class);
 
     /** Marker label for undiscovered locations */
-    private static final Identifier MARKERS_JSON = ModConstants.modId("markers.json");
+    private static final ResourceLocation MARKERS_JSON = ModConstants.modId("markers.json");
 
     /**
      * Loads the markers definition from the `markers.json` resource file.
@@ -86,19 +86,19 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
 
         MarkersDefinition markersDefinition = createDefault();
         Gson gson = new GsonBuilder()
-                .registerTypeAdapter(Identifier.class, new SpriteTypeAdapter())
+                .registerTypeAdapter(ResourceLocation.class, new SpriteTypeAdapter())
                 .registerTypeAdapter(MarkerType.class, new MarkerTypeTypeAdapter())
                 .registerTypeAdapter(MarkersDefinition.class, new MarkersDefinitionTypeAdapter())
                 .create();
 
-        ResourceManager manager = MinecraftClient.getInstance().getResourceManager();
+        ResourceManager manager = Minecraft.getInstance().getResourceManager();
 
         Optional<Resource> resource = manager.getResource(MARKERS_JSON);
 
         if (resource.isEmpty()) throw new RuntimeException("Missing resource: " + MARKERS_JSON);
 
         try (InputStreamReader reader = new InputStreamReader(
-                resource.get().getInputStream(),
+                resource.get().open(),
                 StandardCharsets.UTF_8
         )) {
 

@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.gui.widgets;
 
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 /**
  * Enum representing different types of bookmark buttons in the GUI.
@@ -44,8 +44,8 @@ public enum BookmarkButtonType {
         this.translationKey = translationKey;
     }
 
-    public Text getTranslation(){
+    public Component getTranslation(){
 
-        return Text.translatable(translationKey);
+        return Component.translatable(translationKey);
     }
 }

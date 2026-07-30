@@ -27,7 +27,7 @@ package com.duom.ardamaps.core.networking.packets.server;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * Packet sent by the server to warp the player to a specific location
@@ -42,8 +42,8 @@ public record PlayerWarpPacket(String warpName) implements IPacket {
      * @param buf The PacketByteBuf to read from.
      * @return A new PlayerWarpRequest instance.
      */
-    public static PlayerWarpPacket read(PacketByteBuf buf) {
-        return new PlayerWarpPacket(buf.readString());
+    public static PlayerWarpPacket read(FriendlyByteBuf buf) {
+        return new PlayerWarpPacket(buf.readUtf());
     }
 
     /**
@@ -52,9 +52,9 @@ public record PlayerWarpPacket(String warpName) implements IPacket {
      * @return The PacketByteBuf containing the packet data.
      */
     @Override
-    public PacketByteBuf build() {
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeString(warpName);
+    public FriendlyByteBuf build() {
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeUtf(warpName);
         return buf;
     }
 }

@@ -27,9 +27,9 @@ package com.duom.ardamaps.core.data.map.providers;
 
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
+import com.mojang.blaze3d.platform.NativeImage;
 import io.tileverse.pmtiles.PMTilesReader;
 import io.tileverse.rangereader.RangeReader;
-import net.minecraft.client.texture.NativeImage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

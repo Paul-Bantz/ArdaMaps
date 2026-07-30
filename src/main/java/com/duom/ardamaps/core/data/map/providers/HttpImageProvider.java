@@ -32,14 +32,14 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.jakewharton.disklrucache.DiskLruCache;
+import com.mojang.blaze3d.platform.NativeImage;
 import com.sksamuel.scrimage.ImmutableImage;
 import com.sksamuel.scrimage.pixels.Pixel;
 import com.sksamuel.scrimage.webp.WebpImageReader;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Pair;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Tuple;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -223,15 +223,10 @@ public class HttpImageProvider {
 
         if (data == null || data.image() == null) return;
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null) return;
+        Minecraft client = Minecraft.getInstance();
 
-        client.execute(() -> MinecraftClient.getInstance().getTextureManager().destroyTexture(data.image()));
+        client.execute(() -> Minecraft.getInstance().getTextureManager().release(data.image()));
     }
-
-    // -------------------------------------------------------------------------
-    // Cache maintenance - BlueMap refresh & stale eviction
-    // -------------------------------------------------------------------------
 
     /**
      * Schedules a periodic task that invalidates all disk-cached entries whose
@@ -291,7 +286,7 @@ public class HttpImageProvider {
      * @param path The URL of the texture
      * @return The texture identifier, or null if not yet loaded
      */
-    public Identifier getTexture(String path) {
+    public ResourceLocation getTexture(String path) {
 
         if (path == null || path.isEmpty()) return null;
 
@@ -318,7 +313,7 @@ public class HttpImageProvider {
 
         loadImage(url, loadedTexture -> {
             if (loadedTexture != null)
-                MinecraftClient.getInstance().execute(() -> registerTexture(loadedTexture));
+                Minecraft.getInstance().execute(() -> registerTexture(loadedTexture));
             else
                 loading.remove(url);
         }, () -> loading.remove(url));
@@ -332,11 +327,11 @@ public class HttpImageProvider {
      * @param onComplete  Callback that receives the loaded image and URL, or null if loading failed
      * @param onIoFailure Callback for IO/network failures only
      */
-    public void loadImage(String url, Consumer<Pair<NativeImage, String>> onComplete, Runnable onIoFailure) {
+    public void loadImage(String url, Consumer<Tuple<NativeImage, String>> onComplete, Runnable onIoFailure) {
 
         CompletableFuture.supplyAsync(() -> {
 
-            Pair<NativeImage, String> loadedImage = null;
+            Tuple<NativeImage, String> loadedImage = null;
 
             try {
                 var uri = URI.create(url);
@@ -345,8 +340,8 @@ public class HttpImageProvider {
                 if (rawImageData != null) {
                     var fileExt = getFileExtension(uri);
                     loadedImage = switch (fileExt) {
-                        case WEBP -> new Pair<>(loadWebpImage(rawImageData), url);
-                        case PNG, JPG, JPEG -> new Pair<>(
+                        case WEBP -> new Tuple<>(loadWebpImage(rawImageData), url);
+                        case PNG, JPG, JPEG -> new Tuple<>(
                                 NativeImage.read(new ByteArrayInputStream(rawImageData)), url);
                     };
                 }
@@ -381,16 +376,16 @@ public class HttpImageProvider {
      *
      * @param imageKey A pair containing the NativeImage and its associated URL
      */
-    private void registerTexture(Pair<NativeImage, String> imageKey) {
+    private void registerTexture(Tuple<NativeImage, String> imageKey) {
 
-        var url = imageKey.getRight();
+        var url = imageKey.getB();
         var idName = getDiskCacheKey(URI.create(url));
-        var imageData = imageKey.getLeft();
+        var imageData = imageKey.getA();
 
-        NativeImageBackedTexture nativeImage = new NativeImageBackedTexture(imageData);
-        Identifier texture = MinecraftClient.getInstance()
+        DynamicTexture nativeImage = new DynamicTexture(imageData);
+        ResourceLocation texture = Minecraft.getInstance()
                 .getTextureManager()
-                .registerDynamicTexture(idName, nativeImage);
+                .register(idName, nativeImage);
 
         textures.put(url, new TextureData(texture, imageData.getWidth(), imageData.getHeight()));
         loading.remove(url);
@@ -547,7 +542,7 @@ public class HttpImageProvider {
         Pixel[] pixels = img.pixels();
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
-                nativeImage.setColor(x, y, argbToAbgr(pixels[y * w + x].argb));
+                nativeImage.setPixelRGBA(x, y, argbToAbgr(pixels[y * w + x].argb));
         return nativeImage;
     }
 
@@ -586,6 +581,6 @@ public class HttpImageProvider {
     }
 
     /** Record to hold texture data */
-    private record TextureData(Identifier image, int width, int height) {
+    private record TextureData(ResourceLocation image, int width, int height) {
     }
 }

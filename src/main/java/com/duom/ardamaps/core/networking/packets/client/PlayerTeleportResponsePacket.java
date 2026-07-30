@@ -27,7 +27,7 @@ package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * Response packet sent after a ranged teleport request has completed on the server thread.
@@ -55,7 +55,7 @@ public record PlayerTeleportResponsePacket(boolean success, double x, double y, 
      * @param buf The PacketByteBuf to read from
      * @return The PlayerTeleportResponsePacket read from the buffer
      */
-    public static PlayerTeleportResponsePacket read(PacketByteBuf buf) {
+    public static PlayerTeleportResponsePacket read(FriendlyByteBuf buf) {
 
         boolean packetSuccess = buf.readBoolean();
         double packetX = buf.readDouble();
@@ -71,9 +71,9 @@ public record PlayerTeleportResponsePacket(boolean success, double x, double y, 
      * @return A packet buffer containing the success flag and resolved destination coordinates.
      */
     @Override
-    public PacketByteBuf build() {
+    public FriendlyByteBuf build() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = PacketByteBufs.create();
 
         buf.writeBoolean(success);
         buf.writeDouble(x);

@@ -27,13 +27,13 @@ package com.duom.ardamaps.core.executors;
 
 import com.duom.ardamaps.core.integration.WarpService;
 import com.duom.ardamaps.gui.ModConstants;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.World;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 import net.william278.huskhomes.api.FabricHuskHomesAPI;
 
 /**
@@ -42,7 +42,7 @@ import net.william278.huskhomes.api.FabricHuskHomesAPI;
 public class WarpExecutor implements WarpService {
 
     @Override
-    public void warpTo(MinecraftServer server, ServerPlayerEntity player, String warpName, Runnable onFailure) {
+    public void warpTo(MinecraftServer server, ServerPlayer player, String warpName, Runnable onFailure) {
         FabricHuskHomesAPI.getInstance().getWarp(warpName).thenAccept(warpOpt -> {
             if (warpOpt.isEmpty()) {
                 onFailure.run();
@@ -50,16 +50,16 @@ public class WarpExecutor implements WarpService {
             }
 
             var warp = warpOpt.get();
-            Identifier dimensionId = ModConstants.id(warp.getWorld().getName());
-            RegistryKey<World> key = RegistryKey.of(RegistryKeys.WORLD, dimensionId);
+            ResourceLocation dimensionId = ModConstants.id(warp.getWorld().getName());
+            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, dimensionId);
 
-            ServerWorld serverWorld = server.getWorld(key);
+            ServerLevel serverWorld = server.getLevel(key);
             if (serverWorld == null) {
                 onFailure.run();
                 return;
             }
 
-            player.teleport(serverWorld, warp.getX(), warp.getY(), warp.getZ(), player.getYaw(), player.getPitch());
+            player.teleportTo(serverWorld, warp.getX(), warp.getY(), warp.getZ(), player.getYRot(), player.getXRot());
         });
     }
 }

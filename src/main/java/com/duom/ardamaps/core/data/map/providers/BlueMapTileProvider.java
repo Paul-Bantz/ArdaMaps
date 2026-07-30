@@ -73,7 +73,7 @@ public class BlueMapTileProvider extends TileProvider<TileKey> {
 
         ArdaMapsClient.getHttpImageProvider().loadImage(
                 getUrlForKey(key),
-                image -> registerTexture("bluemap_", image == null ? null : image.getLeft(), key),
+                image -> registerTexture("bluemap_", image == null ? null : image.getA(), key),
                 () -> markTransportFailure(key)
         );
     }

@@ -33,8 +33,8 @@ import com.duom.ardamaps.core.networking.packets.EmptyPacket;
 import com.duom.ardamaps.core.networking.packets.client.MapSourceResponsePacket;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 /**
  * A packet sent from the client to the server to request map source data.
@@ -66,7 +66,7 @@ public class MapSourcesRequestHandler extends RespondablePacketHandler<EmptyPack
      * @return A MapSourceResponsePacket containing the map source configuration in JSON format.
      */
     @Override
-    public MapSourceResponsePacket handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, EmptyPacket packet, PacketSender sender) {
+    public MapSourceResponsePacket handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler, EmptyPacket packet, PacketSender sender) {
 
         return new MapSourceResponsePacket(Warps.isAvailable(), Regions.isAvailable(), ArdaMaps.CONFIG.getDimensions());
     }

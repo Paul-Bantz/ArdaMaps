@@ -26,13 +26,13 @@
 package com.duom.ardamaps.gui.map.rendering;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.gl.ShaderProgram;
-import net.minecraft.client.render.VertexFormats;
-import net.minecraft.resource.ResourceManager;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
  * Utility class for managing the fog of war shader.
@@ -43,14 +43,14 @@ public class FogOfWarShader {
     private static final Logger LOGGER = LoggerFactory.getLogger(FogOfWarShader.class);
     
     /** The fog of war shader program. */
-    private static ShaderProgram FOG_OF_WAR;
+    private static ShaderInstance FOG_OF_WAR;
 
     /**
      * Get the fog of war shader program.
      *
      * @return The fog of war shader program.
      */
-    public static ShaderProgram fogOfWar() {
+    public static ShaderInstance fogOfWar() {
         return FOG_OF_WAR;
     }
 
@@ -69,8 +69,8 @@ public class FogOfWarShader {
     public static void load(ResourceManager resourceManager) {
 
         try {
-            ShaderProgram shader = new ShaderProgram(resourceManager, "fog_of_war", VertexFormats.POSITION_TEXTURE);
-            ShaderProgram previous = FOG_OF_WAR;
+            ShaderInstance shader = new ShaderInstance(resourceManager, "fog_of_war", DefaultVertexFormat.POSITION_TEX);
+            ShaderInstance previous = FOG_OF_WAR;
             FOG_OF_WAR = shader;
             if (previous != null) previous.close();
         } catch (IOException e) {

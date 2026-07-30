@@ -28,7 +28,7 @@ package com.duom.ardamaps.core.networking.packets.client;
 import com.duom.ardamaps.core.data.map.Region;
 import com.duom.ardamaps.core.data.map.RegionLookupTexture;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import org.junit.jupiter.api.Test;
 
 import java.util.Date;
@@ -71,7 +71,7 @@ class RegionsLutResponsePacketTest {
     @Test
     void read_negativeDataLength_rejectsBeforeAllocation() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeInt(-1);
         buf.readerIndex(0);
 
@@ -84,7 +84,7 @@ class RegionsLutResponsePacketTest {
     @Test
     void read_oversizedDataLength_rejectsBeforeAllocation() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeInt(8 * 1024 * 1024 + 1);
         buf.readerIndex(0);
 

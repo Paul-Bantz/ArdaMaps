@@ -28,7 +28,7 @@ package com.duom.ardamaps.core.networking.packets.client;
 import com.duom.ardamaps.core.consumers.networking.IPacket;
 import com.duom.ardamaps.core.data.Vec2d;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +67,7 @@ public record PlayerExplorationPacket(String dimensionId,
      * @param buf The PacketByteBuf to read from.
      * @return A new PlayerExplorationPacket instance.
      */
-    public static PlayerExplorationPacket read(PacketByteBuf buf) {
+    public static PlayerExplorationPacket read(FriendlyByteBuf buf) {
 
         PlayerExplorationPacket packet = PlayerExplorationPacket.EMPTY;
         String dimensionId = "";
@@ -77,8 +77,8 @@ public record PlayerExplorationPacket(String dimensionId,
 
         try {
 
-            dimensionId = buf.readString();
-            regionId = buf.readString();
+            dimensionId = buf.readUtf();
+            regionId = buf.readUtf();
             rootRegionPolygon = readPolygonFromBuffer(buf);
             regionPolygon = readPolygonFromBuffer(buf);
 
@@ -104,7 +104,7 @@ public record PlayerExplorationPacket(String dimensionId,
      * @param buf The PacketByteBuf to read from.
      * @return A list of polygons, where each polygon is a list of Vec2d points.
      */
-    private static List<List<Vec2d>> readPolygonFromBuffer(PacketByteBuf buf) {
+    private static List<List<Vec2d>> readPolygonFromBuffer(FriendlyByteBuf buf) {
 
         int polygonCount = readCount(buf, "polygon", MAX_POLYGONS);
 
@@ -137,7 +137,7 @@ public record PlayerExplorationPacket(String dimensionId,
      * @param max   Maximum accepted count.
      * @return The validated count.
      */
-    private static int readCount(PacketByteBuf buf, String label, int max) {
+    private static int readCount(FriendlyByteBuf buf, String label, int max) {
 
         int count = buf.readVarInt();
 
@@ -158,12 +158,12 @@ public record PlayerExplorationPacket(String dimensionId,
      * @return A PacketByteBuf representing this packet.
      */
     @Override
-    public PacketByteBuf build() {
+    public FriendlyByteBuf build() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = PacketByteBufs.create();
 
-        buf.writeString(dimensionId);
-        buf.writeString(regionId);
+        buf.writeUtf(dimensionId);
+        buf.writeUtf(regionId);
         writePolygonInBuffer(parentRegionPolygon, buf);
         writePolygonInBuffer(regionPolygon, buf);
 
@@ -176,7 +176,7 @@ public record PlayerExplorationPacket(String dimensionId,
      * @param polygonCollection The list of polygons to write, where each polygon is a list of Vec2d points.
      * @param buf               The PacketByteBuf to write to.
      */
-    private void writePolygonInBuffer(List<List<Vec2d>> polygonCollection, PacketByteBuf buf) {
+    private void writePolygonInBuffer(List<List<Vec2d>> polygonCollection, FriendlyByteBuf buf) {
 
         if (polygonCollection == null || polygonCollection.isEmpty()) {
             buf.writeVarInt(0);

@@ -42,8 +42,8 @@ class PlayerExplorationPacketTest {
     void read_negativePolygonCount_returnsEmptyPacket() {
 
         var buf = PacketByteBufs.create();
-        buf.writeString("minecraft:overworld");
-        buf.writeString("region-1");
+        buf.writeUtf("minecraft:overworld");
+        buf.writeUtf("region-1");
         buf.writeVarInt(-1);
         buf.readerIndex(0);
 
@@ -57,8 +57,8 @@ class PlayerExplorationPacketTest {
     void read_oversizedPolygonCount_returnsEmptyPacket() {
 
         var buf = PacketByteBufs.create();
-        buf.writeString("minecraft:overworld");
-        buf.writeString("region-1");
+        buf.writeUtf("minecraft:overworld");
+        buf.writeUtf("region-1");
         buf.writeVarInt(1025);
         buf.readerIndex(0);
 

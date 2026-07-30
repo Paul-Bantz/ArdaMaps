@@ -30,15 +30,14 @@ import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
-import net.minecraft.util.Identifier;
-
 import java.lang.reflect.Type;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Custom JsonDeserializer for Minecraft Identifier objects.
  * This allows us to deserialize JSON strings into Sprite Identifier instances with the mod's namespace.
  */
-public class SpriteTypeAdapter implements JsonDeserializer<Identifier> {
+public class SpriteTypeAdapter implements JsonDeserializer<ResourceLocation> {
 
     /**
      * Deserialize a JSON element into an Identifier.
@@ -50,7 +49,7 @@ public class SpriteTypeAdapter implements JsonDeserializer<Identifier> {
      * @throws JsonParseException If the JSON is not a valid string
      */
     @Override
-    public Identifier deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
+    public ResourceLocation deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
             throws JsonParseException {
 
         return ModConstants.modId(json.getAsString().trim());

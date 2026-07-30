@@ -34,8 +34,8 @@ import com.duom.ardamaps.core.networking.packets.client.LocationsResponsePacket;
 import com.duom.ardamaps.core.networking.packets.server.LocationsRequestPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,7 +74,7 @@ public class LocationsRequestHandler extends RespondablePacketHandler<LocationsR
      * @return A LocationsResponsePacket containing the updated location data if the client's data is outdated, or an empty response if the client's data is up-to-date.
      */
     @Override
-    public LocationsResponsePacket handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, LocationsRequestPacket packet, PacketSender sender) {
+    public LocationsResponsePacket handle(MinecraftServer server, ServerPlayer player, ServerGamePacketListenerImpl handler, LocationsRequestPacket packet, PacketSender sender) {
 
         Date lastClientUpdate = packet.date();
         Date locationsLastServerUpdate = ArdaMaps.CONFIG.getLocationConfig().getLastUpdate();

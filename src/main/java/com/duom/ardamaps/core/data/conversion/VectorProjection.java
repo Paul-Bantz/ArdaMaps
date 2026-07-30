@@ -28,8 +28,8 @@ package com.duom.ardamaps.core.data.conversion;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.Vec3d;
-import net.minecraft.client.render.Camera;
-import net.minecraft.util.math.Vec2f;
+import net.minecraft.client.Camera;
+import net.minecraft.world.phys.Vec2;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -44,21 +44,21 @@ public class VectorProjection {
      * Projects a 3D world position to 2D screen coordinates.
      * Returns null if the point is behind the camera.
      */
-    public static @Nullable Vec2f projectToScreen(Vec3d worldPos) {
+    public static @Nullable Vec2 projectToScreen(Vec3d worldPos) {
 
         var client = Client.mc();
-        Camera camera = client.gameRenderer.getCamera();
+        Camera camera = client.gameRenderer.getMainCamera();
 
         // Calculate the position relative to the camera
-        net.minecraft.util.math.Vec3d cameraPosition = camera.getPos();
-        net.minecraft.util.math.Vec3d relativePosition = new net.minecraft.util.math.Vec3d(
+        net.minecraft.world.phys.Vec3 cameraPosition = camera.getPosition();
+        net.minecraft.world.phys.Vec3 relativePosition = new net.minecraft.world.phys.Vec3(
                 worldPos.x - cameraPosition.x,
                 worldPos.y - cameraPosition.y,
                 worldPos.z - cameraPosition.z
         );
 
         // Rotate the relative position to match the camera's view direction
-        Quaternionf rot = new Quaternionf(camera.getRotation()).conjugate();
+        Quaternionf rot = new Quaternionf(camera.rotation()).conjugate();
         Vector3f vec = new Vector3f(
                 (float) relativePosition.x,
                 (float) relativePosition.y,
@@ -80,7 +80,7 @@ public class VectorProjection {
         float aspect = (float) screenW / screenH;
 
         // Calculate FoV
-        float fovY = (float) Math.toRadians(client.options.getFov().getValue());
+        float fovY = (float) Math.toRadians(client.options.fov().get());
         float tanHalfFov = (float) Math.tan(fovY / 2.0f);
 
         /*
@@ -98,7 +98,7 @@ public class VectorProjection {
         float screenX = (ndcX + 1.0f) * 0.5f * screenW;
         float screenY = (1.0f - (ndcY + 1.0f) * 0.5f) * screenH;
 
-        return new Vec2f(screenX, screenY);
+        return new Vec2(screenX, screenY);
     }
 
     /**
@@ -123,8 +123,8 @@ public class VectorProjection {
      */
     public static float projectToHorizontalAngle(double x, double z) {
 
-        Camera camera = Client.mc().gameRenderer.getCamera();
-        net.minecraft.util.math.Vec3d cameraPos = camera.getPos();
+        Camera camera = Client.mc().gameRenderer.getMainCamera();
+        net.minecraft.world.phys.Vec3 cameraPos = camera.getPosition();
 
         double dx = x - cameraPos.x;
         double dz = z - cameraPos.z;

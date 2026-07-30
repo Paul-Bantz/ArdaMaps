@@ -27,14 +27,14 @@ package com.duom.ardamaps.core.networking.packets;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * A packet with no data.
  * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
 public record EmptyPacket() implements IPacket {
-    private static final PacketByteBuf EMPTY = PacketByteBufs.create();
+    private static final FriendlyByteBuf EMPTY = PacketByteBufs.create();
 
     /**
      * Reads an EmptyPacket from the given PacketByteBuf. Since this packet has no data, the buffer is not read.
@@ -42,7 +42,7 @@ public record EmptyPacket() implements IPacket {
      * @param buf The PacketByteBuf to read from (ignored)
      * @return A new instance of EmptyPacket
      */
-    public static EmptyPacket read(@SuppressWarnings("unused") PacketByteBuf buf) {
+    public static EmptyPacket read(@SuppressWarnings("unused") FriendlyByteBuf buf) {
         return new EmptyPacket();
     }
 
@@ -52,7 +52,7 @@ public record EmptyPacket() implements IPacket {
      * @return An empty PacketByteBuf
      */
     @Override
-    public PacketByteBuf build() {
+    public FriendlyByteBuf build() {
         return EMPTY;
     }
 }
