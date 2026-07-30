@@ -83,7 +83,6 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -95,11 +94,36 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class ArdaMapsClient implements ClientModInitializer {
 
-    /** Executor for asynchronous processing */
-    public static final ExecutorService IMAGE_EXECUTOR =
-            Executors.newFixedThreadPool(
-                    Math.max(2, Runtime.getRuntime().availableProcessors() / 2)
-            );
+    /**
+     * Executor for asynchronous image processing (BlueMap/WebP tile decode). Bounded with a
+     * fixed-size queue, matching {@link #TILE_EXECUTOR}, so a fast pan/zoom that briefly outpaces
+     * the tile provider's own in-flight budget sheds excess work instead of growing an unbounded
+     * backlog that keeps decoding tiles long after they've scrolled off screen.
+     */
+    public static final ExecutorService IMAGE_EXECUTOR = new ThreadPoolExecutor(
+            Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+            Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+            0L, TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(64),
+            imageExecutorThreadFactory()
+    );
+
+    /**
+     * Creates the daemon thread factory for {@link #IMAGE_EXECUTOR}, naming threads so image
+     * decode tasks are identifiable in logs and thread dumps.
+     *
+     * @return A thread factory producing named daemon threads.
+     */
+    private static ThreadFactory imageExecutorThreadFactory() {
+
+        AtomicInteger threadId = new AtomicInteger();
+        return runnable -> {
+            Thread thread = new Thread(runnable);
+            thread.setDaemon(true);
+            thread.setName("ardamaps-image-%02d".formatted(threadId.incrementAndGet()));
+            return thread;
+        };
+    }
 
     /**
      * Dedicated executor for PMTiles range reads. Kept separate from {@link #IMAGE_EXECUTOR} so a

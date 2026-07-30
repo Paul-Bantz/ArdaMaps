@@ -49,6 +49,17 @@ public class BlueMapCamera extends TilesMapCamera {
     private double lodFactor;
 
     /**
+     * Last LOD level returned by {@link #getTileSourceClampedZoom()}. The raw computed LOD is
+     * continuously re-evaluated against a damped, continuously-changing {@code zoom}, so without
+     * hysteresis it can flip back and forth across an integer boundary every frame during a zoom
+     * animation, churning the visible-tile set. {@code Integer.MIN_VALUE} means "not yet computed".
+     */
+    private int lastClampedZoom = Integer.MIN_VALUE;
+
+    /** How far (in raw LOD units) the computed LOD must overshoot the current level before switching. */
+    private static final double LOD_HYSTERESIS = 0.15;
+
+    /**
      * Constructor for BlueMapCamera.
      *
      * @param viewportWidth  Width of the viewport in pixels
@@ -359,6 +370,12 @@ public class BlueMapCamera extends TilesMapCamera {
      * A LOD-lod tile at native size satisfies: lodFactor^(lod-1) * scale() = 1.
      * The switch threshold for lod is therefore: lod = -log(scale()) / log(lodFactor).
      * So: lod = ceil(-log(scale()) / log(lodFactor)), clamped to [maxTileZoom, minTileZoom].
+     * <p>
+     * {@code zoom} is continuously damped every frame during a zoom animation (see
+     * {@link MapCamera#update}), so the raw computed LOD can sit right at an integer boundary and
+     * flip back and forth frame to frame. {@link #LOD_HYSTERESIS} requires the raw value to
+     * overshoot the current level by a margin before switching, so a mid-animation LOD is sticky
+     * instead of thrashing the visible-tile set (and therefore the tile request queue) every frame.
      *
      * @return Zoom level of the tile source to fetch, clamped to the range of available zoom levels in the pmtiles file.
      */
@@ -366,13 +383,19 @@ public class BlueMapCamera extends TilesMapCamera {
     public int getTileSourceClampedZoom() {
 
         double s = scale();
-        int lod;
-        if (s <= 0 || Double.isNaN(s)) {
-            lod = minTileZoom;
+        double raw = (s <= 0 || Double.isNaN(s)) ? minTileZoom : -Math.log(s) / Math.log(lodFactor);
+
+        int candidate;
+        if (lastClampedZoom == Integer.MIN_VALUE
+                || raw > lastClampedZoom + LOD_HYSTERESIS
+                || raw < lastClampedZoom - 1 - LOD_HYSTERESIS) {
+            candidate = (int) Math.ceil(raw);
         } else {
-            lod = (int) Math.ceil(-Math.log(s) / Math.log(lodFactor));
+            candidate = lastClampedZoom;
         }
-        return CameraMath.clamp(lod, maxTileZoom, minTileZoom);
+
+        lastClampedZoom = CameraMath.clamp(candidate, maxTileZoom, minTileZoom);
+        return lastClampedZoom;
     }
 
     /**

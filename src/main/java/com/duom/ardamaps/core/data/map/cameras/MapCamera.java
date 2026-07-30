@@ -38,6 +38,17 @@ public abstract class MapCamera {
     /** Epsilon value for snapping zoom levels to avoid jitter from tiny floating point differences during smooth zooming. */
     private static final double ZOOM_EPSILON = 0.001;
 
+    /** How long after the last detected pan/zoom the camera is considered settled, in milliseconds. */
+    private static final long SETTLE_DELAY_MS = 120L;
+
+    /** worldX/worldZ/zoom as observed at the end of the previous {@link #update} call, to detect motion. */
+    private double lastWorldX = Double.NaN;
+    private double lastWorldZ = Double.NaN;
+    private double lastZoom = Double.NaN;
+
+    /** Wall-clock time of the last detected pan/zoom motion, or 0 if never moved yet. */
+    private long lastMovementMs = 0L;
+
     /** Viewport width - this is the "window into the world" width */
     @Getter
     protected int viewportWidth;
@@ -178,6 +189,39 @@ public abstract class MapCamera {
         // Re-clamp pan position so bounds stay tight when zoom changes
         setWorldX(worldX, frameOffsetX);
         setWorldZ(worldZ, frameOffsetZ);
+
+        detectMovement();
+    }
+
+    /**
+     * Stamps {@link #lastMovementMs} whenever worldX/worldZ/zoom differ from their values at the
+     * end of the previous frame, so {@link #isSettled()} can tell a fling/zoom animation from a
+     * genuinely still camera.
+     */
+    private void detectMovement() {
+
+        boolean moved = worldX != lastWorldX || worldZ != lastWorldZ || zoom != lastZoom;
+
+        if (moved || lastMovementMs == 0L) {
+            lastMovementMs = System.currentTimeMillis();
+        }
+
+        lastWorldX = worldX;
+        lastWorldZ = worldZ;
+        lastZoom = zoom;
+    }
+
+    /**
+     * Whether the camera has been free of pan/zoom motion for at least {@link #SETTLE_DELAY_MS}.
+     * Renderers use this to gate fine-LOD tile loading behind a short delay, so a fast pan/zoom
+     * only ever requests the (pinned, cheap) coarse fallback pyramid instead of flooding the tile
+     * loader with tiles that will have scrolled off screen before they finish loading.
+     *
+     * @return Whether the camera is currently settled.
+     */
+    public boolean isSettled() {
+
+        return lastMovementMs != 0L && System.currentTimeMillis() - lastMovementMs >= SETTLE_DELAY_MS;
     }
 
     /**

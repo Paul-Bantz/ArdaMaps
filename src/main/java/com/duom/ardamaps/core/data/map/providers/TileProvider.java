@@ -31,34 +31,42 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.mojang.blaze3d.platform.NativeImage;
 import lombok.Getter;
+import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Interface for providing map tiles based on tile keys.
  * This class manages an in-memory cache of tile textures and handles asynchronous loading of tiles.
+ * <p>
+ * Loading is bounded and prioritised on a per-frame basis: renderers call {@link #beginFrame()} once
+ * per frame, register every tile they'd like loaded via {@link #request(TileKey, int)} (lower priority
+ * value = more urgent), then call {@link #endFrame()} to submit at most {@link #MAX_SUBMITS_PER_FRAME}
+ * of the highest-priority candidates, never exceeding {@link #MAX_IN_FLIGHT} concurrent loads. Any
+ * candidate not submitted is simply dropped - it will be re-registered next frame if still visible,
+ * which is an exact and free cancellation mechanism for work that never started.
+ * </p>
  */
 public abstract class TileProvider<T extends TileKey> {
 
     /** Maximum in-memory texture cache size */
     protected static final int MAX_CACHE_SIZE = 256;
 
-    /** Debounce window for buffered get requests. */
-    protected static final long REQUEST_BUFFER_TTL_MS = 500L;
-
     /** How long a transport/IO failure suppresses retries for a tile key. */
     protected static final long TRANSPORT_FAILURE_TTL_MS = 30_000L;
 
+    /** Hard cap on fetches in flight at any moment, across all priority tiers. */
+    protected static final int MAX_IN_FLIGHT = 8;
+
+    /** Tiles submitted per {@link #endFrame()} call, so a burst of newly-visible tiles can't be issued in one frame. */
+    protected static final int MAX_SUBMITS_PER_FRAME = 4;
+
     /** Set of tile keys currently being loaded (thread-safe) */
     protected final Set<T> loading = ConcurrentHashMap.newKeySet();
-
-    /** Keys seen once by get(); a second hit within the debounce window triggers loading. */
-    protected final ConcurrentHashMap<T, Long> pendingRequests = new ConcurrentHashMap<>();
 
     /** Keys that hit transport/IO failures, mapped to failure timestamp. */
     protected final ConcurrentHashMap<T, Long> transportFailedKeys = new ConcurrentHashMap<>();
@@ -81,6 +89,23 @@ public abstract class TileProvider<T extends TileKey> {
             .removalListener(textureRemovalListener)
             .build();
 
+    /**
+     * Textures for the pinned (coarsest) zoom level, held outside the LRU so a fallback tile is
+     * always available and can never be evicted by churn at other zoom levels.
+     */
+    protected final Map<T, Identifier> pinnedTextures = new ConcurrentHashMap<>();
+
+    /** Zoom level whose textures are routed into {@link #pinnedTextures} instead of the LRU cache. */
+    @Setter
+    protected volatile int pinnedZoom = Integer.MIN_VALUE;
+
+    /**
+     * Candidates registered this frame via {@link #request(TileKey, int)}, mapped to their best
+     * (lowest) requested priority. Not thread-safe: frame methods must only be called from the
+     * render thread, matching how renderers already drive this class.
+     */
+    private final Map<T, Integer> frameRequests = new LinkedHashMap<>();
+
     /** Minimum zoom level available in the PMTiles file */
     @Getter
     protected int minZoom = 0;
@@ -101,7 +126,6 @@ public abstract class TileProvider<T extends TileKey> {
         if (image == null) {
             // Null images can happen for non-transport reasons (missing tile, out-of-range, decode miss).
             loading.remove(key);
-            pendingRequests.remove(key);
             return;
         }
 
@@ -113,42 +137,76 @@ public abstract class TileProvider<T extends TileKey> {
                     .getTextureManager()
                     .register(id, tex);
 
-            textures.put(key, id);
+            if (key.z == pinnedZoom) {
+                pinnedTextures.put(key, id);
+            } else {
+                textures.put(key, id);
+            }
             loading.remove(key);
-            pendingRequests.remove(key);
         });
     }
 
     /**
-     * Get the texture identifier for the given tile key.
-     * If the tile is not yet loaded, initiates loading and returns an empty Optional.
-     *
-     * @param key The tile key
-     * @return An Optional containing the texture identifier if loaded, or empty if loading is initiated
+     * Clears all frame-scoped request candidates. Renderers must call this exactly once at the
+     * start of each frame, before any {@link #request(TileKey, int)} calls for that frame.
      */
-    public Optional<Identifier> get(T key) {
+    public void beginFrame() {
+        frameRequests.clear();
+    }
 
-        Identifier cached = textures.getIfPresent(key);
-        if (cached != null) return Optional.of(cached);
+    /**
+     * Looks up the texture for the given tile key. If not cached, registers the key as a load
+     * candidate for this frame at the given priority (lower value = more urgent); the actual fetch
+     * is only started when {@link #endFrame()} runs, and only if it fits within this frame's and
+     * the provider's overall budget.
+     *
+     * @param key      The tile key.
+     * @param priority Requested priority; lower values are serviced first. If the key is requested
+     *                 multiple times in the same frame, the lowest (most urgent) priority wins.
+     * @return An Optional containing the texture identifier if already loaded, or empty otherwise.
+     */
+    public Optional<Identifier> request(T key, int priority) {
+
+        Optional<Identifier> cached = peek(key);
+        if (cached.isPresent()) return cached;
 
         if (missingKeys.getIfPresent(key) != null) return Optional.empty();
 
-        long now = System.currentTimeMillis();
-        if (isTransportFailed(key, now)) return Optional.empty();
+        if (isTransportFailed(key, System.currentTimeMillis())) return Optional.empty();
 
-        pruneExpiredPendingRequests(now);
-
-        Long firstSeenAt = pendingRequests.remove(key);
-        if (firstSeenAt == null || now - firstSeenAt > REQUEST_BUFFER_TTL_MS) {
-            pendingRequests.put(key, now);
-            return Optional.empty();
+        if (!loading.contains(key)) {
+            frameRequests.merge(key, priority, Math::min);
         }
 
-        if (loading.add(key)) {
-            loadTile(key);
-        }
+        return Optional.empty();
+    }
 
-        return Optional.ofNullable(textures.getIfPresent(key));
+    /**
+     * Submits the highest-priority candidates registered this frame for loading, respecting both
+     * the per-frame submission cap and the overall in-flight budget. Candidates that don't fit are
+     * dropped - not deferred - and will simply be re-requested next frame if still relevant. This
+     * bounds the total number of concurrent fetches regardless of how many tiles become visible at
+     * once (e.g. during a fast pan/zoom).
+     */
+    public void endFrame() {
+
+        if (frameRequests.isEmpty()) return;
+
+        List<Map.Entry<T, Integer>> candidates = new ArrayList<>(frameRequests.entrySet());
+        candidates.sort(Map.Entry.comparingByValue());
+
+        int submitted = 0;
+        for (Map.Entry<T, Integer> entry : candidates) {
+
+            if (submitted >= MAX_SUBMITS_PER_FRAME) break;
+            if (loading.size() >= MAX_IN_FLIGHT) break;
+
+            T key = entry.getKey();
+            if (loading.add(key)) {
+                loadTile(key);
+                submitted++;
+            }
+        }
     }
 
     /**
@@ -160,6 +218,9 @@ public abstract class TileProvider<T extends TileKey> {
      * @return The cached texture identifier, or empty if not currently loaded.
      */
     public Optional<Identifier> peek(T key) {
+
+        Identifier pinned = pinnedTextures.get(key);
+        if (pinned != null) return Optional.of(pinned);
 
         return Optional.ofNullable(textures.getIfPresent(key));
     }
@@ -183,22 +244,12 @@ public abstract class TileProvider<T extends TileKey> {
     }
 
     /**
-     * Removes first-seen entries that aged out without receiving a second request.
-     */
-    private void pruneExpiredPendingRequests(long now) {
-
-        pendingRequests.forEach((pendingKey, firstSeenAt) -> {
-            if (now - firstSeenAt > REQUEST_BUFFER_TTL_MS)
-                pendingRequests.remove(pendingKey, firstSeenAt);
-        });
-    }
-
-    /**
      * Asynchronously loads a map tile for the given tile key.
      * <p>
-     * When this method is invoked by {@link #get(TileKey)}, the key has already been added
-     * to {@link #loading}. Implementors must <em>not</em> call {@code loading.add(key)} again;
-     * doing so would always return {@code false} and silently abort the fetch.
+     * When this method is invoked by {@link #endFrame()} or {@link #eagerLoadTile(TileKey)}, the key
+     * has already been added to {@link #loading}. Implementors must <em>not</em> call
+     * {@code loading.add(key)} again; doing so would always return {@code false} and silently abort
+     * the fetch.
      * </p>
      *
      * @param key The tile key identifying the tile to load.
@@ -230,12 +281,11 @@ public abstract class TileProvider<T extends TileKey> {
     /**
      * Clears transient async state for the given key.
      *
-     * @param key The key whose in-flight/debounce state should be cleared.
+     * @param key The key whose in-flight state should be cleared.
      */
     protected void clearLoading(T key) {
 
         loading.remove(key);
-        pendingRequests.remove(key);
     }
 
     /**
@@ -261,14 +311,18 @@ public abstract class TileProvider<T extends TileKey> {
     }
 
     /**
-     * Eagerly and asynchronously loads a map tile for the given tile key.
-     * This method bypass the debouncing on tile loading, essentially "force-loading" the tile.
-     * This allows for preloading of tiles.
+     * Eagerly and asynchronously loads a map tile for the given tile key, bypassing the per-frame
+     * budget. Used sparingly for one-off preloads (e.g. the coarsest LOD at configure time) - callers
+     * are responsible for not calling this so often that it defeats {@link #MAX_IN_FLIGHT}.
      *
      * @param key The tile key identifying the tile to load.
      */
     public void eagerLoadTile(T key) {
-        loadTile(key);
+
+        if (peek(key).isPresent()) return;
+        if (loading.add(key)) {
+            loadTile(key);
+        }
     }
 
     /**
@@ -280,8 +334,10 @@ public abstract class TileProvider<T extends TileKey> {
 
         textures.invalidateAll();
         textures.cleanUp();
+        pinnedTextures.values().forEach(this::destroyTexture);
+        pinnedTextures.clear();
         loading.clear();
-        pendingRequests.clear();
+        frameRequests.clear();
         transportFailedKeys.clear();
         missingKeys.invalidateAll();
     }

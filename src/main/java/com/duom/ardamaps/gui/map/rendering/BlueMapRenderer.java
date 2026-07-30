@@ -28,8 +28,11 @@ package com.duom.ardamaps.gui.map.rendering;
 import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.BlueMapCamera;
+import com.duom.ardamaps.core.data.map.cameras.MapCamera;
 import com.duom.ardamaps.core.data.map.providers.BlueMapTileProvider;
+import com.duom.ardamaps.core.data.map.providers.TileProvider;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
+import com.duom.ardamaps.core.data.map.tiles.TileKey;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
@@ -52,6 +55,14 @@ public class BlueMapRenderer extends MapRenderable {
 
     /** Minimum brightness when block light is zero (ambient occlusion floor). */
     private static final float AMBIENT_LIGHT = 0.3f;
+
+    /**
+     * Priority offset for primary-LOD tile requests, keeping them behind every coarse-LOD request
+     * (whose priority is just their centre-tile ring, 0-based) regardless of how far out the
+     * primary tile is. Coarse tiles are cheap and are what backs the fallback pyramid, so they
+     * always win the provider's limited per-frame submission budget.
+     */
+    private static final int PRIMARY_PRIORITY_BASE = 10_000;
 
     /** Camera for managing view and visible tiles */
     private final BlueMapCamera mapCamera;
@@ -96,8 +107,11 @@ public class BlueMapRenderer extends MapRenderable {
         mapCamera.setPreferredRenderScale(renderScale);
         mapCamera.setZoomToMatchVisualPixelsPerBlock();
 
-        // Configure-time preload intentionally bypasses get() debounce.
-        mapCamera.getVisibleTiles(mapCamera.getCoarsestZoom()).forEach(key -> provider.eagerLoadTile(key));
+        // Pin the coarsest LOD outside the LRU so it can never be evicted by request churn at
+        // other zoom levels, and eagerly preload it over the full map bounds (not just the current
+        // viewport) so a fallback tile is available everywhere as soon as possible.
+        provider.setPinnedZoom(mapCamera.getCoarsestZoom());
+        mapCamera.getAllTilesAtZoom(mapCamera.getCoarsestZoom()).forEach(key -> provider.eagerLoadTile(key));
     }
 
     /**
@@ -122,6 +136,16 @@ public class BlueMapRenderer extends MapRenderable {
     /**
      * Renders the map tiles in LOD-grouped batched passes.
      * <p>
+     * Tile loading is bounded and prioritised via {@link TileProvider#beginFrame()} /
+     * {@link TileProvider#request(TileKey, int)} / {@link TileProvider#endFrame()}: every visible
+     * tile registers interest at a priority derived from its distance from the viewport centre, the
+     * coarsest LOD always outranking the primary LOD, and the provider submits only as many fetches
+     * as fit within its overall in-flight budget. Primary-LOD requests are only registered once the
+     * camera has been still for a short delay ({@link MapCamera#isSettled()}) - during a fast pan or
+     * zoom animation only the (already pinned, cheap) coarse fallback pyramid is requested, so the
+     * queue never fills with tiles that will have scrolled off screen before they load.
+     * </p>
+     * <p>
      * A single classification loop separates tiles into:
      * <ul>
      *   <li><b>Primary tiles</b> — loaded at the current LOD; all share {@code primaryZ}.</li>
@@ -139,12 +163,17 @@ public class BlueMapRenderer extends MapRenderable {
 
         int coarsestZoom = mapCamera.getCoarsestZoom();
         int primaryZ = mapCamera.getTileSourceClampedZoom();
+        boolean settled = mapCamera.isSettled();
 
-        // Ensure coarsest-LOD tiles are loaded so fallbacks are always available
-        mapCamera.getVisibleTiles(coarsestZoom).forEach(key -> provider.get(key));
+        provider.beginFrame();
+
+        // Coarse-LOD tiles are cheap, pinned outside the LRU, and back the fallback pyramid -
+        // always request them, ranked purely by distance from the viewport centre.
+        for (PmTileKey key : mapCamera.getVisibleTiles(coarsestZoom)) {
+            provider.request(key, mapCamera.centerTileDistance(key.x, key.y, coarsestZoom));
+        }
 
         Set<PmTileKey> tilesToDisplay = mapCamera.getVisibleTiles();
-        tilesToDisplay.forEach(key -> provider.get(key));
 
         // Classify
         List<TileDraw> primaryTiles = new ArrayList<>();
@@ -156,7 +185,12 @@ public class BlueMapRenderer extends MapRenderable {
 
         for (PmTileKey key : tilesToDisplay) {
 
-            Optional<Identifier> tex = provider.get(key);
+            Optional<Identifier> tex = provider.peek(key);
+
+            if (settled) {
+                int ring = mapCamera.centerTileDistance(key.x, key.y, primaryZ);
+                provider.request(key, PRIMARY_PRIORITY_BASE + ring);
+            }
 
             if (tex.isPresent()) {
                 var screenPos = mapCamera.tilePositionOnViewport(key.x, key.y, key.z);
@@ -180,6 +214,8 @@ public class BlueMapRenderer extends MapRenderable {
             }
         }
 
+        provider.endFrame();
+
         // Pass 1: primary LOD tiles (all same lod -> one uniform update)
         if (!primaryTiles.isEmpty()) {
             drawTilePass(context, primaryTiles, primaryZ);
@@ -199,6 +235,12 @@ public class BlueMapRenderer extends MapRenderable {
 
     /**
      * Finds the nearest loaded fallback tile for the given tile key by traversing up the LOD hierarchy.
+     * <p>
+     * Uses {@link TileProvider#peek(TileKey)}, not {@code request}/{@code get}: this is a read-only
+     * probe over already-cached ancestors and must never itself trigger a load. Doing otherwise
+     * previously meant every missing primary tile fanned out into load requests for every
+     * intermediate ancestor LOD, multiplying request volume by the LOD depth.
+     * </p>
      *
      * @param key       The original tile key for which to find a fallback
      * @param maxLod    The maximum LOD level to search up to (coarsest zoom)
@@ -216,7 +258,7 @@ public class BlueMapRenderer extends MapRenderable {
                     (int) Math.floor(current.y / lodFactor)
             );
 
-            Optional<Identifier> tex = provider.get(current);
+            Optional<Identifier> tex = provider.peek(current);
             if (tex.isPresent()) return new Tuple<>(current, tex);
 
         }

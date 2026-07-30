@@ -31,104 +31,166 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for {@link TileProvider#get(TileKey)} debounce and transport-failure behaviour.
+ * Unit tests for {@link TileProvider}'s frame-scoped, bounded, prioritised load dispatch, and its
+ * transport-failure/missing-key suppression.
  * <p>
  * These tests verify that:
  * <ul>
- *   <li>The first request for a key is buffered (not loaded immediately).</li>
- *   <li>A second request inside the debounce window triggers exactly one load.</li>
- *   <li>Expired buffered requests are pruned and treated as a fresh first request.</li>
+ *   <li>{@link TileProvider#request} registers a candidate but never loads synchronously.</li>
+ *   <li>{@link TileProvider#endFrame()} submits candidates in priority order, up to
+ *       {@link TileProvider#MAX_SUBMITS_PER_FRAME} per call and {@link TileProvider#MAX_IN_FLIGHT}
+ *       concurrently.</li>
+ *   <li>Candidates not submitted in a frame are dropped, not deferred.</li>
+ *   <li>{@link TileProvider#peek} never enqueues or loads.</li>
  *   <li>Keys marked as transport-failed are skipped only during the retry cooldown.</li>
+ *   <li>Keys marked missing are never retried.</li>
  * </ul>
  */
 class TileProviderTest {
 
     /**
-     * Verifies that the very first {@code get()} call for a key only records it in the
-     * debounce buffer and does not start loading.
+     * Verifies that {@code request()} only records a candidate for the frame and never loads
+     * synchronously - the fetch is only started by a subsequent {@code endFrame()}.
      */
     @Test
-    void get_firstRequest_buffersWithoutLoading() {
+    void request_doesNotLoadSynchronously() {
 
         var provider = new TestTileProvider();
         var key = new TileKey(3, 10, 20);
 
-        provider.get(key);
+        provider.beginFrame();
+        provider.request(key, 0);
 
-        assertEquals(0, provider.loadCalls, "First request should only buffer");
-        assertTrue(provider.pendingRequests.containsKey(key), "First request should be remembered");
+        assertEquals(0, provider.loadCalls, "request() must not load synchronously");
     }
 
     /**
-     * Verifies that a second {@code get()} call for the same key, issued within the debounce
-     * window, promotes that key to loading exactly once and removes it from the pending buffer.
+     * Verifies that a candidate registered via {@code request()} is actually submitted once
+     * {@code endFrame()} runs.
      */
     @Test
-    void get_secondRequestWithinDebounceWindow_loadsOnce() {
+    void endFrame_submitsRegisteredCandidate() {
 
         var provider = new TestTileProvider();
         var key = new TileKey(4, 1, 2);
 
-        provider.get(key);
-        provider.get(key);
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
 
-        assertEquals(1, provider.loadCalls, "Second request within debounce should trigger loading once");
-        assertFalse(provider.pendingRequests.containsKey(key), "Key should be removed from pending once promoted");
+        assertEquals(1, provider.loadCalls, "endFrame() should submit the registered candidate");
     }
 
     /**
-     * Verifies that pending entries older than {@link TileProvider#REQUEST_BUFFER_TTL_MS}
-     * are pruned, so a later request is treated as a new first request (buffer-only).
+     * Verifies that {@code endFrame()} submits candidates in ascending priority order (lower value
+     * = more urgent) and stops once {@link TileProvider#MAX_SUBMITS_PER_FRAME} have been submitted.
      */
     @Test
-    void get_stalePendingRequest_isPrunedAndBufferedAgain() {
+    void endFrame_submitsInPriorityOrder_upToPerFrameCap() {
 
         var provider = new TestTileProvider();
-        var key = new TileKey(5, 3, 7);
-        provider.pendingRequests.put(key, System.currentTimeMillis() - TileProvider.REQUEST_BUFFER_TTL_MS - 1);
 
-        provider.get(key);
+        provider.beginFrame();
+        // Register more candidates than MAX_SUBMITS_PER_FRAME, in reverse priority order.
+        for (int i = TileProvider.MAX_SUBMITS_PER_FRAME + 2; i >= 0; i--) {
+            provider.request(new TileKey(1, i, 0), i);
+        }
+        provider.endFrame();
 
-        assertEquals(0, provider.loadCalls, "Expired pending key should not trigger loading");
-        assertTrue(provider.pendingRequests.containsKey(key), "Expired key should be re-buffered as first request");
+        assertEquals(TileProvider.MAX_SUBMITS_PER_FRAME, provider.loadCalls,
+                "Only MAX_SUBMITS_PER_FRAME candidates should be submitted in one frame");
+
+        for (int i = 0; i < TileProvider.MAX_SUBMITS_PER_FRAME; i++) {
+            assertTrue(provider.loadedKeys.contains(new TileKey(1, i, 0)),
+                    "The lowest-priority-value candidates should be the ones submitted");
+        }
+    }
+
+    /**
+     * Verifies that {@code endFrame()} never lets the number of concurrently in-flight loads
+     * exceed {@link TileProvider#MAX_IN_FLIGHT}, even across repeated frames.
+     */
+    @Test
+    void endFrame_neverExceedsMaxInFlight() {
+
+        var provider = new NonCompletingTileProvider();
+
+        for (int frame = 0; frame < 5; frame++) {
+            provider.beginFrame();
+            for (int i = 0; i < TileProvider.MAX_SUBMITS_PER_FRAME; i++) {
+                provider.request(new TileKey(1, frame * 10 + i, 0), 0);
+            }
+            provider.endFrame();
+            assertTrue(provider.loading.size() <= TileProvider.MAX_IN_FLIGHT,
+                    "In-flight count must never exceed MAX_IN_FLIGHT");
+        }
+    }
+
+    /**
+     * Verifies that a candidate registered but not submitted (because the frame budget was
+     * exhausted) is dropped rather than retried automatically on a later {@code endFrame()} - it
+     * must be re-registered via {@code request()} to be considered again. This is the cancellation
+     * mechanism for tiles that scroll off screen before they're ever submitted.
+     */
+    @Test
+    void unsubmittedCandidate_isDroppedNotDeferred() {
+
+        var provider = new TestTileProvider();
+        var overflowKey = new TileKey(1, 999, 0);
+
+        provider.beginFrame();
+        for (int i = 0; i < TileProvider.MAX_SUBMITS_PER_FRAME; i++) {
+            provider.request(new TileKey(1, i, 0), 0);
+        }
+        provider.request(overflowKey, 1); // lower priority than the others -> not submitted
+        provider.endFrame();
+
+        assertFalse(provider.loadedKeys.contains(overflowKey), "Overflow candidate should not have loaded");
+
+        // A later frame that does not re-request it must not load it either.
+        provider.beginFrame();
+        provider.endFrame();
+
+        assertFalse(provider.loadedKeys.contains(overflowKey), "Dropped candidate must not be retried automatically");
     }
 
     /**
      * Verifies that keys marked with transport failure are skipped during the retry cooldown.
      */
     @Test
-    void get_recentTransportFailure_doesNotRetry() {
+    void request_recentTransportFailure_doesNotRetry() {
 
         var provider = new TestTileProvider();
         var key = new TileKey(2, 9, 9);
 
         provider.markTransportFailure(key);
 
-        provider.get(key);
-        provider.get(key);
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
 
         assertEquals(0, provider.loadCalls, "Recent transport-failed keys must not be retried");
-        assertFalse(provider.pendingRequests.containsKey(key), "Transport-failed keys should not enter debounce buffer");
     }
 
     /**
      * Verifies that transport-failure suppression expires, so a transient network blip does not blacklist a tile forever.
      */
     @Test
-    void get_expiredTransportFailure_reentersDebouncePipeline() {
+    void request_expiredTransportFailure_reentersPipeline() {
 
         var provider = new TestTileProvider();
         var key = new TileKey(2, 9, 10);
         provider.transportFailedKeys.put(key, System.currentTimeMillis() - TileProvider.TRANSPORT_FAILURE_TTL_MS - 1);
 
-        provider.get(key);
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
 
-        assertEquals(0, provider.loadCalls, "Expired failure should be treated as a new first request");
-        assertTrue(provider.pendingRequests.containsKey(key), "Expired failure should re-enter debounce buffer");
+        assertEquals(1, provider.loadCalls, "Expired failure should be treated as a fresh candidate");
     }
 
     /**
-     * Verifies {@link TileProvider#peek(TileKey)} never enqueues a load, even repeatedly.
+     * Verifies {@link TileProvider#peek(TileKey)} never enqueues or triggers a load, even repeatedly.
      */
     @Test
     void peek_neverTriggersLoading() {
@@ -139,50 +201,61 @@ class TileProviderTest {
         provider.peek(key);
         provider.peek(key);
         provider.peek(key);
+        provider.beginFrame();
+        provider.endFrame();
 
         assertEquals(0, provider.loadCalls, "peek() must never trigger a load");
-        assertTrue(provider.pendingRequests.isEmpty(), "peek() must not enter the debounce buffer");
     }
 
     /**
-     * Verifies a key marked missing is skipped by {@code get()} without expiring, unlike a
+     * Verifies a key marked missing is skipped by {@code request()} without expiring, unlike a
      * transport failure.
      */
     @Test
-    void markMissing_suppressesFurtherGetCalls() {
+    void markMissing_suppressesFurtherRequests() {
 
         var provider = new TestTileProvider();
         var key = new TileKey(7, 2, 3);
 
         provider.markMissing(key);
 
-        provider.get(key);
-        provider.get(key);
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
 
         assertEquals(0, provider.loadCalls, "Keys marked missing must never be retried");
         assertTrue(provider.peek(key).isEmpty(), "A missing key should not have a cached texture");
     }
 
     /**
-     * Minimal test double for {@link TileProvider} that counts load attempts.
-     * <p>
-     * The implementation immediately clears the in-flight marker so repeated
-     * tests can observe load scheduling behaviour deterministically.
+     * Minimal test double for {@link TileProvider} that counts load attempts and immediately
+     * clears the in-flight marker so repeated tests can observe load scheduling deterministically.
      */
-    private static final class TestTileProvider extends TileProvider<TileKey> {
+    private static class TestTileProvider extends TileProvider<TileKey> {
 
         /** Number of times {@link #loadTile(TileKey)} was invoked. */
         private int loadCalls;
 
-        /**
-         * Records a load invocation for assertions.
-         *
-         * @param key tile key requested for loading
-         */
+        /** Keys that have been passed to {@link #loadTile(TileKey)}. */
+        private final java.util.Set<TileKey> loadedKeys = new java.util.HashSet<>();
+
         @Override
         public void loadTile(TileKey key) {
             loadCalls++;
+            loadedKeys.add(key);
             loading.remove(key);
+        }
+    }
+
+    /**
+     * Test double whose loads never complete (does not clear {@link TileProvider#loading}), used
+     * to verify the in-flight budget is respected across multiple frames.
+     */
+    private static final class NonCompletingTileProvider extends TileProvider<TileKey> {
+
+        @Override
+        public void loadTile(TileKey key) {
+            // Intentionally left in-flight.
         }
     }
 }

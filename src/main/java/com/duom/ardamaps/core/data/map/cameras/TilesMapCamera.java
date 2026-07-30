@@ -163,6 +163,44 @@ public abstract class TilesMapCamera extends MapCamera {
     }
 
     /**
+     * Returns every tile at the given zoom level within the full dimension bounds, ignoring the
+     * current viewport. Used to preload/pin a complete coarse-LOD pyramid so a fallback tile is
+     * always available, independent of what happens to be on screen at configure time.
+     *
+     * @param tileZoom The zoom level to enumerate.
+     * @return The set of tile keys covering the full dimension bounds at the given zoom level.
+     */
+    public @NonNull Set<PmTileKey> getAllTilesAtZoom(int tileZoom) {
+
+        int blocksPerTile = numberOfBlocksPerTile(tileZoom);
+
+        int minTileX = (int) Math.floor((double) dimension.getXMin() / blocksPerTile);
+        int maxTileX = (int) Math.floor((double) dimension.getXMax() / blocksPerTile);
+        int minTileY = (int) Math.floor((double) dimension.getZMin() / blocksPerTile);
+        int maxTileY = (int) Math.floor((double) dimension.getZMax() / blocksPerTile);
+
+        return getVisibleExploredTiles(tileZoom, minTileX, maxTileX, minTileY, maxTileY, blocksPerTile);
+    }
+
+    /**
+     * Chebyshev distance, in tiles, between the given tile and the tile currently under the camera
+     * centre at the same zoom level. Used to prioritize tile loading centre-out.
+     *
+     * @param tileX    Tile X coordinate.
+     * @param tileY    Tile Y coordinate.
+     * @param tileZoom Zoom level the tile belongs to.
+     * @return The Chebyshev distance in tile units from the viewport-centre tile.
+     */
+    public int centerTileDistance(int tileX, int tileY, int tileZoom) {
+
+        int blocksPerTile = numberOfBlocksPerTile(tileZoom);
+        int centerTileX = (int) Math.floor(getWorldX() / blocksPerTile);
+        int centerTileY = (int) Math.floor(getWorldZ() / blocksPerTile);
+
+        return Math.max(Math.abs(tileX - centerTileX), Math.abs(tileY - centerTileY));
+    }
+
+    /**
      * Check whether a tile is at least partially explored. If current exploration is null, return true.
      *
      * @param exploration   the exploration state to check against

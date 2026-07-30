@@ -65,7 +65,12 @@ class PMTilesProviderTest {
         awaitTrue(() -> !provider.loading.contains(key));
 
         assertTrue(provider.peek(key).isEmpty());
-        assertEquals(0, provider.get(key).map(_ -> 1).orElse(0), "Transport-failed key must not load");
+
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
+
+        assertTrue(provider.peek(key).isEmpty(), "Transport-failed key must not load");
     }
 
     /**

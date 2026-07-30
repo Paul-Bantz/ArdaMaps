@@ -26,13 +26,19 @@
 package com.duom.ardamaps.core.data.map.providers;
 
 import com.duom.ardamaps.ArdaMapsClient;
-import com.duom.ardamaps.core.data.map.tiles.TileKey;
+import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Tile provider that fetches map tiles from a BlueMap server.
+ * <p>
+ * Typed on {@link PmTileKey} (not the bare {@link com.duom.ardamaps.core.data.map.tiles.TileKey})
+ * because {@code TileKey.equals}/{@code PmTileKey.equals} compare {@code getClass()}: every key the
+ * BlueMap renderer actually passes in is a {@code PmTileKey}, and a bare {@code TileKey} would
+ * silently miss every cache lookup against it.
+ * </p>
  */
-public class BlueMapTileProvider extends TileProvider<TileKey> {
+public class BlueMapTileProvider extends TileProvider<PmTileKey> {
 
     /** The minimum level of detail (LOD) to load. */
     private final int minLod;
@@ -64,7 +70,7 @@ public class BlueMapTileProvider extends TileProvider<TileKey> {
      * @param key The tile key identifying the tile to load.
      */
     @Override
-    protected void loadTile(TileKey key) {
+    protected void loadTile(PmTileKey key) {
 
         if (key.z < minLod || key.z > maxLod) {
             clearLoading(key);
@@ -84,7 +90,7 @@ public class BlueMapTileProvider extends TileProvider<TileKey> {
      * @param key The tile key.
      * @return The URL string for the tile.
      */
-    private @NotNull String getUrlForKey(TileKey key) {
+    private @NotNull String getUrlForKey(PmTileKey key) {
 
         return "%s/%d/x%d/z%d.png".formatted(blueMapRoot, key.z, key.x, key.y);
     }
@@ -96,7 +102,7 @@ public class BlueMapTileProvider extends TileProvider<TileKey> {
      * </p>
      */
     @Override
-    public String getTileSourceUrl(TileKey key) {
+    public String getTileSourceUrl(PmTileKey key) {
 
         return getUrlForKey(key);
     }

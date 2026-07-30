@@ -105,8 +105,11 @@ public class PmTilesRenderer extends MapRenderable {
             mapCamera.setPreferredRenderScale(renderScale);
             mapCamera.setZoomToMatchVisualPixelsPerBlock();
 
-            // Eagerly preload minimum zoom tiles so fallbacks are available as quickly as possible
-            mapCamera.getVisibleTiles(tileProvider.getMinZoom()).forEach(key -> tileProvider.eagerLoadTile(key));
+            // Pin the coarsest zoom outside the LRU so it can never be evicted by request churn at
+            // other zoom levels, and eagerly preload it over the full map bounds so a fallback tile
+            // is available everywhere as soon as possible.
+            tileProvider.setPinnedZoom(tileProvider.getMinZoom());
+            mapCamera.getAllTilesAtZoom(tileProvider.getMinZoom()).forEach(key -> tileProvider.eagerLoadTile(key));
 
         } catch (IOException e) {
 
@@ -136,26 +139,47 @@ public class PmTilesRenderer extends MapRenderable {
     }
 
     /**
+     * Priority offset for primary-zoom tile requests, keeping them behind every coarse-zoom
+     * request regardless of distance from the viewport centre. Coarse tiles are cheap, pinned,
+     * and back the fallback pyramid, so they always win the provider's limited submission budget.
+     */
+    private static final int PRIMARY_PRIORITY_BASE = 10_000;
+
+    /**
      * Renders the visible map tiles in a single pass.
      * For each tile at the current zoom level, if it is not yet loaded, its coarse fallback tile
+     * <p>
+     * Tile loading is bounded and prioritised via {@link TileProvider#beginFrame()} /
+     * {@link TileProvider#request} / {@link TileProvider#endFrame()}, ranked by distance from the
+     * viewport centre. Primary-zoom requests are only registered once the camera has settled
+     * ({@link com.duom.ardamaps.core.data.map.cameras.MapCamera#isSettled()}); during a fast pan or
+     * zoom only the pinned coarse fallback pyramid is requested.
+     * </p>
      *
      * @param context the draw context
      */
     private void renderMap(GuiGraphicsExtractor context) {
 
         int minZoom = tileProvider.getMinZoom();
+        boolean settled = mapCamera.isSettled();
 
-        // Preload min-zoom tiles so fallbacks are always available
-        Set<PmTileKey> minZoomTiles = mapCamera.getVisibleTiles(minZoom);
-        minZoomTiles.forEach(key -> tileProvider.get(key));
+        tileProvider.beginFrame();
+
+        // Coarse tiles are cheap, pinned outside the LRU, and back the fallback pyramid -
+        // always request them, ranked purely by distance from the viewport centre.
+        for (PmTileKey key : mapCamera.getVisibleTiles(minZoom)) {
+            tileProvider.request(key, mapCamera.centerTileDistance(key.x, key.y, minZoom));
+        }
 
         Set<PmTileKey> tilesToDisplay = mapCamera.getVisibleTiles();
 
-        // Trigger load for current-zoom tiles
-        tilesToDisplay.forEach(key -> tileProvider.get(key));
-
         boolean debugMode = ArdaMapsClient.CONFIG.isMapDebugDisplay();
         for (PmTileKey key : tilesToDisplay) {
+
+            if (settled) {
+                int ring = mapCamera.centerTileDistance(key.x, key.y, key.z);
+                tileProvider.request(key, PRIMARY_PRIORITY_BASE + ring);
+            }
 
             Optional<Identifier> tex = tileProvider.peek(key);
 
@@ -195,6 +219,8 @@ public class PmTilesRenderer extends MapRenderable {
 
             if (debugMode) drawDebugLines(context, renderKey, roundedX, roundedY, renderSize);
         }
+
+        tileProvider.endFrame();
     }
 
     /**
