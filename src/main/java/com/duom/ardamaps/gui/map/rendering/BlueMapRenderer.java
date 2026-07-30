@@ -61,17 +61,10 @@ public class BlueMapRenderer extends MapRenderable {
     /**
      * Priority offset for coarse-LOD tiles within the current viewport - the immediate visual
      * fallback for a primary tile that hasn't loaded yet. Ranked behind primary-LOD tiles (whose
-     * priority is just their centre-tile ring, 0-based) but well ahead of background pyramid
-     * maintenance, so a viewport miss still resolves quickly.
+     * priority is just their centre-tile ring, 0-based), so a viewport miss still resolves quickly
+     * without displacing what's actually on screen.
      */
     private static final int VIEWPORT_FALLBACK_PRIORITY_BASE = 10_000;
-
-    /**
-     * Priority offset for coarse-LOD tiles outside the current viewport - world-wide fallback
-     * coverage for areas nobody is looking at yet. Always the least urgent tier: this work must
-     * never displace anything actually on screen.
-     */
-    private static final int BACKGROUND_PRIORITY_BASE = 1_000_000;
 
     /** Camera for managing view and visible tiles */
     private final BlueMapCamera mapCamera;
@@ -147,16 +140,16 @@ public class BlueMapRenderer extends MapRenderable {
      * Renders the map tiles in LOD-grouped batched passes.
      * <p>
      * Tile loading is bounded and prioritised via {@link TileProvider#beginFrame()} /
-     * {@link TileProvider#request(TileKey, int)} / {@link TileProvider#endFrame()} across three
+     * {@link TileProvider#request(TileKey, int)} / {@link TileProvider#endFrame()} across two
      * tiers, most urgent first: primary-LOD tiles actually in the viewport (tier 0, ranked by
-     * distance from the viewport centre), coarse-LOD tiles in the viewport backing the immediate
-     * visual fallback (tier 1), and coarse-LOD tiles outside the viewport maintaining world-wide
-     * fallback coverage (tier 2). A tile requested by more than one tier keeps its most urgent
-     * priority ({@link TileProvider#request} takes the min). Primary-LOD requests are only
-     * registered once the camera has been still for a short delay ({@link MapCamera#isSettled()}) -
-     * during a fast pan or zoom animation only the (already pinned, cheap) coarse fallback pyramid
-     * is requested, so the queue never fills with tiles that will have scrolled off screen before
-     * they load.
+     * distance from the viewport centre), and coarse-LOD tiles in the viewport backing the
+     * immediate visual fallback (tier 1). Loading is scoped strictly to what's currently visible -
+     * there is no proactive background preload for parts of the map the player hasn't panned to, so
+     * the in-flight count tracks the viewport rather than the whole map. Primary-LOD requests are
+     * only registered once the camera has been still for a short delay
+     * ({@link MapCamera#isSettled()}) - during a fast pan or zoom animation only the (pinned, cheap)
+     * viewport coarse fallback is requested, so the queue never fills with tiles that will have
+     * scrolled off screen before they load.
      * </p>
      * <p>
      * A single classification loop separates tiles into:
@@ -180,13 +173,6 @@ public class BlueMapRenderer extends MapRenderable {
         boolean debugMode = ArdaMapsClient.CONFIG.isMapDebugDisplay();
 
         provider.beginFrame();
-
-        // Tier 2: background pyramid maintenance across the full map, lowest urgency. Requested
-        // first so tiers 0/1 below can override with a more urgent priority via request()'s
-        // min-merge; almost always a cheap peek() cache hit once the pyramid has loaded once.
-        for (PmTileKey key : mapCamera.getAllTilesAtZoom(coarsestZoom)) {
-            provider.request(key, BACKGROUND_PRIORITY_BASE + mapCamera.centerTileDistance(key.x, key.y, coarsestZoom));
-        }
 
         // Tier 1: coarse-LOD tiles within the current viewport - the immediate visual fallback.
         for (PmTileKey key : mapCamera.getVisibleTiles(coarsestZoom)) {
@@ -237,19 +223,24 @@ public class BlueMapRenderer extends MapRenderable {
 
         provider.endFrame();
 
-        // Pass 1: primary LOD tiles (all same lod -> one uniform update)
-        if (!primaryTiles.isEmpty()) {
-            drawTilePass(context, primaryTiles, primaryZ, debugMode);
-        }
-
-        // Pass 2: fallback tiles, grouped by their actual resolved LOD.
-        // Each unique lod gets exactly one uniform update before its tiles are drawn.
+        // Pass 1: fallback tiles (coarse base layer), grouped by their actual resolved LOD.
+        // Each unique lod gets exactly one uniform update before its tiles are drawn. Drawn
+        // *before* the primary pass: these are opaque quads painted in plain 2D order (no depth
+        // test), and a single coarse tile's footprint overlaps several primary-tile positions -
+        // drawing it after primary would repaint over already-finished primary tiles every frame,
+        // hiding them until every primary tile in view had loaded.
         if (!fallbackMap.isEmpty()) {
             Map<Integer, List<TileDraw>> byLod = new LinkedHashMap<>();
             for (TileDraw tile : fallbackMap.values()) {
                 byLod.computeIfAbsent(tile.key().z, _ -> new ArrayList<>()).add(tile);
             }
             byLod.forEach((lod, tiles) -> drawTilePass(context, tiles, lod, debugMode));
+        }
+
+        // Pass 2: primary LOD tiles (all same lod -> one uniform update), drawn on top of the
+        // coarse base layer wherever they've finished loading.
+        if (!primaryTiles.isEmpty()) {
+            drawTilePass(context, primaryTiles, primaryZ, debugMode);
         }
 
     }

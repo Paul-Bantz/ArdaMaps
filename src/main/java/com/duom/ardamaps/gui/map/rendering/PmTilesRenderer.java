@@ -142,31 +142,24 @@ public class PmTilesRenderer extends MapRenderable {
     /**
      * Priority offset for coarse-zoom tiles within the current viewport - the immediate visual
      * fallback for a primary tile that hasn't loaded yet. Ranked behind primary-zoom tiles (whose
-     * priority is just their centre-tile ring, 0-based) but well ahead of background pyramid
-     * maintenance, so a viewport miss still resolves quickly.
+     * priority is just their centre-tile ring, 0-based), so a viewport miss still resolves quickly
+     * without displacing what's actually on screen.
      */
     private static final int VIEWPORT_FALLBACK_PRIORITY_BASE = 10_000;
-
-    /**
-     * Priority offset for coarse-zoom tiles outside the current viewport - world-wide fallback
-     * coverage for areas nobody is looking at yet. Always the least urgent tier: this work must
-     * never displace anything actually on screen.
-     */
-    private static final int BACKGROUND_PRIORITY_BASE = 1_000_000;
 
     /**
      * Renders the visible map tiles in a single pass.
      * For each tile at the current zoom level, if it is not yet loaded, its coarse fallback tile
      * <p>
      * Tile loading is bounded and prioritised via {@link TileProvider#beginFrame()} /
-     * {@link TileProvider#request} / {@link TileProvider#endFrame()} across three tiers, most
-     * urgent first: primary-zoom tiles actually in the viewport (ranked by distance from the
-     * viewport centre), coarse-zoom tiles in the viewport backing the immediate visual fallback,
-     * and coarse-zoom tiles outside the viewport maintaining world-wide fallback coverage. A tile
-     * requested by more than one tier keeps its most urgent priority ({@link TileProvider#request}
-     * takes the min). Primary-zoom requests are only registered once the camera has settled
+     * {@link TileProvider#request} / {@link TileProvider#endFrame()} across two tiers, most urgent
+     * first: primary-zoom tiles actually in the viewport (ranked by distance from the viewport
+     * centre), and coarse-zoom tiles in the viewport backing the immediate visual fallback. Loading
+     * is scoped strictly to what's currently visible - there is no proactive background preload for
+     * parts of the map the player hasn't panned to. Primary-zoom requests are only registered once
+     * the camera has settled
      * ({@link com.duom.ardamaps.core.data.map.cameras.MapCamera#isSettled()}); during a fast pan or
-     * zoom only the coarse fallback pyramid is requested.
+     * zoom only the viewport's coarse fallback is requested.
      * </p>
      *
      * @param context the draw context
@@ -177,13 +170,6 @@ public class PmTilesRenderer extends MapRenderable {
         boolean settled = mapCamera.isSettled();
 
         tileProvider.beginFrame();
-
-        // Tier 2: background pyramid maintenance across the full map, lowest urgency. Requested
-        // first so the tiers below can override with a more urgent priority via request()'s
-        // min-merge; almost always a cheap peek() cache hit once the pyramid has loaded once.
-        for (PmTileKey key : mapCamera.getAllTilesAtZoom(minZoom)) {
-            tileProvider.request(key, BACKGROUND_PRIORITY_BASE + mapCamera.centerTileDistance(key.x, key.y, minZoom));
-        }
 
         // Tier 1: coarse-zoom tiles within the current viewport - the immediate visual fallback.
         for (PmTileKey key : mapCamera.getVisibleTiles(minZoom)) {
