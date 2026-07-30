@@ -123,9 +123,12 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
         UUID requestId = buf.readUuid();
         T packet = reader.apply(buf);
         Consumer<U> responder = response -> respond(sender, requestId, response);
-        U immediate = handle(server, player, handler, packet, sender, responder);
 
-        if (immediate != null) responder.accept(immediate);
+        server.execute(() -> {
+            U immediate = handle(server, player, handler, packet, sender, responder);
+
+            if (immediate != null) responder.accept(immediate);
+        });
     }
 
     /**
@@ -198,7 +201,7 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
         U packet = responseReader.apply(buf);
         Consumer<U> consumer = responseConsumers.remove(requestId);
         if (consumer != null) {
-            consumer.accept(packet);
+            client.execute(() -> consumer.accept(packet));
         }
     }
 }

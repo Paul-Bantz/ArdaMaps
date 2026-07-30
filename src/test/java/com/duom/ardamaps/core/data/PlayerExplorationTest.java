@@ -209,6 +209,20 @@ class PlayerExplorationTest {
     }
 
     /**
+     * Marking a ranged cell on the western edge must clamp negative neighbor coordinates instead of wrapping them into
+     * the previous row's last column.
+     */
+    @Test
+    void markCell_westernEdgeRange_doesNotWrapToPreviousRow() {
+
+        PlayerExploration pe = PlayerExploration.create(OFFSET_DIM, null);
+
+        pe.markCell(0, 1, ExplorationState.REVEALED, 2);
+
+        assertEquals(HIDDEN, pe.stateAt(pe.getNbCellsX() - 1, 0));
+    }
+
+    /**
      * Integration test: world coords flow through toCellX/Z -> stateAt.
      * If any step in the pipeline has an off-by-one, this test catches it at the level that LocationProvider actually calls in production.
      */

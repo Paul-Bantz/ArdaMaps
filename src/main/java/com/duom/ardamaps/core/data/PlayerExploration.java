@@ -538,6 +538,11 @@ public class PlayerExploration implements Serializable {
      * @param state The new state.
      */
     private void updateExplorationState(int cellX, int cellY, ExplorationState state) {
+        if (!inBounds(cellX, cellY)) {
+            LOGGER.warn("Attempted to update exploration state for out-of-bounds cell ({}, {})", cellX, cellY);
+            return;
+        }
+
         var index = index(cellX, cellY);
         if (index < 0 || index >= explorationData.length) {
             LOGGER.warn("Attempted to update exploration state for out-of-bounds cell ({}, {})", cellX, cellY);

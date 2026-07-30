@@ -52,6 +52,12 @@ public record PlayerExplorationPacket(String dimensionId,
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(PlayerExplorationPacket.class);
 
+    /** Maximum number of polygons accepted in one polygon collection. */
+    private static final int MAX_POLYGONS = 1024;
+
+    /** Maximum number of points accepted in a single polygon. */
+    private static final int MAX_POINTS_PER_POLYGON = 16_384;
+
     /** Empty packet */
     public static final PlayerExplorationPacket EMPTY = new PlayerExplorationPacket("", "", List.of(), List.of());
 
@@ -100,7 +106,7 @@ public record PlayerExplorationPacket(String dimensionId,
      */
     private static List<List<Vec2d>> readPolygonFromBuffer(PacketByteBuf buf) {
 
-        int polygonCount = buf.readVarInt();
+        int polygonCount = readCount(buf, "polygon", MAX_POLYGONS);
 
         if (polygonCount == 0)
             return List.of();
@@ -108,7 +114,7 @@ public record PlayerExplorationPacket(String dimensionId,
         List<List<Vec2d>> polygons = new ArrayList<>(polygonCount);
 
         for (int i = 0; i < polygonCount; i++) {
-            int pointCount = buf.readVarInt();
+            int pointCount = readCount(buf, "polygon point", MAX_POINTS_PER_POLYGON);
             List<Vec2d> polygon = new ArrayList<>(pointCount);
 
             for (int j = 0; j < pointCount; j++) {
@@ -121,6 +127,29 @@ public record PlayerExplorationPacket(String dimensionId,
         }
 
         return polygons;
+    }
+
+    /**
+     * Reads and validates a VarInt collection size from the packet.
+     *
+     * @param buf   The packet buffer.
+     * @param label Human-readable field label for error messages.
+     * @param max   Maximum accepted count.
+     * @return The validated count.
+     */
+    private static int readCount(PacketByteBuf buf, String label, int max) {
+
+        int count = buf.readVarInt();
+
+        if (count < 0) {
+            throw new IllegalArgumentException("Player exploration " + label + " count cannot be negative: " + count);
+        }
+
+        if (count > max) {
+            throw new IllegalArgumentException("Player exploration " + label + " count exceeds maximum of " + max + ": " + count);
+        }
+
+        return count;
     }
 
     /**

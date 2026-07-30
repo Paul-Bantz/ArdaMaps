@@ -68,6 +68,13 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
             .setPrettyPrinting()
             .create();
 
+    /**
+     * @return The shared Gson instance with ArdaMaps' custom type adapters registered.
+     */
+    public static Gson gson() {
+        return GSON;
+    }
+
     /** Location configuration file */
     protected final Path locationFile;
 

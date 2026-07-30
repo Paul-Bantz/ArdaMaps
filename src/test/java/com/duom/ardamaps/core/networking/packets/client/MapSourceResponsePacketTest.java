@@ -29,6 +29,7 @@ import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.config.MapLayerSource;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -114,5 +115,104 @@ class MapSourceResponsePacketTest {
         assertEquals(ranges, parsed.dimensions().get(0).getMapLayers().get(0).ranges());
         assertNull(parsed.dimensions().get(0).getMapLayers().get(0).path());
         assertEquals(layer(ranges), parsed.dimensions().get(0).getMapLayers().get(0));
+    }
+
+    /**
+     * Unknown layer types from a newer server should not crash the client; only the unknown layer is skipped.
+     */
+    @Test
+    void read_unknownLayerType_skipsLayer() {
+
+        var buf = PacketByteBufs.create();
+        buf.writeBoolean(false);
+        buf.writeBoolean(false);
+        buf.writeInt(1);
+        writeDimensionHeader(buf);
+        buf.writeInt(1);
+        writeLayer(buf, "New Layer", "FUTURE_LAYER_TYPE");
+        buf.readerIndex(0);
+
+        MapSourceResponsePacket parsed = MapSourceResponsePacket.read(buf);
+
+        assertEquals(1, parsed.dimensions().size());
+        assertTrue(parsed.dimensions().get(0).getMapLayers().isEmpty());
+    }
+
+    /**
+     * Negative collection sizes must be rejected before list allocation.
+     */
+    @Test
+    void read_negativeDimensionsCount_rejectsBeforeAllocation() {
+
+        var buf = PacketByteBufs.create();
+        buf.writeBoolean(false);
+        buf.writeBoolean(false);
+        buf.writeInt(-1);
+        buf.readerIndex(0);
+
+        assertThrows(IllegalArgumentException.class, () -> MapSourceResponsePacket.read(buf));
+    }
+
+    /**
+     * Absurd collection sizes must be rejected before list allocation.
+     */
+    @Test
+    void read_oversizedLayersCount_rejectsBeforeAllocation() {
+
+        var buf = PacketByteBufs.create();
+        buf.writeBoolean(false);
+        buf.writeBoolean(false);
+        buf.writeInt(1);
+        writeDimensionHeader(buf);
+        buf.writeInt(129);
+        buf.readerIndex(0);
+
+        assertThrows(IllegalArgumentException.class, () -> MapSourceResponsePacket.read(buf));
+    }
+
+    /**
+     * Writes a minimal dimension header for hand-built decode tests.
+     *
+     * @param buf The packet buffer to write to.
+     */
+    private static void writeDimensionHeader(net.minecraft.network.PacketByteBuf buf) {
+
+        buf.writeFloat(1f);
+        buf.writeString("Test");
+        buf.writeString("test:dimension");
+        buf.writeBoolean(false);
+        buf.writeInt(0);
+        buf.writeInt(1000);
+        buf.writeInt(0);
+        buf.writeInt(1000);
+        buf.writeBoolean(false);
+    }
+
+    /**
+     * Writes a complete layer record with no ranges.
+     *
+     * @param buf      The packet buffer to write to.
+     * @param name     Layer name.
+     * @param typeName Serialized layer type.
+     */
+    @SuppressWarnings("SameParameterValue")
+    private static void writeLayer(net.minecraft.network.PacketByteBuf buf, String name, String typeName) {
+
+        buf.writeString(name);
+        buf.writeString(typeName);
+        buf.writeBoolean(true);
+        buf.writeInt(8);
+        buf.writeDouble(7d);
+        buf.writeDouble(2d);
+        buf.writeInt(1);
+        buf.writeInt(3);
+        buf.writeInt(1);
+        buf.writeInt(14);
+        buf.writeInt(512);
+        buf.writeDouble(1.25);
+        buf.writeBoolean(true);
+        buf.writeString("fallback.pmtiles");
+        buf.writeString("fallback.png");
+        buf.writeInt(0);
     }
 }

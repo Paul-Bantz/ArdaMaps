@@ -114,6 +114,17 @@ public class PlayerExplorationEventHandler extends ServerToClientPacketHandler<P
             int minCellZ = exploration.toCellZ(minZ);
             int maxCellZ = exploration.toCellZ(maxZ);
 
+            if (maxCellX < 0 || maxCellZ < 0
+                    || minCellX >= exploration.getNbCellsX()
+                    || minCellZ >= exploration.getNbCellsY()) {
+                continue;
+            }
+
+            minCellX = Math.max(0, minCellX);
+            maxCellX = Math.min(exploration.getNbCellsX() - 1, maxCellX);
+            minCellZ = Math.max(0, minCellZ);
+            maxCellZ = Math.min(exploration.getNbCellsY() - 1, maxCellZ);
+
             for (int cellX = minCellX; cellX <= maxCellX; cellX++) {
                 for (int cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
 

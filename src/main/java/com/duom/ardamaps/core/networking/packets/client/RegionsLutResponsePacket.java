@@ -26,16 +26,18 @@
 package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
+import com.duom.ardamaps.core.data.config.ConfigManager;
 import com.duom.ardamaps.core.data.map.RegionLookupTexture;
+import com.google.gson.JsonSyntaxException;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.network.PacketByteBuf;
-import org.apache.commons.lang3.SerializationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -46,6 +48,9 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(RegionsLutResponsePacket.class);
+
+    /** Maximum compressed region LUT payload accepted from the wire. */
+    private static final int MAX_COMPRESSED_DATA_LENGTH = 8 * 1024 * 1024;
 
     /** A static instance representing an empty response, used when no data is available or an error occurs. */
     public static final RegionsLutResponsePacket EMPTY = new RegionsLutResponsePacket(null);
@@ -62,7 +67,7 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
 
         if (dataLength != 0) {
 
-            RegionLookupTexture regionLut = RegionLookupTexture.DEFAULT;
+            validateDataLength(dataLength, buf.readableBytes());
             byte[] compressedData = new byte[dataLength];
             buf.readBytes(compressedData);
 
@@ -71,16 +76,15 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
                 ByteArrayInputStream outputStream = new ByteArrayInputStream(compressedData);
 
                 try (GZIPInputStream gzip = new GZIPInputStream(outputStream)) {
-                    var serializedData = gzip.readAllBytes();
-                    regionLut = SerializationUtils.deserialize(serializedData);
+                    var json = new String(gzip.readAllBytes(), StandardCharsets.UTF_8);
+                    var regionLut = ConfigManager.gson().fromJson(json, RegionLookupTexture.class);
+                    return new RegionsLutResponsePacket(regionLut);
                 }
 
-            } catch (IOException e) {
+            } catch (IOException | JsonSyntaxException e) {
 
-                LOGGER.error("Error decompressing Region LUT data from network packet", e);
+                throw new IllegalStateException("Unable to read Region LUT data from network packet", e);
             }
-
-            return new RegionsLutResponsePacket(regionLut);
         }
 
         return RegionsLutResponsePacket.EMPTY;
@@ -100,7 +104,7 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
 
         if (hasData) {
 
-            byte[] serializedData = SerializationUtils.serialize(data);
+            byte[] serializedData = ConfigManager.gson().toJson(data, RegionLookupTexture.class).getBytes(StandardCharsets.UTF_8);
 
             try {
 
@@ -124,5 +128,28 @@ public record RegionsLutResponsePacket(RegionLookupTexture data) implements IPac
         }
 
         return buf;
+    }
+
+    /**
+     * Validates the compressed payload size before allocating the target byte array.
+     *
+     * @param dataLength    Declared compressed payload length.
+     * @param readableBytes Remaining readable bytes in the packet buffer.
+     */
+    private static void validateDataLength(int dataLength, int readableBytes) {
+
+        if (dataLength < 0) {
+            throw new IllegalArgumentException("Region LUT response data length cannot be negative: " + dataLength);
+        }
+
+        if (dataLength > MAX_COMPRESSED_DATA_LENGTH) {
+            throw new IllegalArgumentException("Region LUT response data length exceeds maximum of "
+                    + MAX_COMPRESSED_DATA_LENGTH + " bytes: " + dataLength);
+        }
+
+        if (dataLength > readableBytes) {
+            throw new IllegalArgumentException("Region LUT response data length " + dataLength
+                    + " exceeds readable packet bytes " + readableBytes);
+        }
     }
 }
