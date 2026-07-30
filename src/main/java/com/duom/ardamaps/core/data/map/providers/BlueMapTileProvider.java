@@ -66,8 +66,10 @@ public class BlueMapTileProvider extends TileProvider<TileKey> {
     @Override
     protected void loadTile(TileKey key) {
 
-        if (key.z < minLod || key.z > maxLod)
+        if (key.z < minLod || key.z > maxLod) {
+            clearLoading(key);
             return; // Always skip out-of-range tiles
+        }
 
         ArdaMapsClient.getHttpImageProvider().loadImage(
                 getUrlForKey(key),

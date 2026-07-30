@@ -59,7 +59,10 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
     @Override
     public void loadTile(PmTileKey key) {
 
-        if (reader == null) return;
+        if (reader == null) {
+            clearLoading(key);
+            return;
+        }
 
         CompletableFuture.supplyAsync(() -> {
 
@@ -69,6 +72,9 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
             } catch (IOException e) {
                 LOGGER.error("Failed to read tile {} from PMTiles source", key, e);
                 markTransportFailure(key);
+                return null;
+            } catch (RuntimeException e) {
+                LOGGER.error("Unexpected error reading tile {} from PMTiles source", key, e);
                 return null;
             }
 
@@ -85,9 +91,20 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
                 // Decode failures are not transport failures; keep key retriable.
                 LOGGER.error("Failed to decode tile {}", key, e);
                 return null;
+            } catch (RuntimeException e) {
+                LOGGER.error("Unexpected error decoding tile {}", key, e);
+                return null;
             }
 
-        }, ArdaMapsClient.IMAGE_EXECUTOR).thenAccept(image -> registerTexture("pmtiles_", image, key));
+        }, ArdaMapsClient.IMAGE_EXECUTOR).whenComplete((image, ex) -> {
+            if (ex != null) {
+                LOGGER.error("Unexpected async failure loading PMTiles tile {}", key, ex);
+                clearLoading(key);
+                return;
+            }
+
+            registerTexture("pmtiles_", image, key);
+        });
     }
 
     /**
@@ -103,5 +120,24 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
         var header = reader.getHeader();
         this.minZoom = Math.max(header.minZoom(), 0);
         this.maxZoom = Math.max(header.maxZoom(), 1);
+    }
+
+    /**
+     * Releases PMTiles reader resources and registered tile textures.
+     */
+    @Override
+    public void close() {
+
+        super.close();
+
+        if (reader != null) {
+            try {
+                reader.close();
+            } catch (IOException e) {
+                LOGGER.warn("Failed to close PMTiles reader", e);
+            } finally {
+                reader = null;
+            }
+        }
     }
 }

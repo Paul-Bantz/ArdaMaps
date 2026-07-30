@@ -137,6 +137,12 @@ public class MapScreen extends ArdaMapsScreen {
     /** The currently displayed map renderable */
     private MapRenderable mapRenderer;
 
+    /** Monotonic token used to discard stale asynchronous layer loads. */
+    private int layerLoadGeneration;
+
+    /** Whether this screen has been removed and must reject completed layer loads. */
+    private boolean removed;
+
     /** Right click Context menu for the map */
     private ContextMenu mapContextMenu;
 
@@ -487,48 +493,50 @@ public class MapScreen extends ArdaMapsScreen {
                     contentArea.topLeftY() + contentArea.guiHeight()
             );
 
-            // Fill the world bounds with a dark background, clipped to content area
-            if (mapCamera != null) {
+            try {
+                // Fill the world bounds with a dark background, clipped to content area
+                if (mapCamera != null) {
 
-                // Enforce minimum zoom to prevent seeing outside world bounds when map is smaller than content area
-                mapCamera.computeZoomLevelToFitContentArea(contentArea.guiWidth(), contentArea.guiHeight());
+                    // Enforce minimum zoom to prevent seeing outside world bounds when map is smaller than content area
+                    mapCamera.computeZoomLevelToFitContentArea(contentArea.guiWidth(), contentArea.guiHeight());
 
-                // Drive zoom/pan damping every render frame so the animation
-                // is truly frame-rate independent and does not jump on frame skips.
-                if (!animation.isRunning())
-                    mapCamera.update(client.getLastFrameDuration(), contentArea.topLeftX(), contentArea.topLeftY());
+                    // Drive zoom/pan damping every render frame so the animation
+                    // is truly frame-rate independent and does not jump on frame skips.
+                    if (!animation.isRunning())
+                        mapCamera.update(client.getLastFrameDuration(), contentArea.topLeftX(), contentArea.topLeftY());
 
-                // Clear background with dark colour - will display if some areas of the map are not covered by tiles
-                context.fill(contentArea.topLeftX(),
-                        contentArea.topLeftY(),
-                        contentArea.topLeftX() + contentArea.guiWidth(),
-                        contentArea.topLeftY() + contentArea.guiHeight(),
-                        ModConstants.COLOR_DARKER_BLUE);
+                    // Clear background with dark colour - will display if some areas of the map are not covered by tiles
+                    context.fill(contentArea.topLeftX(),
+                            contentArea.topLeftY(),
+                            contentArea.topLeftX() + contentArea.guiWidth(),
+                            contentArea.topLeftY() + contentArea.guiHeight(),
+                            ModConstants.COLOR_DARKER_BLUE);
+                }
+
+                mapRenderer.render(context);
+
+                RenderSystem.enableBlend();
+                RenderSystem.defaultBlendFunc();
+
+                var selectedLocationType = markersSelectionDropdown.getSelected();
+                var focusedLocationPosition = locationContextPanel == null
+                        ? null
+                        : locationContextPanel.getDisplayedLocationPosition();
+                markerRenderer.render(
+                        context,
+                        textRenderer,
+                        mapCamera,
+                        mapFrameRenderer,
+                        selectedRange,
+                        focusedLocationPosition,
+                        selectedLocationType != null ? selectedLocationType.key : null,
+                        mouseOverMapWidgets(mouseX, mouseY),
+                        MAP_FRAME_PADDING,
+                        mouseX,
+                        mouseY);
+            } finally {
+                context.disableScissor();
             }
-
-            mapRenderer.render(context);
-
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-
-            var selectedLocationType = markersSelectionDropdown.getSelected();
-            var focusedLocationPosition = locationContextPanel == null
-                    ? null
-                    : locationContextPanel.getDisplayedLocationPosition();
-            markerRenderer.render(
-                    context,
-                    textRenderer,
-                    mapCamera,
-                    mapFrameRenderer,
-                    selectedRange,
-                    focusedLocationPosition,
-                    selectedLocationType != null ? selectedLocationType.key : null,
-                    mouseOverMapWidgets(mouseX, mouseY),
-                    MAP_FRAME_PADDING,
-                    mouseX,
-                    mouseY);
-
-            context.disableScissor();
 
             mapFrameRenderer.render(context, contentArea);
 
@@ -1220,16 +1228,21 @@ public class MapScreen extends ArdaMapsScreen {
 
         if (layerSelectionDropdown == null || layerSelectionDropdown.getSelected() == null) return;
 
+        final int generation = ++layerLoadGeneration;
+
         // Capture the current visual pixels-per-block so we can match zoom on the new map
         final double capturedRenderScale = (getCamera() != null) ? getCamera().getVisualPixelsPerBlock() : Double.NaN;
         MapLayerDefinition layer = layerSelectionDropdown.getSelected();
         MapLayerLoader.Input input = buildLayerLoaderInput(layer, capturedRenderScale);
 
         CompletableFuture.supplyAsync(() -> mapLayerLoader.load(input), ArdaMaps.IO_EXECUTOR)
-                .thenAcceptAsync(this::layerLoaded)
                 .whenComplete((result, ex) -> {
-                    if (ex != null)
+                    if (ex != null) {
                         LOGGER.error("Failed to load map layer", ex);
+                        return;
+                    }
+
+                    MinecraftClient.getInstance().execute(() -> layerLoaded(generation, result));
                 });
     }
 
@@ -1271,18 +1284,46 @@ public class MapScreen extends ArdaMapsScreen {
      *
      * @param mapRenderable The loaded MapRenderable, or null if loading failed
      */
-    private void layerLoaded(@Nullable MapRenderable mapRenderable) {
+    private void layerLoaded(int generation, @Nullable MapRenderable mapRenderable) {
 
         LOGGER.info("Map layer loaded: {}", mapRenderable != null ? "success" : "failed");
 
+        if (removed || generation != layerLoadGeneration) {
+            if (mapRenderable != null) mapRenderable.close();
+            return;
+        }
+
         if (mapRenderable != null) {
 
+            closeMapRenderer();
             mapRenderer = mapRenderable;
             explorationState = mapRenderable.getExploration();
-
             updateMapButtonPositions();
             coordinatesButton.visible = true;
         }
+    }
+
+    /**
+     * Closes the active map renderer if present.
+     */
+    private void closeMapRenderer() {
+
+        if (mapRenderer != null) {
+            mapRenderer.close();
+            mapRenderer = null;
+        }
+    }
+
+    /**
+     * Cleans up renderer resources when the screen is removed.
+     */
+    @Override
+    public void removed() {
+
+        removed = true;
+        layerLoadGeneration++;
+        closeMapRenderer();
+        super.removed();
     }
 
     /**

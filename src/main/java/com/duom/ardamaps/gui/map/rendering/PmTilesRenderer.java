@@ -35,11 +35,13 @@ import com.duom.ardamaps.core.data.map.providers.TileProvider;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
 import com.duom.ardamaps.gui.ModConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.Pair;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,6 +136,18 @@ public class PmTilesRenderer extends MapRenderable {
     }
 
     /**
+     * Releases tile provider resources owned by this renderer.
+     */
+    @Override
+    public void close() {
+
+        if (tileProvider != null) {
+            tileProvider.close();
+            tileProvider = null;
+        }
+    }
+
+    /**
      * Renders the visible map tiles in a single pass.
      * For each tile at the current zoom level, if it is not yet loaded, its coarse fallback tile
      *
@@ -152,12 +166,11 @@ public class PmTilesRenderer extends MapRenderable {
         // Trigger load for current-zoom tiles
         tilesToDisplay.forEach(key -> tileProvider.get(key));
 
-        RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST_MIPMAP_NEAREST);
-        RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
 
         boolean debugMode = ArdaMapsClient.CONFIG.isMapDebugDisplay();
+        var textureManager = MinecraftClient.getInstance().getTextureManager();
 
         for (PmTileKey key : tilesToDisplay) {
 
@@ -180,6 +193,11 @@ public class PmTilesRenderer extends MapRenderable {
             int roundedY = (int) Math.round(screenPos.y());
 
             Identifier currentTexture = tex.get();
+            RenderSystem.activeTexture(GL13.GL_TEXTURE0);
+            textureManager.bindTexture(currentTexture);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+            RenderSystem.setShaderTexture(0, currentTexture);
 
             var matrices = context.getMatrices();
             matrices.push();
@@ -211,7 +229,7 @@ public class PmTilesRenderer extends MapRenderable {
 
         PmTileKey current = key;
 
-        do {
+        while (current.z > minZoom) {
             current = new PmTileKey(
                     current.z - 1,
                     current.x >> 1,
@@ -221,7 +239,7 @@ public class PmTilesRenderer extends MapRenderable {
             Optional<Identifier> tex = tileProvider.get(current);
             if (tex.isPresent()) return new Pair<>(current, tex);
 
-        } while (current.z >= minZoom);
+        }
 
         return new Pair<>(key, Optional.empty());
     }

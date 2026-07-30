@@ -31,9 +31,11 @@ import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.FlatMapCamera;
 import com.duom.ardamaps.core.data.map.providers.HttpImageProvider;
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
 
 /**
  * A map renderable that can display WEBP images as map layers.
@@ -133,9 +135,11 @@ public class WebpRenderer extends MapRenderable {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
 
+        RenderSystem.activeTexture(GL13.GL_TEXTURE0);
+        MinecraftClient.getInstance().getTextureManager().bindTexture(texture);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
         RenderSystem.setShaderTexture(0, texture);
-        RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-        RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
 
         // Translate for sub-pixel accuracy
         var matrices = context.getMatrices();

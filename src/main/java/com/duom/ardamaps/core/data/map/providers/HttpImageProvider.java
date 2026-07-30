@@ -30,6 +30,7 @@ import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.ImageFileType;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.jakewharton.disklrucache.DiskLruCache;
 import com.sksamuel.scrimage.ImmutableImage;
 import com.sksamuel.scrimage.pixels.Pixel;
@@ -86,9 +87,14 @@ public class HttpImageProvider {
     /** Set of URLs currently being loaded (thread-safe) */
     private final Set<String> loading = ConcurrentHashMap.newKeySet();
 
+    /** Removal listener that destroys dynamic textures evicted from the in-memory cache. */
+    private final RemovalListener<String, TextureData> textureRemovalListener =
+            (ignoredUrl, data, ignoredCause) -> destroyTexture(data);
+
     /** Caffeine in-memory LRU cache for registered textures */
     private final Cache<String, TextureData> textures = Caffeine.newBuilder()
             .maximumSize(MAX_MEMORY_CACHE_SIZE)
+            .removalListener(textureRemovalListener)
             .build();
     /**
      * Maps every disk-cache key to their original URL.
@@ -186,6 +192,10 @@ public class HttpImageProvider {
      */
     public void close() {
 
+        textures.invalidateAll();
+        textures.cleanUp();
+        loading.clear();
+
         scheduler.shutdown();
         try {
             if (!scheduler.awaitTermination(5, TimeUnit.SECONDS))
@@ -202,6 +212,21 @@ public class HttpImageProvider {
                 LOGGER.error("Failed to close DiskLruCache", e);
             }
         }
+    }
+
+    /**
+     * Destroys a registered dynamic texture on the client thread.
+     *
+     * @param data Cached texture data.
+     */
+    private void destroyTexture(TextureData data) {
+
+        if (data == null || data.image() == null) return;
+
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null) return;
+
+        client.execute(() -> MinecraftClient.getInstance().getTextureManager().destroyTexture(data.image()));
     }
 
     // -------------------------------------------------------------------------
@@ -327,13 +352,28 @@ public class HttpImageProvider {
                 }
 
             } catch (IOException e) {
-                LOGGER.warn("Failed to load image @\"{}\"", url);
+                LOGGER.warn("Failed to load image @\"{}\"", url, e);
                 if (onIoFailure != null) onIoFailure.run();
+            } catch (RuntimeException e) {
+                LOGGER.error("Unexpected error loading image @\"{}\"", url, e);
             }
 
             return loadedImage;
 
-        }, ArdaMapsClient.IMAGE_EXECUTOR).thenAccept(onComplete);
+        }, ArdaMapsClient.IMAGE_EXECUTOR).whenComplete((loadedImage, ex) -> {
+            if (ex != null) {
+                LOGGER.error("Unexpected async failure loading image @\"{}\"", url, ex);
+                loading.remove(url);
+                return;
+            }
+
+            try {
+                onComplete.accept(loadedImage);
+            } catch (RuntimeException e) {
+                LOGGER.error("Image completion callback failed for @\"{}\"", url, e);
+                loading.remove(url);
+            }
+        });
     }
 
     /**

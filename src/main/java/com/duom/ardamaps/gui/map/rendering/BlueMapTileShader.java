@@ -59,6 +59,13 @@ public class BlueMapTileShader {
     }
 
     /**
+     * @return Whether the BlueMap tile shader is available.
+     */
+    public static boolean isLoaded() {
+        return BLUEMAP_TILE != null;
+    }
+
+    /**
      * Loads (or reloads) the BlueMap tile shader from the given resource manager.
      * Should be called from a {@link net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener}.
      *
@@ -67,9 +74,12 @@ public class BlueMapTileShader {
     public static void load(ResourceManager resourceManager) {
 
         try {
-            BLUEMAP_TILE = new ShaderProgram(resourceManager, "bluemap_tile", VertexFormats.POSITION_TEXTURE);
+            ShaderProgram shader = new ShaderProgram(resourceManager, "bluemap_tile", VertexFormats.POSITION_TEXTURE);
+            ShaderProgram previous = BLUEMAP_TILE;
+            BLUEMAP_TILE = shader;
+            if (previous != null) previous.close();
         } catch (IOException e) {
-            LOGGER.error("Unable to load bluemap_tile shader", e);
+            LOGGER.error("Unable to load bluemap_tile shader; keeping previous shader if available", e);
         }
     }
 

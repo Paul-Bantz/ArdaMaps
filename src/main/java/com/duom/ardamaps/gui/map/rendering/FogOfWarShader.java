@@ -55,6 +55,13 @@ public class FogOfWarShader {
     }
 
     /**
+     * @return Whether the fog-of-war shader is available.
+     */
+    public static boolean isLoaded() {
+        return FOG_OF_WAR != null;
+    }
+
+    /**
      * Initialize the fog of war shader.
      *
      * @param resourceManager The resource manager.
@@ -62,9 +69,12 @@ public class FogOfWarShader {
     public static void load(ResourceManager resourceManager) {
 
         try {
-            FOG_OF_WAR = new ShaderProgram(resourceManager, "fog_of_war", VertexFormats.POSITION_TEXTURE);
+            ShaderProgram shader = new ShaderProgram(resourceManager, "fog_of_war", VertexFormats.POSITION_TEXTURE);
+            ShaderProgram previous = FOG_OF_WAR;
+            FOG_OF_WAR = shader;
+            if (previous != null) previous.close();
         } catch (IOException e) {
-            LOGGER.error("Unable to load fog_of_war shader", e);
+            LOGGER.error("Unable to load fog_of_war shader; keeping previous shader if available", e);
         }
     }
 

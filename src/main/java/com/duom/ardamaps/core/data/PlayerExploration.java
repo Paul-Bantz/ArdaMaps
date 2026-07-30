@@ -226,6 +226,8 @@ public class PlayerExploration implements Serializable {
      */
     private void initialize() {
 
+        releaseTextureResources();
+
         fogMask = new NativeImage(nbCellsX, nbCellsY, true);
 
         fogTexture = new NativeImageBackedTexture(fogMask);
@@ -452,6 +454,16 @@ public class PlayerExploration implements Serializable {
      */
     public void dispose() {
 
+        releaseTextureResources();
+
+        if (dirtyCells != null) dirtyCells.clear();
+    }
+
+    /**
+     * Releases GPU and native texture resources without changing grid data.
+     */
+    private void releaseTextureResources() {
+
         if (fogTexture != null) {
 
             if (fogTextureId != null) {
@@ -472,7 +484,6 @@ public class PlayerExploration implements Serializable {
             fogMask = null;
         }
 
-        if (dirtyCells != null) dirtyCells.clear();
     }
 
     /**

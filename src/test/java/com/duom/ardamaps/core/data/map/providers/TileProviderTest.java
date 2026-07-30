@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>The first request for a key is buffered (not loaded immediately).</li>
  *   <li>A second request inside the debounce window triggers exactly one load.</li>
  *   <li>Expired buffered requests are pruned and treated as a fresh first request.</li>
- *   <li>Keys marked as transport-failed are never retried for the lifetime of the provider instance.</li>
+ *   <li>Keys marked as transport-failed are skipped only during the retry cooldown.</li>
  * </ul>
  */
 class TileProviderTest {
@@ -94,11 +94,10 @@ class TileProviderTest {
     }
 
     /**
-     * Verifies that keys marked with transport failure are permanently skipped by {@code get()}
-     * for the current provider instance and never re-enter the debounce pipeline.
+     * Verifies that keys marked with transport failure are skipped during the retry cooldown.
      */
     @Test
-    void get_transportFailure_doesNotRetry() {
+    void get_recentTransportFailure_doesNotRetry() {
 
         var provider = new TestTileProvider();
         var key = new TileKey(2, 9, 9);
@@ -108,8 +107,24 @@ class TileProviderTest {
         provider.get(key);
         provider.get(key);
 
-        assertEquals(0, provider.loadCalls, "Transport-failed keys must never be retried for this provider instance");
+        assertEquals(0, provider.loadCalls, "Recent transport-failed keys must not be retried");
         assertFalse(provider.pendingRequests.containsKey(key), "Transport-failed keys should not enter debounce buffer");
+    }
+
+    /**
+     * Verifies that transport-failure suppression expires, so a transient network blip does not blacklist a tile forever.
+     */
+    @Test
+    void get_expiredTransportFailure_reentersDebouncePipeline() {
+
+        var provider = new TestTileProvider();
+        var key = new TileKey(2, 9, 10);
+        provider.transportFailedKeys.put(key, System.currentTimeMillis() - TileProvider.TRANSPORT_FAILURE_TTL_MS - 1);
+
+        provider.get(key);
+
+        assertEquals(0, provider.loadCalls, "Expired failure should be treated as a new first request");
+        assertTrue(provider.pendingRequests.containsKey(key), "Expired failure should re-enter debounce buffer");
     }
 
     /**

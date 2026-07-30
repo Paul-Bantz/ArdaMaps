@@ -91,6 +91,13 @@ public abstract class MapRenderable {
     public abstract void render(DrawContext context);
 
     /**
+     * Releases resources owned by this renderable.
+     */
+    public void close() {
+        // Default renderables do not own closeable resources.
+    }
+
+    /**
      * Renders a loading text centered in the viewport.
      *
      * @param context The DrawContext to render with.
@@ -111,6 +118,8 @@ public abstract class MapRenderable {
     protected void renderFogOfWar() {
 
         if (ArdaMapsClient.CONFIG.isMapRevealAll()) return;
+        if (!FogOfWarShader.isLoaded()) return;
+        if (exploration == null || exploration.getFogTextureId() == null) return;
 
         var pos = camera.worldToScreenCoordinates(new Vec2d(getDimension().getXMin(), getDimension().getZMin()));
         var renderHeight = camera.getWorldTextureHeight();
@@ -118,45 +127,49 @@ public abstract class MapRenderable {
         var screenX = pos.x();
         var screenY = pos.y();
 
-        RenderSystem.setShader(FogOfWarShader::fogOfWar);
+        try {
+            RenderSystem.setShader(FogOfWarShader::fogOfWar);
 
-        // Calculate paper tiling (repeat every 256 pixels)
-        float scaleX = renderWidth / 256.0f;
-        float scaleY = renderHeight / 256.0f;
-        float centerX = (float) ((camera.getWorldX() - getDimension().getXMin()) / (double) getDimension().getWidth());
-        float centerY = (float) ((camera.getWorldZ() - getDimension().getZMin()) / (double) getDimension().getHeight());
-        FogOfWarShader.setTextureScale(scaleX, scaleY);
-        FogOfWarShader.setZoomCenter(centerX, centerY);
+            // Calculate paper tiling (repeat every 256 pixels)
+            float scaleX = renderWidth / 256.0f;
+            float scaleY = renderHeight / 256.0f;
+            float centerX = (float) ((camera.getWorldX() - getDimension().getXMin()) / (double) getDimension().getWidth());
+            float centerY = (float) ((camera.getWorldZ() - getDimension().getZMin()) / (double) getDimension().getHeight());
+            FogOfWarShader.setTextureScale(scaleX, scaleY);
+            FogOfWarShader.setZoomCenter(centerX, centerY);
 
-        var textureManager = MinecraftClient.getInstance().getTextureManager();
+            var textureManager = MinecraftClient.getInstance().getTextureManager();
 
-        // Activate texture unit 0 and bind paper texture
-        RenderSystem.activeTexture(GL13.GL_TEXTURE0);
-        textureManager.bindTexture(ModConstants.FOG_OF_WAR_TEXTURE);
+            // Activate texture unit 0 and bind paper texture
+            RenderSystem.activeTexture(GL13.GL_TEXTURE0);
+            textureManager.bindTexture(ModConstants.FOG_OF_WAR_TEXTURE);
 
-        // Activate texture unit 1 and bind fog mask
-        RenderSystem.activeTexture(GL13.GL_TEXTURE1);
-        textureManager.bindTexture(exploration.getFogTextureId());
+            // Activate texture unit 1 and bind fog mask
+            RenderSystem.activeTexture(GL13.GL_TEXTURE1);
+            textureManager.bindTexture(exploration.getFogTextureId());
 
-        // Use bilinear filtering so cell edges blur smoothly
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+            // Use bilinear filtering so cell edges blur smoothly
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
 
-        RenderSystem.enableBlend();
-        RenderSystem.blendFunc(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
+            RenderSystem.enableBlend();
+            RenderSystem.blendFunc(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
 
-        BufferBuilder buffer = Tessellator.getInstance().getBuffer();
-        buffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+            BufferBuilder buffer = Tessellator.getInstance().getBuffer();
+            buffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
 
-        buffer.vertex(screenX, screenY + renderHeight, 0).texture(0, 1).next();
-        buffer.vertex(screenX + renderWidth, screenY + renderHeight, 0).texture(1, 1).next();
-        buffer.vertex(screenX + renderWidth, screenY, 0).texture(1, 0).next();
-        buffer.vertex(screenX, screenY, 0).texture(0, 0).next();
+            buffer.vertex(screenX, screenY + renderHeight, 0).texture(0, 1).next();
+            buffer.vertex(screenX + renderWidth, screenY + renderHeight, 0).texture(1, 1).next();
+            buffer.vertex(screenX + renderWidth, screenY, 0).texture(1, 0).next();
+            buffer.vertex(screenX, screenY, 0).texture(0, 0).next();
 
-        // Draw directly
-        BufferRenderer.drawWithGlobalProgram(buffer.end());
+            // Draw directly
+            BufferRenderer.drawWithGlobalProgram(buffer.end());
 
-        RenderSystem.disableBlend();
+            RenderSystem.disableBlend();
+        } finally {
+            RenderSystem.activeTexture(GL13.GL_TEXTURE0);
+        }
     }
 
     /**

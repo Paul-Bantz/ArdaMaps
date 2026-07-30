@@ -124,6 +124,18 @@ public class BlueMapRenderer extends MapRenderable {
     }
 
     /**
+     * Releases tile provider resources owned by this renderer.
+     */
+    @Override
+    public void close() {
+
+        if (provider != null) {
+            provider.close();
+            provider = null;
+        }
+    }
+
+    /**
      * Renders the map tiles in LOD-grouped batched passes.
      * <p>
      * A single classification loop separates tiles into:
@@ -143,6 +155,8 @@ public class BlueMapRenderer extends MapRenderable {
 
         int coarsestZoom = mapCamera.getCoarsestZoom();
         int primaryZ = mapCamera.getTileSourceClampedZoom();
+
+        if (!BlueMapTileShader.isLoaded()) return;
 
         // Ensure coarsest-LOD tiles are loaded so fallbacks are always available
         mapCamera.getVisibleTiles(coarsestZoom).forEach(key -> provider.get(key));
@@ -220,7 +234,7 @@ public class BlueMapRenderer extends MapRenderable {
     private Pair<PmTileKey, Optional<Identifier>> findFallbackTile(PmTileKey key, int maxLod, int lodFactor) {
         PmTileKey current = key;
 
-        do {
+        while (current.z < maxLod) {
             current = new PmTileKey(
                     current.z + 1,
                     Math.floorDiv(current.x, lodFactor),
@@ -230,7 +244,7 @@ public class BlueMapRenderer extends MapRenderable {
             Optional<Identifier> tex = provider.get(current);
             if (tex.isPresent()) return new Pair<>(current, tex);
 
-        } while (current.z <= maxLod);
+        }
 
         return new Pair<>(key, Optional.empty());
     }

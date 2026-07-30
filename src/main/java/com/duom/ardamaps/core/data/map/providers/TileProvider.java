@@ -28,6 +28,7 @@ package com.duom.ardamaps.core.data.map.providers;
 import com.duom.ardamaps.core.data.map.tiles.TileKey;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalListener;
 import lombok.Getter;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
@@ -47,9 +48,14 @@ public abstract class TileProvider<T extends TileKey> {
     /** Maximum in-memory texture cache size */
     protected static final int MAX_CACHE_SIZE = 256;
 
+    /** Removal listener that destroys dynamic textures evicted from the in-memory cache. */
+    private final RemovalListener<T, Identifier> textureRemovalListener =
+            (ignoredKey, texture, ignoredCause) -> destroyTexture(texture);
+
     /** Caffeine LRU cache for tile textures */
     protected final Cache<T, Identifier> textures = Caffeine.newBuilder()
             .maximumSize(MAX_CACHE_SIZE)
+            .removalListener(textureRemovalListener)
             .build();
 
     /** Set of tile keys currently being loaded (thread-safe) */
@@ -69,8 +75,11 @@ public abstract class TileProvider<T extends TileKey> {
     /** Keys seen once by get(); a second hit within the debounce window triggers loading. */
     protected final ConcurrentHashMap<T, Long> pendingRequests = new ConcurrentHashMap<>();
 
-    /** Keys that hit transport/IO failures and must not be retried for this provider instance. */
-    protected final Set<T> transportFailedKeys = ConcurrentHashMap.newKeySet();
+    /** How long a transport/IO failure suppresses retries for a tile key. */
+    protected static final long TRANSPORT_FAILURE_TTL_MS = 30_000L;
+
+    /** Keys that hit transport/IO failures, mapped to failure timestamp. */
+    protected final ConcurrentHashMap<T, Long> transportFailedKeys = new ConcurrentHashMap<>();
 
     /**
      * Registers the given NativeImage as a texture in Minecraft and associates it with the tile key.
@@ -112,9 +121,10 @@ public abstract class TileProvider<T extends TileKey> {
 
         Identifier cached = textures.getIfPresent(key);
         if (cached != null) return Optional.of(cached);
-        if (transportFailedKeys.contains(key)) return Optional.empty();
 
         long now = System.currentTimeMillis();
+        if (isTransportFailed(key, now)) return Optional.empty();
+
         pruneExpiredPendingRequests(now);
 
         Long firstSeenAt = pendingRequests.remove(key);
@@ -135,9 +145,37 @@ public abstract class TileProvider<T extends TileKey> {
      */
     protected void markTransportFailure(T key) {
 
-        transportFailedKeys.add(key);
+        transportFailedKeys.put(key, System.currentTimeMillis());
+        clearLoading(key);
+    }
+
+    /**
+     * Clears transient async state for the given key.
+     *
+     * @param key The key whose in-flight/debounce state should be cleared.
+     */
+    protected void clearLoading(T key) {
+
         loading.remove(key);
         pendingRequests.remove(key);
+    }
+
+    /**
+     * Returns whether the key is still in its transport-failure retry cooldown.
+     *
+     * @param key The tile key.
+     * @param now Current epoch milliseconds.
+     * @return Whether retry should be suppressed.
+     */
+    private boolean isTransportFailed(T key, long now) {
+
+        Long failedAt = transportFailedKeys.get(key);
+        if (failedAt == null) return false;
+
+        if (now - failedAt <= TRANSPORT_FAILURE_TTL_MS) return true;
+
+        transportFailedKeys.remove(key, failedAt);
+        return false;
     }
 
     /**
@@ -171,5 +209,32 @@ public abstract class TileProvider<T extends TileKey> {
      */
     public void eagerLoadTile(T key) {
         loadTile(key);
+    }
+
+    /**
+     * Releases registered tile textures and clears transient async state.
+     */
+    public void close() {
+
+        textures.invalidateAll();
+        textures.cleanUp();
+        loading.clear();
+        pendingRequests.clear();
+        transportFailedKeys.clear();
+    }
+
+    /**
+     * Destroys a dynamic texture on the client thread.
+     *
+     * @param texture The texture identifier to destroy.
+     */
+    protected void destroyTexture(Identifier texture) {
+
+        if (texture == null) return;
+
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null) return;
+
+        client.execute(() -> MinecraftClient.getInstance().getTextureManager().destroyTexture(texture));
     }
 }
