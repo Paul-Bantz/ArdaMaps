@@ -2,9 +2,9 @@
 import java.nio.file.Files
 
 plugins {
-    id 'fabric-loom' version '1.9-SNAPSHOT'
+    id 'net.fabricmc.fabric-loom' version '1.17.17'
     id 'maven-publish'
-    id 'org.cadixdev.licenser' version '0.6.1'
+    id 'net.minecraftforge.licenser' version '1.2.0'
 }
 
 version = project.mod_version
@@ -35,10 +35,9 @@ dependencies {
 
     // To change the versions see the gradle.properties file
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings loom.officialMojangMappings()
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
     // External libraries for PMTiles and Webp image loading support
     implementation("io.tileverse.pmtiles:tileverse-pmtiles:${project.tileverse_version}")
@@ -68,13 +67,13 @@ dependencies {
     include("com.cronutils:cron-utils:${project.cron_utils_version}")
 
     // Optional integrations - compile against them, never require them at runtime.
-    modCompileOnly("curse.maven:huskhomes-849217:5468607")
-    modCompileOnly("maven.modrinth:ardaregions:${project.ardaregions_version}")
-    //modCompileOnly("maven.modrinth:arda-paths:${project.ardapaths_version}")
-    modCompileOnly(files("build/external-libs/ArdaPaths-1.4.0-SNAPSHOT.jar"))
+    compileOnly(files("libs/ArdaRegionsStub-2.0.1+mc.26.1.jar"))
+    compileOnly(files("libs/ArdaPathsStub-1.4.0+mc.26.1.jar"))
+    compileOnly(files("libs/HuskHomes-Fabric-4.11-ab42970+mc.26.1.2.jar"))
+    compileOnly(files("libs/HuskHomes-Common-4.11-ab42970.jar"))
 
     // DevAuth - Dev/Debug authentication support
-    modRuntimeOnly("me.djtheredstoner:DevAuth-fabric:${project.devauth_version}")
+    runtimeOnly("me.djtheredstoner:DevAuth-fabric:${project.devauth_version}")
 
     // Testing
     testImplementation "org.junit.jupiter:junit-jupiter:5.10.3"
@@ -98,12 +97,14 @@ processResources {
     inputs.property "minecraft_version", project.minecraft_version
     //noinspection GrUnresolvedAccess
     inputs.property "loader_version", project.loader_version
+    inputs.property "minecraft_dependency", ">=${project.minecraft_version}"
     filteringCharset "UTF-8"
 
     filesMatching("fabric.mod.json") {
         expand "version": project.version,
                 "minecraft_version": project.minecraft_version,
-                "loader_version": project.loader_version
+                "loader_version": project.loader_version,
+                "minecraft_dependency": ">=${project.minecraft_version}"
     }
 }
 loom {
@@ -126,10 +127,11 @@ java {
     // If you remove this line, sources will not be generated.
     withSourcesJar()
 
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 
     tasks.withType(JavaCompile).configureEach {
+        options.release = 25
         options.compilerArgs += "-Xlint:unchecked"
     }
 }
@@ -167,11 +169,11 @@ tasks.register('setupDevEnv') {
             println "Created directory: run/mods"
         }
 
-        // Runtime mods declaration
+        // Runtime mods declaration. ArdaRegions and ArdaPaths are local migration stubs for 26.1.
         def mods = [
-                [name: 'HuskHomes-Fabric', version: "${project.huskhomes_version}", url: "https://cdn.modrinth.com/data/J6U9o3JG/versions/cA0nmJeA/HuskHomes-Fabric-${project.huskhomes_version}.jar", runtimeEnv: "server"],
-                [name: 'arda-regions', version: "${project.ardaregions_version}", url: "https://cdn.modrinth.com/data/m9rs3JWq/versions/PHlYomKX/arda-regions-${project.ardaregions_version}.jar", runtimeEnv: "both"],
-                [name: 'arda-paths', version: "${project.ardapaths_version}", url: "https://api.modrinth.com/maven/maven/modrinth/arda-paths/${project.ardapaths_version}/arda-paths-${project.ardapaths_version}.jar", runtimeEnv: "both"]
+                [name: 'HuskHomes-Fabric', version: "${project.huskhomes_version}", source: file("libs/HuskHomes-Fabric-${project.huskhomes_version}.jar"), runtimeEnv: "server"],
+                [name: 'ArdaRegionsStub', version: "${project.ardaregions_version}", source: file("libs/ArdaRegionsStub-${project.ardaregions_version}+mc.26.1.jar"), runtimeEnv: "both"],
+                [name: 'ArdaPathsStub', version: "${project.ardapaths_version}", source: file("libs/ArdaPathsStub-${project.ardapaths_version}+mc.26.1.jar"), runtimeEnv: "both"]
         ]
 
         mods.each { mod ->
@@ -182,9 +184,13 @@ tasks.register('setupDevEnv') {
             if (downloadToServer) {
                 def serverFile = new File(serverModsDir, "${mod.name}-${mod.version}.jar")
                 if (!serverFile.exists()) {
-                    println "Downloading ${mod.name} to server..."
-                    ant.get(src: mod.url, dest: serverFile)
-                    println "Downloaded ${mod.name} to server"
+                    if (!mod.source.exists()) {
+                        println "Skipping ${mod.name}; local jar is missing at ${mod.source}"
+                        return
+                    }
+                    println "Copying ${mod.name} to server..."
+                    Files.copy(mod.source.toPath(), serverFile.toPath())
+                    println "Copied ${mod.name} to server"
                 } else {
                     println "${mod.name} already exists in server, skipping"
                 }
@@ -203,9 +209,13 @@ tasks.register('setupDevEnv') {
             } else if (downloadToClient) {
                 def clientFile = new File(clientModsDir, "${mod.name}-${mod.version}.jar")
                 if (!clientFile.exists()) {
-                    println "Downloading ${mod.name} to client..."
-                    ant.get(src: mod.url, dest: outputFile)
-                    println "Downloaded ${mod.name}"
+                    if (!mod.source.exists()) {
+                        println "Skipping ${mod.name}; local jar is missing at ${mod.source}"
+                        return
+                    }
+                    println "Copying ${mod.name} to client..."
+                    Files.copy(mod.source.toPath(), clientFile.toPath())
+                    println "Copied ${mod.name}"
                 } else {
                     println "${mod.name} already exists, skipping"
                 }
