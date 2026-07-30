@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.core.consumers.networking;
 
-import com.duom.ardamaps.ArdaMaps;
+import com.duom.ardamaps.gui.ModConstants;
 import lombok.Getter;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
@@ -87,7 +87,7 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
     ) {
         super(channel);
         this.reader = reader;
-        responseChannelId = new Identifier(ArdaMaps.MOD_ID, responseChannel);
+        responseChannelId = ModConstants.modId(responseChannel);
         this.responseReader = responseReader;
     }
 
@@ -107,6 +107,15 @@ public abstract class RespondablePacketHandler<T extends IPacket, U extends IPac
             responseConsumers.put(id, consumer);
         }
         ClientPlayNetworking.send(getChannelId(), buf);
+    }
+
+    /**
+     * Clears all pending client-side response consumers.
+     * Call on disconnect so abandoned in-flight requests do not retain captured UI/config state.
+     */
+    public void clearPendingResponses() {
+
+        responseConsumers.clear();
     }
 
     /**

@@ -28,6 +28,7 @@ package com.duom.ardamaps.gui.widgets;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.Vec2d;
+import com.duom.ardamaps.core.data.Vec3d;
 import com.duom.ardamaps.core.data.conversion.ContentBlock;
 import com.duom.ardamaps.core.data.conversion.HtmlConverter;
 import com.duom.ardamaps.core.data.location.LocationClient;
@@ -55,7 +56,6 @@ import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.Vec3d;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 

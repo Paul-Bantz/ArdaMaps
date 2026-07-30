@@ -103,7 +103,7 @@ public class ServerCommands {
         LOGGER.info("Refreshing configuration");
 
         ArdaMaps.CONFIG_MANAGER.reload();
-        ArdaMaps.CONFIG_MANAGER.validateDimensionConfiguration(ArdaMaps.SERVER);
+        ArdaMaps.CONFIG_MANAGER.validateDimensionConfiguration(ArdaMaps.serverWorldDefinitions(ArdaMaps.SERVER));
 
         ArdaMaps.CONFIG = ArdaMaps.CONFIG_MANAGER.getConfig();
 

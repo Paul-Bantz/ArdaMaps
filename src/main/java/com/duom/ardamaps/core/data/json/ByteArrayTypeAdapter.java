@@ -60,7 +60,10 @@ public class ByteArrayTypeAdapter
     public byte[] deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
             throws JsonParseException {
 
-        return Base64.getDecoder().decode(json.getAsString());
+        try {
+            return Base64.getDecoder().decode(json.getAsString());
+        } catch (IllegalArgumentException e) {
+            throw new JsonParseException("Invalid base64 byte array", e);
+        }
     }
 }
-

@@ -100,4 +100,25 @@ public class PacketRegistry {
         /*Ensure class is loaded to register the handlers*/
         LOGGER.info("Initializing Packet Registry");
     }
+
+    /**
+     * Clears client-side response callbacks for requests that can no longer receive a response.
+     */
+    public static void clearPendingResponses() {
+
+        clearPendingResponses(GUIDEBOOK_REQUEST_HANDLER);
+        clearPendingResponses(MAP_SOURCES_REQUEST);
+        clearPendingResponses(LOCATIONS_UPDATE_REQUEST);
+        clearPendingResponses(REGION_LUT_UPDATE_REQUEST);
+        clearPendingResponses(PLAYER_TELEPORT_REQUEST);
+        clearPendingResponses(PLAYER_RANGED_TELEPORT_REQUEST);
+        clearPendingResponses(PLAYER_WARP_REQUEST);
+        clearPendingResponses(LOCATION_DETAILS_REQUEST);
+    }
+
+    private static void clearPendingResponses(Object handler) {
+
+        if (handler instanceof RespondablePacketHandler<?, ?> responseHandler)
+            responseHandler.clearPendingResponses();
+    }
 }

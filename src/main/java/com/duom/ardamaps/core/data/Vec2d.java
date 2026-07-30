@@ -25,7 +25,6 @@
 
 package com.duom.ardamaps.core.data;
 
-import net.minecraft.util.math.Vec3d;
 import org.jspecify.annotations.NonNull;
 
 /**

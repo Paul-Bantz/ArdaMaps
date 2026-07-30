@@ -25,8 +25,8 @@
 
 package com.duom.ardamaps.core.data.json;
 
+import com.duom.ardamaps.core.data.Vec3d;
 import com.google.gson.*;
-import net.minecraft.util.math.Vec3d;
 
 import java.lang.reflect.Type;
 
@@ -64,10 +64,10 @@ public class Vec3dTypeAdapter implements JsonSerializer<Vec3d>, JsonDeserializer
      */
     @Override
     public Vec3d deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-        JsonObject obj = json.getAsJsonObject();
-        double x = obj.get("x").getAsDouble();
-        double y = obj.get("y").getAsDouble();
-        double z = obj.get("z").getAsDouble();
+        JsonObject obj = JsonAdapterUtils.object(json, "Vec3d");
+        double x = JsonAdapterUtils.required(obj, "x").getAsDouble();
+        double y = JsonAdapterUtils.required(obj, "y").getAsDouble();
+        double z = JsonAdapterUtils.required(obj, "z").getAsDouble();
         return new Vec3d(x, y, z);
     }
 }

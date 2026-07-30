@@ -101,8 +101,9 @@ public class PmTileKey extends TileKey {
     @Override
     public boolean equals(Object o) {
 
-        if (!(o instanceof PmTileKey that)) return false;
+        if (o == null || o.getClass() != getClass()) return false;
 
+        PmTileKey that = (PmTileKey) o;
         return this.x == that.x && this.y == that.y && this.z == that.z;
     }
 }

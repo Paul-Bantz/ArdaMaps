@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.core.data.json;
 
-import com.duom.ardamaps.ArdaMaps;
+import com.duom.ardamaps.gui.ModConstants;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
@@ -53,7 +53,7 @@ public class SpriteTypeAdapter implements JsonDeserializer<Identifier> {
     public Identifier deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
             throws JsonParseException {
 
-        return new Identifier(ArdaMaps.MOD_ID, json.getAsString().trim());
+        return ModConstants.modId(json.getAsString().trim());
     }
 
 }

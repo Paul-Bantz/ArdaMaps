@@ -29,7 +29,6 @@ import com.duom.ardamaps.core.data.config.server.ServerConfig;
 import com.duom.ardamaps.core.data.location.LocationServer;
 import com.duom.ardamaps.core.scheduling.CronScheduleHelper;
 import com.google.gson.reflect.TypeToken;
-import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,15 +105,13 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
     /**
      * Checks the dimension configuration on server startup and generate default if non-existent.
      *
-     * @param server The Minecraft server instance.
+     * @param worlds The loaded world descriptors.
      */
-    public void validateDimensionConfiguration(MinecraftServer server) {
+    public void validateDimensionConfiguration(Iterable<ServerWorldDefinition> worlds) {
 
         validateRangeConfiguration();
 
         if (!this.config.isAutoGenerateMissingDimensions()) return;
-
-        var worlds = server.getWorlds();
 
         /*
          For each defined dimension on this server check if we have a matching configured dimension.
@@ -122,19 +119,18 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
          */
         for (var world : worlds) {
 
-            var dimensionId = world.getRegistryKey().getValue();
+            var dimensionId = world.dimensionId();
 
-            if (this.config.getDimensions().stream().noneMatch(d -> d.getId().equals(dimensionId.toString()))) {
+            if (this.config.getDimensions().stream().noneMatch(d -> d.getId().equals(dimensionId))) {
 
                 LOGGER.warn("Dimension {} is not defined in the configuration - generating default definition", dimensionId);
 
-                var border = world.getWorldBorder();
-                Dimension defaultDimension = new Dimension(dimensionId.getPath(), dimensionId.toString(),
+                Dimension defaultDimension = new Dimension(world.dimensionName(), dimensionId,
                         1,
-                        (int) border.getBoundWest(),
-                        (int) border.getBoundEast(),
-                        (int) border.getBoundNorth(),
-                        (int) border.getBoundSouth(),
+                        (int) world.boundWest(),
+                        (int) world.boundEast(),
+                        (int) world.boundNorth(),
+                        (int) world.boundSouth(),
                         false,
                         true);
 
@@ -143,6 +139,17 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
                 this.config.getDimensions().add(defaultDimension);
             }
         }
+    }
+
+    /**
+     * Minimal world data needed to generate missing dimension config.
+     */
+    public record ServerWorldDefinition(String dimensionId,
+                                        String dimensionName,
+                                        double boundWest,
+                                        double boundEast,
+                                        double boundNorth,
+                                        double boundSouth) {
     }
 
     /**

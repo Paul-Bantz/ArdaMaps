@@ -26,7 +26,7 @@
 package com.duom.ardamaps.core.api.locations;
 
 import com.duom.ardamaps.api.locations.ApiLocation;
-import net.minecraft.util.math.Vec3d;
+import com.duom.ardamaps.core.data.Vec3d;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

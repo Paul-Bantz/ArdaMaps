@@ -25,7 +25,6 @@
 
 package com.duom.ardamaps.core.data;
 
-import net.minecraft.util.math.Vec3d;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

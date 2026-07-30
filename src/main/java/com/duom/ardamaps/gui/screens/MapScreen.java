@@ -31,6 +31,7 @@ import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.Vec2d;
+import com.duom.ardamaps.core.data.Vec3d;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
@@ -62,7 +63,6 @@ import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -391,7 +391,7 @@ public class MapScreen extends ArdaMapsScreen {
         var list = MarkersManager.get().types().entrySet().stream()
                 .map(entry -> {
                     var value = entry.getValue();
-                    return new MarkerInfo(entry.getKey(), value.name(), value.icon(), value.color(), value.highlightColor());
+                    return new MarkerInfo(entry.getKey(), value.name(), ModConstants.id(value.icon()), value.color(), value.highlightColor());
                 })
                 .sorted(Comparator.comparing(MarkerInfo::displayName))
                 .toList();
@@ -403,7 +403,7 @@ public class MapScreen extends ArdaMapsScreen {
                         item != null ?
                                 new TextIdentifierPairItem(
                                         MarkersManager.get().getMarkerType(item.key).name(),
-                                        MarkersManager.get().getMarkerType(item.key).icon()) : nullValue)
+                                        ModConstants.id(MarkersManager.get().getMarkerType(item.key).icon())) : nullValue)
                 .setDisplayIcons(true)
                 .setSelected(null)
                 .setAllowNull(true)
@@ -609,8 +609,8 @@ public class MapScreen extends ArdaMapsScreen {
         if (mapFrameRenderer.coordinatesInFrame(mouseX, mouseY, MAP_FRAME_PADDING))
             worldCoordinates = mapCamera.screenToWorldCoordinates(mouseX, mouseY);
 
-        int x = (int) worldCoordinates.x();
-        int z = (int) worldCoordinates.y();
+        int x = (int) Math.floor(worldCoordinates.x());
+        int z = (int) Math.floor(worldCoordinates.y());
         if (x == lastCoordinatesButtonX && z == lastCoordinatesButtonZ) return;
 
         lastCoordinatesButtonX = x;
@@ -1257,13 +1257,13 @@ public class MapScreen extends ArdaMapsScreen {
         if (!Objects.equals(selectedDimension, Client.currentDimension()))
             cameraPosition = new Vec2d(0, 0);
 
-        int cx = (int) cameraPosition.x();
-        int cy = (int) cameraPosition.y();
+        int cx = (int) Math.floor(cameraPosition.x());
+        int cy = (int) Math.floor(cameraPosition.y());
 
         if (getCamera() != null) {
 
-            cx = (int) getCamera().getWorldX();
-            cy = (int) getCamera().getWorldZ();
+            cx = (int) Math.floor(getCamera().getWorldX());
+            cy = (int) Math.floor(getCamera().getWorldZ());
         }
 
         return new MapLayerLoader.Input(

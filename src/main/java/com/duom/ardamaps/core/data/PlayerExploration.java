@@ -269,7 +269,7 @@ public class PlayerExploration implements Serializable {
      * No-op if there are no dirty cells or if the texture has not been initialized.
      */
     public void flushTexture() {
-        if (dirtyCells.isEmpty() || fogMask == null) return;
+        if (dirtyCells == null || dirtyCells.isEmpty() || fogMask == null) return;
 
         var grid = grid();
         for (int idx : dirtyCells) {

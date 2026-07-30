@@ -29,6 +29,7 @@ import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.PlayerExploration;
+import com.duom.ardamaps.core.data.Vec3d;
 import com.duom.ardamaps.core.data.conversion.DistanceUnitConverter;
 import com.duom.ardamaps.core.data.conversion.VectorProjection;
 import com.duom.ardamaps.core.data.location.LocationClient;
@@ -43,7 +44,6 @@ import net.minecraft.client.texture.MissingSprite;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
 
 import java.util.*;
 
@@ -66,7 +66,7 @@ public class CompassRenderer {
     );
 
     /** Map of angles to landmarks - avoid allocating every tick **/
-    private static final LinkedHashMap<Float, LocationClient> angleToLandmarkMap = new LinkedHashMap<>();
+    private static final List<ProjectedLocation> projectedLocations = new ArrayList<>();
 
     /** Compass width **/
     private static final int COMPASS_WIDTH = 360;
@@ -141,7 +141,7 @@ public class CompassRenderer {
         RenderSystem.defaultBlendFunc();
 
         var textRenderer = Client.mc().textRenderer;
-        var playerPos = player.getPos();
+        var playerPos = new Vec3d(player.getX(), player.getY(), player.getZ());
 
         int screenWidth = context.getScaledWindowWidth();
         int centerX = screenWidth / 2;
@@ -196,20 +196,20 @@ public class CompassRenderer {
         projectLocations(ArdaMapsClient.NEAR_LOCATIONS, exploration);
 
         int zOffset = 0;
-        for (var entry : angleToLandmarkMap.entrySet()) {
+        for (var entry : projectedLocations) {
 
-            float x = angleToScreenX(playerYaw, entry.getKey(), centerX);
+            float x = angleToScreenX(playerYaw, entry.angle(), centerX);
 
             if (x != Float.POSITIVE_INFINITY && x != Float.NEGATIVE_INFINITY && isOnScreen(x, centerX)) {
 
                 float alpha = Math.min(
-                        getPoiAlpha(entry.getValue().getPosition().squaredDistanceTo(playerPos)),
+                        getPoiAlpha(entry.location().getPosition().squaredDistanceTo(playerPos)),
                         getAlpha(x, centerX)
                 );
                 alpha = Math.min(alpha, globalAlpha);
 
-                if (entry.getValue().isRevealed())
-                    drawLocationIcon(context, alpha, x, entry.getValue().getIcon(), zOffset);
+                if (entry.location().isRevealed())
+                    drawLocationIcon(context, alpha, x, entry.location().getIcon(), zOffset);
                 else
                     drawUnknownLocationSprite(context, alpha, x, zOffset);
 
@@ -234,6 +234,9 @@ public class CompassRenderer {
 
         for (var waypoint : ArdaMapsClient.CONFIG.getWaypoints(currentDimensionId)) {
 
+            // Skip icon rendering and icon-bearing toasts if not set
+            if (waypoint.icon() == null) continue;
+
             var waypointDistance = waypoint.getPosition().distanceTo(playerPos);
 
             if (waypointDistance < 2) {
@@ -243,13 +246,9 @@ public class CompassRenderer {
                 if (waypoint.showToast())
                     ArdaMapsClient.showToast(new ToastWidget(
                             Text.translatable("ardamaps.client.waypoint.reached"),
-                            waypoint.icon(),
+                            ModConstants.id(waypoint.icon()),
                             waypoint.r(), waypoint.g(), waypoint.b()));
             }
-
-            // Skip icon rendering if not set
-            if (waypoint.icon() == null) continue;
-
             var realWorldUnits = DistanceUnitConverter.asRealWorldUnits(Client.currentDimension(), waypointDistance);
             var halfCompassWidth = COMPASS_WIDTH / 2f;
             float waypointAngle = VectorProjection.projectToHorizontalAngle(waypoint.getPosition());
@@ -258,7 +257,8 @@ public class CompassRenderer {
             if (x == Float.POSITIVE_INFINITY) x = centerX + halfCompassWidth;
             else if (x == Float.NEGATIVE_INFINITY) x = centerX - halfCompassWidth;
 
-            var icon = IconSpriteAtlas.retrieveSprite(waypoint.icon());
+            var iconIdentifier = ModConstants.id(waypoint.icon());
+            var icon = IconSpriteAtlas.retrieveSprite(iconIdentifier);
 
             context.getMatrices().push();
             context.getMatrices().translate( x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET, 100);
@@ -272,7 +272,7 @@ public class CompassRenderer {
 
             } else {
 
-                context.drawTexture(waypoint.icon(), 0, 0, 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE);
+                context.drawTexture(iconIdentifier, 0, 0, 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE);
             }
 
             context.drawText(textRenderer, realWorldUnits, (LANDMARK_ICON_SIZE / 2)-(textRenderer.getWidth(realWorldUnits) / 2), LANDMARK_ICON_SIZE + 15, ModConstants.COLOR_WHITE, false);
@@ -327,7 +327,7 @@ public class CompassRenderer {
      */
     private static void projectLocations(Map<Double, LocationClient> locations, PlayerExploration exploration) {
 
-        angleToLandmarkMap.clear();
+        projectedLocations.clear();
 
         for (var entry : locations.entrySet()) {
 
@@ -345,7 +345,7 @@ public class CompassRenderer {
             }
 
             float projected = VectorProjection.projectToHorizontalAngle(location.getPosition());
-            angleToLandmarkMap.put(projected, location);
+            projectedLocations.add(new ProjectedLocation(projected, location));
         }
     }
 
@@ -393,11 +393,17 @@ public class CompassRenderer {
      */
     private static float getPoiAlpha(double distanceToLocationSquared) {
 
-        double drawDistanceSquared = DistanceUnitConverter.blocksToRealWorldUnits(Client.currentDimension(), ArdaMapsClient.CONFIG.getCompassDrawDistance() * ArdaMapsClient.CONFIG.getCompassDrawDistance());
+        double drawDistanceBlocks = ArdaMapsClient.CONFIG.getCompassDrawDistanceBlocks(Client.currentDimension());
+        double drawDistanceSquared = drawDistanceBlocks * drawDistanceBlocks;
+        if (drawDistanceSquared <= FADE_START_SQUARED) return 1.0f;
+
         double t = (distanceToLocationSquared - FADE_START_SQUARED) / (drawDistanceSquared - FADE_START_SQUARED);
         t = MathHelper.clamp(t, 0.0, 1.0);
         double alphaFactor = 1.0 - t;
         return (float) Math.max(alphaFactor, 0.1);
+    }
+
+    private record ProjectedLocation(float angle, LocationClient location) {
     }
 
     /**

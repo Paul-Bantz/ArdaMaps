@@ -46,6 +46,7 @@ dependencies {
     implementation("com.sksamuel.scrimage:scrimage-webp:${project.scrimage_version}")
     implementation("com.opencsv:opencsv:${project.opencsv_version}")
     implementation("org.jsoup:jsoup:${project.jsoup_version}")
+    implementation("com.google.code.gson:gson:${project.gson_version}")
     implementation("com.github.ben-manes.caffeine:caffeine:${project.caffeine_version}")
     implementation("com.jakewharton:disklrucache:${project.disklrucache_version}")
     implementation("com.cronutils:cron-utils:${project.cron_utils_version}")

@@ -182,7 +182,7 @@ public class BlueMapRenderer extends MapRenderable {
 
             } else {
                 Pair<PmTileKey, Optional<Identifier>> fallback =
-                        findFallbackTile(key, coarsestZoom, (int) mapCamera.getLodFactor());
+                        findFallbackTile(key, coarsestZoom, mapCamera.getLodFactor());
 
                 PmTileKey fbKey = fallback.getLeft();
                 // Store fbKey.z as the tile's actual LOD — findFallbackTile returns the *first*
@@ -231,14 +231,15 @@ public class BlueMapRenderer extends MapRenderable {
      * @param lodFactor The factor by which each LOD level reduces resolution (e.g. 2 means each level halves resolution)
      * @return A pair containing the fallback tile key and its texture identifier if found, or empty if no fallback is loaded
      */
-    private Pair<PmTileKey, Optional<Identifier>> findFallbackTile(PmTileKey key, int maxLod, int lodFactor) {
+    private Pair<PmTileKey, Optional<Identifier>> findFallbackTile(PmTileKey key, int maxLod, double lodFactor) {
         PmTileKey current = key;
+        if (lodFactor < 1.0) lodFactor = 1.0;
 
         while (current.z < maxLod) {
             current = new PmTileKey(
                     current.z + 1,
-                    Math.floorDiv(current.x, lodFactor),
-                    Math.floorDiv(current.y, lodFactor)
+                    (int) Math.floor(current.x / lodFactor),
+                    (int) Math.floor(current.y / lodFactor)
             );
 
             Optional<Identifier> tex = provider.get(current);

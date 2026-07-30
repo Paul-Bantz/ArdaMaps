@@ -23,33 +23,24 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.api.waypoints;
+package com.duom.ardamaps.core.data.map.tiles;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
- * Public waypoint DTO for external mods.
- *
- * @param x          the X coordinate of the waypoint
- * @param z          the Z coordinate of the waypoint
- * @param text       the waypoint display text
- * @param r          the red component of the waypoint colour
- * @param g          the green component of the waypoint colour
- * @param b          the blue component of the waypoint colour
- * @param identifier the waypoint owner's identifier
- * @param dimension  the waypoint dimension
- * @param showToast  whether to show a toast notification on hit
- * @param icon       the waypoint icon identifier string
+ * Tests tile-key equality symmetry across subclasses.
  */
-public record ApiWaypoint(int x, int z,
-                          String text,
-                          float r, float g, float b,
-                          String identifier, String dimension,
-                          boolean showToast,
-                          String icon) {
+class TileKeyTest {
 
-    /**
-     * Creates a waypoint that uses ArdaMaps' default toast and icon handling.
-     */
-    public ApiWaypoint(int x, int z, String text, float r, float g, float b, String identifier, String dimension) {
-        this(x, z, text, r, g, b, identifier, dimension, true, null);
+    @Test
+    void tileKeyAndPmTileKey_areNotEqualAcrossClasses() {
+
+        TileKey tileKey = new TileKey(1, 2, 3);
+        PmTileKey pmTileKey = new PmTileKey(1, 2, 3);
+
+        assertNotEquals(tileKey, pmTileKey);
+        assertNotEquals(pmTileKey, tileKey);
     }
 }

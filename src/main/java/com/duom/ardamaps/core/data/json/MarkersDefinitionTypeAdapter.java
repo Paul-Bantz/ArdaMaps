@@ -50,18 +50,18 @@ public class MarkersDefinitionTypeAdapter implements JsonDeserializer<MarkersDef
      */
     @Override
     public MarkersDefinition deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-        JsonObject obj = json.getAsJsonObject();
+        JsonObject obj = JsonAdapterUtils.object(json, "markers definition");
 
-        Identifier markerBackground = context.deserialize(obj.get("marker_background"), Identifier.class);
-        Identifier markerVisitedBackground = context.deserialize(obj.get("marker_background_visited"), Identifier.class);
-        int mapMarkerBackgroundSize = obj.get("map_marker_background_size").getAsInt();
-        int mapMarkerIconSize = obj.get("map_marker_icon_size").getAsInt();
-        float mapMarkerIconXOffset = obj.get("map_marker_icon_x_offset").getAsFloat();
-        float mapMarkerIconYOffset = obj.get("map_marker_icon_y_offset").getAsFloat();
+        Identifier markerBackground = context.deserialize(JsonAdapterUtils.required(obj, "marker_background"), Identifier.class);
+        Identifier markerVisitedBackground = context.deserialize(JsonAdapterUtils.required(obj, "marker_background_visited"), Identifier.class);
+        int mapMarkerBackgroundSize = JsonAdapterUtils.required(obj, "map_marker_background_size").getAsInt();
+        int mapMarkerIconSize = JsonAdapterUtils.required(obj, "map_marker_icon_size").getAsInt();
+        float mapMarkerIconXOffset = JsonAdapterUtils.required(obj, "map_marker_icon_x_offset").getAsFloat();
+        float mapMarkerIconYOffset = JsonAdapterUtils.required(obj, "map_marker_icon_y_offset").getAsFloat();
 
-        MarkerType defaultType = context.deserialize(obj.get("default_type"), MarkerType.class);
-        MarkerType unknownType = context.deserialize(obj.get("unknown_type"), MarkerType.class);
-        Map<String, MarkerType> types = context.deserialize(obj.get("types"), new TypeToken<Map<String, MarkerType>>() {
+        MarkerType defaultType = context.deserialize(JsonAdapterUtils.required(obj, "default_type"), MarkerType.class);
+        MarkerType unknownType = context.deserialize(JsonAdapterUtils.required(obj, "unknown_type"), MarkerType.class);
+        Map<String, MarkerType> types = context.deserialize(JsonAdapterUtils.required(obj, "types"), new TypeToken<Map<String, MarkerType>>() {
         }.getType());
 
         // Add default type to the types map if it has a name

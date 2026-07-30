@@ -25,11 +25,10 @@
 
 package com.duom.ardamaps.core.items;
 
-import com.duom.ardamaps.ArdaMaps;
+import com.duom.ardamaps.gui.ModConstants;
 import net.minecraft.item.Item;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
 
 /**
  * Registry for all custom ArdaMaps items.
@@ -45,7 +44,6 @@ public class ModItems {
      * Registers all mod items. Must be called during mod initialization.
      */
     public static void register() {
-        Registry.register(Registries.ITEM, new Identifier(ArdaMaps.MOD_ID, "guidebook"), GUIDEBOOK);
+        Registry.register(Registries.ITEM, ModConstants.modId("guidebook"), GUIDEBOOK);
     }
 }
-

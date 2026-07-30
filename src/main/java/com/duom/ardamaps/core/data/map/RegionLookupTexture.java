@@ -79,8 +79,8 @@ public record RegionLookupTexture(byte[] pixels,
 
         if (!Objects.equals(dimension.getId(), dimensionId)) return null;
 
-        int texX = (int) ((worldX - dimension.getXMin()) / (double) dimension.getWidth()  * texWidth);
-        int texZ = (int) ((worldZ - dimension.getZMin()) / (double) dimension.getHeight() * texHeight);
+        int texX = (int) Math.floor((worldX - dimension.getXMin()) / (double) dimension.getWidth()  * texWidth);
+        int texZ = (int) Math.floor((worldZ - dimension.getZMin()) / (double) dimension.getHeight() * texHeight);
 
         if (texX < 0 || texX >= texWidth || texZ < 0 || texZ >= texHeight) return null;
 

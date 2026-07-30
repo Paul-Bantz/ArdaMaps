@@ -124,6 +124,19 @@ class RegionLookupTextureTest {
     }
 
     /**
+     * Coordinates just below a negative lower bound must still map outside the texture.
+     * A plain cast truncates toward zero and incorrectly maps this to texel 0.
+     */
+    @Test
+    void getRegionAt_fractionallyBelowNegativeBound_returnsNull() {
+
+        Dimension negativeDimension = new Dimension("Negative", "test:dim", 1f, -100, 299, -100, 299, false);
+        RegionLookupTexture tex = new RegionLookupTexture(pixels, regions, TEX_W, TEX_H, "test:dim", new Date());
+
+        assertNull(tex.getRegionAt(negativeDimension, -100.1, -50));
+    }
+
+    /**
      * Same for the X upper bound - world positions past xMax must be safe.
      */
     @Test

@@ -27,13 +27,13 @@ package com.duom.ardamaps.core.data.location;
 
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.ExplorationState;
+import com.duom.ardamaps.core.data.Vec3d;
 import com.duom.ardamaps.core.data.map.markers.MarkersManager;
 import com.duom.ardamaps.gui.ModConstants;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Vec3d;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -91,7 +91,7 @@ public class LocationClient extends BasicLocation implements Serializable {
      * @return The identifier for the marker icon texture.  Depending on the exploration state of the location
      */
     public Identifier getIcon() {
-        return (isRevealed() || isVisited()) ? icon : MarkersManager.get().unknownType().icon();
+        return (isRevealed() || isVisited()) ? icon : ModConstants.id(MarkersManager.get().unknownType().icon());
     }
 
     /**

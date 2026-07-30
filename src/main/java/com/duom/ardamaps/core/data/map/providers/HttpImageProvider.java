@@ -172,7 +172,7 @@ public class HttpImageProvider {
                 if (diskCache == null) {
                     try {
                         diskCache = DiskLruCache.open(
-                                Client.cacheDirectory().toFile(),
+                                Client.cacheDirectory().resolve("http-images").toFile(),
                                 DISK_CACHE_APP_VERSION,
                                 1,
                                 DISK_CACHE_MAX_SIZE
@@ -493,8 +493,9 @@ public class HttpImageProvider {
      */
     private @NotNull String getDiskCacheKey(URI uri) {
 
+        String source = uri.toString();
         String path = URLDecoder.decode(uri.getPath(), StandardCharsets.UTF_8);
-        int hash = path.hashCode() & 0x7fffffff;
+        int hash = source.hashCode() & 0x7fffffff;
         String hashedString = Integer.toString(hash, 36);
 
         String filename = path.substring(path.lastIndexOf('/') + 1);
@@ -522,6 +523,10 @@ public class HttpImageProvider {
         conn.setConnectTimeout(5000);
         conn.setReadTimeout(10000);
         conn.setRequestProperty("User-Agent", "Minecraft-Fabric");
+
+        int status = conn.getResponseCode();
+        if (status < 200 || status >= 300)
+            throw new IOException("Unexpected HTTP status " + status + " for " + uri);
 
         try (InputStream in = conn.getInputStream()) {
             return in.readAllBytes();

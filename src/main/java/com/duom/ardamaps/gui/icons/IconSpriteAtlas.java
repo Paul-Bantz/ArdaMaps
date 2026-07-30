@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.gui.icons;
 
-import com.duom.ardamaps.ArdaMaps;
+import com.duom.ardamaps.gui.ModConstants;
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasHolder;
@@ -40,14 +40,14 @@ import net.minecraft.util.Identifier;
 public class IconSpriteAtlas extends SpriteAtlasHolder implements IdentifiableResourceReloadListener {
 
     /** Runtime GPU texture storage location. Never read from disk. */
-    public static final Identifier ATLAS_ID = new Identifier(ArdaMaps.MOD_ID, "textures/atlas/map_icons.png");
+    public static final Identifier ATLAS_ID = ModConstants.modId("textures/atlas/map_icons.png");
 
     /** Singleton instance of the atlas. Initialized at runtime. */
     private static IconSpriteAtlas INSTANCE;
 
     /** Private constructor to enforce singleton pattern. */
     public IconSpriteAtlas(TextureManager textureManager) {
-        super(textureManager, ATLAS_ID, new Identifier(ArdaMaps.MOD_ID, "map_icons"));
+        super(textureManager, ATLAS_ID, ModConstants.modId("map_icons"));
     }
 
     /**
@@ -79,7 +79,6 @@ public class IconSpriteAtlas extends SpriteAtlasHolder implements IdentifiableRe
      */
     @Override
     public Identifier getFabricId() {
-        return new Identifier(ArdaMaps.MOD_ID, "icon_sprite_atlas");
+        return ModConstants.modId("icon_sprite_atlas");
     }
 }
-

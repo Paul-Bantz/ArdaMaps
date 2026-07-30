@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.api.locations;
 
-import net.minecraft.util.math.Vec3d;
+import com.duom.ardamaps.core.data.Vec3d;
 
 import java.util.List;
 

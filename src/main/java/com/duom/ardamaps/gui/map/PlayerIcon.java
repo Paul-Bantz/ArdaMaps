@@ -25,8 +25,8 @@
 
 package com.duom.ardamaps.gui.map;
 
-import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.gui.ModConstants;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.texture.*;
 import net.minecraft.client.util.DefaultSkinHelper;
@@ -155,7 +155,7 @@ public class PlayerIcon {
         blit(skin, head, 40, 8, 8, 8, 0, 0, 48, 48);
 
         NativeImageBackedTexture texture = new NativeImageBackedTexture(head);
-        Identifier id = new Identifier(ArdaMaps.MOD_ID, "player_head_map_marker");
+        Identifier id = ModConstants.modId("player_head_map_marker");
         Client.mc().getTextureManager().registerTexture(id, texture);
 
         return id;

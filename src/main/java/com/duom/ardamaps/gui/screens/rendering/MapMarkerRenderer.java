@@ -27,6 +27,7 @@ package com.duom.ardamaps.gui.screens.rendering;
 
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.core.data.Vec3d;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.map.Waypoint;
@@ -44,7 +45,6 @@ import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.texture.MissingSprite;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -304,7 +304,8 @@ public class MapMarkerRenderer {
 
             if (mapFrameRenderer.coordinatesInFrame(screenX, screenY, framePadding) && waypoint.icon() != null) {
 
-                var icon = IconSpriteAtlas.retrieveSprite(waypoint.icon());
+                var iconIdentifier = ModConstants.id(waypoint.icon());
+                var icon = IconSpriteAtlas.retrieveSprite(iconIdentifier);
 
                 RenderSystem.setShaderColor(waypoint.r(), waypoint.g(), waypoint.b(), 1.0f);
 
@@ -316,7 +317,7 @@ public class MapMarkerRenderer {
 
                 } else {
 
-                    context.drawTexture(waypoint.icon(), screenX, screenY, 0, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE);
+                    context.drawTexture(iconIdentifier, screenX, screenY, 0, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE);
                 }
 
                 RenderSystem.setShaderColor(1f, 1f, 1f, 1.0f);

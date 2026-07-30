@@ -34,7 +34,6 @@ import io.tileverse.rangereader.http.HttpRangeReader;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Path;
 
 /**
  * Tile provider that reads map tiles from a PMTiles file over HTTP.
@@ -52,14 +51,14 @@ public class PMTilesHttpTileProvider extends PMTilesProvider {
      */
     public static TileProvider<PmTileKey> init(String uri) throws IOException {
 
-        var httpTilesProvider = new PMTilesFileTileProvider();
+        var httpTilesProvider = new PMTilesHttpTileProvider();
 
         HttpRangeReader rangeReader = HttpRangeReader.builder()
                 .uri(URI.create(uri))
                 .build();
 
         RangeReader diskCached = DiskCachingRangeReader.builder(rangeReader)
-                .cacheDirectory(Path.of(Client.cacheDirectory().toUri()))
+                .cacheDirectory(Client.cacheDirectory().resolve("pmtiles-http"))
                 .withBlockAlignment()
                 .maxCacheSizeBytes(200_000_000)
                 .build();

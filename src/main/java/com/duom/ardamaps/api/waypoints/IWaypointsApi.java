@@ -25,8 +25,6 @@
 
 package com.duom.ardamaps.api.waypoints;
 
-import net.minecraft.util.Identifier;
-
 /**
  * API Contract for interacting with ArdaMaps waypoints.
  */
@@ -51,9 +49,9 @@ public interface IWaypointsApi {
      * @param identifier the waypoints identifier
      * @param dimension  the dimension the waypoint is in
      * @param showToast  whether to show a Toast notification on hit
-     * @param icon       identifier of the icon texture to show as the waypoint
+     * @param icon       identifier string of the icon texture to show as the waypoint
      */
-    void addWaypoint(int x, int z, String text, float r, float g, float b, String identifier, String dimension, boolean showToast, Identifier icon);
+    void addWaypoint(int x, int z, String text, float r, float g, float b, String identifier, String dimension, boolean showToast, String icon);
 
     /**
      * Adds the given waypoint to the map

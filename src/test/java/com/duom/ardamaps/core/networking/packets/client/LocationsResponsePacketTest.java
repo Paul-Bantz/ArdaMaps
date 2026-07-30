@@ -25,12 +25,12 @@
 
 package com.duom.ardamaps.core.networking.packets.client;
 
+import com.duom.ardamaps.core.data.Vec3d;
 import com.duom.ardamaps.core.data.location.BasicLocation;
 import com.duom.ardamaps.core.data.config.LocationConfig;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.util.math.Vec3d;
 import org.junit.jupiter.api.Test;
 
 import java.util.Date;

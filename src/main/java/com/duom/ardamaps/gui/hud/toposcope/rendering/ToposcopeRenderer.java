@@ -29,6 +29,7 @@ import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.PlayerExploration;
+import com.duom.ardamaps.core.data.Vec3d;
 import com.duom.ardamaps.core.data.conversion.DistanceUnitConverter;
 import com.duom.ardamaps.core.data.conversion.VectorProjection;
 import com.duom.ardamaps.core.data.location.LocationClient;
@@ -194,7 +195,8 @@ public class ToposcopeRenderer {
 
             if (screen == null) continue;
 
-            screenMappings.add(new ScreenMappedLocation(location, screen, location.getPosition().distanceTo(player.getPos())));
+            var playerPos = new Vec3d(player.getX(), player.getY(), player.getZ());
+            screenMappings.add(new ScreenMappedLocation(location, screen, location.getPosition().distanceTo(playerPos)));
         }
 
         // Sort by screen X (then Y) before grouping so membership is deterministic across frames

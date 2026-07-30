@@ -26,6 +26,7 @@
 package com.duom.ardamaps.core.data.guide;
 
 import com.duom.ardamaps.ArdaMaps;
+import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.core.Client;
 import com.google.gson.Gson;
 import net.minecraft.client.MinecraftClient;
@@ -57,7 +58,7 @@ public final class GuideLoader {
     private static final String DEFAULT_LOCALE = "en_us";
 
     /** Identifier for the guide index JSON file. */
-    private static final Identifier GUIDE_JSON_ID = new Identifier(ArdaMaps.MOD_ID, "guide/guide.json");
+    private static final Identifier GUIDE_JSON_ID = ModConstants.modId("guide/guide.json");
 
     /** Gson instance shared for guide deserialization. */
     private static final Gson GSON = new Gson();
@@ -186,7 +187,7 @@ public final class GuideLoader {
         String clientLocale = getClientLocale();
 
         // Try exact client locale
-        var identifier = new Identifier(ArdaMaps.MOD_ID, String.format("guide/%s/%s", clientLocale, filePath));
+        var identifier = ModConstants.modId(String.format("guide/%s/%s", clientLocale, filePath));
         var resource = resourceManager.getResource(identifier);
 
         if (resource.isPresent()) {
@@ -238,7 +239,7 @@ public final class GuideLoader {
         }
 
         // If nothing found fall back to default locale
-        identifier = new Identifier(ArdaMaps.MOD_ID, String.format("guide/%s/%s", DEFAULT_LOCALE, filePath));
+        identifier = ModConstants.modId(String.format("guide/%s/%s", DEFAULT_LOCALE, filePath));
 
         return resourceManager.getResource(identifier);
     }

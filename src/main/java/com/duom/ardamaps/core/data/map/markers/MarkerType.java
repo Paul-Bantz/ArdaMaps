@@ -28,18 +28,17 @@ package com.duom.ardamaps.core.data.map.markers;
 import com.duom.ardamaps.core.data.json.ColorIntTypeAdapter;
 import com.google.gson.annotations.JsonAdapter;
 import com.google.gson.annotations.SerializedName;
-import net.minecraft.util.Identifier;
 
 /**
  * Definition of a marker type, including its name, icon, and colour.
  *
  * @param name           the name of the marker type
- * @param icon           the identifier for the marker icon texture
+ * @param icon           the identifier string for the marker icon texture
  * @param color          the colour of the marker in ARGB format (e.g., 0xFFFF0000 for red)
  * @param highlightColor the colour of the marker when highlighted, in ARGB format
  */
 public record MarkerType(String name,
-                         @SerializedName("icon") Identifier icon,
+                         @SerializedName("icon") String icon,
                          @SerializedName("color") @JsonAdapter(ColorIntTypeAdapter.class) int color,
                          @SerializedName("highlight_color") @JsonAdapter(ColorIntTypeAdapter.class) int highlightColor) {
 }

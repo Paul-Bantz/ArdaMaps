@@ -70,8 +70,9 @@ public class TileKey {
     @Override
     public boolean equals(Object o) {
 
-        if (!(o instanceof TileKey that)) return false;
+        if (o == null || o.getClass() != getClass()) return false;
 
+        TileKey that = (TileKey) o;
         return this.x == that.x && this.y == that.y && this.z == that.z;
     }
 

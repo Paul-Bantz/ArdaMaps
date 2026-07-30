@@ -27,9 +27,9 @@ package com.duom.ardamaps.core.data.conversion;
 
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.Vec2d;
+import com.duom.ardamaps.core.data.Vec3d;
 import net.minecraft.client.render.Camera;
 import net.minecraft.util.math.Vec2f;
-import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -50,8 +50,12 @@ public class VectorProjection {
         Camera camera = client.gameRenderer.getCamera();
 
         // Calculate the position relative to the camera
-        Vec3d cameraPosition = camera.getPos();
-        Vec3d relativePosition = worldPos.subtract(cameraPosition);
+        net.minecraft.util.math.Vec3d cameraPosition = camera.getPos();
+        net.minecraft.util.math.Vec3d relativePosition = new net.minecraft.util.math.Vec3d(
+                worldPos.x - cameraPosition.x,
+                worldPos.y - cameraPosition.y,
+                worldPos.z - cameraPosition.z
+        );
 
         // Rotate the relative position to match the camera's view direction
         Quaternionf rot = new Quaternionf(camera.getRotation()).conjugate();
@@ -120,7 +124,7 @@ public class VectorProjection {
     public static float projectToHorizontalAngle(double x, double z) {
 
         Camera camera = Client.mc().gameRenderer.getCamera();
-        Vec3d cameraPos = camera.getPos();
+        net.minecraft.util.math.Vec3d cameraPos = camera.getPos();
 
         double dx = x - cameraPos.x;
         double dz = z - cameraPos.z;

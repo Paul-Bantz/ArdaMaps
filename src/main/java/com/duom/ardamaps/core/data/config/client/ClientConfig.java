@@ -142,6 +142,19 @@ public class ClientConfig extends Configuration<LocationClient> {
     }
 
     /**
+     * Clears server-scoped state received over the play connection.
+     */
+    public void clearSessionState() {
+
+        dimensions = null;
+        warpsAvailable = false;
+        ardaRegionsAvailable = false;
+        waypoints.clear();
+
+        if (clientProgress != null) clientProgress.clearSessionState();
+    }
+
+    /**
      * Sets the unit system. When switching, converts stored draw distances to the new unit.
      */
     public void setUnitSystem(UnitSystem newSystem) {

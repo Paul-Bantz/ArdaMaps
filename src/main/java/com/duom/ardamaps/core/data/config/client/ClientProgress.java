@@ -58,6 +58,19 @@ public class ClientProgress implements Serializable {
     private final Set<String> visitedLocationIds = new HashSet<>();
 
     /**
+     * Creates a shallow collection snapshot for serialization.
+     *
+     * @return A progress object whose maps/sets will not be concurrently mutated by the client tick.
+     */
+    public ClientProgress snapshot() {
+
+        ClientProgress snapshot = new ClientProgress();
+        snapshot.explorationState.putAll(explorationState);
+        snapshot.visitedLocationIds.addAll(visitedLocationIds);
+        return snapshot;
+    }
+
+    /**
      * Initializes textures for all exploration states.
      * Should be run at client startup when RenderSystem is available
      */
@@ -105,6 +118,19 @@ public class ClientProgress implements Serializable {
         // Reset ArdaRegions progress
         if (!autoGenOnly && ArdaMapsClient.CONFIG.isArdaRegionsAvailable() && Client.player() != null)
             Client.player().networkHandler.sendChatCommand("ardaregions resetprogress");
+    }
+
+    /**
+     * Disposes and clears all locally stored progress without persistence or server-side reset side effects.
+     */
+    public void clearSessionState() {
+
+        explorationState.forEach((key, exploration) -> {
+            LOGGER.warn("Disposing exploration state for dimension {} on disconnect", key);
+            exploration.dispose();
+        });
+        explorationState.clear();
+        visitedLocationIds.clear();
     }
 
     /**

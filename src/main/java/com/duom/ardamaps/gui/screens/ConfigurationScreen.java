@@ -289,7 +289,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
                 .setSize(BUTTON_WIDTH, BUTTON_HEIGHT)
                 .setOptions(Arrays.asList(UnitSystem.values()))
                 .setAllowNull(false)
-                .setOptionDisplay((unitSystem) -> new TextIdentifierPairItem(unitSystem.getDisplayName(), null))
+                .setOptionDisplay((unitSystem) -> new TextIdentifierPairItem(Text.translatable(unitSystem.getDisplayNameKey()).getString(), null))
                 .setSelected(ArdaMapsClient.CONFIG.getUnitSystem())
                 .setOnSelect((unitSystem) -> {
                     ArdaMapsClient.CONFIG.setUnitSystem(unitSystem);
@@ -959,4 +959,3 @@ public class ConfigurationScreen extends ArdaMapsScreen {
     private record Margins(int left, int right, int top, int bottom) {
     }
 }
-

@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.core.data;
 
-import net.minecraft.text.Text;
+import lombok.Getter;
 
 /**
  * Enumeration of supported unit systems for measurements.
@@ -37,10 +37,8 @@ public enum UnitSystem {
     IMPERIAL("unit.system.imperial");
 
     /** The translation key for the display name of this unit system. */
+    @Getter
     private final String displayNameKey;
-
-    /** The cached display name for this unit system, initialized to the translation key. */
-    private String displayName;
 
     /**
      * Constructs a new UnitSystem with the specified translation key for display names and units.
@@ -50,18 +48,5 @@ public enum UnitSystem {
     UnitSystem(String translationKey) {
 
         this.displayNameKey = translationKey;
-        this.displayName = translationKey;
-    }
-
-    /**
-     * Retrieves the display name for this unit system, using lazy loading to fetch the translated string only when needed.
-     *
-     * @return The display name for this unit system.
-     */
-    public String getDisplayName() {
-
-        if (displayName.equals(displayNameKey)) displayName = Text.translatable(displayNameKey).getString();
-
-        return displayName;
     }
 }

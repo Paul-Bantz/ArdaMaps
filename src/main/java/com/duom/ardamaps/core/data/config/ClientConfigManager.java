@@ -45,6 +45,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -85,7 +86,7 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
 
             try (Reader reader = Files.newBufferedReader(clientProgressFile)) {
 
-                ClientProgress progress = GSON.fromJson(reader, ClientProgress.class);
+                ClientProgress progress = Objects.requireNonNullElse(GSON.fromJson(reader, ClientProgress.class), defaultProgress);
                 config.setClientProgress(progress);
                 synchronizeLocationExplorationProgress();
 
@@ -134,7 +135,7 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
             if (explorationData != null) {
 
                 var position = location.getPosition();
-                explored = explorationData.stateAtWorldPos(position.getX(), position.getZ());
+                explored = explorationData.stateAtWorldPos(position.x, position.z);
             }
 
             location.synchronizeProgress(explored, visited);
@@ -153,6 +154,15 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
      * Save the client's exploration progress to file.
      */
     public void saveProgress() {
+        ClientProgress snapshot = config.getClientProgress().snapshot();
+        final String json;
+        try {
+            json = GSON.toJson(snapshot, ClientProgress.class);
+        } catch (RuntimeException e) {
+            LOGGER.error("Failed to serialize exploration progress file", e);
+            return;
+        }
+
         CompletableFuture.runAsync(() -> {
 
             try {
@@ -161,10 +171,10 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
                 }
 
                 try (Writer writer = Files.newBufferedWriter(clientProgressFile)) {
-                    GSON.toJson(config.getClientProgress(), ClientProgress.class, writer);
+                    writer.write(json);
                 }
 
-            } catch (IOException e) {
+            } catch (RuntimeException | IOException e) {
                 LOGGER.error("Failed to save exploration progress file", e);
             }
 

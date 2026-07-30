@@ -32,7 +32,6 @@ import com.duom.ardamaps.api.waypoints.IWaypointsApi;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.map.Waypoint;
 import com.duom.ardamaps.gui.ModConstants;
-import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,11 +46,11 @@ public class WaypointsApiImpl implements IWaypointsApi {
 
     @Override
     public void addWaypoint(int x, int z, String text, float r, float g, float b, String identifier, String dimension) {
-        addWaypoint(x, z, text, r, g, b, identifier, dimension, true, ModConstants.ICON_WAYPOINT);
+        addWaypoint(x, z, text, r, g, b, identifier, dimension, true, ModConstants.ICON_WAYPOINT.toString());
     }
 
     @Override
-    public void addWaypoint(int x, int z, String text, float r, float g, float b, String identifier, String dimension, boolean showToast, Identifier icon) {
+    public void addWaypoint(int x, int z, String text, float r, float g, float b, String identifier, String dimension, boolean showToast, String icon) {
         addWaypoint(new ApiWaypoint(x, z, text, r, g, b, identifier, dimension, showToast, icon));
     }
 
@@ -100,7 +99,7 @@ public class WaypointsApiImpl implements IWaypointsApi {
     public static Waypoint toWaypoint(ApiWaypoint waypoint) {
         return new Waypoint(waypoint.x(), waypoint.z(), waypoint.text(), waypoint.r(), waypoint.g(), waypoint.b(),
                 waypoint.identifier(), waypoint.dimension(), waypoint.showToast(),
-                waypoint.icon() != null ? waypoint.icon() : ModConstants.ICON_WAYPOINT);
+                waypoint.icon() != null ? waypoint.icon() : ModConstants.ICON_WAYPOINT.toString());
     }
 
     /**

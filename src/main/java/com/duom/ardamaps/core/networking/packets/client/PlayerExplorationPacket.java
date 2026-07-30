@@ -86,7 +86,7 @@ public record PlayerExplorationPacket(String dimensionId,
             LOGGER.info("Read PlayerExplorationPacket for dimension '{}', parent region polygon with {} polygons, and region polygon with {} polygons.",
                     dimensionId, rootRegionPolygon.size(), regionPolygon.size());
 
-        } catch (Throwable ex) {
+        } catch (RuntimeException ex) {
             /*
                 Catch-all to prevent client crashes due to malformed packets. It can happen at client Server-join if
                 erroneous data is returned from ArdaRegions API.

@@ -26,6 +26,7 @@
 package com.duom.ardamaps.core.data.config;
 
 import com.duom.ardamaps.ArdaMaps;
+import com.duom.ardamaps.core.data.Vec3d;
 import com.duom.ardamaps.core.data.config.shared.Configuration;
 import com.duom.ardamaps.core.data.json.ByteArrayTypeAdapter;
 import com.duom.ardamaps.core.data.json.DimensionTypeAdapter;
@@ -35,8 +36,9 @@ import com.duom.ardamaps.core.data.map.RegionLookupTexture;
 import com.duom.ardamaps.gui.ModConstants;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
 import lombok.Getter;
-import net.minecraft.util.math.Vec3d;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,9 +132,10 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
                 T loadedConfig = GSON.fromJson(reader, (Class<T>) defaultConfig.getClass());
                 config = Objects.requireNonNullElse(loadedConfig, defaultConfig);
 
-            } catch (IOException e) {
+            } catch (JsonIOException | JsonSyntaxException | IOException e) {
 
                 LOGGER.error("Failed to load configuration", e);
+                config = createDefaultConfig();
             }
         } else {
             config = createDefaultConfig();
@@ -154,9 +157,10 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
                 LocationConfig<L> loadedConfig = GSON.fromJson(reader, getLocationConfigType());
                 config.setLocationConfig(Objects.requireNonNullElse(loadedConfig, defaultConfig));
 
-            } catch (IOException e) {
+            } catch (JsonIOException | JsonSyntaxException | IOException e) {
 
                 LOGGER.error("Failed to load configuration", e);
+                config.setLocationConfig(createDefaultLocationConfig());
             }
         } else {
             config.setLocationConfig(createDefaultLocationConfig());
@@ -179,9 +183,10 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
                 RegionLookupTexture loadedConfig = GSON.fromJson(reader, RegionLookupTexture.class);
                 config.setRegionLookupTexture(Objects.requireNonNullElse(loadedConfig, defaultConfig));
 
-            } catch (IOException e) {
+            } catch (JsonIOException | JsonSyntaxException | IOException e) {
 
                 LOGGER.error("Failed to load region texture lookup", e);
+                config.setRegionLookupTexture(defaultConfig);
             }
         } else {
             config.setRegionLookupTexture(defaultConfig);
@@ -248,6 +253,14 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
 
         if (data == null || filePath == null) return;
 
+        final String json;
+        try {
+            json = GSON.toJson(data, data.getClass());
+        } catch (RuntimeException e) {
+            LOGGER.error("Failed to serialize configuration", e);
+            return;
+        }
+
         CompletableFuture.runAsync(() -> {
 
             try {
@@ -256,9 +269,9 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
                 }
 
                 try (Writer writer = Files.newBufferedWriter(filePath)) {
-                    GSON.toJson(data, data.getClass(), writer);
+                    writer.write(json);
                 }
-            } catch (IOException e) {
+            } catch (RuntimeException | IOException e) {
                 LOGGER.error("Failed to save configuration", e);
             }
 

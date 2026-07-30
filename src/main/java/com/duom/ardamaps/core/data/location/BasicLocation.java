@@ -25,9 +25,9 @@
 
 package com.duom.ardamaps.core.data.location;
 
+import com.duom.ardamaps.core.data.Vec3d;
 import com.google.gson.annotations.SerializedName;
 import lombok.Data;
-import net.minecraft.util.math.Vec3d;
 
 import java.io.*;
 import java.util.List;

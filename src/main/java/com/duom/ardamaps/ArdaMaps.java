@@ -31,6 +31,7 @@ import com.duom.ardamaps.api.ArdaMapsApiEntrypoint;
 import com.duom.ardamaps.core.api.ArdaMapsApiImpl;
 import com.duom.ardamaps.core.commands.ServerCommands;
 import com.duom.ardamaps.core.data.config.ServerConfigManager;
+import com.duom.ardamaps.core.data.config.ServerConfigManager.ServerWorldDefinition;
 import com.duom.ardamaps.core.data.config.server.ServerConfig;
 import com.duom.ardamaps.core.data.location.ExternalLocationSource;
 import com.duom.ardamaps.core.items.ModItems;
@@ -46,6 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -110,25 +112,17 @@ public class ArdaMaps implements ModInitializer {
         // ready API to register their LocationSource (or any other setup).
         invokeApiEntrypoints();
 
-        // Config initialization only on the server side
+        // Dedicated-server config can be loaded immediately. Integrated-server config is loaded on SERVER_STARTED.
         if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) {
 
-            CONFIG_MANAGER = new ServerConfigManager(
-                    "./config/arda-maps/server.json",
-                    "./config/arda-maps/server-locations.json",
-                    "./config/arda-maps/region-texture-lookup.json"
-            );
-
-            CONFIG = CONFIG_MANAGER.getConfig();
-
-            // Register server lifecycle events
-            ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
+            initializeServerConfig();
         }
 
         ModItems.register();
         PacketRegistry.init();
         ServerCommands.register();
 
+        ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
         ServerLifecycleEvents.SERVER_STOPPING.register(this::onStop);
 
         // IO_EXECUTOR and SCHEDULER are static singletons shared with client-side features
@@ -147,8 +141,42 @@ public class ArdaMaps implements ModInitializer {
     private void onServerStarted(MinecraftServer server) {
 
         SERVER = server;
-        CONFIG_MANAGER.validateDimensionConfiguration(server);
+        initializeServerConfig();
+        CONFIG_MANAGER.validateDimensionConfiguration(serverWorldDefinitions(server));
         scheduleLocationRefresh();
+    }
+
+    public static Iterable<ServerWorldDefinition> serverWorldDefinitions(MinecraftServer server) {
+
+        List<ServerWorldDefinition> definitions = new ArrayList<>();
+
+        for (var world : server.getWorlds()) {
+            var dimensionId = world.getRegistryKey().getValue();
+            var border = world.getWorldBorder();
+            definitions.add(new ServerWorldDefinition(
+                    dimensionId.toString(),
+                    dimensionId.getPath(),
+                    border.getBoundWest(),
+                    border.getBoundEast(),
+                    border.getBoundNorth(),
+                    border.getBoundSouth()
+            ));
+        }
+
+        return definitions;
+    }
+
+    private void initializeServerConfig() {
+
+        if (CONFIG_MANAGER != null && CONFIG != null) return;
+
+        CONFIG_MANAGER = new ServerConfigManager(
+                "./config/arda-maps/server.json",
+                "./config/arda-maps/server-locations.json",
+                "./config/arda-maps/region-texture-lookup.json"
+        );
+
+        CONFIG = CONFIG_MANAGER.getConfig();
     }
 
     /**
@@ -183,9 +211,7 @@ public class ArdaMaps implements ModInitializer {
 
         // Parse & validate - falls back to default "0 3 */4 * *" with a WARN if needed
         Cron cron = CronScheduleHelper.parse(CONFIG.getRefreshCron());
-        activeCronExpression = CONFIG.getRefreshCron() != null && !CONFIG.getRefreshCron().isBlank()
-                ? CONFIG.getRefreshCron()
-                : CronScheduleHelper.DEFAULT_CRON;
+        activeCronExpression = cron.asString();
 
         ZonedDateTime now = ZonedDateTime.now();
 
@@ -256,14 +282,18 @@ public class ArdaMaps implements ModInitializer {
         SCHEDULER.schedule(() -> {
 
             ArdaMaps.LOGGER.info("[ArdaMaps] CRON-triggered location refresh firing");
-            ExternalLocationSource.fetchLocations().thenAccept(ServerCommands::saveLocationData)
-                    .exceptionally(ex -> {
-                        ArdaMaps.LOGGER.warn("Failed to fetch locations: {}", ex.getMessage());
-                        return null;
-                    });
-
-            // Re-arm for the next execution
-            scheduleNextCronTrigger(cron);
+            try {
+                ExternalLocationSource.fetchLocations().thenAccept(ServerCommands::saveLocationData)
+                        .exceptionally(ex -> {
+                            ArdaMaps.LOGGER.warn("Failed to fetch locations: {}", ex.getMessage());
+                            return null;
+                        });
+            } catch (RuntimeException e) {
+                ArdaMaps.LOGGER.warn("Failed to start scheduled location fetch", e);
+            } finally {
+                // Re-arm for the next execution even when a synchronous source throws.
+                scheduleNextCronTrigger(cron);
+            }
 
         }, delayMs, TimeUnit.MILLISECONDS);
     }

@@ -35,6 +35,19 @@ import net.minecraft.util.Identifier;
  */
 public class ModConstants {
 
+    public static Identifier id(String path) {
+        if (path == null) return UNKNOWN_ICON;
+        return new Identifier(path);
+    }
+
+    public static Identifier id(String namespace, String path) {
+        return new Identifier(namespace, path);
+    }
+
+    public static Identifier modId(String path) {
+        return id(ArdaMaps.MOD_ID, path);
+    }
+
     public static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
     /** Standard button dimensions used throughout the map GUI for consistent sizing of interactive elements. */
@@ -45,35 +58,35 @@ public class ModConstants {
     public static final int ROW_SPACING = 12;
 
     /** Texture identifiers for various GUI elements, such as the fog of war overlay, paper background, and map GUI elements. */
-    public static final Identifier FOG_OF_WAR_TEXTURE = new Identifier(ArdaMaps.MOD_ID, "textures/gui/fog_of_war_texture.png");
-    public static final Identifier PAPER_TEXTURE = new Identifier(ArdaMaps.MOD_ID, "textures/gui/paper_tex_9slices_512px.png");
-    public static final Identifier MAP_GUI_ELEMENTS = new Identifier(ArdaMaps.MOD_ID, "textures/gui/gui_tex_map_elements_9slices_512px.png");
-    public static final Identifier GUI_TEXTURE = new Identifier(ArdaMaps.MOD_ID, "textures/gui/gui_tex_book_9slices_512px.png");
-    public static final Identifier TEXTURE = new Identifier("textures/gui/checkbox.png");
+    public static final Identifier FOG_OF_WAR_TEXTURE = modId("textures/gui/fog_of_war_texture.png");
+    public static final Identifier PAPER_TEXTURE = modId("textures/gui/paper_tex_9slices_512px.png");
+    public static final Identifier MAP_GUI_ELEMENTS = modId("textures/gui/gui_tex_map_elements_9slices_512px.png");
+    public static final Identifier GUI_TEXTURE = modId("textures/gui/gui_tex_book_9slices_512px.png");
+    public static final Identifier TEXTURE = id("textures/gui/checkbox.png");
 
-    public static final Identifier ARDACRAFT_LOGO = new Identifier(ArdaMaps.MOD_ID, "textures/icons/icon_ardacraft_gradient_128px.png");
+    public static final Identifier ARDACRAFT_LOGO = modId("textures/icons/icon_ardacraft_gradient_128px.png");
 
     /** Texture identifiers for various icons used in the map GUI, such as the close button, map icon, configuration icon, and others. */
-    public static final Identifier CLOSE_ICON = new Identifier(ArdaMaps.MOD_ID, "icons/icon_close");
-    public static final Identifier MAP_ICON = new Identifier(ArdaMaps.MOD_ID, "icons/icon_map");
-    public static final Identifier CONFIGURATION_ICON = new Identifier(ArdaMaps.MOD_ID, "icons/icon_configuration");
-    public static final Identifier GUIDE_ICON = new Identifier(ArdaMaps.MOD_ID, "icons/icon_guide");
-    public static final Identifier LANDMARK_ICON = new Identifier(ArdaMaps.MOD_ID, "icons/icon_landmark");
-    public static final Identifier UNKNOWN_ICON = new Identifier(ArdaMaps.MOD_ID, "icons/icon_unknown");
-    public static final Identifier MAP_MARKER_ICON = new Identifier(ArdaMaps.MOD_ID, "icons/map_marker");
-    public static final Identifier MAP_MARKER_VISITED_ICON = new Identifier(ArdaMaps.MOD_ID, "icons/map_marker_visited");
-    public static final Identifier ICON_WAYPOINT = new Identifier(ArdaMaps.MOD_ID, "icons/icon_waypoint");
+    public static final Identifier CLOSE_ICON = modId("icons/icon_close");
+    public static final Identifier MAP_ICON = modId("icons/icon_map");
+    public static final Identifier CONFIGURATION_ICON = modId("icons/icon_configuration");
+    public static final Identifier GUIDE_ICON = modId("icons/icon_guide");
+    public static final Identifier LANDMARK_ICON = modId("icons/icon_landmark");
+    public static final Identifier UNKNOWN_ICON = modId("icons/icon_unknown");
+    public static final Identifier MAP_MARKER_ICON = modId("icons/map_marker");
+    public static final Identifier MAP_MARKER_VISITED_ICON = modId("icons/map_marker_visited");
+    public static final Identifier ICON_WAYPOINT = modId("icons/icon_waypoint");
 
-    public static final Identifier ICON_MOUSE_LEFT_CLICK = new Identifier(ArdaMaps.MOD_ID, "icons/icon_mouse_left_click");
-    public static final Identifier ICON_MOUSE_RIGHT_CLICK = new Identifier(ArdaMaps.MOD_ID, "icons/icon_mouse_right_click");
-    public static final Identifier ICON_CARDINAL_NORTH = new Identifier(ArdaMaps.MOD_ID, "icons/icon_compass_north");
-    public static final Identifier ICON_CARDINAL_SOUTH = new Identifier(ArdaMaps.MOD_ID, "icons/icon_compass_south");
-    public static final Identifier ICON_CARDINAL_EAST = new Identifier(ArdaMaps.MOD_ID, "icons/icon_compass_east");
-    public static final Identifier ICON_CARDINAL_WEST = new Identifier(ArdaMaps.MOD_ID, "icons/icon_compass_west");
-    public static final Identifier COMPASS_BACKGROUND = new Identifier(ArdaMaps.MOD_ID, "textures/gui/compass_texture.png");
-    public static final Identifier ICON_ALL = new Identifier(ArdaMaps.MOD_ID, "icons/icon_all");
-    public static final Identifier ICON_BOOK = new Identifier(ArdaMaps.MOD_ID, "icons/icon_book");
-    public static final Identifier ICON_KEYBIND = new Identifier(ArdaMaps.MOD_ID, "textures/icons/icon_keybind.png");
+    public static final Identifier ICON_MOUSE_LEFT_CLICK = modId("icons/icon_mouse_left_click");
+    public static final Identifier ICON_MOUSE_RIGHT_CLICK = modId("icons/icon_mouse_right_click");
+    public static final Identifier ICON_CARDINAL_NORTH = modId("icons/icon_compass_north");
+    public static final Identifier ICON_CARDINAL_SOUTH = modId("icons/icon_compass_south");
+    public static final Identifier ICON_CARDINAL_EAST = modId("icons/icon_compass_east");
+    public static final Identifier ICON_CARDINAL_WEST = modId("icons/icon_compass_west");
+    public static final Identifier COMPASS_BACKGROUND = modId("textures/gui/compass_texture.png");
+    public static final Identifier ICON_ALL = modId("icons/icon_all");
+    public static final Identifier ICON_BOOK = modId("icons/icon_book");
+    public static final Identifier ICON_KEYBIND = modId("textures/icons/icon_keybind.png");
 
     /** Text color constants */
     public static final int COLOR_WHITE = 0xFFFFFFFF;
@@ -100,7 +113,7 @@ public class ModConstants {
      * {@link TextContentBlockRenderer} reads {@code Style.getFont()} and compares it against this
      * value to identify chatcommand runs – no colour-sniffing required.
      */
-    public static final Identifier RUN_FONT_CHATCOMMAND = new Identifier(ArdaMaps.MOD_ID, "run/chatcommand");
+    public static final Identifier RUN_FONT_CHATCOMMAND = modId("run/chatcommand");
 
     /**
      * Sentinel font {@link Identifier} written into the {@link net.minecraft.text.Style} of every
@@ -108,7 +121,7 @@ public class ModConstants {
      * {@link TextContentBlockRenderer} reads {@code Style.getFont()} and compares it against this
      * value to identify keybind runs – no colour-sniffing required.
      */
-    public static final Identifier RUN_FONT_KEYBIND = new Identifier(ArdaMaps.MOD_ID, "run/keybind");
+    public static final Identifier RUN_FONT_KEYBIND = modId("run/keybind");
 
     /**
      * Padding in pixels applied around the background rectangle of both

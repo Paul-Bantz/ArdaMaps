@@ -143,6 +143,17 @@ class PmTilesMapCameraTest {
     }
 
     /**
+     * Blocks-per-pixel is the inverse of render scale.
+     */
+    @Test
+    void getBlocksPerPixel_aboveIdentityZoom_returnsFractionalBlockCoverage() {
+
+        camera.updateZoom(9);
+
+        assertEquals(0.5, camera.getBlocksPerPixel(), 1e-9);
+    }
+
+    /**
      * Zooming out means fewer pixels per block - scale must be < 1.
      */
     @Test

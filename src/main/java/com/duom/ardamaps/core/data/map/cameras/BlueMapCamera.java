@@ -396,7 +396,7 @@ public class BlueMapCamera extends TilesMapCamera {
 
     @Override
     public double getBlocksPerPixel() {
-        return renderScale();
+        return 1.0 / renderScale();
     }
 
     /**

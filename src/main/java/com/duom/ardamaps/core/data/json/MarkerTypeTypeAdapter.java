@@ -27,7 +27,6 @@ package com.duom.ardamaps.core.data.json;
 
 import com.duom.ardamaps.core.data.map.markers.MarkerType;
 import com.google.gson.*;
-import net.minecraft.util.Identifier;
 
 import java.lang.reflect.Type;
 
@@ -49,12 +48,12 @@ public class MarkerTypeTypeAdapter implements JsonDeserializer<MarkerType> {
     @Override
     public MarkerType deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
 
-        JsonObject obj = json.getAsJsonObject();
+        JsonObject obj = JsonAdapterUtils.object(json, "marker type");
 
-        String name = obj.get("name").getAsString();
-        Identifier icon = context.deserialize(obj.get("icon"), Identifier.class);
-        String color = obj.get("color").getAsString();
-        String highlightColor = obj.get("highlight_color").getAsString();
+        String name = JsonAdapterUtils.required(obj, "name").getAsString();
+        String icon = JsonAdapterUtils.qualify(JsonAdapterUtils.required(obj, "icon").getAsString());
+        String color = JsonAdapterUtils.required(obj, "color").getAsString();
+        String highlightColor = JsonAdapterUtils.required(obj, "highlight_color").getAsString();
 
         return new MarkerType(name, icon, deserializeHexColor(color), deserializeHexColor(highlightColor));
     }

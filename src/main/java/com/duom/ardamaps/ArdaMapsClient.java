@@ -30,6 +30,7 @@ import com.duom.ardamaps.core.KeyBinds;
 import com.duom.ardamaps.core.commands.ClientCommands;
 import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.PlayerExploration;
+import com.duom.ardamaps.core.data.Vec3d;
 import com.duom.ardamaps.core.data.config.ClientConfigManager;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.LocationConfig;
@@ -76,7 +77,6 @@ import net.minecraft.resource.ResourceManager;
 import net.minecraft.resource.ResourceType;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.profiler.Profiler;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
@@ -180,6 +180,7 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         // Handle join world event to initialize mod internals and sync data with the server
         ClientPlayConnectionEvents.JOIN.register(this::initModInternals);
+        ClientPlayConnectionEvents.DISCONNECT.register(this::onDisconnect);
 
         // Register exploration tracking once here to avoid stacking listeners on every server join
         ClientTickEvents.END_CLIENT_TICK.register(this::clientTick);
@@ -246,6 +247,25 @@ public class ArdaMapsClient implements ClientModInitializer {
         ArdaMapsClient.refreshLocations();
         ArdaMapsClient.refreshMapSources();
         ArdaMapsClient.refreshRegionsLut();
+    }
+
+    /**
+     * Clears all state scoped to a single play connection.
+     */
+    @SuppressWarnings("unused")
+    private void onDisconnect(ClientPlayNetworkHandler handler, MinecraftClient client) {
+
+        LOGGER.info("Disconnected from world, clearing ArdaMaps session state");
+
+        NEAR_LOCATIONS.clear();
+        lastNearLocationsUpdate = 0L;
+        lastNearLocationsDimensionId = null;
+        pendingScreen = null;
+
+        Client.invalidateCachedDimension();
+        PacketRegistry.clearPendingResponses();
+
+        if (CONFIG != null) CONFIG.clearSessionState();
     }
 
     /**
@@ -368,7 +388,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      */
     public static void refreshLocations() {
 
-        ArdaMaps.IO_EXECUTOR.submit(() -> {
+        ArdaMaps.IO_EXECUTOR.execute(() -> {
 
             Date lastUpdate = ArdaMapsClient.CONFIG.getLocationConfig().getLastUpdate();
             PacketRegistry.LOCATIONS_UPDATE_REQUEST.send(new LocationsRequestPacket(lastUpdate), response -> {
@@ -434,7 +454,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      */
     public static void refreshRegionsLut() {
 
-        ArdaMaps.IO_EXECUTOR.submit(() -> {
+        ArdaMaps.IO_EXECUTOR.execute(() -> {
             Date lastUpdate = ArdaMapsClient.CONFIG.getRegionLookupTexture().lastUpdate();
             PacketRegistry.REGION_LUT_UPDATE_REQUEST.send(new RegionsLutRequestPacket(lastUpdate), regionsLutResponsePacket -> {
 
@@ -572,7 +592,7 @@ public class ArdaMapsClient implements ClientModInitializer {
         float toposcopeRange = CONFIG.getToposcopeDrawDistanceBlocks(dimension);
         float maxRange = Math.max(compassRange, toposcopeRange);
 
-        var playerPos = player.getPos();
+        var playerPos = new Vec3d(player.getX(), player.getY(), player.getZ());
 
         NEAR_LOCATIONS = LocationProvider.getLocations(currentDimensionId, playerPos, maxRange, true);
         lastNearLocationsUpdate = now;
@@ -655,7 +675,7 @@ public class ArdaMapsClient implements ClientModInitializer {
         /** The identifier for this resource reload listener, used to distinguish it from other listeners. */
         @Override
         public Identifier getFabricId() {
-            return new Identifier(ArdaMaps.MOD_ID, "markers_loader");
+            return ModConstants.modId("markers_loader");
         }
 
         /** Loads all custom shaders when client resources are reloaded. */
@@ -674,7 +694,7 @@ public class ArdaMapsClient implements ClientModInitializer {
         /** The identifier for this resource reload listener, used to distinguish it from other listeners. */
         @Override
         public Identifier getFabricId() {
-            return new Identifier(ArdaMaps.MOD_ID, "shader_loader");
+            return ModConstants.modId("shader_loader");
         }
 
         /** Loads all custom shaders when client resources are reloaded. */
@@ -697,7 +717,7 @@ public class ArdaMapsClient implements ClientModInitializer {
         /** Returns the identifier for this resource reload listener, which is used to distinguish it from other listeners. */
         @Override
         public Identifier getFabricId() {
-            return new Identifier(ArdaMaps.MOD_ID, "icon_sprite_atlas");
+            return ModConstants.modId("icon_sprite_atlas");
         }
 
         /** Reloads the icon sprite atlas when client resources are reloaded, ensuring that any changes to the icons are reflected in the mod's HUD and map rendering. */
@@ -722,7 +742,7 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         @Override
         public Identifier getFabricId() {
-            return new Identifier(ArdaMaps.MOD_ID, "guide_image_cache");
+            return ModConstants.modId("guide_image_cache");
         }
 
         @Override

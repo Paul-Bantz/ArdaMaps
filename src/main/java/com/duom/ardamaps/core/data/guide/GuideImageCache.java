@@ -26,6 +26,7 @@
 package com.duom.ardamaps.core.data.guide;
 
 import com.duom.ardamaps.ArdaMaps;
+import com.duom.ardamaps.gui.ModConstants;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
@@ -86,7 +87,7 @@ public final class GuideImageCache {
             return CACHE.get(src).orElse(null);
         }
 
-        Identifier resourceId = new Identifier(ArdaMaps.MOD_ID, src);
+        Identifier resourceId = ModConstants.modId(src);
         Optional<Resource> resource = MinecraftClient.getInstance()
                 .getResourceManager()
                 .getResource(resourceId);
@@ -131,4 +132,3 @@ public final class GuideImageCache {
         CACHE.clear();
     }
 }
-

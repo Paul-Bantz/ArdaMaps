@@ -26,7 +26,7 @@
 package com.duom.ardamaps.core.data.location;
 
 import com.duom.ardamaps.ArdaMapsClient;
-import net.minecraft.util.math.Vec3d;
+import com.duom.ardamaps.core.data.Vec3d;
 
 import java.util.List;
 import java.util.Objects;
@@ -64,7 +64,7 @@ public class LocationProvider {
             var pos = location.getPosition();
 
             if (pos == null) continue;
-            if (filter && pos.getX() == 0d && pos.getY() == 0d && pos.getZ() == 0d) continue;
+            if (filter && pos.x == 0d && pos.y == 0d && pos.z == 0d) continue;
 
             var squaredDistance = position.squaredDistanceTo(pos);
 

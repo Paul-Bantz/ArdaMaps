@@ -29,7 +29,6 @@ import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.api.waypoints.ApiWaypoint;
 import com.duom.ardamaps.core.data.map.Waypoint;
 import com.duom.ardamaps.gui.ModConstants;
-import net.minecraft.util.Identifier;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -43,12 +42,12 @@ class WaypointsApiImplTest {
 
         Waypoint waypoint = WaypointsApiImpl.toWaypoint(api);
 
-        assertEquals(new Waypoint(1, 2, "text", .1f, .2f, .3f, "external", "minecraft:overworld", true, ModConstants.ICON_WAYPOINT), waypoint);
+        assertEquals(new Waypoint(1, 2, "text", .1f, .2f, .3f, "external", "minecraft:overworld", true, ModConstants.ICON_WAYPOINT.toString()), waypoint);
     }
 
     @Test
     void mapsInternalWaypointToApiWaypoint() {
-        Identifier icon = new Identifier("ardamaps", "custom");
+        String icon = "ardamaps:custom";
         Waypoint waypoint = new Waypoint(3, 4, "label", .4f, .5f, .6f, "external", "minecraft:the_nether", false, icon);
 
         ApiWaypoint api = WaypointsApiImpl.toApiWaypoint(waypoint);

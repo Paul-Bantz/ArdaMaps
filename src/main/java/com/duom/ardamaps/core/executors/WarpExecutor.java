@@ -26,6 +26,7 @@
 package com.duom.ardamaps.core.executors;
 
 import com.duom.ardamaps.core.integration.WarpService;
+import com.duom.ardamaps.gui.ModConstants;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
@@ -49,7 +50,7 @@ public class WarpExecutor implements WarpService {
             }
 
             var warp = warpOpt.get();
-            Identifier dimensionId = new Identifier(warp.getWorld().getName());
+            Identifier dimensionId = ModConstants.id(warp.getWorld().getName());
             RegistryKey<World> key = RegistryKey.of(RegistryKeys.WORLD, dimensionId);
 
             ServerWorld serverWorld = server.getWorld(key);

@@ -38,6 +38,7 @@ import org.mockito.Mockito;
 
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -166,5 +167,28 @@ class BlueMapCameraTest {
         Set<PmTileKey> tiles = camera.getVisibleTiles(1);
 
         assertFalse(tiles.isEmpty());
+    }
+
+    /**
+     * Blocks-per-pixel is the inverse of the visual render scale.
+     */
+    @Test
+    void getBlocksPerPixel_belowIdentityZoom_returnsFractionalBlockCoverage() {
+
+        var config = Mockito.mock(ClientConfig.class);
+        var progress = Mockito.mock(ClientProgress.class);
+
+        Mockito.when(config.getClientProgress()).thenReturn(progress);
+        Mockito.when(progress.getExplorationState(DIMENSION.getId(), false)).thenReturn(null);
+
+        ArdaMapsClient.CONFIG = config;
+
+        BlueMapCamera camera = new BlueMapCamera(640, 480, 0, 0);
+        camera.setDimension(DIMENSION);
+        camera.setIdentityZoom(2);
+        camera.updateZoom(1);
+        camera.setLodFactor(2.0);
+
+        assertEquals(0.5, camera.getBlocksPerPixel(), 1e-9);
     }
 }

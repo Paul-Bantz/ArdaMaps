@@ -23,33 +23,44 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.api.waypoints;
+package com.duom.ardamaps.core.data.json;
 
-/**
- * Public waypoint DTO for external mods.
- *
- * @param x          the X coordinate of the waypoint
- * @param z          the Z coordinate of the waypoint
- * @param text       the waypoint display text
- * @param r          the red component of the waypoint colour
- * @param g          the green component of the waypoint colour
- * @param b          the blue component of the waypoint colour
- * @param identifier the waypoint owner's identifier
- * @param dimension  the waypoint dimension
- * @param showToast  whether to show a toast notification on hit
- * @param icon       the waypoint icon identifier string
- */
-public record ApiWaypoint(int x, int z,
-                          String text,
-                          float r, float g, float b,
-                          String identifier, String dimension,
-                          boolean showToast,
-                          String icon) {
+import com.duom.ardamaps.ArdaMaps;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+
+public final class JsonAdapterUtils {
+
+    private JsonAdapterUtils() {
+    }
+
+    public static JsonObject object(JsonElement json, String type) {
+
+        if (json == null || json.isJsonNull() || !json.isJsonObject())
+            throw new JsonParseException(type + " must be a JSON object");
+
+        return json.getAsJsonObject();
+    }
+
+    public static JsonElement required(JsonObject obj, String field) {
+
+        JsonElement value = obj.get(field);
+        if (value == null || value.isJsonNull())
+            throw new JsonParseException("Missing required field '" + field + "'");
+
+        return value;
+    }
 
     /**
-     * Creates a waypoint that uses ArdaMaps' default toast and icon handling.
+     * Qualifies a bare resource path with the mod namespace; already-qualified values pass through.
+     *
+     * @param value Raw resource path.
+     * @return A qualified resource identifier string.
      */
-    public ApiWaypoint(int x, int z, String text, float r, float g, float b, String identifier, String dimension) {
-        this(x, z, text, r, g, b, identifier, dimension, true, null);
+    public static String qualify(String value) {
+
+        String trimmed = value.trim();
+        return trimmed.indexOf(':') >= 0 ? trimmed : ArdaMaps.MOD_ID + ":" + trimmed;
     }
 }

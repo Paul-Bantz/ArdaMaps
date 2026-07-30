@@ -25,7 +25,6 @@
 
 package com.duom.ardamaps.core.data.map.markers;
 
-import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.core.data.json.MarkerTypeTypeAdapter;
 import com.duom.ardamaps.core.data.json.MarkersDefinitionTypeAdapter;
 import com.duom.ardamaps.core.data.json.SpriteTypeAdapter;
@@ -75,7 +74,7 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
     private static final Logger LOGGER = LoggerFactory.getLogger(MarkersDefinition.class);
 
     /** Marker label for undiscovered locations */
-    private static final Identifier MARKERS_JSON = new Identifier(ArdaMaps.MOD_ID, "markers.json");
+    private static final Identifier MARKERS_JSON = ModConstants.modId("markers.json");
 
     /**
      * Loads the markers definition from the `markers.json` resource file.
@@ -120,8 +119,8 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
      */
     public static MarkersDefinition createDefault() {
 
-        var defaultMarker = new MarkerType("Landmark", ModConstants.LANDMARK_ICON, ModConstants.COLOR_BROWN, ModConstants.COLOR_LIGHT_BROWN);
-        var unknown = new MarkerType("Unknown", ModConstants.UNKNOWN_ICON, ModConstants.COLOR_BROWN, ModConstants.COLOR_LIGHT_BROWN);
+        var defaultMarker = new MarkerType("Landmark", ModConstants.LANDMARK_ICON.toString(), ModConstants.COLOR_BROWN, ModConstants.COLOR_LIGHT_BROWN);
+        var unknown = new MarkerType("Unknown", ModConstants.UNKNOWN_ICON.toString(), ModConstants.COLOR_BROWN, ModConstants.COLOR_LIGHT_BROWN);
         return new MarkersDefinition(ModConstants.MAP_MARKER_ICON,
                 ModConstants.MAP_MARKER_VISITED_ICON,
                 35,
@@ -148,7 +147,7 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
                     null :
                     location.getTypes().get(0).toUpperCase());
 
-            location.setIcon(markerType.icon());
+            location.setIcon(ModConstants.id(markerType.icon()));
             location.setColor(markerType.color());
             location.setHighlightColor(markerType.highlightColor());
         }
@@ -163,8 +162,14 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
      */
     public @NotNull MarkerType getMarkerType(String type) {
 
-        if (type == null || type.isBlank()) return types.get("LANDMARK");
+        if (type == null || type.isBlank()) return defaultType != null ? defaultType : unknownType;
 
-        return types.getOrDefault(type, types.get("LANDMARK"));
+        MarkerType markerType = types.get(type);
+        if (markerType != null) return markerType;
+
+        if (defaultType != null) return defaultType;
+        if (unknownType != null) return unknownType;
+
+        throw new IllegalStateException("Markers definition has neither a default nor an unknown marker type");
     }
 }

@@ -28,12 +28,11 @@ package com.duom.ardamaps.core.data.map;
 import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.Vec2d;
-import com.duom.ardamaps.gui.ModConstants;
+import com.duom.ardamaps.core.data.json.JsonAdapterUtils;
 import com.google.gson.ExclusionStrategy;
 import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import net.minecraft.util.Identifier;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Objects;
@@ -51,14 +50,14 @@ import java.util.Optional;
  * @param identifier the waypoint's initiator's identifier this attributes defines the equality between waypoints.
  * @param dimension  this waypoint's dimension
  * @param showToast  whether to display a toast notification when the waypoint is hit
- * @param icon       the waypoint's icon
+ * @param icon       the waypoint's icon identifier string
  */
 public record Waypoint(int x, int z,
                        String text,
                        float r, float g, float b,
                        String identifier, String dimension,
                        boolean showToast,
-                       Identifier icon) {
+                       String icon) {
 
     /**
      * Initializes a new default waypoint with colour yellow at the given position
@@ -92,7 +91,7 @@ public record Waypoint(int x, int z,
                 text,
                 r, g, b,
                 identifier, dimension,
-                true, ModConstants.ICON_WAYPOINT);
+                true, ArdaMaps.MOD_ID + ":icons/icon_waypoint");
     }
 
     /**
@@ -122,7 +121,7 @@ public record Waypoint(int x, int z,
                         deserialized.identifier != null ? deserialized.identifier : ArdaMaps.MOD_ID,
                         deserialized.dimension != null ? deserialized.dimension : Client.currentDimensionId(),
                         deserialized.showToast,
-                        deserialized.icon != null ? deserialized.icon : ModConstants.ICON_WAYPOINT
+                        deserialized.icon != null ? JsonAdapterUtils.qualify(deserialized.icon) : ArdaMaps.MOD_ID + ":icons/icon_waypoint"
                 );
             }
 
