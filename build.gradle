@@ -70,8 +70,7 @@ dependencies {
     // Optional integrations - compile against them, never require them at runtime.
     modCompileOnly("curse.maven:huskhomes-849217:5468607")
     modCompileOnly("maven.modrinth:ardaregions:${project.ardaregions_version}")
-    //modCompileOnly("maven.modrinth:arda-paths:${project.ardapaths_version}")
-    modCompileOnly(files("build/external-libs/ArdaPaths-1.4.0-SNAPSHOT.jar"))
+    modCompileOnly("maven.modrinth:arda-paths:${project.ardapaths_version}")
 
     // DevAuth - Dev/Debug authentication support
     modRuntimeOnly("me.djtheredstoner:DevAuth-fabric:${project.devauth_version}")
