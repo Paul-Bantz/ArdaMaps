@@ -87,7 +87,9 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The client-side initializer for the Arda Maps mod, responsible for setting up client-specific features such as the toposcope and compass HUD elements, handling resource reloads, and managing player exploration tracking.
@@ -95,10 +97,20 @@ import java.util.concurrent.Executors;
  */
 public class ArdaMapsClient implements ClientModInitializer {
 
-    /** Executor for asynchronous processing */
+    /** Executor for asynchronous image decoding and HTTP image loads. */
     public static final ExecutorService IMAGE_EXECUTOR =
-            Executors.newFixedThreadPool(
-                    Math.max(2, Runtime.getRuntime().availableProcessors() / 2)
+            newBoundedExecutor(
+                    "ardamaps-image-loader",
+                    Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+                    64
+            );
+
+    /** Executor for PMTiles archive reads, separate from HTTP/WebP image loading. */
+    public static final ExecutorService TILE_EXECUTOR =
+            newBoundedExecutor(
+                    "ardamaps-tile-loader",
+                    Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+                    256
             );
 
     /** How long (ms) the near-locations cache is valid before refreshing. */
@@ -118,6 +130,21 @@ public class ArdaMapsClient implements ClientModInitializer {
      * Entries are removed once their lifetime ({@link ToastWidget#TOTAL_MS}) has elapsed.
      */
     private static final Deque<ToastWidget> TOAST_QUEUE = new ArrayDeque<>();
+
+    private static ExecutorService newBoundedExecutor(String threadName, int threads, int queueSize) {
+        return new ThreadPoolExecutor(
+                threads,
+                threads,
+                0L,
+                TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(queueSize),
+                runnable -> {
+                    Thread thread = new Thread(runnable, threadName);
+                    thread.setDaemon(true);
+                    return thread;
+                }
+        );
+    }
 
     /** Client configuration manager instance, responsible for loading and saving client-specific configurations such as map layers and player progress. */
     public static ClientConfigManager CONFIG_MANAGER;
@@ -329,6 +356,16 @@ public class ArdaMapsClient implements ClientModInitializer {
             }
         } catch (InterruptedException e) {
             IMAGE_EXECUTOR.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+
+        TILE_EXECUTOR.shutdown();
+        try {
+            if (!TILE_EXECUTOR.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                TILE_EXECUTOR.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            TILE_EXECUTOR.shutdownNow();
             Thread.currentThread().interrupt();
         }
 

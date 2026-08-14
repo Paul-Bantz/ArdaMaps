@@ -40,8 +40,12 @@ import java.net.URI;
  */
 public class PMTilesHttpTileProvider extends PMTilesProvider {
 
-    /** Private constructor to prevent direct instantiation */
-    private PMTilesHttpTileProvider() {/* Instantiated via init */}
+    /**
+     * Prevent direct instantiation.
+     */
+    private PMTilesHttpTileProvider() {
+        /* Instantiated via init */
+    }
 
     /**
      * Create a PMTilesHttpTileProvider from the specified PMTiles HTTP URI.
@@ -52,6 +56,7 @@ public class PMTilesHttpTileProvider extends PMTilesProvider {
     public static TileProvider<PmTileKey> init(String uri) throws IOException {
 
         var httpTilesProvider = new PMTilesHttpTileProvider();
+        httpTilesProvider.setArchivePath(uri);
 
         HttpRangeReader rangeReader = HttpRangeReader.builder()
                 .uri(URI.create(uri))
@@ -67,7 +72,7 @@ public class PMTilesHttpTileProvider extends PMTilesProvider {
                 .withBlockAlignment()
                 .build();
 
-        httpTilesProvider.configureReader(memoryCached);
+        httpTilesProvider.configureReader(memoryCached, true);
 
         return httpTilesProvider;
     }

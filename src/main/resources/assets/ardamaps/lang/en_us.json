@@ -54,6 +54,7 @@
   "ardamaps.client.map.screen.guide": "Guide",
   "ardamaps.client.map.screen.layer.dropdown.empty": "No Map Layers Available",
   "ardamaps.client.map.screen.layer.dropdown": "Map Layer",
+  "ardamaps.client.map.screen.layer_load_failed": "Failed to load map layer: %s",
   "ardamaps.client.map.screen.loading": "Map Loading...",
   "ardamaps.client.map.screen.map.tooltip": "World Map",
   "ardamaps.client.map.screen.map": "Map",

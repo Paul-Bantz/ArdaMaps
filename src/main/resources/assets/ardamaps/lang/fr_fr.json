@@ -54,6 +54,7 @@
   "ardamaps.client.map.screen.guide": "Guide",
   "ardamaps.client.map.screen.layer.dropdown.empty": "Aucun calque trouvé",
   "ardamaps.client.map.screen.layer.dropdown": "Calques",
+  "ardamaps.client.map.screen.layer_load_failed": "Échec du chargement du calque : %s",
   "ardamaps.client.map.screen.loading": "Chargement de la carte...",
   "ardamaps.client.map.screen.map.tooltip": "Carte du monde",
   "ardamaps.client.map.screen.map": "Carte",

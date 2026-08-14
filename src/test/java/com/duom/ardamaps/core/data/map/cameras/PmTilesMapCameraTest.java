@@ -175,6 +175,23 @@ class PmTilesMapCameraTest {
     }
 
     /**
+     * Verify that the settled-state timer flips from false to true after movement cools down.
+     */
+    @Test
+    void isSettled_falseAfterMovementThenTrueAfterDelay() throws InterruptedException {
+
+        Thread.sleep(MapCamera.SETTLE_DELAY_MS + 20);
+        assertTrue(camera.isSettled());
+
+        camera.setZoom(1);
+
+        assertFalse(camera.isSettled());
+
+        Thread.sleep(MapCamera.SETTLE_DELAY_MS + 20);
+        assertTrue(camera.isSettled());
+    }
+
+    /**
      * At zoom=8, scale=1, the 640×480 viewport is 640×480 blocks wide.
      * With 256 blocks/tile the camera covers 2.5 × 1.875 tiles - at least some tiles visible.
      */

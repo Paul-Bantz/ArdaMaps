@@ -30,6 +30,13 @@ package com.duom.ardamaps.core.data.map.tiles;
  */
 public class PmTileKey extends TileKey {
 
+    /**
+     * Create a PMTiles tile key.
+     *
+     * @param z Tile zoom level.
+     * @param x Tile X coordinate.
+     * @param y Tile Y coordinate.
+     */
     public PmTileKey(int z, int x, int y) {
         super(z, x, y);
     }
@@ -44,6 +51,17 @@ public class PmTileKey extends TileKey {
         long zoomOffset = ((1L << (2 * z)) - 1) / 3;
         long hilbert = hilbertIndex(z, x, y);
         return zoomOffset + hilbert;
+    }
+
+    /**
+     * Exclusive upper bound on PMTiles tile IDs for all tiles at zoom {@code <= maxZoomInclusive}.
+     *
+     * @param maxZoomInclusive The inclusive maximum zoom.
+     * @return The first tile ID belonging to the next zoom level.
+     */
+    public static long tileIdUpperBound(int maxZoomInclusive) {
+
+        return (((1L << (2 * (maxZoomInclusive + 1))) - 1) / 3);
     }
 
     /**

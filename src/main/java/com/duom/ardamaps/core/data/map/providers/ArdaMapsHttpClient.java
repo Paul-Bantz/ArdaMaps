@@ -25,40 +25,31 @@
 
 package com.duom.ardamaps.core.data.map.providers;
 
-import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
-import io.tileverse.rangereader.RangeReader;
-import io.tileverse.rangereader.cache.CachingRangeReader;
-import io.tileverse.rangereader.file.FileRangeReader;
-
-import java.io.IOException;
-import java.nio.file.Path;
+import java.net.http.HttpClient;
+import java.time.Duration;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
- * Tile provider that reads map tiles from a PMTiles file.
+ * Shared Java HTTP client for map image transport.
  */
-public class PMTilesFileTileProvider extends PMTilesProvider {
+final class ArdaMapsHttpClient {
 
-    /**
-     * Create a PMTilesFileTileProvider from the specified PMTiles file path.
-     * This constructor is expected to fail with an IOException if the file is inaccessible.
-     *
-     * @param filePath The path to the PMTiles file
-     */
-    public static TileProvider<PmTileKey> init(String filePath) throws IOException {
+    /** Shared executor for the HTTP client. */
+    private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool(runnable -> {
+        Thread thread = new Thread(runnable, "ardamaps-http-client");
+        thread.setDaemon(true);
+        return thread;
+    });
 
-        var fileTileProvider = new PMTilesFileTileProvider();
-        fileTileProvider.setArchivePath(filePath);
+    /** Shared HTTP client for map image and metadata requests. */
+    static final HttpClient CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .executor(EXECUTOR)
+            .version(HttpClient.Version.HTTP_2)
+            .build();
 
-        FileRangeReader rangeReader = FileRangeReader.builder()
-                .path(Path.of(filePath))
-                .build();
-
-        RangeReader memoryCached = CachingRangeReader.builder(rangeReader)
-                .withBlockAlignment()
-                .build();
-
-        fileTileProvider.configureReader(memoryCached);
-
-        return fileTileProvider;
+    /** Prevent instantiation. */
+    private ArdaMapsHttpClient() {
     }
 }

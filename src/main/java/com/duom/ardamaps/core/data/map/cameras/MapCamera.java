@@ -38,6 +38,9 @@ public abstract class MapCamera {
     /** Epsilon value for snapping zoom levels to avoid jitter from tiny floating point differences during smooth zooming. */
     private static final double ZOOM_EPSILON = 0.001;
 
+    /** Delay after the last observed movement before high-detail tile requests resume. */
+    public static final long SETTLE_DELAY_MS = 120L;
+
     /** Viewport width - this is the "window into the world" width */
     @Getter
     protected int viewportWidth;
@@ -77,7 +80,7 @@ public abstract class MapCamera {
     @Getter
     protected double zoom;
 
-    /** Target zoom level for smooth zooming */
+    /** Target zoom level for smooth zooming. */
     protected double targetCameraZoom;
 
     /** Camera centre X in world coordinates */
@@ -88,6 +91,9 @@ public abstract class MapCamera {
     @Getter
     protected double worldZ;
 
+    /** Last time the camera position or zoom target changed. */
+    protected long lastMovementMs = System.currentTimeMillis();
+
     /** Current scale (pixels per block) */
     @Setter
     protected double scale;
@@ -97,10 +103,10 @@ public abstract class MapCamera {
     @Getter
     protected Dimension dimension;
 
-    /** World coordinates of the zoom anchor point (world position under mouse when zoom was triggered) */
+    /** World coordinates of the zoom anchor point, captured when zooming starts. */
     private Vec2d zoomAnchorWorld;
 
-    /** Screen coordinates of the zoom anchor point (mouse position when zoom was triggered) */
+    /** Screen coordinates of the zoom anchor point, captured when zooming starts. */
     private Vec2d zoomAnchorScreen;
 
     /** Preferred zoom level for displaying this map */
@@ -140,6 +146,10 @@ public abstract class MapCamera {
      */
     public void update(double deltaTime, double frameOffsetX, double frameOffsetZ) {
 
+        double previousZoom = zoom;
+        double previousWorldX = worldX;
+        double previousWorldZ = worldZ;
+
         var zoomDiff = targetCameraZoom - zoom;
 
         if (Math.abs(zoomDiff) > 0.01) {
@@ -178,6 +188,27 @@ public abstract class MapCamera {
         // Re-clamp pan position so bounds stay tight when zoom changes
         setWorldX(worldX, frameOffsetX);
         setWorldZ(worldZ, frameOffsetZ);
+
+        if (Math.abs(previousZoom - zoom) > ZOOM_EPSILON ||
+                Math.abs(previousWorldX - worldX) > ZOOM_EPSILON ||
+                Math.abs(previousWorldZ - worldZ) > ZOOM_EPSILON ||
+                Math.abs(targetCameraZoom - zoom) > 0.01) {
+            markMovement();
+        }
+    }
+
+    /**
+     * Returns whether the camera has been still long enough to request high-detail tiles.
+     */
+    public boolean isSettled() {
+        return System.currentTimeMillis() - lastMovementMs >= SETTLE_DELAY_MS;
+    }
+
+    /**
+     * Marks the camera as recently moved.
+     */
+    protected void markMovement() {
+        lastMovementMs = System.currentTimeMillis();
     }
 
     /**
@@ -223,7 +254,9 @@ public abstract class MapCamera {
         double lo = dimension.getXMin() + halfW - worldOffset;
         double hi = dimension.getXMax() - halfW + worldOffset;
 
-        this.worldX = lo <= hi ? CameraMath.clamp(worldX, lo, hi) : (dimension.getXMin() + dimension.getXMax()) / 2.0;
+        double nextWorldX = lo <= hi ? CameraMath.clamp(worldX, lo, hi) : (dimension.getXMin() + dimension.getXMax()) / 2.0;
+        if (Math.abs(this.worldX - nextWorldX) > ZOOM_EPSILON) markMovement();
+        this.worldX = nextWorldX;
     }
 
     /**
@@ -237,7 +270,9 @@ public abstract class MapCamera {
         double lo = dimension.getZMin() + halfH - worldOffset;
         double hi = dimension.getZMax() - halfH + worldOffset;
 
-        this.worldZ = lo <= hi ? CameraMath.clamp(worldZ, lo, hi) : (dimension.getZMin() + dimension.getZMax()) / 2.0;
+        double nextWorldZ = lo <= hi ? CameraMath.clamp(worldZ, lo, hi) : (dimension.getZMin() + dimension.getZMax()) / 2.0;
+        if (Math.abs(this.worldZ - nextWorldZ) > ZOOM_EPSILON) markMovement();
+        this.worldZ = nextWorldZ;
     }
 
     /**
@@ -374,6 +409,8 @@ public abstract class MapCamera {
         if (!Double.isNaN(zoomLevelToFitContentArea) && targetCameraZoom < zoomLevelToFitContentArea) {
             targetCameraZoom = zoomLevelToFitContentArea;
         }
+
+        markMovement();
     }
 
     /**
@@ -393,6 +430,7 @@ public abstract class MapCamera {
 
         this.zoom = snapZoom(zoom);
         this.targetCameraZoom = this.zoom;
+        markMovement();
     }
 
     /**

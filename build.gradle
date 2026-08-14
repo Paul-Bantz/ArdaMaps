@@ -84,6 +84,7 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    systemProperty "net.bytebuddy.experimental", "true"
 }
 
 license {
@@ -109,13 +110,14 @@ processResources {
 loom {
     runs {
         client {
+            runDir = "run-1_20_1"
             property("devauth.configDir", getRootProject().file(".devauth").absolutePath)
             client()
             vmArg "-Xmx8G"
             vmArg "-Xms8G"
         }
         server {
-            runDir = "run-server"
+            runDir = "run-server-1_20_1"
             server()
         }
     }

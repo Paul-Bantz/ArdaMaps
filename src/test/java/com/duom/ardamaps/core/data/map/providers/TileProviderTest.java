@@ -26,127 +26,452 @@
 package com.duom.ardamaps.core.data.map.providers;
 
 import com.duom.ardamaps.core.data.map.tiles.TileKey;
+import com.github.benmanes.caffeine.cache.Ticker;
+import net.minecraft.util.Identifier;
 import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Unit tests for {@link TileProvider#get(TileKey)} debounce and transport-failure behaviour.
- * <p>
- * These tests verify that:
- * <ul>
- *   <li>The first request for a key is buffered (not loaded immediately).</li>
- *   <li>A second request inside the debounce window triggers exactly one load.</li>
- *   <li>Expired buffered requests are pruned and treated as a fresh first request.</li>
- *   <li>Keys marked as transport-failed are skipped only during the retry cooldown.</li>
- * </ul>
- */
 class TileProviderTest {
 
     /**
-     * Verifies that the very first {@code get()} call for a key only records it in the
-     * debounce buffer and does not start loading.
+     * Verify that the per-frame submission cap is never exceeded.
      */
     @Test
-    void get_firstRequest_buffersWithoutLoading() {
+    void endFrame_neverExceedsInFlightCeiling() {
 
-        var provider = new TestTileProvider();
-        var key = new TileKey(3, 10, 20);
+        var provider = new TestTileProvider(false);
 
-        provider.get(key);
+        for (int frame = 0; frame < 4; frame++) {
+            provider.beginFrame();
+            for (int i = 0; i < 20; i++) {
+                provider.request(new TileKey(3, i, frame), i);
+            }
+            provider.endFrame();
+            assertTrue(provider.loading.size() <= TileProvider.MAX_IN_FLIGHT);
+        }
 
-        assertEquals(0, provider.loadCalls, "First request should only buffer");
-        assertTrue(provider.pendingRequests.containsKey(key), "First request should be remembered");
+        assertEquals(TileProvider.MAX_IN_FLIGHT, provider.loading.size());
+        assertEquals(TileProvider.MAX_IN_FLIGHT, provider.loadedKeys.size());
     }
 
     /**
-     * Verifies that a second {@code get()} call for the same key, issued within the debounce
-     * window, promotes that key to loading exactly once and removes it from the pending buffer.
+     * Verify that at most the per-frame submission limit is sent.
      */
     @Test
-    void get_secondRequestWithinDebounceWindow_loadsOnce() {
+    void endFrame_submitsAtMostPerFrameCap() {
 
-        var provider = new TestTileProvider();
-        var key = new TileKey(4, 1, 2);
+        var provider = new TestTileProvider(false);
 
-        provider.get(key);
-        provider.get(key);
+        provider.beginFrame();
+        for (int i = 0; i < 20; i++) {
+            provider.request(new TileKey(3, i, 0), i);
+        }
+        provider.endFrame();
 
-        assertEquals(1, provider.loadCalls, "Second request within debounce should trigger loading once");
-        assertFalse(provider.pendingRequests.containsKey(key), "Key should be removed from pending once promoted");
+        assertEquals(TileProvider.MAX_SUBMITS_PER_FRAME, provider.loadedKeys.size());
     }
 
     /**
-     * Verifies that pending entries older than {@link TileProvider#REQUEST_BUFFER_TTL_MS}
-     * are pruned, so a later request is treated as a new first request (buffer-only).
+     * Verify that lower priority values are submitted first.
      */
     @Test
-    void get_stalePendingRequest_isPrunedAndBufferedAgain() {
+    void endFrame_submitsLowestPriorityValuesFirst() {
 
-        var provider = new TestTileProvider();
-        var key = new TileKey(5, 3, 7);
-        provider.pendingRequests.put(key, System.currentTimeMillis() - TileProvider.REQUEST_BUFFER_TTL_MS - 1);
+        var provider = new TestTileProvider(true);
+        var low = new TileKey(3, 1, 0);
+        var high = new TileKey(3, 2, 0);
+        var mid = new TileKey(3, 3, 0);
 
-        provider.get(key);
+        provider.beginFrame();
+        provider.request(low, 50);
+        provider.request(high, 5);
+        provider.request(mid, 20);
+        provider.endFrame();
 
-        assertEquals(0, provider.loadCalls, "Expired pending key should not trigger loading");
-        assertTrue(provider.pendingRequests.containsKey(key), "Expired key should be re-buffered as first request");
+        assertEquals(List.of(high, mid, low), provider.loadedKeys);
     }
 
     /**
-     * Verifies that keys marked with transport failure are skipped during the retry cooldown.
+     * Verify that repeated requests keep the best priority for a key.
      */
     @Test
-    void get_recentTransportFailure_doesNotRetry() {
+    void request_sameKeyKeepsBetterPriority() {
 
-        var provider = new TestTileProvider();
+        var provider = new TestTileProvider(true);
+        var merged = new TileKey(3, 1, 0);
+        var first = new TileKey(3, 2, 0);
+
+        provider.beginFrame();
+        provider.request(merged, 100);
+        provider.request(first, 20);
+        provider.request(merged, 1);
+        provider.endFrame();
+
+        assertEquals(List.of(merged, first), provider.loadedKeys);
+    }
+
+    /**
+     * Verify that unsubmitted candidates are dropped on the next frame.
+     */
+    @Test
+    void beginFrame_dropsUnsubmittedCandidates() {
+
+        var provider = new TestTileProvider(false);
+
+        provider.beginFrame();
+        for (int i = 0; i < 20; i++) {
+            provider.request(new TileKey(3, i, 0), i);
+        }
+        provider.endFrame();
+
+        provider.loading.clear();
+        provider.endFrame();
+
+        assertEquals(TileProvider.MAX_SUBMITS_PER_FRAME, provider.loadedKeys.size());
+    }
+
+    /**
+     * Verify that peek is read-only.
+     */
+    @Test
+    void peek_isPureReadOnlyProbe() {
+
+        var provider = new TestTileProvider(true);
+        var key = new TileKey(3, 1, 0);
+
+        assertTrue(provider.peek(key).isEmpty());
+
+        assertTrue(provider.loadedKeys.isEmpty());
+        assertTrue(provider.loading.isEmpty());
+        assertTrue(provider.frameRequests.isEmpty());
+    }
+
+    /**
+     * Verify that pinned textures survive LRU churn.
+     */
+    @Test
+    void pinnedTexturesSurviveLruChurn() {
+
+        var provider = new TestTileProvider(true);
+        var pinnedKey = new TileKey(1, 0, 0);
+        var pinnedTexture = Identifier.of("ardamaps", "pinned");
+
+        provider.setPinnedZoom(1);
+        assertNotNull(pinnedTexture);
+        provider.pinnedTextures.put(pinnedKey, pinnedTexture);
+        for (int i = 0; i < TileProvider.MAX_CACHE_SIZE * 2; i++) {
+            provider.publish(new TileKey(3, i, 0), Objects.requireNonNull(Identifier.of("ardamaps", "tile_" + i)));
+        }
+        provider.textures.cleanUp();
+
+        assertEquals(pinnedTexture, provider.peek(pinnedKey).orElseThrow());
+    }
+
+    /**
+     * Verify that drawn textures remain resident when speculative churn exceeds the budget.
+     */
+    @Test
+    void protectDrawnTiles_keepsDrawnTextureResidentPastBudget() {
+
+        String previousBudget = System.getProperty("ardamaps.textureCacheBudgetBytes");
+        System.setProperty("ardamaps.textureCacheBudgetBytes", "500");
+        try {
+            var provider = new TestTileProvider(true);
+            var drawn = new TileKey(3, 1, 1);
+            provider.publish(drawn, Identifier.of("ardamaps", "drawn"), 10, 10);
+            provider.protectDrawnTiles(Set.of(drawn));
+
+            for (int i = 0; i < TileProvider.MAX_CACHE_SIZE; i++) {
+                provider.publish(new TileKey(3, i + 10, 0), Identifier.of("ardamaps", "tile_" + i), 10, 10);
+            }
+            provider.textures.cleanUp();
+
+            assertEquals(Identifier.of("ardamaps", "drawn"), provider.peek(drawn).orElseThrow());
+        } finally {
+            if (previousBudget == null) System.clearProperty("ardamaps.textureCacheBudgetBytes");
+            else System.setProperty("ardamaps.textureCacheBudgetBytes", previousBudget);
+        }
+    }
+
+    /**
+     * Verify that an old drawn texture returns to the LRU when it is no longer drawn.
+     */
+    @Test
+    void protectDrawnTiles_releasesOldDrawnTextureBackToLru() {
+
+        String previousBudget = System.getProperty("ardamaps.textureCacheBudgetBytes");
+        System.setProperty("ardamaps.textureCacheBudgetBytes", "500");
+        try {
+            var provider = new TestTileProvider(true);
+            var oldDrawn = new TileKey(3, 1, 1);
+            var currentDrawn = new TileKey(3, 2, 2);
+            provider.publish(oldDrawn, Identifier.of("ardamaps", "old"), 10, 10);
+            provider.publish(currentDrawn, Identifier.of("ardamaps", "current"), 10, 10);
+
+            provider.protectDrawnTiles(Set.of(oldDrawn));
+            provider.protectDrawnTiles(Set.of(currentDrawn));
+
+            for (int i = 0; i < TileProvider.MAX_CACHE_SIZE; i++) {
+                provider.publish(new TileKey(3, i + 100, 0), Identifier.of("ardamaps", "churn_" + i), 10, 10);
+            }
+            provider.textures.cleanUp();
+
+            assertTrue(provider.peek(oldDrawn).isEmpty());
+            assertEquals(Identifier.of("ardamaps", "current"), provider.peek(currentDrawn).orElseThrow());
+        } finally {
+            if (previousBudget == null) System.clearProperty("ardamaps.textureCacheBudgetBytes");
+            else System.setProperty("ardamaps.textureCacheBudgetBytes", previousBudget);
+        }
+    }
+
+    /**
+     * Verify that moving a texture out of the LRU does not destroy the GL texture.
+     */
+    @Test
+    void protectDrawnTiles_moveDoesNotDestroyTexture() {
+
+        var provider = new TestTileProvider(true);
+        var drawn = new TileKey(3, 4, 4);
+        provider.publish(drawn, Identifier.of("ardamaps", "drawn"), 10, 10);
+
+        provider.protectDrawnTiles(Set.of(drawn));
+
+        assertTrue(provider.destroyedTextures.isEmpty());
+        assertEquals(Identifier.of("ardamaps", "drawn"), provider.peek(drawn).orElseThrow());
+    }
+
+    /**
+     * Verify that the negative cache suppresses retries until its TTL expires.
+     */
+    @Test
+    void negativeCacheSuppressesUntilTtlExpires() {
+
+        var clock = new FakeClock();
+        var provider = new TestTileProvider(true, new FakeTicker());
+        provider.setClock(clock::millis);
+        var key = new TileKey(3, 1, 0);
+
+        provider.markMissing(key);
+
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
+
+        assertTrue(provider.loadedKeys.isEmpty());
+
+        clock.advance();
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
+
+        assertEquals(List.of(key), provider.loadedKeys);
+    }
+
+    /**
+     * Verify that decode-abandoned keys do not expire with the missing TTL.
+     */
+    @Test
+    void decodeAbandonedKeysDoNotExpireWithMissingTtl() {
+
+        var clock = new FakeClock();
+        var provider = new TestTileProvider(true);
+        provider.setClock(clock::millis);
+        var key = new TileKey(3, 5, 5);
+
+        provider.markDecodeFailure(key);
+        provider.markDecodeFailure(key);
+        provider.markDecodeFailure(key);
+
+        clock.advance();
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
+
+        assertTrue(provider.loadedKeys.isEmpty());
+    }
+
+    /**
+     * Verify that transport failures are suppressed only during the cooldown window.
+     */
+    @Test
+    void transportFailureSuppressesOnlyDuringCooldown() {
+
+        var provider = new TestTileProvider(true);
         var key = new TileKey(2, 9, 9);
 
         provider.markTransportFailure(key);
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
 
-        provider.get(key);
-        provider.get(key);
+        assertTrue(provider.loadedKeys.isEmpty());
 
-        assertEquals(0, provider.loadCalls, "Recent transport-failed keys must not be retried");
-        assertFalse(provider.pendingRequests.containsKey(key), "Transport-failed keys should not enter debounce buffer");
+        provider.transportFailedKeys.put(key, System.currentTimeMillis() - TileProvider.TRANSPORT_FAILURE_TTL_MS - 1);
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
+
+        assertEquals(List.of(key), provider.loadedKeys);
     }
 
     /**
-     * Verifies that transport-failure suppression expires, so a transient network blip does not blacklist a tile forever.
+     * Verify that bootstrap pumping waits for viewport loading to become idle.
      */
     @Test
-    void get_expiredTransportFailure_reentersDebouncePipeline() {
+    void bootstrapPumpYieldsWhileViewportLoadIsInFlight() {
 
-        var provider = new TestTileProvider();
-        var key = new TileKey(2, 9, 10);
-        provider.transportFailedKeys.put(key, System.currentTimeMillis() - TileProvider.TRANSPORT_FAILURE_TTL_MS - 1);
+        var provider = new TestTileProvider(false);
+        var visible = new TileKey(3, 1, 1);
+        var bootstrap = new TileKey(1, 0, 0);
 
-        provider.get(key);
+        provider.enqueueBootstrapTiles(List.of(bootstrap));
+        provider.loading.add(visible);
+        provider.endFrame();
 
-        assertEquals(0, provider.loadCalls, "Expired failure should be treated as a new first request");
-        assertTrue(provider.pendingRequests.containsKey(key), "Expired failure should re-enter debounce buffer");
+        assertTrue(provider.loadedKeys.isEmpty());
+
+        provider.loading.clear();
+        provider.endFrame();
+
+        assertEquals(List.of(bootstrap), provider.loadedKeys);
     }
 
     /**
-     * Minimal test double for {@link TileProvider} that counts load attempts.
-     * <p>
-     * The implementation immediately clears the in-flight marker so repeated
-     * tests can observe load scheduling behaviour deterministically.
+     * Verify that texture eviction is weighted by decoded byte size.
+     */
+    @Test
+    void textureCacheEvictsByByteWeight() {
+
+        String previousBudget = System.getProperty("ardamaps.textureCacheBudgetBytes");
+        System.setProperty("ardamaps.textureCacheBudgetBytes", "500");
+        try {
+            var provider = new TestTileProvider(true);
+
+            provider.publish(new TileKey(3, 1, 1), Identifier.of("ardamaps", "large_a"), 10, 10);
+            provider.publish(new TileKey(3, 2, 2), Identifier.of("ardamaps", "large_b"), 10, 10);
+            provider.textures.cleanUp();
+
+            assertTrue(provider.textures.estimatedSize() < 2);
+        } finally {
+            if (previousBudget == null) System.clearProperty("ardamaps.textureCacheBudgetBytes");
+            else System.setProperty("ardamaps.textureCacheBudgetBytes", previousBudget);
+        }
+    }
+
+    /**
+     * Test tile provider that records submitted keys.
      */
     private static final class TestTileProvider extends TileProvider<TileKey> {
 
-        /** Number of times {@link #loadTile(TileKey)} was invoked. */
-        private int loadCalls;
+        /** Whether submitted loads should complete immediately. */
+        private final boolean completeImmediately;
+        /** Keys submitted to the provider. */
+        private final List<TileKey> loadedKeys = new ArrayList<>();
+        /** Texture ids destroyed by the provider. */
+        private final List<Identifier> destroyedTextures = new ArrayList<>();
 
         /**
-         * Records a load invocation for assertions.
+         * Create a provider with the given completion behavior.
          *
-         * @param key tile key requested for loading
+         * @param completeImmediately Whether load calls should clear in-flight state immediately.
+         */
+        private TestTileProvider(boolean completeImmediately) {
+            this.completeImmediately = completeImmediately;
+        }
+
+        /**
+         * Create a provider with a custom ticker.
+         *
+         * @param completeImmediately Whether load calls should clear in-flight state immediately.
+         * @param ticker Cache ticker.
+         */
+        private TestTileProvider(boolean completeImmediately, Ticker ticker) {
+            super(ticker);
+            this.completeImmediately = completeImmediately;
+        }
+
+        /**
+         * Record the key as loaded.
+         *
+         * @param key Tile key to record.
          */
         @Override
         public void loadTile(TileKey key) {
-            loadCalls++;
-            loading.remove(key);
+            loadedKeys.add(key);
+            if (completeImmediately) clearLoading(key);
+        }
+
+        @Override
+        protected void destroyTexture(Identifier texture) {
+            if (texture != null) destroyedTextures.add(texture);
+        }
+
+        /**
+         * Publish a 1x1 texture for the given key.
+         *
+         * @param key Tile key.
+         * @param texture Texture identifier.
+         */
+        private void publish(TileKey key, Identifier texture) {
+            publish(key, texture, 1, 1);
+        }
+
+        /**
+         * Publish a texture with explicit dimensions.
+         *
+         * @param key Tile key.
+         * @param texture Texture identifier.
+         * @param width Texture width.
+         * @param height Texture height.
+         */
+        private void publish(TileKey key, Identifier texture, int width, int height) {
+            textures.put(key, new TextureData(texture, width, height));
+        }
+    }
+
+    /**
+     * Minimal ticker used to stabilize cache timing in tests.
+     */
+    private static final class FakeTicker implements Ticker {
+
+        /**
+         * Return a stable tick value.
+         *
+         * @return Constant ticker value.
+         */
+        @Override
+        public long read() {
+            return 1;
+        }
+    }
+
+    /**
+     * Simple monotonic clock used for TTL tests.
+     */
+    private static final class FakeClock {
+
+        private long millis;
+
+        /**
+         * Return the current synthetic time.
+         *
+         * @return Synthetic epoch milliseconds.
+         */
+        private long millis() {
+            return millis;
+        }
+
+        /**
+         * Advance the clock beyond the missing-TTL window.
+         */
+        private void advance() {
+            this.millis += 14400001L;
         }
     }
 }

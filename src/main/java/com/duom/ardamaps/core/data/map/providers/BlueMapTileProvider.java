@@ -26,13 +26,13 @@
 package com.duom.ardamaps.core.data.map.providers;
 
 import com.duom.ardamaps.ArdaMapsClient;
-import com.duom.ardamaps.core.data.map.tiles.TileKey;
+import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Tile provider that fetches map tiles from a BlueMap server.
  */
-public class BlueMapTileProvider extends TileProvider<TileKey> {
+public class BlueMapTileProvider extends TileProvider<PmTileKey> {
 
     /** The minimum level of detail (LOD) to load. */
     private final int minLod;
@@ -55,7 +55,8 @@ public class BlueMapTileProvider extends TileProvider<TileKey> {
         this.blueMapRoot = path;
         this.minLod = minLod;
         this.maxLod = maxLod;
-        ArdaMapsClient.getHttpImageProvider().scheduleBlueMapRefresh(blueMapRoot);
+        this.minZoom = minLod;
+        this.maxZoom = maxLod;
     }
 
     /**
@@ -64,7 +65,7 @@ public class BlueMapTileProvider extends TileProvider<TileKey> {
      * @param key The tile key identifying the tile to load.
      */
     @Override
-    protected void loadTile(TileKey key) {
+    protected void loadTile(PmTileKey key) {
 
         if (key.z < minLod || key.z > maxLod) {
             clearLoading(key);
@@ -74,7 +75,8 @@ public class BlueMapTileProvider extends TileProvider<TileKey> {
         ArdaMapsClient.getHttpImageProvider().loadImage(
                 getUrlForKey(key),
                 image -> registerTexture("bluemap_", image == null ? null : image.getLeft(), key),
-                () -> markTransportFailure(key)
+                () -> markTransportFailure(key),
+                maxAgeSeconds -> markMissing(key, maxAgeSeconds * 1000L)
         );
     }
 
@@ -84,8 +86,20 @@ public class BlueMapTileProvider extends TileProvider<TileKey> {
      * @param key The tile key.
      * @return The URL string for the tile.
      */
-    private @NotNull String getUrlForKey(TileKey key) {
+    private @NotNull String getUrlForKey(PmTileKey key) {
 
         return "%s/%d/x%d/z%d.png".formatted(blueMapRoot, key.z, key.x, key.y);
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * BlueMap tiles are fetched over HTTP, so a URL is always available for a given key.
+     * </p>
+     */
+    @Override
+    public String getTileSourceUrl(PmTileKey key) {
+
+        return getUrlForKey(key);
     }
 }

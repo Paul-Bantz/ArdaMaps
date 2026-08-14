@@ -30,25 +30,31 @@ import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
+import lombok.Getter;
 import lombok.Setter;
 import org.jspecify.annotations.NonNull;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+/**
+ * Base camera for tile-backed map layers. It adds tile zoom bounds, tile selection helpers,
+ * and exploration-aware tile filtering on top of the generic map camera math.
+ */
 public abstract class TilesMapCamera extends MapCamera {
 
-    /** Tile size in pixels */
+    /** Tile size in pixels. */
+    @Getter
     @Setter
     protected int tileSize;
 
-    /** Maximum zoom level allowed by the pmtiles file */
+    /** Maximum zoom level allowed by the tile source. */
     protected int maxTileZoom;
 
-    /** Minimum zoom level allowed by the pmtiles file */
+    /** Minimum zoom level allowed by the tile source. */
     protected int minTileZoom;
 
-    /** Current exploration state for the tileset */
+    /** Current exploration state for the tileset. */
     private PlayerExploration playerExploration;
 
     /**
@@ -79,6 +85,17 @@ public abstract class TilesMapCamera extends MapCamera {
      */
     @SuppressWarnings("unused")
     public abstract Set<PmTileKey> getVisibleTiles(int tileZoom);
+
+    /**
+     * Get tiles for request scheduling, optionally expanded by a Chebyshev ring beyond the
+     * viewport. Renderers use this only for loading candidates; drawing remains based on
+     * {@link #getVisibleTiles(int)}.
+     *
+     * @param tileZoom Zoom level of the tiles to fetch.
+     * @param rings    Number of tile rings to include beyond the viewport.
+     * @return Set of tile keys in the expanded request scope.
+     */
+    public abstract Set<PmTileKey> getRequestTiles(int tileZoom, int rings);
 
     /**
      * Get number of blocks per tile for a given zoom level
@@ -118,6 +135,24 @@ public abstract class TilesMapCamera extends MapCamera {
      */
     @SuppressWarnings("unused")
     public abstract int getTileSourceClampedZoom();
+
+    /**
+     * Returns a stable integer distance from the viewport center to the tile center.
+     * Lower distances are higher priority.
+     *
+     * @param tileX tile X coordinate
+     * @param tileY tile Y coordinate
+     * @param tileZoom tile zoom level
+     * @return rounded screen-space distance from viewport center
+     */
+    public int centerTileDistance(int tileX, int tileY, int tileZoom) {
+
+        Vec2d screen = tilePositionOnViewport(tileX, tileY, tileZoom);
+        double halfTile = displayedTileSize(tileZoom) / 2.0;
+        double dx = screen.x() + halfTile - viewportWidth / 2.0;
+        double dy = screen.y() + halfTile - viewportHeight / 2.0;
+        return (int) Math.round(Math.hypot(dx, dy));
+    }
 
     /**
      * Set tile zoom bounds. This is the allowed zoom range for the tile source.
