@@ -52,6 +52,7 @@ public class PMTilesHttpTileProvider extends PMTilesProvider {
     public static TileProvider<PmTileKey> init(String uri) throws IOException {
 
         var httpTilesProvider = new PMTilesHttpTileProvider();
+        httpTilesProvider.setArchivePath(uri);
 
         HttpRangeReader rangeReader = HttpRangeReader.builder()
                 .uri(URI.create(uri))
@@ -68,7 +69,7 @@ public class PMTilesHttpTileProvider extends PMTilesProvider {
                 .withBlockAlignment()
                 .build();
 
-        httpTilesProvider.configureReader(memoryCached);
+        httpTilesProvider.configureReader(memoryCached, true);
 
         return httpTilesProvider;
     }

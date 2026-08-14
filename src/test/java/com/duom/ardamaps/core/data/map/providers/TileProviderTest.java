@@ -26,6 +26,8 @@
 package com.duom.ardamaps.core.data.map.providers;
 
 import com.duom.ardamaps.core.data.map.tiles.TileKey;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -208,8 +210,7 @@ class TileProviderTest {
     }
 
     /**
-     * Verifies a key marked missing is skipped by {@code request()} without expiring, unlike a
-     * transport failure.
+     * Verifies a key marked missing is skipped by {@code request()} while its absent-tile TTL is fresh.
      */
     @Test
     void markMissing_suppressesFurtherRequests() {
@@ -223,8 +224,229 @@ class TileProviderTest {
         provider.request(key, 0);
         provider.endFrame();
 
-        assertEquals(0, provider.loadCalls, "Keys marked missing must never be retried");
+        assertEquals(0, provider.loadCalls, "Fresh missing keys must not be retried");
         assertTrue(provider.peek(key).isEmpty(), "A missing key should not have a cached texture");
+    }
+
+    /**
+     * Verifies negative-cache entries expire and re-enter the request pipeline, while staying
+     * suppressed before their retry timestamp.
+     */
+    @Test
+    void markMissing_expiresAfterTtl() {
+
+        var provider = new TestTileProvider();
+        var key = new TileKey(7, 8, 9);
+        long[] now = {1_000L};
+        provider.setClock(() -> now[0]);
+
+        provider.markMissing(key, 100L);
+
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
+
+        assertEquals(0, provider.loadCalls, "Fresh negative-cache entry should suppress retry");
+
+        now[0] = 1_101L;
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
+
+        assertEquals(1, provider.loadCalls, "Expired negative-cache entry should retry exactly once");
+    }
+
+    /**
+     * Verifies decode failures are retried only three times, then converted to a permanent missing
+     * marker so a deterministic bad payload cannot loop forever.
+     */
+    @Test
+    void markDecodeFailure_afterThirdFailure_marksMissing() {
+
+        var provider = new TestTileProvider();
+        var key = new TileKey(7, 4, 5);
+
+        provider.markDecodeFailure(key);
+        provider.markDecodeFailure(key);
+
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
+
+        assertEquals(1, provider.loadCalls, "Key should still be retriable before the third decode failure");
+
+        provider.markDecodeFailure(key);
+
+        provider.missingKeys.invalidateAll();
+        provider.setClock(() -> System.currentTimeMillis() + TileProvider.DEFAULT_MISSING_TTL_MS + 1);
+
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
+
+        assertEquals(1, provider.loadCalls, "Decode-abandoned key must not be retried");
+        assertTrue(provider.decodeAbandonedKeys.contains(key), "Decode-abandoned key should be permanently suppressed");
+    }
+
+    /**
+     * Verifies bootstrap work is issued only when no viewport or async load is in flight.
+     */
+    @Test
+    void bootstrapPump_yieldsWhileLoadingIsNonEmpty() {
+
+        var provider = new TestTileProvider();
+        var blockingKey = new TileKey(1, 1, 1);
+        var bootstrapKey = new TileKey(1, 2, 2);
+
+        provider.loading.add(blockingKey);
+        provider.enqueueBootstrapTiles(java.util.List.of(bootstrapKey));
+
+        provider.beginFrame();
+        provider.endFrame();
+
+        assertEquals(0, provider.loadCalls, "Bootstrap pump must not run while viewport loading is active");
+
+        provider.loading.clear();
+        provider.beginFrame();
+        provider.endFrame();
+
+        assertEquals(1, provider.loadCalls, "Bootstrap pump should issue one tile once idle");
+        assertTrue(provider.loadedKeys.contains(bootstrapKey));
+    }
+
+    /**
+     * Verifies the texture cache is capped by decoded RGBA bytes instead of tile count.
+     */
+    @Test
+    void textureCache_evictsByByteWeight() {
+
+        String previousBudget = System.getProperty("ardamaps.textureCacheBudgetBytes");
+        System.setProperty("ardamaps.textureCacheBudgetBytes", "16");
+        try {
+            var provider = new TestTileProvider();
+
+            for (int i = 0; i < 5; i++) {
+                provider.textures.put(
+                        new TileKey(1, i, 0),
+                        new TileProvider.TextureData(Identifier.parse("ardamaps:test/" + i), 1, 1));
+            }
+            provider.textures.cleanUp();
+
+            long weightedSize = provider.textures.policy()
+                    .eviction()
+                    .flatMap(eviction -> eviction.weightedSize().stream().boxed().findFirst())
+                    .orElseThrow();
+
+            assertTrue(weightedSize <= 16, "Cache must stay within the decoded byte budget");
+            assertTrue(provider.textures.estimatedSize() < 5, "At least one 4-byte texture should be evicted");
+        } finally {
+            if (previousBudget == null)
+                System.clearProperty("ardamaps.textureCacheBudgetBytes");
+            else
+                System.setProperty("ardamaps.textureCacheBudgetBytes", previousBudget);
+        }
+    }
+
+    /**
+     * Verifies a burst of completed decodes uploads only the per-frame budget during one drain.
+     */
+    @Test
+    void drainTextureUploads_uploadsAtMostPerFrameBudget() {
+
+        var provider = new UploadCountingTileProvider();
+        for (int i = 0; i < TileProvider.MAX_TEXTURE_UPLOADS_PER_FRAME + 2; i++) {
+            provider.registerTexture("test_", new NativeImage(NativeImage.Format.RGBA, 1, 1, false), new TileKey(1, i, 0));
+        }
+
+        provider.drainTextureUploads();
+
+        assertEquals(TileProvider.MAX_TEXTURE_UPLOADS_PER_FRAME, provider.uploadCalls);
+    }
+
+    /**
+     * Drawn textures move out of the LRU, so speculative cache churn cannot evict them.
+     */
+    @Test
+    void protectDrawnTiles_keepsDrawnTextureResidentPastBudget() {
+
+        String previousBudget = System.getProperty("ardamaps.textureCacheBudgetBytes");
+        System.setProperty("ardamaps.textureCacheBudgetBytes", "16");
+        try {
+            var provider = new DestroyCountingTileProvider();
+            TileKey drawn = new TileKey(1, 0, 0);
+            provider.cacheTexture(drawn, Identifier.parse("ardamaps:test/drawn"));
+
+            provider.protectDrawnTiles(java.util.Set.of(drawn));
+            for (int i = 1; i < 20; i++) {
+                provider.cacheTexture(new TileKey(1, i, 0), Identifier.parse("ardamaps:test/" + i));
+            }
+            provider.textures.cleanUp();
+
+            assertTrue(provider.peek(drawn).isPresent(), "Protected drawn tile must remain visible");
+        } finally {
+            restoreTextureBudget(previousBudget);
+        }
+    }
+
+    /**
+     * Once a tile is no longer drawn, it returns to the byte-weighted LRU and can be evicted.
+     */
+    @Test
+    void protectDrawnTiles_releasesOldDrawnTextureBackToLru() {
+
+        String previousBudget = System.getProperty("ardamaps.textureCacheBudgetBytes");
+        System.setProperty("ardamaps.textureCacheBudgetBytes", "16");
+        try {
+            var provider = new DestroyCountingTileProvider();
+            TileKey released = new TileKey(1, 0, 0);
+            provider.cacheTexture(released, Identifier.parse("ardamaps:test/released"));
+
+            provider.protectDrawnTiles(java.util.Set.of(released));
+            provider.protectDrawnTiles(java.util.Set.of());
+            assertNotNull(provider.textures.getIfPresent(released), "Released tile should return to the LRU cache");
+
+            for (int i = 1; i < 20; i++) {
+                provider.cacheTexture(new TileKey(1, i, 0), Identifier.parse("ardamaps:test/" + i));
+            }
+            provider.textures.cleanUp();
+
+            assertTrue(provider.peek(released).isEmpty(), "Released tile should become evictable again");
+        } finally {
+            restoreTextureBudget(previousBudget);
+        }
+    }
+
+    /**
+     * Moving a texture from the LRU to protection is not a GL destruction point.
+     */
+    @Test
+    void protectDrawnTiles_moveDoesNotDestroyTexture() {
+
+        var provider = new DestroyCountingTileProvider();
+        TileKey key = new TileKey(1, 0, 0);
+        provider.cacheTexture(key, Identifier.parse("ardamaps:test/protected"));
+
+        provider.protectDrawnTiles(java.util.Set.of(key));
+        provider.textures.cleanUp();
+
+        assertEquals(0, provider.destroyCalls, "Protecting a drawn texture must not release its GL id");
+    }
+
+    /**
+     * Replacing a deterministic texture id must not asynchronously release the just-registered id.
+     */
+    @Test
+    void textureCache_replacedEntryDoesNotDestroyTexture() {
+
+        var provider = new DestroyCountingTileProvider();
+        TileKey key = new TileKey(1, 0, 0);
+        Identifier id = Identifier.parse("ardamaps:test/replaced");
+
+        provider.cacheTexture(key, id);
+        provider.cacheTexture(key, id);
+        provider.textures.cleanUp();
+
+        assertEquals(0, provider.destroyCalls, "REPLACED entries reuse the live deterministic texture id");
     }
 
     /**
@@ -247,6 +469,14 @@ class TileProviderTest {
         }
     }
 
+    private static void restoreTextureBudget(String previousBudget) {
+
+        if (previousBudget == null)
+            System.clearProperty("ardamaps.textureCacheBudgetBytes");
+        else
+            System.setProperty("ardamaps.textureCacheBudgetBytes", previousBudget);
+    }
+
     /**
      * Test double whose loads never complete (does not clear {@link TileProvider#loading}), used
      * to verify the in-flight budget is respected across multiple frames.
@@ -256,6 +486,36 @@ class TileProviderTest {
         @Override
         public void loadTile(TileKey key) {
             // Intentionally left in-flight.
+        }
+    }
+
+    private static final class UploadCountingTileProvider extends TileProvider<TileKey> {
+
+        private int uploadCalls;
+
+        @Override
+        public void loadTile(TileKey key) {
+            // Not used by this test.
+        }
+
+        @Override
+        protected void uploadNativeTexture(String textureName, NativeImage image, Identifier id) {
+            uploadCalls++;
+        }
+    }
+
+    private static final class DestroyCountingTileProvider extends TileProvider<TileKey> {
+
+        private int destroyCalls;
+
+        @Override
+        public void loadTile(TileKey key) {
+            // Not used by these tests.
+        }
+
+        @Override
+        protected void destroyTexture(Identifier texture) {
+            destroyCalls++;
         }
     }
 }

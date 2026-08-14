@@ -23,42 +23,23 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.core.data.map.providers;
+package com.duom.ardamaps.core.data.config.client;
 
-import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
-import io.tileverse.rangereader.RangeReader;
-import io.tileverse.rangereader.cache.CachingRangeReader;
-import io.tileverse.rangereader.file.FileRangeReader;
+import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.nio.file.Path;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tile provider that reads map tiles from a PMTiles file.
+ * Tests client configuration defaults.
  */
-public class PMTilesFileTileProvider extends PMTilesProvider {
+class ClientConfigTest {
 
     /**
-     * Create a PMTilesFileTileProvider from the specified PMTiles file path.
-     * This constructor is expected to fail with an IOException if the file is inaccessible.
-     *
-     * @param filePath The path to the PMTiles file
+     * Verifies coarse pyramid bootstrap defaults on as a permanent bandwidth preference.
      */
-    public static TileProvider<PmTileKey> init(String filePath) throws IOException {
+    @Test
+    void coarsePyramidBootstrap_defaultsOn() {
 
-        var fileTileProvider = new PMTilesFileTileProvider();
-        fileTileProvider.setArchivePath(filePath);
-
-        FileRangeReader rangeReader = FileRangeReader.builder()
-                .path(Path.of(filePath))
-                .build();
-
-        RangeReader memoryCached = CachingRangeReader.builder(rangeReader)
-                .withBlockAlignment()
-                .build();
-
-        fileTileProvider.configureReader(memoryCached);
-
-        return fileTileProvider;
+        assertTrue(new ClientConfig().isCoarsePyramidBootstrap());
     }
 }

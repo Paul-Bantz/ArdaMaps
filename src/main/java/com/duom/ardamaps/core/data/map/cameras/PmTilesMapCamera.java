@@ -81,6 +81,12 @@ public class PmTilesMapCamera extends TilesMapCamera {
     @Override
     public Set<PmTileKey> getVisibleTiles(int tileZoom) {
 
+        return getRequestTiles(tileZoom, 0);
+    }
+
+    @Override
+    public Set<PmTileKey> getRequestTiles(int tileZoom, int rings) {
+
         double scale = renderScale();
 
         int blocksPerTile = numberOfBlocksPerTile(tileZoom);
@@ -108,10 +114,11 @@ public class PmTilesMapCamera extends TilesMapCamera {
         int maxTileY = (int) Math.floor((maxWorldZ - dimension.getZMin()) / blocksPerTile);
 
         // Clamp to world bounds
-        minTileX = Math.max(minTileX, 0);
-        maxTileX = Math.min(tilesBoundX, maxTileX);
-        minTileY = Math.max(minTileY, 0);
-        maxTileY = Math.min(tilesBoundY, maxTileY);
+        int expansion = Math.max(0, rings);
+        minTileX = Math.max(minTileX - expansion, 0);
+        maxTileX = Math.min(maxTileX + expansion, tilesBoundX);
+        minTileY = Math.max(minTileY - expansion, 0);
+        maxTileY = Math.min(maxTileY + expansion, tilesBoundY);
 
         return getVisibleExploredTiles(tileZoom, minTileX, maxTileX, minTileY, maxTileY, blocksPerTile);
     }

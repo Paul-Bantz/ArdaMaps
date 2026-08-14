@@ -26,14 +26,26 @@
 package com.duom.ardamaps.core.data.map.providers;
 
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
+import com.mojang.blaze3d.platform.NativeImage;
+import io.tileverse.pmtiles.PMTilesDirectory;
+import io.tileverse.pmtiles.PMTilesEntry;
+import io.tileverse.pmtiles.PMTilesHeader;
 import io.tileverse.pmtiles.PMTilesReader;
+import io.tileverse.rangereader.RangeReader;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -161,9 +173,242 @@ class PMTilesProviderTest {
     }
 
     /**
+     * Verifies undecodable tile bytes are attempted exactly three times, then abandoned as missing.
+     */
+    @Test
+    @Timeout(5)
+    void loadTile_undecodableBytes_attemptedThreeTimesThenMarkedMissing() throws IOException {
+
+        var provider = new CountingPMTilesProvider();
+        var reader = mock(PMTilesReader.class);
+        var key = new PmTileKey(4, 5, 5);
+
+        when(reader.getTile(anyLong())).thenReturn(Optional.of(ByteBuffer.wrap(new byte[]{1, 2, 3, 4})));
+        provider.reader = reader;
+
+        for (int i = 0; i < 3; i++) {
+            provider.loading.add(key);
+            provider.loadTile(key);
+            awaitTrue(() -> !provider.loading.contains(key));
+        }
+
+        assertEquals(3, provider.loadCalls);
+        assertNotNull(provider.missingKeys.getIfPresent(key), "Third decode failure should mark the key missing");
+
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
+
+        assertEquals(3, provider.loadCalls, "Decode-abandoned key must not be loaded again");
+    }
+
+    /**
+     * Verifies a rejected tile executor submission cannot escape the provider or strand the key in
+     * the in-flight set.
+     */
+    @Test
+    void endFrame_executorRejection_clearsLoadingWithoutThrowing() {
+
+        var provider = new RejectingPMTilesProvider();
+        provider.reader = mock(PMTilesReader.class);
+        var key = new PmTileKey(4, 6, 6);
+
+        provider.beginFrame();
+        provider.request(key, 0);
+
+        assertDoesNotThrow(provider::endFrame);
+        assertFalse(provider.loading.contains(key), "Rejected submission should be retriable next frame");
+    }
+
+    /**
+     * Verifies remote PMTiles bootstrap reads exactly the leaf-directory section and then one
+     * contiguous coarse tile-data span through the supplied shared range reader.
+     */
+    @Test
+    void bootstrap_clusteredArchive_readsLeafSectionThenCoarseExtent() {
+
+        var provider = new TestPMTilesProvider();
+        provider.minZoom = 0;
+        provider.maxZoom = 3;
+        var rangeReader = new RecordingRangeReader();
+        var reader = mockBootstrapReader();
+
+        provider.runRemoteBootstrap(rangeReader, reader, header(true));
+
+        assertEquals(List.of(new RangeRead(300, 50), new RangeRead(1_000, 200)), rangeReader.reads);
+    }
+
+    /**
+     * Verifies an unclustered archive skips bootstrap reads entirely.
+     */
+    @Test
+    void bootstrap_unclusteredArchive_skipsReads() {
+
+        var provider = new TestPMTilesProvider();
+        provider.minZoom = 0;
+        provider.maxZoom = 3;
+        var rangeReader = new RecordingRangeReader();
+
+        provider.runRemoteBootstrap(rangeReader, mockBootstrapReader(), header(false));
+
+        assertTrue(rangeReader.reads.isEmpty());
+    }
+
+    /**
+     * Verifies oversized coarse extents abort the data prewarm but still enqueue pump work.
+     */
+    @Test
+    void bootstrap_extentGuard_abortsDataReadButPumpStillRuns() {
+
+        var provider = new BootstrapPMTilesProvider();
+        provider.minZoom = 0;
+        provider.maxZoom = 3;
+        var rangeReader = new RecordingRangeReader();
+        var reader = mockBootstrapReader(PMTilesEntry.of(0, 0, 33 * 1024 * 1024, 1));
+
+        provider.runRemoteBootstrap(rangeReader, reader, header(true));
+
+        assertEquals(List.of(new RangeRead(300, 50)), rangeReader.reads);
+
+        provider.beginFrame();
+        provider.endFrame();
+
+        assertEquals(1, provider.loadCalls);
+    }
+
+    /**
+     * Verifies a 416-like range failure aborts the prewarm without escaping to configure callers.
+     */
+    @SuppressWarnings("resource")
+    @Test
+    void bootstrap_rangeNotSatisfiable_isCaught() {
+
+        var provider = new TestPMTilesProvider();
+        provider.minZoom = 0;
+        provider.maxZoom = 3;
+        var rangeReader = new RecordingRangeReader();
+        rangeReader.failOnRead = 2;
+
+        assertDoesNotThrow(() -> provider.runRemoteBootstrap(rangeReader, mockBootstrapReader(), header(true)));
+    }
+
+    /**
      * Minimal concrete {@link PMTilesProvider} for testing; PMTilesProvider itself is abstract only
      * to force construction through the file/HTTP {@code init(...)} factories.
      */
     private static final class TestPMTilesProvider extends PMTilesProvider {
+    }
+
+    private static final class CountingPMTilesProvider extends PMTilesProvider {
+
+        private int loadCalls;
+
+        @Override
+        public void loadTile(PmTileKey key) {
+            loadCalls++;
+            super.loadTile(key);
+        }
+    }
+
+    private static final class RejectingPMTilesProvider extends PMTilesProvider {
+
+        @Override
+        CompletableFuture<NativeImage> submitTileLoad(Supplier<NativeImage> supplier) {
+            throw new RejectedExecutionException("full");
+        }
+    }
+
+    private static final class BootstrapPMTilesProvider extends PMTilesProvider {
+
+        private int loadCalls;
+
+        @Override
+        public void loadTile(PmTileKey key) {
+            loadCalls++;
+            clearLoading(key);
+        }
+    }
+
+    private static PMTilesHeader header(boolean clustered) {
+
+        return new PMTilesHeader(
+                127L,
+                65,
+                192L,
+                0L,
+                300L,
+                50,
+                1000,
+                10_000L,
+                0L,
+                0L,
+                0L,
+                clustered,
+                PMTilesHeader.COMPRESSION_NONE,
+                PMTilesHeader.COMPRESSION_NONE,
+                PMTilesHeader.TILETYPE_PNG,
+                (byte) 0,
+                (byte) 3,
+                0,
+                0,
+                0,
+                0,
+                (byte) 0,
+                0,
+                0);
+    }
+
+    private static PMTilesReader mockBootstrapReader(PMTilesEntry... tileEntries) {
+
+        PMTilesEntry rootLeaf = PMTilesEntry.of(0, 0, 50, 0);
+        PMTilesDirectory root = directory(rootLeaf);
+        PMTilesDirectory leaf = tileEntries.length == 0
+                ? directory(PMTilesEntry.of(0, 0, 100, 1), PMTilesEntry.of(1, 100, 100, 1))
+                : directory(tileEntries);
+
+        PMTilesReader reader = mock(PMTilesReader.class);
+        when(reader.getRootDirectory()).thenReturn(root);
+        when(reader.getDirectory(rootLeaf)).thenReturn(leaf);
+        return reader;
+    }
+
+    private static PMTilesDirectory directory(PMTilesEntry... entries) {
+
+        PMTilesDirectory directory = mock(PMTilesDirectory.class);
+        when(directory.iterator()).thenAnswer(_ -> List.of(entries).iterator());
+        return directory;
+    }
+
+    private record RangeRead(long offset, int length) {
+
+    }
+
+    private static final class RecordingRangeReader implements RangeReader {
+
+        private final List<RangeRead> reads = new ArrayList<>();
+        private int failOnRead = -1;
+
+        @Override
+        public int readRange(long offset, int length, ByteBuffer target) throws IOException {
+
+            reads.add(new RangeRead(offset, length));
+            if (reads.size() == failOnRead) throw new IOException("416 Range Not Satisfiable");
+            target.put(new byte[Math.min(length, target.remaining())]);
+            return length;
+        }
+
+        @Override
+        public OptionalLong size() {
+            return OptionalLong.empty();
+        }
+
+        @Override
+        public String getSourceIdentifier() {
+            return "test";
+        }
+
+        @Override
+        public void close() {
+        }
     }
 }

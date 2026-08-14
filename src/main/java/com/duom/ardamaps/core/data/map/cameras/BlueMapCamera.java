@@ -112,6 +112,12 @@ public class BlueMapCamera extends TilesMapCamera {
     @Override
     public Set<PmTileKey> getVisibleTiles(int tileZoom) {
 
+        return getRequestTiles(tileZoom, 0);
+    }
+
+    @Override
+    public Set<PmTileKey> getRequestTiles(int tileZoom, int rings) {
+
         int blocksPerTile = numberOfBlocksPerTile(tileZoom);
 
         // Calculate visible world area (screen size / scale)
@@ -138,10 +144,11 @@ public class BlueMapCamera extends TilesMapCamera {
         int boundMinTileY = (int) Math.floor((double) dimension.getZMin() / blocksPerTile);
         int boundMaxTileY = (int) Math.floor((double) dimension.getZMax() / blocksPerTile);
 
-        minTileX = Math.max(minTileX, boundMinTileX);
-        maxTileX = Math.min(maxTileX, boundMaxTileX);
-        minTileY = Math.max(minTileY, boundMinTileY);
-        maxTileY = Math.min(maxTileY, boundMaxTileY);
+        int expansion = Math.max(0, rings);
+        minTileX = Math.max(minTileX - expansion, boundMinTileX);
+        maxTileX = Math.min(maxTileX + expansion, boundMaxTileX);
+        minTileY = Math.max(minTileY - expansion, boundMinTileY);
+        maxTileY = Math.min(maxTileY + expansion, boundMaxTileY);
 
         return getVisibleExploredTiles(tileZoom, minTileX, maxTileX, minTileY, maxTileY, blocksPerTile);
     }

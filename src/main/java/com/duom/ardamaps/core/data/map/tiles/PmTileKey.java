@@ -54,6 +54,17 @@ public class PmTileKey extends TileKey {
     }
 
     /**
+     * Exclusive upper bound on TileIDs for all tiles at zoom {@code <= maxZoomInclusive}.
+     *
+     * @param maxZoomInclusive Maximum zoom included in the prefix.
+     * @return The first TileID belonging to {@code maxZoomInclusive + 1}.
+     */
+    public static long tileIdUpperBound(int maxZoomInclusive) {
+
+        return (((1L << (2 * (maxZoomInclusive + 1))) - 1) / 3);
+    }
+
+    /**
      * Calculate the Hilbert curve index for given ZXY tile coordinates.
      *
      * @param z Zoom level

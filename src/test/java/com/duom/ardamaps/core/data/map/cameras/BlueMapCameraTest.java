@@ -189,4 +189,30 @@ class BlueMapCameraTest {
 
         assertEquals(0.5, camera.getBlocksPerPixel(), 1e-9);
     }
+
+    /**
+     * The prefetch request scope expands by one tile ring, while normal visible tiles remain the
+     * draw scope.
+     */
+    @Test
+    void getRequestTiles_oneRing_expandsBeyondVisibleTiles() {
+
+        var config = Mockito.mock(ClientConfig.class);
+        var progress = Mockito.mock(ClientProgress.class);
+
+        Mockito.when(config.isMapRevealAll()).thenReturn(false);
+        Mockito.when(config.getClientProgress()).thenReturn(progress);
+        Mockito.when(progress.getExplorationState(DIMENSION.getId(), false)).thenReturn(null);
+
+        ArdaMapsClient.CONFIG = config;
+
+        BlueMapCamera camera = new BlueMapCamera(640, 480, 0, 0);
+        camera.setDimension(DIMENSION);
+
+        Set<PmTileKey> visible = camera.getVisibleTiles(1);
+        Set<PmTileKey> request = camera.getRequestTiles(1, 1);
+
+        assertTrue(request.containsAll(visible));
+        assertTrue(request.size() > visible.size(), "One-ring request scope should include extra tiles");
+    }
 }

@@ -81,6 +81,17 @@ public abstract class TilesMapCamera extends MapCamera {
     public abstract Set<PmTileKey> getVisibleTiles(int tileZoom);
 
     /**
+     * Get tiles for request scheduling, optionally expanded by a Chebyshev ring beyond the
+     * viewport. Renderers use this only for loading candidates; drawing remains based on
+     * {@link #getVisibleTiles(int)}.
+     *
+     * @param tileZoom Zoom level of the tiles to fetch.
+     * @param rings    Number of tile rings to include beyond the viewport.
+     * @return Set of tile keys in the expanded request scope.
+     */
+    public abstract Set<PmTileKey> getRequestTiles(int tileZoom, int rings);
+
+    /**
      * Get number of blocks per tile for a given zoom level
      *
      * @param zoom level of the tile source

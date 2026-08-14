@@ -31,6 +31,7 @@ import com.duom.ardamaps.core.data.ImageFileType;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalListener;
+import com.google.gson.Gson;
 import com.jakewharton.disklrucache.DiskLruCache;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.sksamuel.scrimage.ImmutableImage;
@@ -47,42 +48,50 @@ import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Set;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
+import java.util.function.LongConsumer;
+import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 /**
  * Provider for loading images over HTTP.
  * <p>
- * This class implements a two-tier caching strategy using Caffeine for in-memory caching and DiskLruCache
- * for persistent on-disk caching. It supports asynchronous loading of images and handles common image formats
- * including WebP, PNG, and JPEG.
+ * This class implements a two-tier caching strategy using Caffeine for registered textures and a
+ * two-slot DiskLruCache for bytes plus freshness metadata. Network fetches use the shared
+ * {@link DelegatingHttpClient}; image decode remains on {@link ArdaMapsClient#IMAGE_EXECUTOR}.
+ * </p>
  */
 public class HttpImageProvider {
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(HttpImageProvider.class);
 
-    /** Maximum in-memory texture cache size */
-    private static final int MAX_MEMORY_CACHE_SIZE = 256;
-
     /** Maximum disk cache size: 512 Mb */
     private static final long DISK_CACHE_MAX_SIZE = 512L << 20;
 
-    /** Disk cache app version - bump when cache format changes */
-    private static final int DISK_CACHE_APP_VERSION = 1;
+    /** Disk cache app version; phase 2 changes both key format and value slots. */
+    private static final int DISK_CACHE_APP_VERSION = 2;
 
-    /** How long BlueMap tiles are cached on disk before a forced refresh */
-    private static final long BLUEMAP_REFRESH_INTERVAL_MINUTES = 15;
+    /** Number of values per disk entry: slot 0 is raw bytes, slot 1 is JSON metadata. */
+    private static final int DISK_CACHE_VALUE_COUNT = 2;
 
-    /** How long a disk entry must go un-accessed before it is evicted (1 day) */
-    private static final long STALE_ENTRY_TTL_MS = 24L * 60 * 60 * 1000;
+    /** Disk entries older than this are removed by periodic maintenance. */
+    private static final long STALE_ENTRY_TTL_MS = 7L * 24 * 60 * 60 * 1000;
+
+    private static final Gson GSON = new Gson();
 
     /** Set of URLs currently being loaded (thread-safe) */
     private final Set<String> loading = ConcurrentHashMap.newKeySet();
@@ -91,76 +100,65 @@ public class HttpImageProvider {
     private final RemovalListener<String, TextureData> textureRemovalListener =
             (ignoredUrl, data, ignoredCause) -> destroyTexture(data);
 
-    /** Caffeine in-memory LRU cache for registered textures */
+    /** Caffeine in-memory LRU cache for registered textures, weighted by decoded RGBA bytes. */
     private final Cache<String, TextureData> textures = Caffeine.newBuilder()
-            .maximumSize(MAX_MEMORY_CACHE_SIZE)
+            .maximumWeight(TileProvider.textureCacheBudgetBytes())
+            .weigher((String ignoredUrl, TextureData data) -> data.byteWeight())
             .removalListener(textureRemovalListener)
             .build();
 
-    /**
-     * Maps every disk-cache key to their original URL.
-     * Used to locate and invalidate entries by URL prefix (e.g. all BlueMap tiles).
-     */
-    private final ConcurrentHashMap<String, String> diskKeyToUrl = new ConcurrentHashMap<>();
-
-    /**
-     * Tracks the last time (epoch ms) each disk-cache key was accessed.
-     * Used by the stale-entry eviction job.
-     */
-    private final ConcurrentHashMap<String, Long> lastAccessTimes = new ConcurrentHashMap<>();
-
-    /**
-     * Holds the {@link ScheduledFuture} for each URL prefix registered for periodic BlueMap refresh.
-     * Keyed by the prefix string so duplicate calls are no-ops.
-     */
-    private final ConcurrentHashMap<String, ScheduledFuture<?>> refreshSchedules = new ConcurrentHashMap<>();
-
-    /** Single-threaded daemon scheduler for periodic cache-maintenance tasks */
+    /** Single-threaded daemon scheduler for periodic disk-cache maintenance. */
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "ardamaps-cache-scheduler");
         t.setDaemon(true);
         return t;
     });
 
+    private final Path diskCacheDirectory;
+    private final DelegatingHttpClient httpClient;
+
     /** Lazily-initialised DiskLruCache */
     private volatile DiskLruCache diskCache;
 
+    /** Time source for cache freshness; overridable in tests. */
+    private LongSupplier clock = System::currentTimeMillis;
+
     public HttpImageProvider() {
-        // Evict stale entries once per hour since the client process lives less than a day,
-        // this single sweep keeps disk use bounded without needing cross-session timestamps.
+
+        this(Client.cacheDirectory().resolve("http-images"), DelegatingHttpClient.create());
+    }
+
+    HttpImageProvider(Path diskCacheDirectory, DelegatingHttpClient httpClient) {
+
+        this.diskCacheDirectory = diskCacheDirectory;
+        this.httpClient = httpClient;
+
         scheduler.scheduleAtFixedRate(this::evictStaleEntries, 60, 60, TimeUnit.MINUTES);
     }
 
     /**
-     * Evicts disk-cached entries not accessed within {@value STALE_ENTRY_TTL_MS} ms (1 day).
-     * Runs hourly via the scheduler. Because the client process lives less than a day,
-     * only entries left over from a previously interrupted session will be evicted here.
+     * Evicts disk-cached entries whose persisted fetch timestamp is older than
+     * {@value STALE_ENTRY_TTL_MS} ms. Metadata lives on disk, so this reaches entries from prior
+     * sessions instead of only this process's in-memory bookkeeping.
      */
     private void evictStaleEntries() {
 
-        long cutoff = System.currentTimeMillis() - STALE_ENTRY_TTL_MS;
+        DiskLruCache cache = getDiskCache();
+        if (cache == null) return;
+
+        long cutoff = clock.getAsLong() - STALE_ENTRY_TTL_MS;
         int count = 0;
 
-        for (var entry : lastAccessTimes.entrySet()) {
-            if (entry.getValue() > cutoff) continue;
-
-            String diskKey = entry.getKey();
-            String url = diskKeyToUrl.get(diskKey);
-
-            try {
-                DiskLruCache cache = getDiskCache();
-                if (cache != null) cache.remove(diskKey);
-            } catch (IOException e) {
-                LOGGER.warn("[ArdaMaps] Failed to remove stale disk entry {}", diskKey, e);
+        try (var files = Files.list(diskCacheDirectory)) {
+            for (Path file : files.filter(path -> path.getFileName().toString().endsWith(".1")).toList()) {
+                String filename = file.getFileName().toString();
+                String key = filename.substring(0, filename.length() - 2);
+                CacheMetadata metadata = readMetadata(file);
+                if (metadata != null && metadata.fetchedAt() >= cutoff) continue;
+                if (cache.remove(key)) count++;
             }
-
-            if (url != null) {
-                textures.invalidate(url);
-                loading.remove(url);
-                diskKeyToUrl.remove(diskKey);
-            }
-            lastAccessTimes.remove(diskKey);
-            count++;
+        } catch (IOException e) {
+            LOGGER.warn("[ArdaMaps] Failed to evict stale HTTP image disk entries", e);
         }
 
         if (count > 0)
@@ -172,14 +170,15 @@ public class HttpImageProvider {
      * Returns {@code null} if the cache could not be opened.
      */
     private @Nullable DiskLruCache getDiskCache() {
+
         if (diskCache == null) {
             synchronized (this) {
                 if (diskCache == null) {
                     try {
                         diskCache = DiskLruCache.open(
-                                Client.cacheDirectory().resolve("http-images").toFile(),
+                                diskCacheDirectory.toFile(),
                                 DISK_CACHE_APP_VERSION,
-                                1,
+                                DISK_CACHE_VALUE_COUNT,
                                 DISK_CACHE_MAX_SIZE
                         );
                     } catch (IOException e) {
@@ -283,57 +282,6 @@ public class HttpImageProvider {
     }
 
     /**
-     * Schedules a periodic task that invalidates all disk-cached entries whose
-     * original URL starts with {@code urlPrefix} every {@value BLUEMAP_REFRESH_INTERVAL_MINUTES}
-     * minutes.  Calling this a second time with the same prefix is a no-op.
-     *
-     * @param urlPrefix URL prefix that identifies BlueMap tile URLs
-     *                  (e.g. {@code "https://example.com/maps/arda/tiles"}).
-     */
-    public void scheduleBlueMapRefresh(String urlPrefix) {
-        refreshSchedules.computeIfAbsent(urlPrefix, prefix ->
-                scheduler.scheduleAtFixedRate(
-                        () -> invalidateDiskEntriesByPrefix(prefix),
-                        BLUEMAP_REFRESH_INTERVAL_MINUTES,
-                        BLUEMAP_REFRESH_INTERVAL_MINUTES,
-                        TimeUnit.MINUTES
-                )
-        );
-    }
-
-    /**
-     * Removes every disk entry and in-memory texture whose URL starts with {@code urlPrefix},
-     * so the next {@link #getTexture} call triggers a fresh HTTP fetch.
-     */
-    private void invalidateDiskEntriesByPrefix(String urlPrefix) {
-
-        LOGGER.info("[ArdaMaps] Refreshing BlueMap disk-cache entries");
-        int count = 0;
-
-        for (var entry : diskKeyToUrl.entrySet()) {
-            if (!entry.getValue().startsWith(urlPrefix)) continue;
-
-            String diskKey = entry.getKey();
-            String url = entry.getValue();
-
-            try {
-                DiskLruCache cache = getDiskCache();
-                if (cache != null) cache.remove(diskKey);
-            } catch (IOException e) {
-                LOGGER.warn("[ArdaMaps] Failed to remove disk entry {} during BlueMap refresh", diskKey, e);
-            }
-
-            textures.invalidate(url);
-            loading.remove(url);
-            diskKeyToUrl.remove(diskKey);
-            lastAccessTimes.remove(diskKey);
-            count++;
-        }
-
-        LOGGER.info("[ArdaMaps] BlueMap refresh complete - invalidated {} entries.", count);
-    }
-
-    /**
      * Gets the texture identifier for the specified URL.
      * Initiates loading if the texture is not yet cached.
      *
@@ -370,7 +318,7 @@ public class HttpImageProvider {
                 Minecraft.getInstance().execute(() -> registerTexture(loadedTexture));
             else
                 loading.remove(url);
-        }, () -> loading.remove(url));
+        }, () -> loading.remove(url), _ -> loading.remove(url));
     }
 
     /**
@@ -383,57 +331,88 @@ public class HttpImageProvider {
      */
     public void loadImage(String url, Consumer<Tuple<NativeImage, String>> onComplete, Runnable onIoFailure) {
 
-        CompletableFuture.supplyAsync(() -> {
+        loadImage(url, onComplete, onIoFailure, null);
+    }
 
-            Tuple<NativeImage, String> loadedImage = null;
+    /**
+     * Asynchronously loads an image, distinguishing confirmed absence from transport failure.
+     *
+     * @param url         The URL of the image to load.
+     * @param onComplete  Callback that receives the loaded image and URL, or null if loading failed.
+     * @param onIoFailure Callback for IO/network failures only.
+     * @param onAbsent    Callback for 204/404/empty-body absent responses, with max-age seconds.
+     */
+    public void loadImage(String url,
+                          Consumer<Tuple<NativeImage, String>> onComplete,
+                          Runnable onIoFailure,
+                          LongConsumer onAbsent) {
 
-            try {
-                var uri = URI.create(url);
-                byte[] rawImageData;
+        try {
+            loadBytesAsync(URI.create(url))
+                    .thenCompose(result -> {
+                        if (result.absent()) {
+                            if (onAbsent != null) onAbsent.accept(result.absentTtlSeconds());
+                            return CompletableFuture.completedFuture(null);
+                        }
+                        if (result.bytes() == null) {
+                            return CompletableFuture.completedFuture(null);
+                        }
 
-                try {
-                    rawImageData = loadBytes(uri);
-                } catch (IOException e) {
-                    LOGGER.warn("Failed to load image bytes @\"{}\"", url, e);
-                    if (onIoFailure != null) onIoFailure.run();
-                    return null;
-                }
+                        return submitImageLoad(() -> decodeImage(result.bytes(), result.uri()));
 
-                if (rawImageData != null) {
-                    var fileType = detectImageFileType(rawImageData, uri);
-                    try {
-                        loadedImage = switch (fileType) {
-                            case WEBP -> new Tuple<>(loadWebpImage(rawImageData), url);
-                            case JPEG -> new Tuple<>(loadJpegImage(rawImageData), url);
-                            case PNG -> new Tuple<>(NativeImage.read(new ByteArrayInputStream(rawImageData)), url);
-                        };
-                    } catch (IOException e) {
-                        LOGGER.warn("Failed to decode image @\"{}\" as {}", url, fileType, e);
-                        removeDiskCacheEntry(url);
-                    }
-                }
+                    })
+                    .whenComplete((loadedImage, ex) -> {
+                        if (ex != null) {
+                            if (ex instanceof CompletionException completion
+                                    && completion.getCause() instanceof RejectedExecutionException) {
+                                LOGGER.warn("Image executor rejected image @\"{}\", retrying next request", url);
+                            } else {
+                                LOGGER.error("Unexpected async failure loading image @\"{}\"", url, ex);
+                                if (onIoFailure != null) onIoFailure.run();
+                            }
+                            loading.remove(url);
+                            return;
+                        }
 
-            } catch (RuntimeException e) {
-                LOGGER.error("Unexpected error loading image @\"{}\"", url, e);
-                removeDiskCacheEntry(url);
-            }
+                        try {
+                            onComplete.accept(loadedImage == null ? null : new Tuple<>(loadedImage, url));
+                        } catch (RuntimeException e) {
+                            LOGGER.error("Image completion callback failed for @\"{}\"", url, e);
+                            loading.remove(url);
+                        }
+                    });
+        } catch (RejectedExecutionException e) {
+            LOGGER.warn("HTTP client rejected image @\"{}\", retrying next request", url);
+            loading.remove(url);
+        } catch (RuntimeException e) {
+            LOGGER.error("Unexpected error scheduling image @\"{}\"", url, e);
+            loading.remove(url);
+        }
+    }
 
-            return loadedImage;
+    CompletableFuture<NativeImage> submitImageLoad(Supplier<NativeImage> supplier) {
 
-        }, ArdaMapsClient.IMAGE_EXECUTOR).whenComplete((loadedImage, ex) -> {
-            if (ex != null) {
-                LOGGER.error("Unexpected async failure loading image @\"{}\"", url, ex);
-                loading.remove(url);
-                return;
-            }
+        return CompletableFuture.supplyAsync(supplier, ArdaMapsClient.IMAGE_EXECUTOR);
+    }
 
-            try {
-                onComplete.accept(loadedImage);
-            } catch (RuntimeException e) {
-                LOGGER.error("Image completion callback failed for @\"{}\"", url, e);
-                loading.remove(url);
-            }
-        });
+    NativeImage decodeImage(byte[] rawImageData, URI uri) {
+
+        try {
+            var fileType = detectImageFileType(rawImageData, uri);
+            return switch (fileType) {
+                case WEBP -> loadWebpImage(rawImageData);
+                case JPEG -> loadJpegImage(rawImageData);
+                case PNG -> NativeImage.read(new ByteArrayInputStream(rawImageData));
+            };
+        } catch (IOException e) {
+            LOGGER.warn("Failed to decode image @\"{}\"", uri, e);
+            removeDiskCacheEntry(uri);
+            return null;
+        } catch (RuntimeException e) {
+            LOGGER.error("Unexpected error decoding image @\"{}\"", uri, e);
+            removeDiskCacheEntry(uri);
+            return null;
+        }
     }
 
     /**
@@ -459,55 +438,124 @@ public class HttpImageProvider {
 
     /* Disk I/O */
 
-    /**
-     * Loads raw image bytes for {@code uri}, consulting the DiskLruCache first
-     * and falling back to an HTTP request on a miss.
-     *
-     * @param uri The URI of the image to load
-     * @return The raw image bytes, or null if loading failed
-     */
-    private byte @Nullable [] loadBytes(URI uri) throws IOException {
+    private CompletableFuture<LoadResult> loadBytesAsync(URI uri) {
 
         DiskLruCache cache = getDiskCache();
         String key = getDiskCacheKey(uri);
-        String url = uri.toString();
+        long now = clock.getAsLong();
 
-        // Look for a disk hit
-        if (cache != null) {
+        DiskEntry diskEntry = readDiskEntry(cache, key);
+        if (diskEntry != null && diskEntry.isFresh(now)) {
+            return CompletableFuture.completedFuture(LoadResult.fromDisk(uri, diskEntry));
+        }
 
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
+                .GET()
+                .header("User-Agent", "Minecraft-Fabric");
+        if (diskEntry != null && diskEntry.metadata().lastModified() != null)
+            builder.header("If-Modified-Since", diskEntry.metadata().lastModified());
+
+        return httpClient.sendAsync(builder.build(), HttpResponse.BodyHandlers.ofByteArray())
+                .thenApply(response -> handleNetworkResponse(uri, key, cache, diskEntry, FetchResult.fromResponse(response)));
+    }
+
+    private LoadResult handleNetworkResponse(URI uri,
+                                             String key,
+                                             @Nullable DiskLruCache cache,
+                                             @Nullable DiskEntry previous,
+                                             FetchResult fetch) {
+
+        if (fetch.isNotModified()) {
+            if (previous == null) {
+                LOGGER.warn("Received 304 for uncached image @\"{}\"", uri);
+                return LoadResult.empty(uri);
+            }
+            CacheMetadata metadata = previous.metadata().refreshed(clock.getAsLong(), fetch);
+            writeDiskEntry(cache, key, previous.bytes(), metadata);
+            return LoadResult.fromBytes(uri, previous.bytes());
+        }
+
+        if (fetch.status() < 200 || fetch.status() >= 300) {
+            throw new CompletionException(new IOException("Unexpected HTTP status " + fetch.status() + " for " + uri));
+        }
+
+        CacheMetadata metadata = CacheMetadata.fromFetch(fetch, clock.getAsLong());
+        if (fetch.isAbsent()) {
+            writeDiskEntry(cache, key, new byte[]{0}, metadata);
+            return LoadResult.absent(uri, fetch.maxAgeSeconds());
+        }
+
+        writeDiskEntry(cache, key, fetch.bytes(), metadata);
+        return LoadResult.fromBytes(uri, fetch.bytes());
+    }
+
+    private @Nullable DiskEntry readDiskEntry(@Nullable DiskLruCache cache, String key) {
+
+        if (cache == null) return null;
+
+        try {
             DiskLruCache.Snapshot snapshot = cache.get(key);
-
-            if (snapshot != null) {
-                try (snapshot) {
-                    // Update access metadata
-                    diskKeyToUrl.put(key, url);
-                    lastAccessTimes.put(key, System.currentTimeMillis());
-                    return snapshot.getInputStream(0).readAllBytes();
-                }
+            if (snapshot == null) return null;
+            try (snapshot) {
+                CacheMetadata metadata = readMetadata(snapshot);
+                if (metadata == null) return null;
+                byte[] bytes = metadata.isAbsent() ? null : snapshot.getInputStream(0).readAllBytes();
+                return new DiskEntry(bytes == null ? new byte[0] : bytes, metadata);
             }
+        } catch (IOException | RuntimeException e) {
+            LOGGER.debug("Failed to read disk cache entry {}", key, e);
+            return null;
         }
+    }
 
-        // Network fetch on cache miss
-        byte[] data = fetchFromUrl(uri);
+    private @Nullable CacheMetadata readMetadata(DiskLruCache.Snapshot snapshot) {
 
-        // Write-through to disk
-        if (cache != null) {
-            DiskLruCache.Editor editor = cache.edit(key);
+        try {
+            String json = new String(snapshot.getInputStream(1).readAllBytes(), StandardCharsets.UTF_8);
+            return GSON.fromJson(json, CacheMetadata.class);
+        } catch (IOException | RuntimeException e) {
+            LOGGER.debug("Failed to read disk cache metadata", e);
+            return null;
+        }
+    }
+
+    private @Nullable CacheMetadata readMetadata(Path path) {
+
+        try {
+            return GSON.fromJson(Files.readString(path), CacheMetadata.class);
+        } catch (IOException | RuntimeException e) {
+            LOGGER.debug("Failed to read disk cache metadata {}", path, e);
+            return null;
+        }
+    }
+
+    private void writeDiskEntry(@Nullable DiskLruCache cache, String key, byte @Nullable [] bytes, CacheMetadata metadata) {
+
+        if (cache == null) return;
+        if (bytes != null && bytes.length == 0) return;
+
+        DiskLruCache.Editor editor = null;
+        try {
+            editor = cache.edit(key);
+            if (editor == null) return;
+
+            try (OutputStream out = editor.newOutputStream(0)) {
+                if (bytes != null) out.write(bytes);
+            }
+            try (OutputStream out = editor.newOutputStream(1)) {
+                out.write(GSON.toJson(metadata).getBytes(StandardCharsets.UTF_8));
+            }
+            editor.commit();
+        } catch (IOException e) {
             if (editor != null) {
-                try (OutputStream out = editor.newOutputStream(0)) {
-                    out.write(data);
-                    editor.commit();
-                    // Register metadata after successful write
-                    diskKeyToUrl.put(key, url);
-                    lastAccessTimes.put(key, System.currentTimeMillis());
-                } catch (IOException e) {
+                try {
                     editor.abort();
-                    throw e;
+                } catch (IOException ignored) {
+                    // Preserve the original failure.
                 }
             }
+            LOGGER.warn("Failed to write disk cache entry {}", key, e);
         }
-
-        return data;
     }
 
     /**
@@ -528,7 +576,7 @@ public class HttpImageProvider {
      * Loads a JPEG image from raw bytes using Scrimage and converts it to a NativeImage.
      *
      * @param imageData The raw bytes of the JPEG image
-     * @return A NativeImage containing the decoded image data
+     * @return A NativeImage containing the same image data
      * @throws IOException if the image data cannot be decoded
      */
     private @NotNull NativeImage loadJpegImage(byte[] imageData) throws IOException {
@@ -539,49 +587,35 @@ public class HttpImageProvider {
     /* Helpers */
 
     /**
-     * Returns a DiskLruCache-safe key for {@code uri} (lowercase alphanumeric + '-',
-     * max 64 characters as required by DiskLruCache).
+     * Returns a DiskLruCache-safe key for {@code uri}: a short filename hint plus 128 bits of
+     * SHA-256 over the full URL. The hash supplies collision resistance; the hint keeps cache files
+     * inspectable while staying below DiskLruCache's 64-character key limit.
      *
      * @param uri The URI to generate a cache key for
      * @return A sanitized cache key derived from the URI
      */
-    private @NotNull String getDiskCacheKey(URI uri) {
+    static @NotNull String getDiskCacheKey(URI uri) {
 
-        String source = uri.toString();
         String path = URLDecoder.decode(uri.getPath(), StandardCharsets.UTF_8);
-        int hash = source.hashCode() & 0x7fffffff;
-        String hashedString = Integer.toString(hash, 36);
-
         String filename = path.substring(path.lastIndexOf('/') + 1);
         int dotIndex = filename.lastIndexOf('.');
         if (dotIndex != -1) filename = filename.substring(0, dotIndex);
 
         String sanitized = filename.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
-        String key = sanitized + "-" + hashedString;
+        if (sanitized.isEmpty()) sanitized = "url";
+        if (sanitized.length() > 24) sanitized = sanitized.substring(0, 24);
 
-        // DiskLruCache keys must be at most 64 characters
-        return key.length() > 64 ? key.substring(key.length() - 64) : key;
+        return sanitized + "-" + sha256Prefix(uri.toString());
     }
 
-    /**
-     * Opens an HTTP connection and reads all bytes from the response body.
-     *
-     * @param uri The URI to fetch
-     * @return The response body bytes
-     */
-    private byte[] fetchFromUrl(URI uri) throws IOException {
+    private static String sha256Prefix(String value) {
 
-        HttpURLConnection conn = (HttpURLConnection) uri.toURL().openConnection();
-        conn.setConnectTimeout(5000);
-        conn.setReadTimeout(10000);
-        conn.setRequestProperty("User-Agent", "Minecraft-Fabric");
-
-        int status = conn.getResponseCode();
-        if (status < 200 || status >= 300)
-            throw new IOException("Unexpected HTTP status " + status + " for " + uri);
-
-        try (InputStream in = conn.getInputStream()) {
-            return in.readAllBytes();
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash, 0, 16);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
         }
     }
 
@@ -603,14 +637,13 @@ public class HttpImageProvider {
         return nativeImage;
     }
 
-    private void removeDiskCacheEntry(String url) {
+    private void removeDiskCacheEntry(URI uri) {
 
         try {
-            URI uri = URI.create(url);
             DiskLruCache cache = getDiskCache();
             if (cache != null) cache.remove(getDiskCacheKey(uri));
         } catch (IOException | RuntimeException e) {
-            LOGGER.debug("Failed to remove undecodable image cache entry @\"{}\"", url, e);
+            LOGGER.debug("Failed to remove undecodable image cache entry @\"{}\"", uri, e);
         }
     }
 
@@ -640,8 +673,71 @@ public class HttpImageProvider {
         return data != null ? data.height() : 0;
     }
 
+    void setClock(LongSupplier clock) {
+
+        this.clock = clock == null ? System::currentTimeMillis : clock;
+    }
+
     /** Record to hold texture data */
     private record TextureData(Identifier image, int width, int height) {
 
+        int byteWeight() {
+            long weight = (long) width * height * 4L;
+            return weight > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(1L, weight);
+        }
+    }
+
+    private record CacheMetadata(String lastModified, long fetchedAt, long maxAgeSeconds, int status) {
+
+        static CacheMetadata fromFetch(FetchResult fetch, long now) {
+
+            return new CacheMetadata(fetch.lastModified(), now, fetch.maxAgeSeconds(), fetch.status());
+        }
+
+        CacheMetadata refreshed(long now, FetchResult fetch) {
+
+            return new CacheMetadata(
+                    fetch.lastModified() == null ? lastModified : fetch.lastModified(),
+                    now,
+                    fetch.maxAgeSeconds(),
+                    status);
+        }
+
+        boolean isAbsent() {
+
+            return status == 204 || status == 404;
+        }
+    }
+
+    private record DiskEntry(byte[] bytes, CacheMetadata metadata) {
+
+        boolean isFresh(long now) {
+
+            return now - metadata.fetchedAt() < metadata.maxAgeSeconds() * 1000L;
+        }
+    }
+
+    private record LoadResult(URI uri, byte @Nullable [] bytes, boolean absent, long absentTtlSeconds) {
+
+        static LoadResult fromDisk(URI uri, DiskEntry entry) {
+
+            if (entry.metadata().isAbsent()) return absent(uri, entry.metadata().maxAgeSeconds());
+            return fromBytes(uri, entry.bytes());
+        }
+
+        static LoadResult fromBytes(URI uri, byte[] bytes) {
+
+            return new LoadResult(uri, bytes, false, 0L);
+        }
+
+        static LoadResult absent(URI uri, long absentTtlSeconds) {
+
+            return new LoadResult(uri, null, true, absentTtlSeconds);
+        }
+
+        static LoadResult empty(URI uri) {
+
+            return new LoadResult(uri, null, false, 0L);
+        }
     }
 }

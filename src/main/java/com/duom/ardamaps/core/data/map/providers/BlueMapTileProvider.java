@@ -61,7 +61,8 @@ public class BlueMapTileProvider extends TileProvider<PmTileKey> {
         this.blueMapRoot = path;
         this.minLod = minLod;
         this.maxLod = maxLod;
-        ArdaMapsClient.getHttpImageProvider().scheduleBlueMapRefresh(blueMapRoot);
+        this.minZoom = minLod;
+        this.maxZoom = maxLod;
     }
 
     /**
@@ -80,7 +81,8 @@ public class BlueMapTileProvider extends TileProvider<PmTileKey> {
         ArdaMapsClient.getHttpImageProvider().loadImage(
                 getUrlForKey(key),
                 image -> registerTexture("bluemap_", image == null ? null : image.getA(), key),
-                () -> markTransportFailure(key)
+                () -> markTransportFailure(key),
+                maxAgeSeconds -> markMissing(key, maxAgeSeconds * 1000L)
         );
     }
 

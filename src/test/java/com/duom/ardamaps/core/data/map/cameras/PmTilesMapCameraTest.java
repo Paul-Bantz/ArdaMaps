@@ -215,4 +215,18 @@ class PmTilesMapCameraTest {
 
         assertTrue(tiles.stream().noneMatch(key -> key.x == 8 || key.y == 8));
     }
+
+    /**
+     * The prefetch request scope expands by one tile ring, while the draw-visible scope remains
+     * unchanged.
+     */
+    @Test
+    void getRequestTiles_oneRing_expandsBeyondVisibleTiles() {
+
+        Set<PmTileKey> visible = camera.getVisibleTiles(8);
+        Set<PmTileKey> request = camera.getRequestTiles(8, 1);
+
+        assertTrue(request.containsAll(visible));
+        assertTrue(request.size() > visible.size(), "One-ring request scope should include extra tiles");
+    }
 }

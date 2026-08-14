@@ -107,7 +107,7 @@ public final class DelegatingHttpClient extends HttpClient {
         return runnable -> {
             Thread thread = new Thread(runnable);
             thread.setDaemon(true);
-            thread.setName("ardamaps-pmtiles-http-%02d".formatted(threadId.incrementAndGet()));
+            thread.setName("ardamaps-http-%02d".formatted(threadId.incrementAndGet()));
             return thread;
         };
     }

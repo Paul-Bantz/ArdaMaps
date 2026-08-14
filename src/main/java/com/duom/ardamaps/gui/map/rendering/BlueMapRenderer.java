@@ -40,6 +40,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Tuple;
 import org.joml.Matrix3x2f;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -52,19 +54,17 @@ import java.util.*;
  */
 public class BlueMapRenderer extends MapRenderable {
 
+    /** Class logger */
+    private static final Logger LOGGER = LoggerFactory.getLogger(BlueMapRenderer.class);
+
     /** Sunlight strength passed to the tile shader (0 = block-lit only, 1 = full sun). */
     private static final float SUNLIGHT_STRENGTH = 0.7f;
 
     /** Minimum brightness when block light is zero (ambient occlusion floor). */
     private static final float AMBIENT_LIGHT = 0.3f;
 
-    /**
-     * Priority offset for coarse-LOD tiles within the current viewport - the immediate visual
-     * fallback for a primary tile that hasn't loaded yet. Ranked behind primary-LOD tiles (whose
-     * priority is just their centre-tile ring, 0-based), so a viewport miss still resolves quickly
-     * without displacing what's actually on screen.
-     */
-    private static final int VIEWPORT_FALLBACK_PRIORITY_BASE = 10_000;
+    /** Approximate decoded BlueMap tile cost: measured 501x501 RGBA, about 1 MiB per tile. */
+    static final long APPROX_DECODED_TILE_BYTES = 501L * 501L * 4L;
 
     /** Camera for managing view and visible tiles */
     private final BlueMapCamera mapCamera;
@@ -115,6 +115,31 @@ public class BlueMapRenderer extends MapRenderable {
         // than being force-loaded here - that let a large coarse pyramid flood the executor queue
         // ahead of whatever the player actually pans to first.
         provider.setPinnedZoom(mapCamera.getCoarsestZoom());
+
+        if (ArdaMapsClient.CONFIG == null || ArdaMapsClient.CONFIG.isCoarsePyramidBootstrap()) {
+            List<PmTileKey> coarsePyramidTiles = enumerateCoarsePyramidTiles(layer);
+            LOGGER.info("BlueMap coarse pyramid bootstrap queued {} tiles for {}", coarsePyramidTiles.size(), layer.layer());
+            provider.enqueueBootstrapTiles(coarsePyramidTiles);
+        }
+    }
+
+    List<PmTileKey> enumerateCoarsePyramidTiles(MapLayerDefinition layer) {
+
+        int lod = mapCamera.getCoarsestZoom();
+        int blocksPerTile = (int) Math.round(layer.tileSize() * Math.pow(layer.lodFactor(), lod - 1));
+
+        int minTileX = (int) Math.floor((double) getDimension().getXMin() / blocksPerTile);
+        int maxTileX = (int) Math.floor((double) getDimension().getXMax() / blocksPerTile);
+        int minTileY = (int) Math.floor((double) getDimension().getZMin() / blocksPerTile);
+        int maxTileY = (int) Math.floor((double) getDimension().getZMax() / blocksPerTile);
+
+        List<PmTileKey> keys = new ArrayList<>();
+        for (int x = minTileX; x <= maxTileX; x++) {
+            for (int y = minTileY; y <= maxTileY; y++) {
+                keys.add(new PmTileKey(lod, x, y));
+            }
+        }
+        return keys;
     }
 
     /**
@@ -142,11 +167,10 @@ public class BlueMapRenderer extends MapRenderable {
      * Tile loading is bounded and prioritised via {@link TileProvider#beginFrame()} /
      * {@link TileProvider#request(TileKey, int)} / {@link TileProvider#endFrame()} across two
      * tiers, most urgent first: primary-LOD tiles actually in the viewport (tier 0, ranked by
-     * distance from the viewport centre), and coarse-LOD tiles in the viewport backing the
-     * immediate visual fallback (tier 1). Loading is scoped strictly to what's currently visible -
-     * there is no proactive background preload for parts of the map the player hasn't panned to, so
-     * the in-flight count tracks the viewport rather than the whole map. Primary-LOD requests are
-     * only registered once the camera has been still for a short delay
+     * distance from the viewport centre), the one-tile ring just outside the viewport, coarse-LOD
+     * tiles in the viewport backing the immediate visual fallback, and the adjacent BlueMap
+     * zoom-step viewport at {@code primaryZ - 1} when its estimated decoded footprint fits the
+     * speculative budget. Primary-LOD requests are only registered once the camera has been still for a short delay
      * ({@link MapCamera#isSettled()}) - during a fast pan or zoom animation only the (pinned, cheap)
      * viewport coarse fallback is requested, so the queue never fills with tiles that will have
      * scrolled off screen before they load.
@@ -174,12 +198,8 @@ public class BlueMapRenderer extends MapRenderable {
 
         provider.beginFrame();
 
-        // Tier 1: coarse-LOD tiles within the current viewport - the immediate visual fallback.
-        for (PmTileKey key : mapCamera.getVisibleTiles(coarsestZoom)) {
-            provider.request(key, VIEWPORT_FALLBACK_PRIORITY_BASE + mapCamera.centerTileDistance(key.x, key.y, coarsestZoom));
-        }
-
         Set<PmTileKey> tilesToDisplay = mapCamera.getVisibleTiles();
+        requestTilesForFrame(coarsestZoom, primaryZ, settled);
 
         // Classify
         List<TileDraw> primaryTiles = new ArrayList<>();
@@ -196,7 +216,7 @@ public class BlueMapRenderer extends MapRenderable {
             // Tier 0: primary-LOD tiles actually in the viewport - the most urgent tier.
             if (settled) {
                 int ring = mapCamera.centerTileDistance(key.x, key.y, primaryZ);
-                provider.request(key, ring);
+                provider.request(key, TileProvider.PRIMARY_VIEWPORT_PRIORITY_BASE + ring);
             }
 
             if (tex.isPresent()) {
@@ -223,6 +243,17 @@ public class BlueMapRenderer extends MapRenderable {
 
         provider.endFrame();
 
+        if (primaryTiles.isEmpty() && fallbackMap.isEmpty()) {
+            provider.protectDrawnTiles(Set.of());
+            super.renderLoadingText(context);
+            return;
+        }
+
+        Set<PmTileKey> drawnTiles = new HashSet<>();
+        primaryTiles.forEach(tile -> drawnTiles.add(tile.key()));
+        drawnTiles.addAll(fallbackMap.keySet());
+        provider.protectDrawnTiles(drawnTiles);
+
         // Pass 1: fallback tiles (coarse base layer), grouped by their actual resolved LOD.
         // Each unique lod gets exactly one uniform update before its tiles are drawn. Drawn
         // *before* the primary pass: these are opaque quads painted in plain 2D order (no depth
@@ -243,6 +274,46 @@ public class BlueMapRenderer extends MapRenderable {
             drawTilePass(context, primaryTiles, primaryZ, debugMode);
         }
 
+    }
+
+    /**
+     * Registers tile load requests for this frame across multiple priority tiers: coarse-LOD fallback tiles,
+     * primary-LOD prefetch ring, and optionally the coarser zoom-step viewport (primaryZ - 1) if budget permits.
+     * Only primary-LOD tiles are requested when the camera is settled; during pans/zooms only the coarse
+     * LOD fallback is requested to avoid queuing tiles that will scroll off screen.
+     *
+     * @param coarsestZoom The coarsest LOD level to use for immediate fallback.
+     * @param primaryZ The current primary LOD level whose tiles are in the viewport.
+     * @param settled Whether the camera has been still long enough to request fine-grained primary tiles.
+     */
+    void requestTilesForFrame(int coarsestZoom, int primaryZ, boolean settled) {
+
+        // Tier 1: coarse-LOD tiles within the current viewport - the immediate visual fallback.
+        for (PmTileKey key : mapCamera.getVisibleTiles(coarsestZoom)) {
+            provider.request(key, TileProvider.VIEWPORT_FALLBACK_PRIORITY_BASE
+                    + mapCamera.centerTileDistance(key.x, key.y, coarsestZoom));
+        }
+
+        if (!settled) return;
+
+        for (PmTileKey key : mapCamera.getRequestTiles(primaryZ, 1)) {
+            provider.request(key, TileProvider.PRIMARY_PREFETCH_PRIORITY_BASE
+                    + mapCamera.centerTileDistance(key.x, key.y, primaryZ));
+        }
+
+        int zoomStep = primaryZ - 1;
+        int lowerBound = Math.min(provider.getMinZoom(), provider.getMaxZoom());
+        int upperBound = Math.max(provider.getMinZoom(), provider.getMaxZoom());
+        if (zoomStep >= lowerBound && zoomStep <= upperBound) {
+            Set<PmTileKey> zoomStepTiles = mapCamera.getVisibleTiles(zoomStep);
+            long estimatedBytes = (long) zoomStepTiles.size() * APPROX_DECODED_TILE_BYTES;
+            if (estimatedBytes > TileProvider.zoomStepByteCeiling()) return;
+
+            for (PmTileKey key : zoomStepTiles) {
+                provider.request(key, TileProvider.ZOOM_STEP_PRIORITY_BASE
+                        + mapCamera.centerTileDistance(key.x, key.y, zoomStep));
+            }
+        }
     }
 
     /**
