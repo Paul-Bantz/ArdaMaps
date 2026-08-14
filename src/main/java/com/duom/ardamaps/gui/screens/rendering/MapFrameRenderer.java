@@ -155,7 +155,7 @@ public class MapFrameRenderer {
             int segW = scaledFrameBarLongEdge;
             if (x + segW > endX) segW = endX - x;
 
-            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                     x, y,
                     edgeU, edgeV,
                     segW, scaledFrameBarShortEdge,
@@ -187,7 +187,7 @@ public class MapFrameRenderer {
             int segW = scaledFrameBarLongEdge;
             if (x + segW > endX) segW = endX - x;
 
-            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                     x, y,
                     edgeU, edgeV,
                     segW, scaledFrameBarShortEdge,
@@ -219,7 +219,7 @@ public class MapFrameRenderer {
             int segH = scaledFrameBarLongEdge;
             if (y + segH > endY) segH = endY - y;
 
-            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                     x, y,
                     edgeU, edgeV,
                     scaledFrameBarShortEdge, segH,
@@ -251,7 +251,7 @@ public class MapFrameRenderer {
             int segmentHeight = scaledFrameBarLongEdge;
             if (y + segmentHeight > endY) segmentHeight = endY - y;
 
-            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                     x, y,
                     edgeU, edgeV,
                     scaledFrameBarShortEdge, segmentHeight,
@@ -274,25 +274,25 @@ public class MapFrameRenderer {
 
         var cornerUv = scaledFrameTextureSize - scaledCornerSize;
 
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                 (int) (topLeft.x()), (int) (topLeft.y()),
                 0, 0,
                 scaledCornerSize, scaledCornerSize,
                 scaledFrameTextureSize, scaledFrameTextureSize);
 
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                 (int) (topRight.x() - scaledCornerSize), (int) (topRight.y()),
                 cornerUv, 0,
                 scaledCornerSize, scaledCornerSize,
                 scaledFrameTextureSize, scaledFrameTextureSize);
 
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                 (int) (bottomRight.x() - scaledCornerSize), (int) (bottomRight.y() - scaledCornerSize),
                 cornerUv, cornerUv,
                 scaledCornerSize, scaledCornerSize,
                 scaledFrameTextureSize, scaledFrameTextureSize);
 
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                 (int) (bottomLeft.x()), (int) (bottomLeft.y() - scaledCornerSize),
                 0, cornerUv,
                 scaledCornerSize, scaledCornerSize,

@@ -30,6 +30,7 @@ import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.ImageFileType;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.google.gson.Gson;
 import com.jakewharton.disklrucache.DiskLruCache;
@@ -98,7 +99,10 @@ public class HttpImageProvider {
 
     /** Removal listener that destroys dynamic textures evicted from the in-memory cache. */
     private final RemovalListener<String, TextureData> textureRemovalListener =
-            (ignoredUrl, data, ignoredCause) -> destroyTexture(data);
+            (ignoredUrl, data, cause) -> {
+                if (cause == RemovalCause.REPLACED) return;
+                destroyTexture(data);
+            };
 
     /** Caffeine in-memory LRU cache for registered textures, weighted by decoded RGBA bytes. */
     private final Cache<String, TextureData> textures = Caffeine.newBuilder()
@@ -231,14 +235,6 @@ public class HttpImageProvider {
         return true;
     }
 
-    static int argbToAbgr(int argb) {
-
-        // Scrimage uses ARGB, while NativeImage.Format.RGBA expects ABGR-packed colours.
-        return (argb & 0xFF00FF00)
-                | ((argb & 0x00FF0000) >>> 16)
-                | ((argb & 0x000000FF) << 16);
-    }
-
     /**
      * Closes the underlying DiskLruCache and the maintenance scheduler.
      * Call during mod shutdown.
@@ -272,7 +268,7 @@ public class HttpImageProvider {
      *
      * @param data Cached texture data.
      */
-    private void destroyTexture(TextureData data) {
+    void destroyTexture(TextureData data) {
 
         if (data == null || data.image() == null) return;
 
@@ -311,6 +307,7 @@ public class HttpImageProvider {
      */
     public void loadImage(String url) {
 
+        if (textures.getIfPresent(url) != null) return;
         if (!loading.add(url)) return; // already in-flight
 
         loadImage(url, loadedTexture -> {
@@ -633,7 +630,7 @@ public class HttpImageProvider {
         Pixel[] pixels = img.pixels();
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
-                nativeImage.setPixel(x, y, argbToAbgr(pixels[y * w + x].argb));
+                nativeImage.setPixel(x, y, pixels[y * w + x].argb);
         return nativeImage;
     }
 
@@ -679,7 +676,7 @@ public class HttpImageProvider {
     }
 
     /** Record to hold texture data */
-    private record TextureData(Identifier image, int width, int height) {
+    record TextureData(Identifier image, int width, int height) {
 
         int byteWeight() {
             long weight = (long) width * height * 4L;

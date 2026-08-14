@@ -18,8 +18,6 @@
   "ardamaps.client.map.screen.configuration.compass.opacity": "Opacity",
   "ardamaps.client.map.screen.configuration.compass.poi.distance.tooltip": "Adjust the distance at which Points of Interest appear on the compass",
   "ardamaps.client.map.screen.configuration.compass.poi.distance": "Distance",
-  "ardamaps.client.map.screen.configuration.coarse_pyramid_bootstrap.tooltip": "Preloads low-detail map tiles after visible tiles finish loading. Disable to reduce first-run bandwidth on slow or metered connections.",
-  "ardamaps.client.map.screen.configuration.coarse_pyramid_bootstrap": "Preload",
   "ardamaps.client.map.screen.configuration.description": "Configuration Options",
   "ardamaps.client.map.screen.configuration.directory": "Config Directory",
   "ardamaps.client.map.screen.configuration.exploration": "Exploration",

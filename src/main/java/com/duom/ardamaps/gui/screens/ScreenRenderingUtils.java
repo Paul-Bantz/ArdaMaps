@@ -60,57 +60,14 @@ public class ScreenRenderingUtils {
     public static int renderSeparator(GuiGraphicsExtractor context, int width, int x, int y, boolean displayCenterSeparator) {
 
         int separatorSize = 9;
-        int xOffset = x;
-        int lineWidth = (width / 2);
+
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, ModConstants.PAGE_SEPARATOR_SPRITE, x, y, width, separatorSize);
 
         if (displayCenterSeparator) {
-
-            lineWidth -= separatorSize * 2;
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, ModConstants.PAGE_SEPARATOR_CENTER_SPRITE,
+                    x + width / 2 - separatorSize, y,
+                    separatorSize * 2, separatorSize);
         }
-
-        // Left end
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                xOffset, y,
-                32, 224,
-                separatorSize, separatorSize,
-                18, 18,
-                512, 512);
-
-        // Left line
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                xOffset += separatorSize, y,
-                50, 224,
-                lineWidth, separatorSize,
-                1, 18,
-                512, 512);
-
-        if (displayCenterSeparator) {
-            // Center
-            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                    xOffset += lineWidth, y,
-                    142, 224,
-                    separatorSize * 2, separatorSize,
-                    36, 18,
-                    512, 512);
-        } else {
-            xOffset += lineWidth - (separatorSize * 4);
-        }
-
-        // Right line
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                xOffset += separatorSize * 2, y,
-                50, 224,
-                lineWidth, separatorSize,
-                1, 18,
-                512, 512);
-
-        // Right end
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                xOffset + lineWidth, y,
-                270, 224,
-                separatorSize, separatorSize,
-                18, 18,
-                512, 512);
 
         return separatorSize;
     }

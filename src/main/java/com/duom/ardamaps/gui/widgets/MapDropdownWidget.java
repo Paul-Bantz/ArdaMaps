@@ -159,16 +159,8 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
         else
             context.blit(RenderPipelines.GUI_TEXTURED, icon, x, y, 0, 0, iconSize, iconSize, iconSize, iconSize);
 
-        var u = 288f;
-
-        if (hovered) u += 96;
-
-        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                x - 1, y,
-                u, 224f,
-                buttonSize, buttonSize,
-                96, 96,
-                512, 512);
+        var sprite = hovered ? ModConstants.SQUARE_BUTTON_HIGHLIGHT_SPRITE : ModConstants.SQUARE_BUTTON_SPRITE;
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x - 1, y, buttonSize, buttonSize);
     }
 
     /**
@@ -182,19 +174,13 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
      */
     private void drawBaseButton(GuiGraphicsExtractor context, int x, int y, boolean hovered) {
 
-        var u = 16;
-        var v = hovered ? 16 * 3 : 16;
         var textRenderer = Client.mc().font;
 
         E itemPair = optionDisplay.apply(selected);
         Component label = (selected == null) ? placeholderText : itemPair.text();
 
-        GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
-                x, y, width, originalHeight,
-                12, 9,
-                128, 32,
-                u, v,
-                ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
+        var sprite = hovered ? ModConstants.MAP_BUTTON_HOVERED_SPRITE : ModConstants.MAP_BUTTON_SPRITE;
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x, y, width, originalHeight);
 
         if (displayIcons) {
 
@@ -254,17 +240,11 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
             for (int idx = 0; idx < visibleCount; idx++) {
 
                 var y = getDropdownItemY(idx, visibleCount);
+                var sprite = isMouseOverItem(mouseX, mouseY, y)
+                        ? ModConstants.SQUARE_BUTTON_HIGHLIGHT_SPRITE
+                        : ModConstants.SQUARE_BUTTON_SPRITE;
 
-                var u = 288f;
-
-                if (isMouseOverItem(mouseX, mouseY, y)) u += 96;
-
-                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                        getX() - 1, y,
-                        u, 224f,
-                        buttonSize, buttonSize,
-                        96, 96,
-                        512, 512);
+                context.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, getX() - 1, y, buttonSize, buttonSize);
             }
 
         } else {
@@ -272,7 +252,7 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
             var y = getDropdownListTopY(visibleCount);
 
             if (visibleCount > 0) {
-                GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
+                GuiTextures.blitNineSliced(context, ModConstants.MAP_FRAME_TEXTURE,
                         getX(), y, width, computedHeight,
                         16, 16,
                         64, 64,
@@ -312,7 +292,7 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
             if (y == listTop) topSliceHeight = 16;
             if (y == listBottom) bottomSliceHeight = 16;
 
-            GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
+            GuiTextures.blitNineSliced(context, ModConstants.MAP_FRAME_TEXTURE,
                     x, y, width, originalHeight,
                     16, topSliceHeight, 16, bottomSliceHeight,
                     64, 64,

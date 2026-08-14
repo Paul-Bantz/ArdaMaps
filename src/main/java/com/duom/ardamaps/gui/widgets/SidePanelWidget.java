@@ -57,6 +57,7 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.Style;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -487,6 +488,9 @@ public class SidePanelWidget implements GuiEventListener {
         // Handle hover tooltip and click events
         Style hoveredStyle = result.hoveredStyle;
         if (hoveredStyle != null) {
+            if (hoveredStyle.getHoverEvent() instanceof HoverEvent.ShowText(Component value)) {
+                context.setTooltipForNextFrame(textRenderer, value, (int) mouseX, (int) mouseY);
+            }
 
             if (clicked && hoveredStyle.getClickEvent() instanceof ClickEvent.OpenUrl) {
                 handleLinkClick(hoveredStyle.getClickEvent());

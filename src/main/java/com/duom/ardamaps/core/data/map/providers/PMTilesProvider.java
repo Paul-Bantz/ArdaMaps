@@ -187,14 +187,9 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
         this.minZoom = Math.max(header.minZoom(), 0);
         this.maxZoom = Math.max(header.maxZoom(), 1);
 
-        if (bootstrapRemote && coarsePyramidBootstrapEnabled()) {
+        if (bootstrapRemote) {
             scheduleRemoteBootstrap(rangeReader, reader, header);
         }
-    }
-
-    private boolean coarsePyramidBootstrapEnabled() {
-
-        return ArdaMapsClient.CONFIG == null || ArdaMapsClient.CONFIG.isCoarsePyramidBootstrap();
     }
 
     private void scheduleRemoteBootstrap(RangeReader rangeReader, PMTilesReader activeReader, PMTilesHeader header) {

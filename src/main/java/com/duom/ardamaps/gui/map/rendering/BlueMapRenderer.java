@@ -116,11 +116,9 @@ public class BlueMapRenderer extends MapRenderable {
         // ahead of whatever the player actually pans to first.
         provider.setPinnedZoom(mapCamera.getCoarsestZoom());
 
-        if (ArdaMapsClient.CONFIG == null || ArdaMapsClient.CONFIG.isCoarsePyramidBootstrap()) {
-            List<PmTileKey> coarsePyramidTiles = enumerateCoarsePyramidTiles(layer);
-            LOGGER.info("BlueMap coarse pyramid bootstrap queued {} tiles for {}", coarsePyramidTiles.size(), layer.layer());
-            provider.enqueueBootstrapTiles(coarsePyramidTiles);
-        }
+        List<PmTileKey> coarsePyramidTiles = enumerateCoarsePyramidTiles(layer);
+        LOGGER.info("BlueMap coarse pyramid bootstrap queued {} tiles for {}", coarsePyramidTiles.size(), layer.layer());
+        provider.enqueueBootstrapTiles(coarsePyramidTiles);
     }
 
     List<PmTileKey> enumerateCoarsePyramidTiles(MapLayerDefinition layer) {

@@ -111,22 +111,17 @@ public class StyledButtonWidget extends AbstractWidget {
      */
     private void renderDefaultStyle(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
-        var u = 16;
-        var v = 16;
         var x = getX();
         var y = getY();
 
-        if (toggled) v += 64;
-        else if (isMouseOver(mouseX, mouseY)) v += 32;
+        var sprite = toggled
+                ? ModConstants.MAP_BUTTON_PRESSED_SPRITE
+                : isMouseOver(mouseX, mouseY)
+                ? ModConstants.MAP_BUTTON_HOVERED_SPRITE
+                : ModConstants.MAP_BUTTON_SPRITE;
 
         int color = !active ? GuiTextures.argb(0.85f, 0.85f, 0.85f, 1.0f) : ModConstants.COLOR_WHITE;
-        GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
-                x, y, width, height,
-                12, 9,
-                128, 32,
-                u, v,
-                ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE,
-                color);
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x, y, width, height, color);
 
         var text = getMessage();
 
@@ -161,12 +156,8 @@ public class StyledButtonWidget extends AbstractWidget {
             var indicatorHeight = getHeight();
             var indicatorWidth = indicatorHeight * 14 / 64;
             context.fill(x, y, x + getWidth(), y + getHeight(), ModConstants.COLOR_LIGHT_BROWN);
-            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_GUI_ELEMENTS,
-                    x + getWidth() - indicatorWidth, y,
-                    32, 242,
-                    indicatorWidth, indicatorHeight,
-                    14, 64,
-                    512, 512,
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, ModConstants.EDGE_INDICATOR_SPRITE,
+                    x + getWidth() - indicatorWidth, y, indicatorWidth, indicatorHeight,
                     mouseOver ? GuiTextures.argb(1.0f, 1.0f, 1.0f, 0.5f) : ModConstants.COLOR_WHITE);
         }
 

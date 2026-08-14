@@ -26,12 +26,17 @@
 package com.duom.ardamaps.core.data.map.providers;
 
 import com.duom.ardamaps.core.data.ImageFileType;
+import com.duom.ardamaps.gui.ModConstants;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.RemovalCause;
+import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.mojang.blaze3d.platform.NativeImage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
+import java.lang.reflect.Field;
 import java.net.Authenticator;
 import java.net.CookieHandler;
 import java.net.ProxySelector;
@@ -60,15 +65,6 @@ class HttpImageProviderTest {
 
     @TempDir
     private Path tempDir;
-
-    /**
-     * Verifies that Scrimage ARGB pixels are converted to the ABGR packing expected by NativeImage.
-     */
-    @Test
-    void argbToAbgr_swapsRedAndBlueChannels() {
-
-        assertEquals(0xFF332211, HttpImageProvider.argbToAbgr(0xFF112233));
-    }
 
     /**
      * Verifies PNG signature detection does not depend on the URL extension.
@@ -131,6 +127,40 @@ class HttpImageProviderTest {
         assertDoesNotThrow(() -> provider.loadImage(url));
 
         assertEquals(2, provider.submitAttempts, "Rejected URL should be retriable on the next request");
+    }
+
+    /**
+     * Verifies preloaded icons are not loaded again when the map screen is re-initialized.
+     */
+    @Test
+    void loadImage_cachedTexture_skipsReload() throws Exception {
+
+        var client = new FakeHttpClient();
+        var provider = new CapturingHttpImageProvider(tempDir, client);
+        String url = "https://example.test/icon.png";
+
+        cacheTexture(provider, url);
+        provider.loadImage(url);
+
+        assertEquals(0, client.requests.get(), "Cached textures should not trigger another fetch");
+        assertTrue(provider.decodedBytes.isEmpty(), "Cached textures should not be decoded again");
+    }
+
+    /**
+     * Verifies replacing a Caffeine cache entry does not release a deterministic texture identifier
+     * that the replacement may still use.
+     */
+    @Test
+    void textureRemovalListener_replacedEntry_doesNotDestroyTexture() throws Exception {
+
+        var provider = new CountingDestroyHttpImageProvider(tempDir, new FakeHttpClient());
+        var listener = textureRemovalListener(provider);
+        var data = textureData();
+
+        listener.onRemoval("https://example.test/icon.png", data, RemovalCause.REPLACED);
+        listener.onRemoval("https://example.test/icon.png", data, RemovalCause.EXPLICIT);
+
+        assertEquals(1, provider.destroyedTextures.get(), "Only non-replacement removals should destroy textures");
     }
 
     /**
@@ -266,6 +296,46 @@ class HttpImageProviderTest {
             submitAttempts++;
             throw new RejectedExecutionException("full");
         }
+    }
+
+    private static final class CountingDestroyHttpImageProvider extends HttpImageProvider {
+
+        private final AtomicInteger destroyedTextures = new AtomicInteger();
+
+        private CountingDestroyHttpImageProvider(Path diskCacheDirectory, FakeHttpClient client) {
+
+            super(diskCacheDirectory, new DelegatingHttpClient(client));
+        }
+
+        @Override
+        void destroyTexture(TextureData data) {
+            destroyedTextures.incrementAndGet();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void cacheTexture(HttpImageProvider provider, String url) throws Exception {
+
+        Field texturesField = HttpImageProvider.class.getDeclaredField("textures");
+        texturesField.setAccessible(true);
+        Cache<String, HttpImageProvider.TextureData> textures =
+                (Cache<String, HttpImageProvider.TextureData>) texturesField.get(provider);
+
+        textures.put(url, textureData());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static RemovalListener<String, HttpImageProvider.TextureData> textureRemovalListener(HttpImageProvider provider)
+            throws Exception {
+
+        Field listenerField = HttpImageProvider.class.getDeclaredField("textureRemovalListener");
+        listenerField.setAccessible(true);
+        return (RemovalListener<String, HttpImageProvider.TextureData>) listenerField.get(provider);
+    }
+
+    private static HttpImageProvider.TextureData textureData() {
+
+        return new HttpImageProvider.TextureData(ModConstants.modId("test/cached"), 1, 1);
     }
 
     private static void awaitLoad(CapturingHttpImageProvider provider, String url) throws Exception {

@@ -75,12 +75,6 @@ public class ClientConfig extends Configuration<LocationClient> {
     @SerializedName("map_reveal_all")
     private boolean mapRevealAll = false;
 
-    /** Whether to prefetch coarse map tiles after viewport work is idle - defaults to true */
-    @Setter
-    @Getter
-    @SerializedName("coarse_pyramid_bootstrap")
-    private boolean coarsePyramidBootstrap = true;
-
     /** Compass opacity - defaults to 1.0 (fully opaque) */
     @Setter
     @Getter

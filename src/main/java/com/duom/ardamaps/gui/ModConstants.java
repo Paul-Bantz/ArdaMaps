@@ -60,7 +60,46 @@ public class ModConstants {
     public static final Identifier PAPER_TEXTURE = modId("textures/gui/paper_tex_9slices_512px.png");
 
     /** Texture identifier for map GUI elements using 9-slice scaling. */
-    public static final Identifier MAP_GUI_ELEMENTS = modId("textures/gui/gui_tex_map_elements_9slices_512px.png");
+    public static final Identifier MAP_FRAME_TEXTURE = modId("textures/gui/map_frame.png");
+
+    /** Sprite identifier for the normal map button background. */
+    public static final Identifier MAP_BUTTON_SPRITE = modId("widgets/map_button_normal");
+
+    /** Sprite identifier for the hovered map button background. */
+    public static final Identifier MAP_BUTTON_HOVERED_SPRITE = modId("widgets/map_button_hovered");
+
+    /** Sprite identifier for the pressed/toggled map button background. */
+    public static final Identifier MAP_BUTTON_PRESSED_SPRITE = modId("widgets/map_button_pressed");
+
+    /** Sprite identifier for the red bookmark button background. */
+    public static final Identifier BOOKMARK_BUTTON_RED_SPRITE = modId("widgets/bookmark_button_red");
+
+    /** Sprite identifier for the blue bookmark button background. */
+    public static final Identifier BOOKMARK_BUTTON_BLUE_SPRITE = modId("widgets/bookmark_button_blue");
+
+    /** Sprite identifier for the violet bookmark button background. */
+    public static final Identifier BOOKMARK_BUTTON_VIOLET_SPRITE = modId("widgets/bookmark_button_violet");
+
+    /** Sprite identifier for the green bookmark button background. */
+    public static final Identifier BOOKMARK_BUTTON_GREEN_SPRITE = modId("widgets/bookmark_button_green");
+
+    /** Sprite identifier for the square dropdown button background. */
+    public static final Identifier SQUARE_BUTTON_SPRITE = modId("widgets/square_button");
+
+    /** Sprite identifier for the highlighted square dropdown button background. */
+    public static final Identifier SQUARE_BUTTON_HIGHLIGHT_SPRITE = modId("widgets/square_button_highlight");
+
+    /** Sprite identifier for the scroll-style label background. */
+    public static final Identifier SCROLL_BUTTON_SPRITE = modId("widgets/scroll_button");
+
+    /** Sprite identifier for the edge-style button indicator. */
+    public static final Identifier EDGE_INDICATOR_SPRITE = modId("widgets/edge_indicator");
+
+    /** Sprite identifier for the page separator base. */
+    public static final Identifier PAGE_SEPARATOR_SPRITE = modId("widgets/page_separator");
+
+    /** Sprite identifier for the page separator center ornament. */
+    public static final Identifier PAGE_SEPARATOR_CENTER_SPRITE = modId("widgets/page_separator_center");
 
     /** Texture identifier for the book GUI using 9-slice scaling. */
     public static final Identifier GUI_TEXTURE = modId("textures/gui/gui_tex_book_9slices_512px.png");
@@ -91,9 +130,6 @@ public class ModConstants {
 
     /** Icon identifier for the unknown icon (fallback). */
     public static final Identifier UNKNOWN_ICON = modId("icons/icon_unknown");
-
-    /** Texture identifier for checkbox element. */
-    public static final Identifier TEXTURE = id("textures/gui/checkbox.png");
 
     /** Icon identifier for the map marker. */
     public static final Identifier MAP_MARKER_ICON = modId("icons/map_marker");

@@ -26,7 +26,6 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.Client;
-import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import lombok.Getter;
@@ -248,9 +247,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
 
         if (visibleCount <= 0) return;
 
-        // Dynamically adjust height based on visible items when expanded
-        this.height = originalHeight + visibleCount * originalHeight;
-
         for (int i = 0; i < visibleCount; i++) {
 
             // Calculate the actual index in the full item list based on scroll offset
@@ -430,15 +426,21 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
         context.text(textRenderer, Component.literal(arrow), arrowX, arrowY, ModConstants.COLOR_WHITE);
     }
 
+    /**
+     * Draws the given dropdown list item
+     *
+     * @param context    the draw context
+     * @param x          the button x coordinates
+     * @param y          the button y coordinates
+     * @param isHovered  whether the button is hovered
+     * @param isSelected whether the button is selected
+     */
     protected void drawListSlice(GuiGraphicsExtractor context, int x, int y, boolean isHovered, boolean isSelected) {
 
-        int u = isHovered || isSelected ? 80 : 16;
-        GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS, x, y,
-                originalWidth, originalHeight,
-                16, 16,
-                64, 64,
-                u, 176,
-                ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
+        Identifier sprite = (isHovered || isSelected)
+                ? Identifier.withDefaultNamespace("widget/button_highlighted")
+                : Identifier.withDefaultNamespace("widget/button");
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x, y, originalWidth, originalHeight);
     }
 
     /**
@@ -476,9 +478,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
 
         expanded = true;
         scrollbar.resetOffset();
-
-        int visibleCount = getVisibleDropdownItemCount(dropdownItems);
-        this.height = originalHeight + visibleCount * originalHeight;
     }
 
     /**
@@ -542,7 +541,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      */
     private void collapse() {
         expanded = false;
-        height = originalHeight;
     }
 
     /**

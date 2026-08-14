@@ -117,7 +117,7 @@ public class ContextMenu {
 
         var textRenderer = Client.mc().font;
 
-        GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
+        GuiTextures.blitNineSliced(context, ModConstants.MAP_FRAME_TEXTURE,
                 x, y, width, height,
                 16, 16,
                 64, 64,
@@ -131,7 +131,7 @@ public class ContextMenu {
 
             if (hovered) {
 
-                GuiTextures.blitNineSliced(context, ModConstants.MAP_GUI_ELEMENTS,
+                GuiTextures.blitNineSliced(context, ModConstants.MAP_FRAME_TEXTURE,
                         x, itemY, width, ITEM_HEIGHT,
                         16, 1, 16, 1,
                         64, 64,

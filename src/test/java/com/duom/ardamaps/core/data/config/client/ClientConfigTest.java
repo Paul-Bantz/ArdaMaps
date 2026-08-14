@@ -25,9 +25,11 @@
 
 package com.duom.ardamaps.core.data.config.client;
 
+import com.google.gson.Gson;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Tests client configuration defaults.
@@ -35,11 +37,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ClientConfigTest {
 
     /**
-     * Verifies coarse pyramid bootstrap defaults on as a permanent bandwidth preference.
+     * Verifies stale persisted coarse pyramid bootstrap values are ignored and not written back.
      */
     @Test
-    void coarsePyramidBootstrap_defaultsOn() {
+    void coarsePyramidBootstrap_isNotPartOfClientConfigJson() {
 
-        assertTrue(new ClientConfig().isCoarsePyramidBootstrap());
+        Gson gson = new Gson();
+
+        ClientConfig config = assertDoesNotThrow(() -> gson.fromJson("{\"coarse_pyramid_bootstrap\":false}", ClientConfig.class));
+
+        assertFalse(gson.toJson(config).contains("coarse_pyramid_bootstrap"));
     }
 }

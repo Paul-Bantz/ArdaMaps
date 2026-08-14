@@ -28,19 +28,14 @@ package com.duom.ardamaps.gui.screens;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.UnitSystem;
 import com.duom.ardamaps.gui.ModConstants;
-import com.duom.ardamaps.gui.widgets.CheckboxWidget;
 import com.duom.ardamaps.gui.widgets.DropdownWidget;
 import com.duom.ardamaps.gui.widgets.StyledButtonWidget;
 import com.duom.ardamaps.gui.widgets.TextIdentifierPairItem;
-import com.duom.ardamaps.gui.widgets.builders.CheckboxBuilder;
 import com.duom.ardamaps.gui.widgets.builders.DropdownBuilder;
 import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.AbstractSliderButton;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.*;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -95,8 +90,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
     private final Component revealAllOptionLabel = Component.translatable("ardamaps.client.map.screen.configuration.reveal_all");
 
-    private final Component coarsePyramidBootstrapLabel = Component.translatable("ardamaps.client.map.screen.configuration.coarse_pyramid_bootstrap");
-
     private final Component resetExplorationProgressLabel = Component.translatable("ardamaps.client.map.screen.configuration.exploration");
 
     private final Component configDirectoryLabel = Component.translatable("ardamaps.client.map.screen.configuration.directory");
@@ -135,10 +128,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
     private AbstractSliderButton compassOpacitySlider;
 
     /** Checkbox for the reveal all option. */
-    private CheckboxWidget revealAllCheckbox;
-
-    /** Checkbox for coarse pyramid bootstrap. */
-    private CheckboxWidget coarsePyramidBootstrapCheckbox;
+    private Checkbox revealAllCheckbox;
 
     /** Open Config directory button */
     private Button configDirectoryButton;
@@ -194,7 +184,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         configureUnitSystemDropdown();
         configureCompassOpacitySlider();
         configureExplorationToggle();
-        configureCoarsePyramidBootstrapToggle();
         configureOpenConfigurationDirectoryButton();
         configureResetExplorationData();
         configureCompassRenderDistanceSlider();
@@ -235,7 +224,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         cancelRevealAllButton = Button.builder(
                         Component.translatable("ardamaps.generic.cancel"),
                         _ -> {
-                            revealAllCheckbox.setChecked(false);
+                            configureExplorationToggle();
                             displayRevealAllConfirmationDialog = false;
                         })
                 .size(dialogBtnWidth, BUTTON_HEIGHT)
@@ -341,10 +330,9 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     private void configureExplorationToggle() {
 
-        revealAllCheckbox = CheckboxBuilder.create()
-                .setSize(BUTTON_WIDTH, BUTTON_HEIGHT)
-                .setChecked(ArdaMapsClient.CONFIG.isMapRevealAll())
-                .setOnChange((checked) -> {
+        revealAllCheckbox = Checkbox.builder(Component.empty(), this.font)
+                .selected(ArdaMapsClient.CONFIG.isMapRevealAll())
+                .onValueChange((_, checked) -> {
                     if (!checked) {
                         ArdaMapsClient.CONFIG.setMapRevealAll(false);
                         ArdaMapsClient.CONFIG_MANAGER.save();
@@ -354,23 +342,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
                 .build();
 
         revealAllCheckbox.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.configuration.reveal_all.tooltip")));
-    }
-
-    /**
-     * Configure the persistent coarse pyramid bootstrap preference.
-     */
-    private void configureCoarsePyramidBootstrapToggle() {
-
-        coarsePyramidBootstrapCheckbox = CheckboxBuilder.create()
-                .setSize(BUTTON_WIDTH, BUTTON_HEIGHT)
-                .setChecked(ArdaMapsClient.CONFIG.isCoarsePyramidBootstrap())
-                .setOnChange((checked) -> {
-                    ArdaMapsClient.CONFIG.setCoarsePyramidBootstrap(checked);
-                    ArdaMapsClient.CONFIG_MANAGER.save();
-                })
-                .build();
-
-        coarsePyramidBootstrapCheckbox.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.configuration.coarse_pyramid_bootstrap.tooltip")));
     }
 
     /**
@@ -615,14 +586,16 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         y = renderRow(context, x, y, pageWidth, revealAllOptionLabel,
                 revealAllCheckbox, mouseX, mouseY, delta) + ModConstants.ROW_SPACING;
 
-        y = renderRow(context, x, y, pageWidth, coarsePyramidBootstrapLabel,
-                coarsePyramidBootstrapCheckbox, mouseX, mouseY, delta) + ModConstants.ROW_SPACING;
-
         y = renderRow(context, x, y, pageWidth, resetExplorationProgressLabel,
                 resetExplorationButton, mouseX, mouseY, delta) + ModConstants.ROW_SPACING;
 
         renderRow(context, x, y, pageWidth, configDirectoryLabel,
                 configDirectoryButton, mouseX, mouseY, delta);
+
+        // Draw the expanded dropdown last so its option list overlays the rows below it.
+        if (unitSystemDropdown.isExpanded()) {
+            unitSystemDropdown.extractRenderState(context, mouseX, mouseY, delta);
+        }
     }
 
     /**
@@ -725,8 +698,13 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         context.text(font, label, x, labelY, ModConstants.COLOR_DARK_BROWN, false);
 
         // Widget - vertically centred in the row
-        int widgetYPosition = y - BUTTON_HEIGHT / 2;
-        widget.setX(rightX);
+        int widgetYPosition = y - BUTTON_HEIGHT / 2 + (BUTTON_HEIGHT - widget.getHeight()) / 2;
+        int widgetXPosition = rightX;
+        if (widget instanceof Checkbox) {
+            int controlWidth = Math.min(halfPageWidth, BUTTON_WIDTH);
+            widgetXPosition = rightX + controlWidth - widget.getWidth();
+        }
+        widget.setX(widgetXPosition);
         widget.setY(widgetYPosition);
 
         var mousePosX = mouseX;
@@ -743,7 +721,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         widget.extractRenderState(context, mousePosX, mousePosY, delta);
 
-        return widgetYPosition + BUTTON_HEIGHT;
+        return y - BUTTON_HEIGHT / 2 + BUTTON_HEIGHT;
     }
 
     /**
@@ -857,7 +835,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
             if (!consumed) {
 
                 consumed = revealAllCheckbox.mouseClicked(event, doubleClick);
-                consumed |= coarsePyramidBootstrapCheckbox.mouseClicked(event, doubleClick);
                 consumed |= resetExplorationButton.mouseClicked(event, doubleClick);
                 consumed |= configDirectoryButton.mouseClicked(event, doubleClick);
             }

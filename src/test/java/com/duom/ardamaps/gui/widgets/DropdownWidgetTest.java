@@ -119,6 +119,20 @@ class DropdownWidgetTest {
     }
 
     /**
+     * Verifies that the widget's reported height stays at the button height while expanded.
+     * This protects parent row layout from shifting the trigger when the option list opens.
+     */
+    @Test
+    void onClick_expandsWithoutChangingReportedHeight() {
+
+        DropdownWidget<String, TextIdentifierPairItem> widget = widget(DropdownWidget.ExpandDirection.DOWN_RIGHT);
+
+        widget.onClick(mouse(10, 100), false);
+
+        assertEquals(20, widget.getHeight());
+    }
+
+    /**
      * Creates a mouse button event at the supplied screen coordinates.
      *
      * @param x The screen X coordinate.

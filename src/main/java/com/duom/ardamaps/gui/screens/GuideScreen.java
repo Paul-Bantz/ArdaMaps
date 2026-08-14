@@ -44,6 +44,7 @@ import net.minecraft.client.gui.screens.options.controls.KeyBindsScreen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.util.Util;
 import org.jetbrains.annotations.Nullable;
@@ -916,6 +917,10 @@ public class GuideScreen extends ArdaMapsScreen {
         context.disableScissor();
 
         lastHoveredContentStyle = result.hoveredStyle;
+        if (lastHoveredContentStyle != null
+                && lastHoveredContentStyle.getHoverEvent() instanceof HoverEvent.ShowText(Component value)) {
+            context.setTooltipForNextFrame(font, value, mouseX, mouseY);
+        }
     }
 
     /**

@@ -130,7 +130,7 @@ public class BookmarkButtonWidget extends AbstractWidget {
      */
     private void renderCloseButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
-        renderBookmarkButton(context, mouseX, mouseY, 384, 32, 0.7568f, 0.4235f, 0.4431f, ModConstants.CLOSE_ICON);
+        renderBookmarkButton(context, mouseX, mouseY, ModConstants.BOOKMARK_BUTTON_RED_SPRITE, 0.7568f, 0.4235f, 0.4431f, ModConstants.CLOSE_ICON);
     }
 
     /**
@@ -146,7 +146,7 @@ public class BookmarkButtonWidget extends AbstractWidget {
      */
     private void renderConfigurationButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
-        renderBookmarkButton(context, mouseX, mouseY, 288, 32, 0.5333f, 0.6549f, 0.7765f, ModConstants.CONFIGURATION_ICON);
+        renderBookmarkButton(context, mouseX, mouseY, ModConstants.BOOKMARK_BUTTON_BLUE_SPRITE, 0.5333f, 0.6549f, 0.7765f, ModConstants.CONFIGURATION_ICON);
     }
 
     /**
@@ -162,7 +162,7 @@ public class BookmarkButtonWidget extends AbstractWidget {
      */
     private void renderGuideButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
-        renderBookmarkButton(context, mouseX, mouseY, 384, 128, 0.611f, 0.494f, 0.647f, ModConstants.GUIDE_ICON);
+        renderBookmarkButton(context, mouseX, mouseY, ModConstants.BOOKMARK_BUTTON_VIOLET_SPRITE, 0.611f, 0.494f, 0.647f, ModConstants.GUIDE_ICON);
     }
 
     /**
@@ -178,50 +178,35 @@ public class BookmarkButtonWidget extends AbstractWidget {
      */
     private void renderMapButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
-        renderBookmarkButton(context, mouseX, mouseY, 288, 128, 0.3843f, 0.5058f, 0.3490f, ModConstants.MAP_ICON);
+        renderBookmarkButton(context, mouseX, mouseY, ModConstants.BOOKMARK_BUTTON_GREEN_SPRITE, 0.3843f, 0.5058f, 0.3490f, ModConstants.MAP_ICON);
     }
 
     /**
      * Core rendering routine shared by all bookmark button styles.
      *
-     * <p>Performs two draw operations:</p>
-     * <ol>
-     *   <li>Draws a 96×96 region from {@link ModConstants#MAP_GUI_ELEMENTS} (a 512×512 atlas)
-     *       at the UV coordinate ({@code u}, {@code v}), scaled to fill the button's bounds.
-     *       This forms the background shape of the bookmark tab.</li>
-     *   <li>Draws the supplied {@code icon} sprite centred inside the button. The icon is
-     *       sized to 50 % of the shorter button dimension. When the cursor is <em>not</em>
-     *       hovering over the button the icon is drawn with tint ({@code r}, {@code g},
-     *       {@code b}, 1.0); otherwise the icon renders at full white to produce a
-     *       hover-highlight effect.</li>
-     * </ol>
+     * <p>Performs two draw operations: draws the bookmark background sprite stretched to fill
+     * the button's bounds, then draws the supplied {@code icon} sprite centred inside the
+     * button. The icon is sized to 50 % of the shorter button dimension. When the cursor is
+     * <em>not</em> hovering over the button the icon is drawn with tint ({@code r}, {@code g},
+     * {@code b}, 1.0); otherwise the icon renders at full white to produce a hover-highlight
+     * effect.</p>
      *
      * @param context the {@link GuiGraphicsExtractor} used for all draw calls
      * @param mouseX  current x position of the mouse cursor in screen pixels
      * @param mouseY  current y position of the mouse cursor in screen pixels
-     * @param u       horizontal texel offset into {@link ModConstants#MAP_GUI_ELEMENTS}
-     *                for the background region
-     * @param v       vertical texel offset into {@link ModConstants#MAP_GUI_ELEMENTS}
-     *                for the background region
+     * @param sprite  {@link Identifier} of the bookmark background sprite
      * @param r       red component of the icon tint applied when not hovered (0.0–1.0)
      * @param g       green component of the icon tint applied when not hovered (0.0–1.0)
      * @param b       blue component of the icon tint applied when not hovered (0.0–1.0)
      * @param icon    {@link Identifier} of the sprite to retrieve from {@link IconSpriteAtlas}
      *                and render as the button icon
      */
-    private void renderBookmarkButton(GuiGraphicsExtractor context, int mouseX, int mouseY, int u, int v, float r, float g, float b, Identifier icon) {
+    private void renderBookmarkButton(GuiGraphicsExtractor context, int mouseX, int mouseY, Identifier sprite, float r, float g, float b, Identifier icon) {
 
         var x = getX();
         var y = getY();
 
-        context.blit(
-                RenderPipelines.GUI_TEXTURED,
-                ModConstants.MAP_GUI_ELEMENTS,
-                x, y,
-                u, v,
-                getWidth(), getHeight(),
-                96, 96,
-                512, 512);
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x, y, getWidth(), getHeight());
 
         var iconSize = (int) (Math.min(getWidth(), getHeight()) * .5);
         var halfIconSize = (int) (iconSize / 2f);

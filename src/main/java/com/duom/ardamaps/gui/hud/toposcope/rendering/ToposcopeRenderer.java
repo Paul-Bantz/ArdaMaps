@@ -34,7 +34,6 @@ import com.duom.ardamaps.core.data.conversion.DistanceUnitConverter;
 import com.duom.ardamaps.core.data.conversion.VectorProjection;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.map.Waypoint;
-import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.hud.toposcope.Toposcope;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
@@ -334,12 +333,7 @@ public class ToposcopeRenderer {
             int bgX = iconX - 16;
             int bgY = baseY - 8;
 
-            GuiTextures.blitNineSliced(drawContext, ModConstants.MAP_GUI_ELEMENTS,
-                    bgX, bgY, bgWidth, bgHeight,
-                    16, 16,
-                    96, 48,
-                    144, 160,
-                    ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
+            drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, ModConstants.SCROLL_BUTTON_SPRITE, bgX, bgY, bgWidth, bgHeight);
 
             boolean hasActiveWaypoint = getLocationActiveWaypoint(location).isPresent();
 

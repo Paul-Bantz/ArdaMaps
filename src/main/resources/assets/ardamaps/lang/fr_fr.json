@@ -18,8 +18,6 @@
   "ardamaps.client.map.screen.configuration.compass.opacity": "Opacité",
   "ardamaps.client.map.screen.configuration.compass.poi.distance.tooltip": "Ajuste la distance à laquelle les points d'intérêt apparaissent sur la boussole",
   "ardamaps.client.map.screen.configuration.compass.poi.distance": "Distance",
-  "ardamaps.client.map.screen.configuration.coarse_pyramid_bootstrap.tooltip": "Précharge les tuiles de carte basse définition après le chargement des tuiles visibles. Désactivez cette option pour réduire la bande passante initiale sur une connexion lente ou limitée.",
-  "ardamaps.client.map.screen.configuration.coarse_pyramid_bootstrap": "Précharger",
   "ardamaps.client.map.screen.configuration.description": "Options de Configuration",
   "ardamaps.client.map.screen.configuration.directory": "Répertoire de Configuration",
   "ardamaps.client.map.screen.configuration.exploration": "Exploration",
