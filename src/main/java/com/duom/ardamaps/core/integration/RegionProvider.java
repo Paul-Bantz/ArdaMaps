@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.core.integration;
 
-import com.duom.ardamaps.core.data.map.RegionLookupTexture;
+import com.duom.ardamaps.core.data.map.region.RegionGeometry;
 
 import java.util.function.Consumer;
 
@@ -35,10 +35,10 @@ import java.util.function.Consumer;
 public interface RegionProvider {
 
     /**
-     * Generates the lookup texture for the given dimension.
+     * Generates region geometry for the given dimension.
      *
      * @param dimensionId the dimension id
-     * @param callback    callback receiving the generated texture, or null when no data exists
+     * @param callback    callback receiving the generated geometry, or null when no data exists
      */
-    void generateRegionLookup(String dimensionId, Consumer<RegionLookupTexture> callback);
+    void generateRegionGeometry(String dimensionId, Consumer<RegionGeometry> callback);
 }

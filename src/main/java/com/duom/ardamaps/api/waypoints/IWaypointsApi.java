@@ -36,6 +36,10 @@ public interface IWaypointsApi {
      *
      * @param x          the X coordinate of the waypoint
      * @param z          the Z coordinate of the waypoint
+     * @param text       the waypoint label shown to the player
+     * @param r          the red color channel for the waypoint marker
+     * @param g          the green color channel for the waypoint marker
+     * @param b          the blue color channel for the waypoint marker
      * @param identifier the waypoints identifier
      * @param dimension  the dimension the waypoint is in
      */
@@ -46,6 +50,10 @@ public interface IWaypointsApi {
      *
      * @param x          the X coordinate of the waypoint
      * @param z          the Z coordinate of the waypoint
+     * @param text       the waypoint label shown to the player
+     * @param r          the red color channel for the waypoint marker
+     * @param g          the green color channel for the waypoint marker
+     * @param b          the blue color channel for the waypoint marker
      * @param identifier the waypoints identifier
      * @param dimension  the dimension the waypoint is in
      * @param showToast  whether to show a Toast notification on hit
@@ -66,6 +74,7 @@ public interface IWaypointsApi {
      * @param x          the X coordinate of the waypoint
      * @param z          the Z coordinate of the waypoint
      * @param identifier the waypoints identifier
+     * @param dimension  the dimension the waypoint is in
      */
     void removeWaypoint(int x, int z, String identifier, String dimension);
 

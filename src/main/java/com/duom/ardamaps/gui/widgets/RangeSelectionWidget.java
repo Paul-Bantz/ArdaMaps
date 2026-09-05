@@ -28,6 +28,7 @@ package com.duom.ardamaps.gui.widgets;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.gui.ModConstants;
+import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import lombok.Getter;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -402,6 +403,9 @@ public class RangeSelectionWidget extends AbstractWidget {
         if (!visible) return;
 
         int hoveredIndex = dragging ? -1 : indexAt(mouseX, mouseY);
+        if (dragging) context.requestCursor(CursorTypes.RESIZE_EW);
+        else if (hoveredIndex >= 0) context.requestCursor(CursorTypes.POINTING_HAND);
+
         Font textRenderer = Client.mc().font;
         int contentX = contentX();
         int stripX = stripX();

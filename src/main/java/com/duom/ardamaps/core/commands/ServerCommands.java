@@ -29,8 +29,10 @@ import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.core.data.config.LocationConfig;
 import com.duom.ardamaps.core.data.location.ExternalLocationSource;
 import com.duom.ardamaps.core.data.location.LocationServer;
-import com.duom.ardamaps.core.data.map.RegionLookupTexture;
+import com.duom.ardamaps.core.data.map.region.RegionGeometry;
+import com.duom.ardamaps.core.data.map.region.RegionGeometryPruner;
 import com.duom.ardamaps.core.integration.Regions;
+import com.duom.ardamaps.core.networking.packets.client.RegionsGeometryResponsePacket;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
@@ -40,10 +42,9 @@ import net.minecraft.commands.Commands;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -130,47 +131,53 @@ public class ServerCommands {
     }
 
     /**
-     * Refreshes region lookup texture data.
+     * Refreshes region geometry data.
      *
      * @param ignoredCommandSource The command context.
      * @return The result of the command execution.
      */
     private static int refreshRegionLookupData(CommandContext<CommandSourceStack> ignoredCommandSource) {
 
-        LOGGER.info("Refreshing region lookup texture data");
+        LOGGER.info("Refreshing region geometry data");
 
         if (!Regions.isAvailable()) {
-            LOGGER.warn("Region provider unavailable, skipping region lookup texture generation");
+            LOGGER.warn("Region provider unavailable, skipping region geometry generation");
             return Command.SINGLE_SUCCESS;
         }
 
         var count = 0;
+        var locations = ArdaMaps.CONFIG.getLocationConfig() == null
+                ? List.<LocationServer>of()
+                : ArdaMaps.CONFIG.getLocationConfig().getLocations();
+        ArdaMaps.CONFIG.clearRegionGeometry();
+        ArdaMaps.CONFIG_MANAGER.saveRegionGeometry();
 
         for (var entry : ArdaMaps.CONFIG.getDimensions()) {
 
             if (!entry.isSupportsArdaRegions())
                 continue;
 
-            LOGGER.info("Generating region lookup texture for dimension {}", entry.getId());
+            LOGGER.info("Generating region geometry for dimension {}", entry.getId());
 
-            Regions.generateRegionLookup(entry.getId(), (RegionLookupTexture regionLookup) -> {
+            Regions.generateRegionGeometry(entry.getId(), (RegionGeometry regionGeometry) -> {
 
-                if (regionLookup == null) {
+                if (regionGeometry == null) {
                     LOGGER.info("No region data found for dimension {}", entry.getId());
                     return;
                 }
 
-                ArdaMaps.CONFIG.setRegionLookupTexture(regionLookup);
-                ArdaMaps.CONFIG_MANAGER.saveRegionTextureLookup();
+                RegionGeometry pruned = RegionGeometryPruner.prune(regionGeometry, locations);
+                ArdaMaps.CONFIG.setRegionGeometry(pruned);
+                ArdaMaps.CONFIG_MANAGER.saveRegionGeometry();
             });
 
             count++;
         }
 
         if (count == 0)
-            LOGGER.warn("No dimension definitions with region data found in configuration, skipping region lookup texture generation");
+            LOGGER.warn("No dimension definitions with region data found in configuration, skipping region geometry generation");
         else
-            LOGGER.info("Refreshing {} textures", count);
+            LOGGER.info("Refreshing geometry for {} dimension(s)", count);
 
         return Command.SINGLE_SUCCESS;
     }
@@ -218,25 +225,31 @@ public class ServerCommands {
     }
 
     /**
-     * Saves the current region lookup texture data to a debug file.
+     * Logs the current region geometry statistics.
      *
      * @param ignoredCommandSource The command context.
      * @return The result of the command execution.
      */
     private static int debugRegionLookupData(CommandContext<CommandSourceStack> ignoredCommandSource) {
 
-        LOGGER.info("Dumping region lookup texture data to file");
+        LOGGER.info("Dumping region geometry statistics");
 
         ArdaMaps.IO_EXECUTOR.submit(() -> {
+            for (var entry : ArdaMaps.CONFIG.getRegionGeometryByDimension().entrySet()) {
+                RegionGeometry geometry = entry.getValue();
+                int rings = 0;
+                int vertices = 0;
 
-            try {
+                for (var shape : geometry.regions()) {
+                    rings += shape.rings().length;
+                    for (int[] ring : shape.rings()) {
+                        vertices += ring.length / 2;
+                    }
+                }
 
-                RegionLookupTexture texture = ArdaMaps.CONFIG.getRegionLookupTexture();
-                texture.debugSaveToFile(new File("region_lookup_debug.png"));
-
-            } catch (IOException e) {
-
-                LOGGER.error("Failed to save region lookup texture debug image", e);
+                int packetBytes = new RegionsGeometryResponsePacket(List.of(geometry), List.of(entry.getKey())).build().readableBytes();
+                LOGGER.info("- {}: {} shapes, {} rings, {} vertices, {} encoded packet bytes, last update {}",
+                        entry.getKey(), geometry.regions().length, rings, vertices, packetBytes, geometry.lastUpdate());
             }
         });
 
@@ -275,8 +288,37 @@ public class ServerCommands {
 
         ArdaMaps.CONFIG.setLocationConfig(config);
         ArdaMaps.CONFIG_MANAGER.saveLocations();
+        repruneRegionGeometry(locations);
 
         // Update the in-memory last-refresh timestamp for the debug command
         ArdaMaps.lastRefreshTime = ZonedDateTime.now();
+    }
+
+    /**
+     * Re-prunes stored region geometry after location data changes.
+     *
+     * @param locations The refreshed locations.
+     */
+    private static void repruneRegionGeometry(List<LocationServer> locations) {
+
+        if (ArdaMaps.CONFIG.getRegionGeometryByDimension() == null
+                || ArdaMaps.CONFIG.getRegionGeometryByDimension().isEmpty()) {
+            return;
+        }
+
+        List<RegionGeometry> changed = new ArrayList<>();
+
+        for (RegionGeometry geometry : ArdaMaps.CONFIG.getRegionGeometryByDimension().values()) {
+            RegionGeometry pruned = RegionGeometryPruner.prune(geometry, locations);
+            if (pruned != geometry)
+                changed.add(new RegionGeometry(pruned.dimensionId(), pruned.regions(), new Date()));
+        }
+
+        if (changed.isEmpty()) return;
+
+        for (RegionGeometry geometry : changed)
+            ArdaMaps.CONFIG.setRegionGeometry(geometry);
+
+        ArdaMaps.CONFIG_MANAGER.saveRegionGeometry();
     }
 }

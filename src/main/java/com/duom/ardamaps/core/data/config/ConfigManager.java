@@ -32,12 +32,13 @@ import com.duom.ardamaps.core.data.json.ByteArrayTypeAdapter;
 import com.duom.ardamaps.core.data.json.DimensionTypeAdapter;
 import com.duom.ardamaps.core.data.json.Vec3dTypeAdapter;
 import com.duom.ardamaps.core.data.location.BasicLocation;
-import com.duom.ardamaps.core.data.map.RegionLookupTexture;
+import com.duom.ardamaps.core.data.map.region.RegionGeometry;
 import com.duom.ardamaps.gui.ModConstants;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
+import com.google.gson.reflect.TypeToken;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +49,8 @@ import java.io.Writer;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -98,7 +101,7 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
 
         this.loadConfig();
         this.loadLocationsConfig();
-        this.loadRegionTextureLookup();
+        this.loadRegionGeometry();
     }
 
     /**
@@ -114,17 +117,29 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
                 T defaultConfig = createDefaultConfig();
                 T loadedConfig = GSON.fromJson(reader, (Class<T>) defaultConfig.getClass());
                 config = Objects.requireNonNullElse(loadedConfig, defaultConfig);
+                postLoad(config);
 
             } catch (JsonIOException | JsonSyntaxException | IOException e) {
 
                 LOGGER.error("Failed to load configuration", e);
                 config = createDefaultConfig();
+                postLoad(config);
             }
         } else {
             config = createDefaultConfig();
+            postLoad(config);
         }
 
         save();
+    }
+
+    /**
+     * Normalizes a configuration after loading and before saving.
+     *
+     * @param loadedConfig The loaded configuration.
+     */
+    protected void postLoad(T loadedConfig) {
+
     }
 
     /**
@@ -153,33 +168,37 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
     }
 
     /**
-     * Load region texture lookup from file.
+     * Load region geometry from file.
      */
-    protected final void loadRegionTextureLookup() {
+    protected final void loadRegionGeometry() {
 
-        RegionLookupTexture defaultConfig = RegionLookupTexture.DEFAULT;
+        Map<String, RegionGeometry> defaultConfig = new HashMap<>();
 
         if (Files.exists(regionTextureLookupFile)) {
 
             try (Reader reader = Files.newBufferedReader(regionTextureLookupFile)) {
 
-                RegionLookupTexture loadedConfig = GSON.fromJson(reader, RegionLookupTexture.class);
-                config.setRegionLookupTexture(Objects.requireNonNullElse(loadedConfig, defaultConfig));
+                Type mapType = new TypeToken<Map<String, RegionGeometry>>() {
+                }.getType();
+                Map<String, RegionGeometry> loadedConfig = GSON.fromJson(reader, mapType);
+                config.setRegionGeometryByDimension(Objects.requireNonNullElse(loadedConfig, defaultConfig));
 
             } catch (JsonIOException | JsonSyntaxException | IOException e) {
 
-                LOGGER.error("Failed to load region texture lookup", e);
-                config.setRegionLookupTexture(defaultConfig);
+                LOGGER.error("Failed to load region geometry", e);
+                config.setRegionGeometryByDimension(defaultConfig);
             }
         } else {
-            config.setRegionLookupTexture(defaultConfig);
+            config.setRegionGeometryByDimension(defaultConfig);
         }
 
-        saveRegionTextureLookup();
+        saveRegionGeometry();
     }
 
     /**
      * Creates the default configuration object.
+     *
+     * @return A new default configuration instance.
      */
     protected abstract T createDefaultConfig();
 
@@ -193,6 +212,8 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
 
     /**
      * Creates the default location configuration object.
+     *
+     * @return A new default location configuration instance.
      */
     protected abstract LocationConfig<L> createDefaultLocationConfig();
 
@@ -210,11 +231,11 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
     }
 
     /**
-     * Saves the provided region texture lookup to the server config directory
+     * Saves the provided region geometry to the server config directory
      */
-    public final void saveRegionTextureLookup() {
+    public final void saveRegionGeometry() {
 
-        save(regionTextureLookupFile, config.getRegionLookupTexture());
+        save(regionTextureLookupFile, config.getRegionGeometryByDimension());
     }
 
     /**
@@ -266,7 +287,7 @@ public abstract class ConfigManager<T extends Configuration<L>, L extends BasicL
 
         loadConfig();
         loadLocationsConfig();
-        loadRegionTextureLookup();
+        loadRegionGeometry();
     }
 
     /**

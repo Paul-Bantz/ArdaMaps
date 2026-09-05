@@ -47,9 +47,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Renders map markers, the player marker, and waypoints for {@link com.duom.ardamaps.gui.screens.MapScreen}.
@@ -63,26 +61,43 @@ public class MapMarkerRenderer {
     /** Rendered map marker scale factor */
     private static final float MARKER_SCALE = .6f;
 
-    /** Rendered map marker size in pixels */
-    private static final int MARKER_BACKGROUND_SIZE = (int) (MarkersManager.get().mapMarkerBackgroundSize() * MARKER_SCALE);
+    /** Base rendered map marker size in pixels at identity zoom and closer. */
+    private static final int BASE_MARKER_BACKGROUND_SIZE = (int) (MarkersManager.get().mapMarkerBackgroundSize() * MARKER_SCALE);
 
-    /** Precalculated half size of the marker background, used for centering */
-    private static final int HALF_MARKER_SIZE = MARKER_BACKGROUND_SIZE / 2;
+    /** Base rendered map marker icon size in pixels at identity zoom and closer. */
+    private static final int BASE_MARKER_ICON_SIZE = (int) (MarkersManager.get().mapMarkerIconSize() * MARKER_SCALE);
 
-    /** Rendered map marker icon size in pixels */
-    private static final int MARKER_ICON_SIZE = (int) (MarkersManager.get().mapMarkerIconSize() * MARKER_SCALE);
+    /** Fraction of the marker highlight texture covered by its visible disc. */
+    private static final float MARKER_HIGHLIGHT_DISC_RATIO = 38f / 48f;
+
+    /** Pixel padding that keeps marker icons inside the visible highlight disc. */
+    private static final int MARKER_ICON_DISC_PADDING = 8;
+
+    /** Base rendered marker icon size contained within the highlight disc, at identity zoom. */
+    private static final int BASE_MARKER_ICON_DISC_SIZE =
+            Math.max(1, Math.round(BASE_MARKER_BACKGROUND_SIZE * MARKER_HIGHLIGHT_DISC_RATIO)
+                    - MARKER_ICON_DISC_PADDING);
 
     /** Opacity applied to markers outside the currently displayed vertical range. */
     private static final float MARKER_OUT_OF_RANGE_OPACITY = 0.25f;
 
-    /** Precalculated x offset to position the marker icon within the marker background */
-    private static final int MARKER_ICON_X_OFFSET = (int) (MarkersManager.get().mapMarkerIconXOffset() * MARKER_SCALE);
-
-    /** Precalculated y offset to position the marker icon within the marker background */
-    private static final int MARKER_ICON_Y_OFFSET = (int) (MarkersManager.get().mapMarkerIconYOffset() * MARKER_SCALE);
+    /** Minimum fraction of their regular size markers shrink to when fully zoomed out. */
+    private static final float MARKER_MIN_ZOOM_SCALE = .25f;
 
     /** Reusable buffer for markers currently under the mouse cursor. */
     private final List<DeferredMarker> mouseOverMarkers = new ArrayList<>();
+
+    /** Current frame marker background size. */
+    private int markerBackgroundSize = BASE_MARKER_BACKGROUND_SIZE;
+
+    /** Current frame marker half-size, used for centering. */
+    private int halfMarkerSize = markerBackgroundSize / 2;
+
+    /** Current frame marker icon size. */
+    private int markerIconSize = BASE_MARKER_ICON_DISC_SIZE;
+
+    /** Current frame marker icon offset from the marker background edge. */
+    private int markerIconOffset = (markerBackgroundSize - markerIconSize) / 2;
 
     /** Backing location list used by the cached marker-filter result. Compared by reference identity. */
     private List<LocationClient> cachedMarkerBackingLocations;
@@ -90,8 +105,8 @@ public class MapMarkerRenderer {
     /** Dimension key used by the cached marker-filter result. */
     private String cachedMarkerDimensionId;
 
-    /** Marker type key used by the cached marker-filter result. */
-    private String cachedMarkerTypeKey;
+    /** Marker type key set used by the cached marker-filter result. */
+    private Set<String> cachedMarkerTypeKeys;
 
     /** Filtered locations rendered by the marker loop for the current dimension/type/backing-list tuple. */
     private List<LocationClient> cachedMarkerLocations = List.of();
@@ -111,7 +126,7 @@ public class MapMarkerRenderer {
      * @param mapFrameRenderer        The frame renderer used for viewport hit-testing.
      * @param selectedRange           The currently selected vertical range, or null when the layer is unranged.
      * @param focusedLocationPosition The location currently displayed in the side panel, or null.
-     * @param selectedTypeKey         The selected marker type filter key, or null to render all marker types.
+     * @param enabledTypeKeys         The enabled marker type filter keys, or null to render all marker types.
      * @param mouseOverWidgets        True when the mouse is currently over an interactive map widget.
      * @param framePadding            The padding used by frame hit-testing.
      * @param mouseX                  The current mouse X coordinate.
@@ -119,15 +134,31 @@ public class MapMarkerRenderer {
      */
     public void render(GuiGraphicsExtractor context, Font textRenderer, MapCamera mapCamera, MapFrameRenderer mapFrameRenderer,
                        @Nullable MapLayerRange selectedRange, @Nullable Vec3d focusedLocationPosition,
-                       @Nullable String selectedTypeKey, boolean mouseOverWidgets, int framePadding, int mouseX, int mouseY) {
+                       @Nullable Set<String> enabledTypeKeys, boolean mouseOverWidgets, int framePadding, int mouseX, int mouseY) {
 
         mouseOverLocation = null;
         mouseOverWaypoint = null;
 
+        updateMarkerSizes(mapCamera);
+
         renderMarkers(context, textRenderer, mapCamera, mapFrameRenderer, selectedRange, focusedLocationPosition,
-                selectedTypeKey, mouseOverWidgets, mouseX, mouseY);
+                enabledTypeKeys, mouseOverWidgets, mouseX, mouseY);
         renderPlayerMarker(context, mapCamera, mapFrameRenderer, selectedRange, framePadding);
         renderWaypoint(context, textRenderer, mapCamera, mapFrameRenderer, framePadding, mouseX, mouseY);
+    }
+
+    /**
+     * Updates per-frame marker dimensions from the camera zoom.
+     *
+     * @param mapCamera The active map camera.
+     */
+    private void updateMarkerSizes(MapCamera mapCamera) {
+
+        float scale = markerZoomScale(mapCamera.identityRelativeScale(), mapCamera.minIdentityRelativeScale());
+        markerBackgroundSize = scaled(BASE_MARKER_BACKGROUND_SIZE, scale);
+        halfMarkerSize = markerBackgroundSize / 2;
+        markerIconSize = scaled(BASE_MARKER_ICON_DISC_SIZE, scale);
+        markerIconOffset = (markerBackgroundSize - markerIconSize) / 2;
     }
 
     /**
@@ -139,17 +170,17 @@ public class MapMarkerRenderer {
      * @param mapFrameRenderer        The frame renderer used for viewport hit-testing.
      * @param selectedRange           The currently selected vertical range, or null when the layer is unranged.
      * @param focusedLocationPosition The location currently displayed in the side panel, or null.
-     * @param selectedTypeKey         The selected marker type filter key, or null to render all marker types.
+     * @param enabledTypeKeys         The enabled marker type filter keys, or null to render all marker types.
      * @param mouseOverWidgets        True when the mouse is currently over an interactive map widget.
      * @param mouseX                  The current mouse X coordinate.
      * @param mouseY                  The current mouse Y coordinate.
      */
     private void renderMarkers(GuiGraphicsExtractor context, Font textRenderer, MapCamera mapCamera, MapFrameRenderer mapFrameRenderer,
                                @Nullable MapLayerRange selectedRange, @Nullable Vec3d focusedLocationPosition,
-                               @Nullable String selectedTypeKey, boolean mouseOverWidgets, int mouseX, int mouseY) {
+                               @Nullable Set<String> enabledTypeKeys, boolean mouseOverWidgets, int mouseX, int mouseY) {
 
         var dimensionId = mapCamera.getDimension().getId();
-        var locations = getCachedMarkerLocations(dimensionId, selectedTypeKey);
+        var locations = getCachedMarkerLocations(dimensionId, enabledTypeKeys);
 
         boolean revealAll = ArdaMapsClient.CONFIG.isMapRevealAll();
 
@@ -167,13 +198,13 @@ public class MapMarkerRenderer {
             int screenX = (int) landmarkScreenPos.x();
             int screenY = (int) landmarkScreenPos.y();
 
-            if (!mapFrameRenderer.coordinatesInFrame(screenX, screenY, -MARKER_BACKGROUND_SIZE)) continue;
+            if (!mapFrameRenderer.coordinatesInFrame(screenX, screenY, -markerBackgroundSize)) continue;
 
-            var xPos = screenX - HALF_MARKER_SIZE;
-            var yPos = screenY - MARKER_BACKGROUND_SIZE;
+            var xPos = screenX - halfMarkerSize;
+            var yPos = screenY - markerBackgroundSize;
 
-            var isMouseOver = mouseX > xPos && mouseX < xPos + MARKER_BACKGROUND_SIZE
-                    && mouseY > yPos && mouseY < yPos + MARKER_BACKGROUND_SIZE
+            var isMouseOver = mouseX > xPos && mouseX < xPos + markerBackgroundSize
+                    && mouseY > yPos && mouseY < yPos + markerBackgroundSize
                     && !mouseOverWidgets;
 
             var isFocused = Objects.equals(location.getPosition(), focusedLocationPosition);
@@ -287,16 +318,17 @@ public class MapMarkerRenderer {
 
             var waypointScreenPos = mapCamera.worldToScreenCoordinates(waypoint.getPosition());
 
-            int halfIconSize = MARKER_ICON_SIZE / 2;
+            int waypointIconSize = BASE_MARKER_ICON_SIZE;
+            int halfIconSize = waypointIconSize / 2;
 
             int screenX = (int) waypointScreenPos.x() - halfIconSize;
             int screenY = (int) waypointScreenPos.y() - halfIconSize;
 
             if (mouseOverWaypoint == null
                     && mouseX >= screenX
-                    && mouseX <= screenX + MARKER_ICON_SIZE
+                    && mouseX <= screenX + waypointIconSize
                     && mouseY >= screenY
-                    && mouseY <= screenY + MARKER_ICON_SIZE) {
+                    && mouseY <= screenY + waypointIconSize) {
 
                 mouseOverWaypoint = waypoint;
                 context.setTooltipForNextFrame(textRenderer, Component.literal(waypoint.text()), mouseX, mouseY);
@@ -311,13 +343,13 @@ public class MapMarkerRenderer {
                         && icon.contents() != null
                         && !Objects.equals(icon.contents().name(), MissingTextureAtlasSprite.getLocation())) {
 
-                    context.blitSprite(RenderPipelines.GUI_TEXTURED, icon, screenX, screenY, MARKER_ICON_SIZE, MARKER_ICON_SIZE,
+                    context.blitSprite(RenderPipelines.GUI_TEXTURED, icon, screenX, screenY, waypointIconSize, waypointIconSize,
                             GuiTextures.argb(waypoint.r(), waypoint.g(), waypoint.b(), 1.0f));
 
                 } else {
 
                     context.blit(RenderPipelines.GUI_TEXTURED, iconIdentifier, screenX, screenY, 0, 0,
-                            MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE,
+                            waypointIconSize, waypointIconSize, waypointIconSize, waypointIconSize,
                             GuiTextures.argb(waypoint.r(), waypoint.g(), waypoint.b(), 1.0f));
                 }
 
@@ -326,26 +358,64 @@ public class MapMarkerRenderer {
     }
 
     /**
-     * Return the filtered marker locations for the current dimension/type, reusing the list while the backing
+     * Marker size multiplier for the current camera zoom. Full size at identity zoom and closer;
+     * when zoomed out, shrinks linearly with zoom level down to {@link #MARKER_MIN_ZOOM_SCALE}
+     * at the point where the camera can no longer zoom out.
+     *
+     * @param identityRelativeScale    Camera scale relative to identity zoom.
+     * @param minIdentityRelativeScale Camera scale relative to identity zoom at the zoom-out limit.
+     * @return Multiplier in [MARKER_MIN_ZOOM_SCALE, 1].
+     */
+    public static float markerZoomScale(double identityRelativeScale, double minIdentityRelativeScale) {
+
+        if (Double.isNaN(identityRelativeScale) || identityRelativeScale >= 1.0) return 1f;
+        if (Double.isNaN(minIdentityRelativeScale) || minIdentityRelativeScale >= 1.0) return 1f;
+        if (identityRelativeScale <= 0) return MARKER_MIN_ZOOM_SCALE;
+
+        double t = Math.log(identityRelativeScale) / Math.log(minIdentityRelativeScale);
+        t = Math.min(1.0, Math.max(0.0, t));
+
+        return (float) (1.0 + t * (MARKER_MIN_ZOOM_SCALE - 1.0));
+    }
+
+    /**
+     * Scales a pixel size while keeping blits and fills from collapsing to zero dimensions.
+     *
+     * @param base  Base pixel size.
+     * @param scale Scale multiplier.
+     * @return Scaled pixel size of at least one pixel.
+     */
+    @SuppressWarnings("SameParameterValue")
+    private static int scaled(int base, float scale) {
+
+        return Math.max(1, Math.round(base * scale));
+    }
+
+    /**
+     * Return the filtered marker locations for the current dimension/type set, reusing the list while the backing
      * location list instance is unchanged. Location visibility remains live because the cached list stores objects.
      *
-     * @param dimensionId The dimension id used to filter locations.
-     * @param typeKey     The marker type key used to filter locations, or null for all types.
+     * @param dimensionId     The dimension id used to filter locations.
+     * @param enabledTypeKeys The marker type keys used to filter locations, or null for all types.
      * @return The cached filtered marker list for the current dimension/type tuple.
      */
-    private List<LocationClient> getCachedMarkerLocations(String dimensionId, @Nullable String typeKey) {
+    private List<LocationClient> getCachedMarkerLocations(String dimensionId, @Nullable Set<String> enabledTypeKeys) {
 
         var backingLocations = ArdaMapsClient.CONFIG.getLocationConfig().getLocations();
+        Set<String> copiedTypeKeys = enabledTypeKeys == null ? null : new HashSet<>(enabledTypeKeys);
         if (cachedMarkerBackingLocations == backingLocations
                 && Objects.equals(cachedMarkerDimensionId, dimensionId)
-                && Objects.equals(cachedMarkerTypeKey, typeKey)) {
+                && Objects.equals(cachedMarkerTypeKeys, copiedTypeKeys)) {
             return cachedMarkerLocations;
         }
 
         cachedMarkerBackingLocations = backingLocations;
         cachedMarkerDimensionId = dimensionId;
-        cachedMarkerTypeKey = typeKey;
-        cachedMarkerLocations = ArdaMapsClient.CONFIG.getLocations(dimensionId, typeKey);
+        cachedMarkerTypeKeys = copiedTypeKeys;
+        cachedMarkerLocations = ArdaMapsClient.CONFIG.getLocations(dimensionId, null).stream()
+                .filter(location -> copiedTypeKeys == null
+                        || copiedTypeKeys.contains(MarkersManager.get().markerTypeKey(location.getTypes())))
+                .toList();
         return cachedMarkerLocations;
     }
 
@@ -363,20 +433,23 @@ public class MapMarkerRenderer {
     private void renderMarker(GuiGraphicsExtractor context, Font textRenderer, LocationClient location,
                               int xPos, int yPos, boolean focused, boolean outOfRange) {
 
-        var iconXPos = xPos + MARKER_ICON_X_OFFSET;
-        var iconYPos = yPos + MARKER_ICON_Y_OFFSET;
+        var iconXPos = xPos + markerIconOffset;
+        var iconYPos = yPos + markerIconOffset;
 
         Identifier icon = location.getIcon();
         int color = outOfRange ? withOpacity(location.getColor()) : location.getColor();
         int highlightColor = outOfRange ? withOpacity(location.getHighlightColor()) : location.getHighlightColor();
         float markerOpacity = outOfRange ? MARKER_OUT_OF_RANGE_OPACITY : 1f;
+        int highlightTint = focused ? highlightColor : color;
+
+        context.blitSprite(RenderPipelines.GUI_TEXTURED,
+                IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_HIGHLIGHT_ICON),
+                xPos, yPos, markerBackgroundSize, markerBackgroundSize, highlightTint);
 
         if (focused) {
 
-            var screenX = xPos + HALF_MARKER_SIZE;
-            var screenY = yPos + MARKER_BACKGROUND_SIZE;
-
-            context.fill(xPos + 4, yPos + 4, xPos + MARKER_BACKGROUND_SIZE - 4, yPos + MARKER_BACKGROUND_SIZE - 4, highlightColor);
+            var screenX = xPos + halfMarkerSize;
+            var screenY = yPos + markerBackgroundSize;
 
             var text = location.getName();
             var textX = screenX - textRenderer.width(text) / 2;
@@ -387,19 +460,15 @@ public class MapMarkerRenderer {
                     screenY + textRenderer.lineHeight / 2,
                     ModConstants.COLOR_WHITE,
                     false);
-
-        } else {
-
-            context.fill(xPos + 4, yPos + 4, xPos + MARKER_BACKGROUND_SIZE - 4, yPos + MARKER_BACKGROUND_SIZE - 4, color);
         }
 
         int markerColor = GuiTextures.withAlpha(ModConstants.COLOR_WHITE, markerOpacity);
         if (location.isVisited())
-            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_VISITED_ICON), xPos, yPos, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE, markerColor);
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_VISITED_ICON), xPos, yPos, markerBackgroundSize, markerBackgroundSize, markerColor);
         else
-            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_ICON), xPos, yPos, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE, markerColor);
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_ICON), xPos, yPos, markerBackgroundSize, markerBackgroundSize, markerColor);
 
-        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), iconXPos, iconYPos, MARKER_ICON_SIZE, MARKER_ICON_SIZE, markerColor);
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), iconXPos, iconYPos, markerIconSize, markerIconSize, markerColor);
 
     }
 

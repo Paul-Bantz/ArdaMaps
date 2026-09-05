@@ -31,8 +31,8 @@ import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.render.TextureSetup;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2f;
@@ -55,12 +55,12 @@ public record PmTilesTileRenderState(
     /**
      * Constructs a render state for a single PMTiles texture quad, computing final bounds.
      *
-     * @param texture The texture identifier to render.
-     * @param pose The 2D transformation matrix for the quad.
-     * @param x0 Left edge in screen pixels.
-     * @param y0 Top edge in screen pixels.
-     * @param x1 Right edge in screen pixels.
-     * @param y1 Bottom edge in screen pixels.
+     * @param texture     The texture identifier to render.
+     * @param pose        The 2D transformation matrix for the quad.
+     * @param x0          Left edge in screen pixels.
+     * @param y0          Top edge in screen pixels.
+     * @param x1          Right edge in screen pixels.
+     * @param y1          Bottom edge in screen pixels.
      * @param scissorArea The scissor rectangle to apply, or null for no clipping.
      */
     public PmTilesTileRenderState(

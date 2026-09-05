@@ -27,11 +27,13 @@ package com.duom.ardamaps.core.data.config.shared;
 
 import com.duom.ardamaps.core.data.config.LocationConfig;
 import com.duom.ardamaps.core.data.location.BasicLocation;
-import com.duom.ardamaps.core.data.map.RegionLookupTexture;
+import com.duom.ardamaps.core.data.map.region.RegionGeometry;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Abstract base class for configuration classes that manage location data.
@@ -51,10 +53,60 @@ public abstract class Configuration<T extends BasicLocation> {
     protected transient LocationConfig<T> locationConfig;
 
     /**
-     * Region lookup texture is persisted in another file.
+     * Region geometry is persisted in another file.
      * Managed by ConfigManager
      */
-    protected transient RegionLookupTexture regionLookupTexture;
+    protected transient Map<String, RegionGeometry> regionGeometryByDimension = new ConcurrentHashMap<>();
+
+    /**
+     * Replaces the stored region geometry map.
+     *
+     * @param regionGeometryByDimension the geometry by dimension identifier
+     */
+    public void setRegionGeometryByDimension(Map<String, RegionGeometry> regionGeometryByDimension) {
+
+        this.regionGeometryByDimension = new ConcurrentHashMap<>();
+        if (regionGeometryByDimension == null) return;
+
+        regionGeometryByDimension.forEach((dimensionId, geometry) -> {
+            if (dimensionId != null && geometry != null) {
+                this.regionGeometryByDimension.put(dimensionId, geometry);
+            }
+        });
+    }
+
+    /**
+     * Gets geometry for a dimension.
+     *
+     * @param dimensionId the dimension identifier
+     * @return the region geometry, or null when unavailable
+     */
+    public RegionGeometry getRegionGeometry(String dimensionId) {
+
+        if (dimensionId == null || regionGeometryByDimension == null) return null;
+        return regionGeometryByDimension.get(dimensionId);
+    }
+
+    /**
+     * Stores geometry for a dimension.
+     *
+     * @param regionGeometry the geometry to store
+     */
+    public void setRegionGeometry(RegionGeometry regionGeometry) {
+
+        if (regionGeometry == null || regionGeometry.dimensionId() == null) return;
+        if (regionGeometryByDimension == null) regionGeometryByDimension = new ConcurrentHashMap<>();
+        regionGeometryByDimension.put(regionGeometry.dimensionId(), regionGeometry);
+    }
+
+    /**
+     * Clears all stored region geometry.
+     */
+    public void clearRegionGeometry() {
+
+        if (regionGeometryByDimension == null) regionGeometryByDimension = new ConcurrentHashMap<>();
+        else regionGeometryByDimension.clear();
+    }
 
     /**
      * Get the given location from its id
@@ -86,6 +138,7 @@ public abstract class Configuration<T extends BasicLocation> {
      * Get all locations in a specific worldId
      *
      * @param worldId The worldId id to get locations from
+     * @param type    The optional location type to filter by.
      * @return A list of locations in the specified worldId
      */
     public List<T> getLocations(String worldId, String type) {

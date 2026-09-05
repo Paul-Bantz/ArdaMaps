@@ -26,41 +26,51 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.Client;
-import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
+import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import lombok.Getter;
-import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
+import java.util.function.IntSupplier;
+import java.util.function.ToIntFunction;
 
 /**
  * A simple context menu implementation for the map GUI.
  * It supports multiple entries, each with a label and an associated action.
- * The menu is rendered as a nine-sliced texture, and entries are highlighted on hover.
+ * The menu is rendered as a connected stack of vanilla-style buttons.
  */
 public class ContextMenu {
 
-    /** Context menu item height */
-    private static final int ITEM_HEIGHT = 16;
+    /** Context menu row height in pixels. */
+    static final int ITEM_HEIGHT = Button.DEFAULT_HEIGHT;
 
-    /** The padding around the menu items, ensuring that the text is not flush against the edges of the menu. */
-    private static final int PADDING = 6;
-
-    /** The horizontal padding for the text within the menu, providing space on either side of the text for better readability. */
-    private static final int H_PADDING = 12;
+    /** Shared minimum width applied to menus opened from the map and from book labels. */
+    public static final int DEFAULT_MIN_WIDTH = 90;
 
     /** The list of entries that will be displayed in the context menu, each containing a label and an associated action. */
     private final List<Entry> entries;
 
     /** The calculated width of the context menu, determined by the longest entry label plus horizontal padding. */
+    @Getter
     private final int width;
 
-    /** The calculated height of the context menu, determined by the number of entries multiplied by the item height plus vertical padding. */
+    /** The calculated height of the context menu, determined by row count. */
+    @Getter
     private final int height;
+
+    /** Font line height used for stable construction-time menu geometry. */
+    private final int lineHeight;
+
+    /** Width of the screen containing this context menu. */
+    private final int screenWidth;
+
+    /** Height of the screen containing this context menu. */
+    private final int screenHeight;
 
     /** The world X coordinate associated with this context menu, used for actions that require world position. */
     @Getter
@@ -70,39 +80,179 @@ public class ContextMenu {
     @Getter
     private final double worldZ;
 
+    /** Whether the menu opens above its anchor point. */
+    @Getter
+    private final boolean openUpward;
+
     /** The x-coordinate of the top-left corner of the context menu on the screen. */
-    @Setter
+    @Getter
     private int x;
 
     /** The y-coordinate of the top-left corner of the context menu on the screen. */
-    @Setter
+    @Getter
     private int y;
 
+    /** Keyboard and scroll highlighted entry index, or -1 when none is highlighted. */
+    private int highlightIndex = -1;
+
     /**
-     * Constructs a new ContextMenu instance with the specified screen coordinates, world coordinates, and menu entries.
+     * Constructs a new ContextMenu instance with automatic opening direction and minimum width.
      *
-     * @param x       The x-coordinate of the top-left corner of the context menu on the screen.
-     * @param y       The y-coordinate of the top-left corner of the context menu on the screen.
-     * @param worldX  The world X coordinate associated with this context menu, used for actions that require world position.
-     * @param worldZ  The world Z coordinate associated with this context menu, used for actions that require world position.
-     * @param entries The list of entries that will be displayed in the context menu, each containing a label and an associated action.
+     * @param x            The anchor x-coordinate of the context menu on the screen.
+     * @param y            The anchor y-coordinate of the context menu on the screen.
+     * @param screenWidth  The width of the screen containing this menu.
+     * @param screenHeight The height of the screen containing this menu.
+     * @param worldX       The world X coordinate associated with this context menu.
+     * @param worldZ       The world Z coordinate associated with this context menu.
+     * @param entries      The list of entries that will be displayed in the context menu.
+     * @param minWidth     The minimum menu width in pixels.
      */
-    public ContextMenu(int x, int y, double worldX, double worldZ, List<Entry> entries) {
+    public ContextMenu(int x, int y, int screenWidth, int screenHeight,
+                       double worldX, double worldZ, List<Entry> entries,
+                       int minWidth) {
 
-        this.x = x;
-        this.y = y;
+        this(x, y, screenWidth, screenHeight, worldX, worldZ, entries,
+                label -> Minecraft.getInstance().font.width(label),
+                () -> Minecraft.getInstance().font.lineHeight,
+                minWidth,
+                null);
+    }
 
+    /**
+     * Constructs a context menu using injected text measurement dependencies.
+     *
+     * @param x            The anchor x-coordinate of the context menu on the screen.
+     * @param y            The anchor y-coordinate of the context menu on the screen.
+     * @param screenWidth  The width of the screen containing this menu.
+     * @param screenHeight The height of the screen containing this menu.
+     * @param worldX       The world X coordinate associated with this context menu.
+     * @param worldZ       The world Z coordinate associated with this context menu.
+     * @param entries      The list of entries that will be displayed in the context menu.
+     * @param textWidth    The text width calculator for entry labels.
+     * @param lineHeight   The font line height supplier for menu geometry.
+     */
+    ContextMenu(int x, int y, int screenWidth, int screenHeight,
+                double worldX, double worldZ, List<Entry> entries,
+                ToIntFunction<Component> textWidth, IntSupplier lineHeight) {
+
+        this(x, y, screenWidth, screenHeight, worldX, worldZ, entries, textWidth, lineHeight, 0, null);
+    }
+
+    /**
+     * Constructs a context menu using injected text measurement dependencies and a minimum width.
+     *
+     * @param x            The anchor x-coordinate of the context menu on the screen.
+     * @param y            The anchor y-coordinate of the context menu on the screen.
+     * @param screenWidth  The width of the screen containing this menu.
+     * @param screenHeight The height of the screen containing this menu.
+     * @param worldX       The world X coordinate associated with this context menu.
+     * @param worldZ       The world Z coordinate associated with this context menu.
+     * @param entries      The list of entries that will be displayed in the context menu.
+     * @param textWidth    The text width calculator for entry labels.
+     * @param lineHeight   The font line height supplier for menu geometry.
+     * @param minWidth     The minimum menu width in pixels.
+     */
+    ContextMenu(int x, int y, int screenWidth, int screenHeight,
+                double worldX, double worldZ, List<Entry> entries,
+                ToIntFunction<Component> textWidth, IntSupplier lineHeight, int minWidth) {
+
+        this(x, y, screenWidth, screenHeight, worldX, worldZ, entries, textWidth, lineHeight, minWidth, null);
+    }
+
+    /**
+     * Constructs a context menu using injected dependencies and an optional explicit opening direction.
+     *
+     * @param x               The anchor x-coordinate of the context menu on the screen.
+     * @param y               The anchor y-coordinate of the context menu on the screen.
+     * @param screenWidth     The width of the screen containing this menu.
+     * @param screenHeight    The height of the screen containing this menu.
+     * @param worldX          The world X coordinate associated with this context menu.
+     * @param worldZ          The world Z coordinate associated with this context menu.
+     * @param entries         The list of entries that will be displayed in the context menu.
+     * @param textWidth       The text width calculator for entry labels.
+     * @param lineHeight      The font line height supplier for menu geometry.
+     * @param openUpward      True to open above the anchor, false to open below, or null to derive it from available space.
+     */
+    ContextMenu(int x, int y, int screenWidth, int screenHeight,
+                double worldX, double worldZ, List<Entry> entries,
+                ToIntFunction<Component> textWidth, IntSupplier lineHeight, Boolean openUpward) {
+
+        this(x, y, screenWidth, screenHeight, worldX, worldZ, entries, textWidth, lineHeight, 0, openUpward);
+    }
+
+    /**
+     * Constructs a context menu using injected dependencies and an optional explicit opening direction.
+     *
+     * @param x               The anchor x-coordinate of the context menu on the screen.
+     * @param y               The anchor y-coordinate of the context menu on the screen.
+     * @param screenWidth     The width of the screen containing this menu.
+     * @param screenHeight    The height of the screen containing this menu.
+     * @param worldX          The world X coordinate associated with this context menu.
+     * @param worldZ          The world Z coordinate associated with this context menu.
+     * @param entries         The list of entries that will be displayed in the context menu.
+     * @param textWidth       The text width calculator for entry labels.
+     * @param lineHeight      The font line height supplier for menu geometry.
+     * @param minWidth        The minimum menu width in pixels.
+     * @param openUpward      True to open above the anchor, false to open below, or null to derive it from available space.
+     */
+    ContextMenu(int x, int y, int screenWidth, int screenHeight,
+                double worldX, double worldZ, List<Entry> entries,
+                ToIntFunction<Component> textWidth, IntSupplier lineHeight, int minWidth, Boolean openUpward) {
+
+        this.screenWidth = screenWidth;
+        this.screenHeight = screenHeight;
         this.worldX = worldX;
         this.worldZ = worldZ;
-
         this.entries = entries;
+        this.lineHeight = lineHeight.getAsInt();
 
-        this.width = entries.stream()
-                .mapToInt(e -> Minecraft.getInstance().font.width(e.label()))
+        this.width = Math.max(minWidth, entries.stream()
+                .mapToInt(e -> textWidth.applyAsInt(e.label()))
                 .max()
-                .orElse(40) + H_PADDING * 2;
+                .orElse(0) + ConnectedButtonSurface.LABEL_PADDING * 2);
 
-        this.height = entries.size() * ITEM_HEIGHT + PADDING * 2;
+        this.height = entries.size() * ITEM_HEIGHT;
+        this.openUpward = openUpward != null ? openUpward : y + height > screenHeight;
+
+        setPosition(x, y);
+    }
+
+    /**
+     * Sets the context menu anchor position while preserving the original opening direction.
+     *
+     * @param x The anchor x-coordinate.
+     * @param y The anchor y-coordinate.
+     */
+    public void setPosition(int x, int y) {
+
+        this.x = Math.clamp(x, 0, Math.max(0, screenWidth - width));
+
+        int topY = openUpward ? y - height : y;
+        this.y = Math.clamp(topY, 0, Math.max(0, screenHeight - height));
+    }
+
+    /**
+     * Constructs a new ContextMenu instance with an explicit opening direction and minimum width.
+     *
+     * @param x            The anchor x-coordinate of the context menu on the screen.
+     * @param y            The anchor y-coordinate of the context menu on the screen.
+     * @param screenWidth  The width of the screen containing this menu.
+     * @param screenHeight The height of the screen containing this menu.
+     * @param worldX       The world X coordinate associated with this context menu.
+     * @param worldZ       The world Z coordinate associated with this context menu.
+     * @param entries      The list of entries that will be displayed in the context menu.
+     * @param openUpward   True to open above the anchor point.
+     * @param minWidth     The minimum menu width in pixels.
+     */
+    public ContextMenu(int x, int y, int screenWidth, int screenHeight,
+                       double worldX, double worldZ, List<Entry> entries,
+                       boolean openUpward, int minWidth) {
+
+        this(x, y, screenWidth, screenHeight, worldX, worldZ, entries,
+                label -> Minecraft.getInstance().font.width(label),
+                () -> Minecraft.getInstance().font.lineHeight,
+                minWidth,
+                openUpward);
     }
 
     /**
@@ -115,39 +265,73 @@ public class ContextMenu {
      */
     public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
-        var textRenderer = Client.mc().font;
+        renderContents(context, mouseX, mouseY);
+    }
 
-        GuiTextures.blitNineSliced(context, ModConstants.MAP_FRAME_TEXTURE,
-                x, y, width, height,
-                16, 16,
-                64, 64,
-                16, 176,
-                ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
+    /**
+     * Renders the full unclipped context menu contents.
+     *
+     * @param context The DrawContext used for rendering the menu.
+     * @param mouseX  The current x-coordinate of the mouse cursor, used for hover detection.
+     * @param mouseY  The current y-coordinate of the mouse cursor, used for hover detection.
+     */
+    private void renderContents(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         for (int i = 0; i < entries.size(); i++) {
-            int itemY = y + PADDING + i * ITEM_HEIGHT;
-            boolean hovered = mouseX >= x && mouseX <= x + width
-                    && mouseY >= itemY && mouseY <= itemY + ITEM_HEIGHT;
+            int itemY = rowTop(i);
+            boolean mouseHovered = isMouseOverEntry(mouseX, mouseY, i);
+            boolean hovered = mouseHovered || i == highlightIndex;
 
-            if (hovered) {
+            if (mouseHovered) context.requestCursor(CursorTypes.POINTING_HAND);
 
-                GuiTextures.blitNineSliced(context, ModConstants.MAP_FRAME_TEXTURE,
-                        x, itemY, width, ITEM_HEIGHT,
-                        16, 1, 16, 1,
-                        64, 64,
-                        80, 176,
-                        ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
-            }
-
+            ConnectedButtonSurface.drawInList(context, x, itemY, width, ITEM_HEIGHT, i, entries.size(), hovered);
             context.text(
                     Client.mc().font,
                     entries.get(i).label(),
-                    x + H_PADDING,
-                    itemY + textRenderer.lineHeight / 2,
-                    ModConstants.COLOR_DARK_BROWN,
+                    x + ConnectedButtonSurface.LABEL_PADDING,
+                    textY(i),
+                    ModConstants.COLOR_WHITE,
                     false
             );
         }
+    }
+
+    /**
+     * Gets the top y-coordinate of an entry's highlighted and clickable band.
+     *
+     * @param index The entry row index.
+     * @return The top y-coordinate of the row band.
+     */
+    private int rowTop(int index) {
+
+        return y + index * ITEM_HEIGHT;
+    }
+
+    /**
+     * Determines if the given mouse coordinates are within a menu entry row.
+     *
+     * @param mouseX The x-coordinate of the mouse cursor.
+     * @param mouseY The y-coordinate of the mouse cursor.
+     * @param index  The entry row index.
+     * @return True if the coordinates are inside the row.
+     */
+    private boolean isMouseOverEntry(double mouseX, double mouseY, int index) {
+
+        return mouseX >= x
+                && mouseX < x + width
+                && mouseY >= rowTop(index)
+                && mouseY < rowTop(index) + ITEM_HEIGHT;
+    }
+
+    /**
+     * Gets the top y-coordinate used to draw an entry label.
+     *
+     * @param index The entry row index.
+     * @return The label top y-coordinate.
+     */
+    private int textY(int index) {
+
+        return y + (ITEM_HEIGHT - lineHeight) / 2 + index * ITEM_HEIGHT;
     }
 
     /**
@@ -159,18 +343,78 @@ public class ContextMenu {
      * @return true if a menu entry was clicked and its action executed, false otherwise.
      */
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+
         if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false;
 
         for (int i = 0; i < entries.size(); i++) {
-            int itemY = y + PADDING + i * ITEM_HEIGHT;
-            if (mouseX >= x && mouseX <= x + width
-                    && mouseY >= itemY && mouseY <= itemY + ITEM_HEIGHT) {
+            if (isMouseOverEntry(mouseX, mouseY, i)) {
 
                 entries.get(i).action().run();
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Moves the highlighted entry cyclically in response to scroll input.
+     *
+     * @param amount The vertical scroll amount.
+     * @return True if the scroll was consumed.
+     */
+    public boolean scroll(double amount) {
+
+        if (entries.isEmpty() || amount == 0) return false;
+
+        return moveHighlight(amount < 0 ? 1 : -1);
+    }
+
+    /**
+     * Moves the highlighted entry cyclically by the given step.
+     *
+     * @param step The signed movement amount.
+     * @return True if the highlight moved.
+     */
+    public boolean moveHighlight(int step) {
+
+        if (entries.isEmpty() || step == 0) return false;
+
+        int origin = highlightIndex < 0 && step < 0 ? 0 : highlightIndex;
+        highlightIndex = Math.floorMod(origin + step, entries.size());
+        return true;
+    }
+
+    /**
+     * Returns the highlighted entry index.
+     *
+     * @return The highlighted index, or -1 when none is highlighted.
+     */
+    public int highlightIndex() {
+
+        return highlightIndex;
+    }
+
+    /**
+     * Sets the highlighted entry index.
+     *
+     * @param highlightIndex The highlighted index, or -1 for no highlight.
+     */
+    public void setHighlightIndex(int highlightIndex) {
+
+        this.highlightIndex = highlightIndex >= 0 && highlightIndex < entries.size() ? highlightIndex : -1;
+    }
+
+    /**
+     * Runs the highlighted entry action when one is selected.
+     *
+     * @return True if an action was run.
+     */
+    public boolean activateHighlighted() {
+
+        if (highlightIndex < 0 || highlightIndex >= entries.size()) return false;
+
+        entries.get(highlightIndex).action().run();
+        return true;
     }
 
     /**

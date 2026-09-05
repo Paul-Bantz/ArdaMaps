@@ -44,8 +44,10 @@ import java.util.UUID;
  */
 public record MapSourcesRequestPacket(UUID requestId) implements IRespondablePacket<MapSourcesRequestPacket> {
 
+    /** Fabric custom payload type for this packet. */
     public static final CustomPacketPayload.Type<MapSourcesRequestPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("map_source_request"));
 
+    /** Stream codec used to serialize and deserialize map source requests. */
     public static final StreamCodec<RegistryFriendlyByteBuf, MapSourcesRequestPacket> CODEC = IPacket.codec(MapSourcesRequestPacket::read);
 
     /**

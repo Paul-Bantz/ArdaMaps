@@ -187,7 +187,7 @@ public class FlatMapCamera extends MapCamera {
         if (Double.isNaN(preferredRenderScale)) return;
 
         double newZoom = (Math.log(preferredRenderScale * getBlocksPerPixel() / scale) / Math.log(2.0)) + identityZoom;
-        newZoom = CameraMath.clamp(newZoom, minCameraZoom, maxCameraZoom);
+        newZoom = clampToZoomBounds(newZoom);
         this.zoom = newZoom;
         this.targetCameraZoom = newZoom;
 

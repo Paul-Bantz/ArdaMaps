@@ -44,8 +44,10 @@ import org.jspecify.annotations.NonNull;
  */
 public record PlayerTeleportPacket(double x, double y, double z, String worldId) implements IPacket {
 
+    /** Fabric custom payload type for this packet. */
     public static final CustomPacketPayload.Type<PlayerTeleportPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_teleport"));
 
+    /** Stream codec used to serialize and deserialize direct teleport packets. */
     public static final StreamCodec<RegistryFriendlyByteBuf, PlayerTeleportPacket> CODEC = IPacket.codec(PlayerTeleportPacket::read);
 
     /**

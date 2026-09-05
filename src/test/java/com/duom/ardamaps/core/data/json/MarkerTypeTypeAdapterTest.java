@@ -39,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class MarkerTypeTypeAdapterTest {
 
+    /** Gson instance configured with the marker type adapter. */
     private final Gson gson = new GsonBuilder()
             .registerTypeAdapter(MarkerType.class, new MarkerTypeTypeAdapter())
             .create();

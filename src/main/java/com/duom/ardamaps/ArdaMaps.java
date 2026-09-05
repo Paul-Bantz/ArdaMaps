@@ -54,6 +54,7 @@ import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -100,6 +101,9 @@ public class ArdaMaps implements ModInitializer {
      */
     public static volatile String activeCronExpression = null;
 
+    /** Pending one-shot task for the next scheduled location refresh. */
+    private static volatile ScheduledFuture<?> nextRefreshTask = null;
+
     /**
      * Builds a list of server world definitions from all levels in the given Minecraft server.
      *
@@ -135,6 +139,12 @@ public class ArdaMaps implements ModInitializer {
      */
     private static void scheduleNextCronTrigger(Cron cron) {
 
+        cancelNextRefreshTask();
+        if (SERVER == null) {
+            nextScheduledRefresh = null;
+            return;
+        }
+
         ZonedDateTime now = ZonedDateTime.now();
         Optional<ZonedDateTime> next = CronScheduleHelper.nextExecution(cron, now);
 
@@ -150,7 +160,7 @@ public class ArdaMaps implements ModInitializer {
         ArdaMaps.LOGGER.info("[ArdaMaps] Next scheduled location refresh: {} (in ~{} minutes)",
                 nextScheduledRefresh, delayMs / 60_000);
 
-        SCHEDULER.schedule(() -> {
+        nextRefreshTask = SCHEDULER.schedule(() -> {
 
             ArdaMaps.LOGGER.info("[ArdaMaps] CRON-triggered location refresh firing");
             try {
@@ -167,6 +177,18 @@ public class ArdaMaps implements ModInitializer {
             }
 
         }, delayMs, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Cancels the pending scheduled location refresh task, if one exists.
+     */
+    private static void cancelNextRefreshTask() {
+
+        ScheduledFuture<?> task = nextRefreshTask;
+        if (task != null) {
+            task.cancel(false);
+            nextRefreshTask = null;
+        }
     }
 
     /**
@@ -340,5 +362,7 @@ public class ArdaMaps implements ModInitializer {
     private void onStop(MinecraftServer ignored) {
 
         SERVER = null;
+        cancelNextRefreshTask();
+        nextScheduledRefresh = null;
     }
 }

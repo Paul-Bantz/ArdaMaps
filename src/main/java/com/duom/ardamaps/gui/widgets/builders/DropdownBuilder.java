@@ -28,7 +28,6 @@ package com.duom.ardamaps.gui.widgets.builders;
 import com.duom.ardamaps.gui.widgets.DropdownWidget;
 import com.duom.ardamaps.gui.widgets.TextIdentifierPairItem;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -42,7 +41,6 @@ import java.util.function.Function;
  * @param <T> The type of items stored in the dropdown
  * @param <E> The type of display pair (must extend {@link TextIdentifierPairItem})
  */
-@SuppressWarnings("unused")
 public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
 
     /** whether the dropdown widget should start in an expanded state when created */
@@ -77,29 +75,6 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
 
     /** whether null (no selection) is allowed as a valid option in the dropdown widget */
     protected boolean allowNull = false;
-
-    /** text displayed when no item is selected in the dropdown widget */
-    protected Component placeholderText = Component.literal("None");
-
-    /** icon displayed when no item is selected in the dropdown widget */
-    protected Identifier placeholderIcon = null;
-
-    /** maximum number of options visible in the dropdown widget before scrolling is enabled */
-    protected int maxVisibleOptions = 8;
-
-    /** direction in which the dropdown widget expands when opened */
-    protected DropdownWidget.ExpandDirection expandDirection = DropdownWidget.ExpandDirection.DOWN_RIGHT;
-
-    /** whether to display icons for each option in the dropdown widget (if available) */
-    protected boolean displayIcons = false;
-
-    /** whether to display text labels for each option in the dropdown widget */
-    protected boolean displayLabels = true;
-
-    /** whether to display expand/collapse arrows for the dropdown widget */
-    protected boolean displayArrows = true;
-
-    protected boolean displayAsSprite = false;
 
     /** Private constructor to prevent direct instantiation. Use the static create() method instead. */
     protected DropdownBuilder() {
@@ -152,39 +127,6 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
     }
 
     /**
-     * Sets whether icons should be displayed for each option.
-     *
-     * @param displayIcons true to display icons, false otherwise
-     * @return This builder for method chaining
-     */
-    public DropdownBuilder<T, E> setDisplayIcons(boolean displayIcons) {
-        this.displayIcons = displayIcons;
-        return this;
-    }
-
-    /**
-     * Sets whether text labels should be displayed for each option.
-     *
-     * @param displayLabels true to display labels, false otherwise
-     * @return This builder for method chaining
-     */
-    public DropdownBuilder<T, E> setDisplayLabels(boolean displayLabels) {
-        this.displayLabels = displayLabels;
-        return this;
-    }
-
-    /**
-     * Sets whether expand/collapse arrows should be displayed.
-     *
-     * @param displayArrows true to display arrows, false otherwise
-     * @return This builder for method chaining
-     */
-    public DropdownBuilder<T, E> setDisplayArrows(boolean displayArrows) {
-        this.displayArrows = displayArrows;
-        return this;
-    }
-
-    /**
      * Sets the initially selected item in the dropdown.
      *
      * @param selected The item to select initially (can be null)
@@ -218,61 +160,6 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
     }
 
     /**
-     * Sets the text displayed when no item is selected.
-     *
-     * @param placeholderText The placeholder text
-     * @return This builder for method chaining
-     */
-    public DropdownBuilder<T, E> setPlaceholderText(Component placeholderText) {
-        this.placeholderText = placeholderText;
-        return this;
-    }
-
-    /**
-     * Sets the icon displayed when no item is selected.
-     *
-     * @param placeholderIcon The placeholder icon
-     * @return This builder for method chaining
-     */
-    public DropdownBuilder<T, E> setPlaceholderIcon(Identifier placeholderIcon) {
-        this.placeholderIcon = placeholderIcon;
-        return this;
-    }
-
-    /**
-     * Sets whether the dropdown should display options as sprites (icons) instead of text.
-     *
-     * @param displayAsSprite true to display options as sprites, false to display as text
-     * @return This builder for method chaining
-     */
-    public DropdownBuilder<T, E> setDisplayAsSprite(boolean displayAsSprite) {
-        this.displayAsSprite = displayAsSprite;
-        return this;
-    }
-
-    /**
-     * Sets the maximum number of options visible before scrolling is enabled.
-     *
-     * @param maxVisibleOptions Maximum number of visible options
-     * @return This builder for method chaining
-     */
-    public DropdownBuilder<T, E> setMaxVisibleOptions(int maxVisibleOptions) {
-        this.maxVisibleOptions = maxVisibleOptions;
-        return this;
-    }
-
-    /**
-     * Sets the direction in which the dropdown expands when opened.
-     *
-     * @param expandDirection The expansion direction
-     * @return This builder for method chaining
-     */
-    public DropdownBuilder<T, E> setExpandDirection(DropdownWidget.ExpandDirection expandDirection) {
-        this.expandDirection = expandDirection;
-        return this;
-    }
-
-    /**
      * Builds and returns a configured {@link DropdownWidget} instance.
      *
      * @return A new DropdownWidget with the configured settings
@@ -284,20 +171,20 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
                 width,
                 height,
                 title,
-                placeholderText,
-                placeholderIcon,
+                Component.literal("None"),
+                null,
                 options,
                 optionDisplay,
                 selected,
                 onSelect,
                 allowNull,
                 expanded,
-                displayAsSprite,
-                displayLabels,
-                displayIcons,
-                displayArrows,
-                expandDirection,
-                maxVisibleOptions
+                false,
+                true,
+                false,
+                true,
+                DropdownWidget.ExpandDirection.DOWN_RIGHT,
+                8
         );
     }
 }

@@ -33,6 +33,7 @@ import com.google.gson.GsonBuilder;
 import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static com.duom.ardamaps.gui.ModConstants.modId;
@@ -66,6 +67,29 @@ class MarkersDefinitionTest {
 
         assertSame(defaultType, definition.getMarkerType("LANDMARK"));
         assertSame(defaultType, definition.getMarkerType(null));
+    }
+
+    /**
+     * Verifies that marker type keys use the first type when it is configured.
+     */
+    @Test
+    void markerTypeKey_configuredFirstType_returnsUppercaseFirstType() {
+
+        MarkersDefinition definition = definitionWithTypes();
+
+        assertEquals("TOWN", definition.markerTypeKey(List.of("town", "city")));
+    }
+
+    /**
+     * Verifies that marker type keys fall back to the default type when the first type is missing.
+     */
+    @Test
+    void markerTypeKey_missingFirstType_usesDefaultTypeKey() {
+
+        MarkersDefinition definition = definitionWithTypes();
+
+        assertEquals("LANDMARK", definition.markerTypeKey(List.of("village")));
+        assertEquals("LANDMARK", definition.markerTypeKey(List.of()));
     }
 
     /**
@@ -116,5 +140,28 @@ class MarkersDefinitionTest {
         assertEquals("ardamaps:icons/icon_town", definition.getMarkerType("TOWN").icon());
         assertEquals("ardamaps:icons/icon_unknown", definition.unknownType().icon());
         assertEquals("ardamaps:icons/icon_landmark", definition.defaultType().icon());
+    }
+
+    /**
+     * Creates a marker definition fixture with a default and one configured type.
+     *
+     * @return The marker definition fixture.
+     */
+    private static MarkersDefinition definitionWithTypes() {
+
+        MarkerType defaultType = new MarkerType("Landmark", "ardamaps:landmark", 1, 2);
+        MarkerType unknownType = new MarkerType("Unknown", "ardamaps:unknown", 3, 4);
+        MarkerType townType = new MarkerType("Town", "ardamaps:town", 5, 6);
+        return new MarkersDefinition(
+                modId("marker"),
+                modId("marker_visited"),
+                35,
+                30,
+                0,
+                0,
+                unknownType,
+                defaultType,
+                Map.of("LANDMARK", defaultType, "TOWN", townType)
+        );
     }
 }

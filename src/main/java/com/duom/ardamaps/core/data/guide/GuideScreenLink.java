@@ -42,12 +42,16 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class GuideScreenLink {
 
+    /** Guide constant. */
     public static final String GUIDE = "guide";
 
+    /** Guide map constant. */
     public static final String GUIDE_MAP = "guide:map";
 
+    /** Guide config constant. */
     public static final String GUIDE_CONFIG = "guide:configuration";
 
+    /** Guide page prefix constant. */
     private static final String GUIDE_PAGE_PREFIX = "guide:page:";
 
     /** Utility class with no public instances. */
@@ -121,12 +125,22 @@ public final class GuideScreenLink {
         return null; // IDs not found - fall back to landing
     }
 
-    /** @return {@code true} if the link should open the Map screen */
+    /**
+     * Returns whether a guide link targets the Map screen.
+     *
+     * @param link The guide screen link to inspect.
+     * @return {@code true} if the link should open the Map screen
+     */
     public static boolean isMapLink(@Nullable String link) {
         return GUIDE_MAP.equals(link);
     }
 
-    /** @return {@code true} if the link should open the Configuration screen */
+    /**
+     * Returns whether a guide link targets the Configuration screen.
+     *
+     * @param link The guide screen link to inspect.
+     * @return {@code true} if the link should open the Configuration screen
+     */
     public static boolean isConfigLink(@Nullable String link) {
         return GUIDE_CONFIG.equals(link);
     }
@@ -141,4 +155,3 @@ public final class GuideScreenLink {
 
     }
 }
-

@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.core.integration;
 
-import com.duom.ardamaps.core.data.map.RegionLookupTexture;
+import com.duom.ardamaps.core.data.map.region.RegionGeometry;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.Nullable;
@@ -58,13 +58,13 @@ public final class Regions {
     }
 
     /**
-     * Generates the region lookup texture if a provider is available.
+     * Generates the region geometry if a provider is available.
      *
      * @param dimensionId the dimension id
-     * @param callback    callback receiving the generated texture
+     * @param callback    callback receiving the generated geometry
      */
-    public static void generateRegionLookup(String dimensionId, Consumer<RegionLookupTexture> callback) {
+    public static void generateRegionGeometry(String dimensionId, Consumer<RegionGeometry> callback) {
         RegionProvider regionProvider = provider;
-        if (regionProvider != null) regionProvider.generateRegionLookup(dimensionId, callback);
+        if (regionProvider != null) regionProvider.generateRegionGeometry(dimensionId, callback);
     }
 }

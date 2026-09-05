@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.gui.map.rendering;
 
-import com.duom.ardamaps.ArdaMapsClient;
+import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.PmTilesMapCamera;
@@ -36,32 +36,26 @@ import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
 import com.duom.ardamaps.gui.ModConstants;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.resources.Identifier;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Tuple;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * A map viewer that renders map tiles from PMTiles files.
  */
 public class PmTilesRenderer extends MapRenderable {
 
-    /** Class logger */
-    private static final Logger LOGGER = LoggerFactory.getLogger(PmTilesRenderer.class);
-
     /** Approximate decoded PMTiles tile cost for common 256x256 RGBA tiles. */
     static final long APPROX_DECODED_TILE_BYTES = 256L * 256L * 4L;
+
+    /** Class logger */
+    private static final Logger LOGGER = LoggerFactory.getLogger(PmTilesRenderer.class);
 
     /** The camera used to determine which tiles are visible and how they should be rendered based on the current view. */
     private final PmTilesMapCamera mapCamera;
@@ -210,7 +204,7 @@ public class PmTilesRenderer extends MapRenderable {
         drawnTiles.addAll(plan.fallbackMap().keySet());
         tileProvider.protectDrawnTiles(drawnTiles);
 
-        boolean debugMode = ArdaMapsClient.CONFIG.isMapDebugDisplay();
+        boolean debugMode = Client.debugOverlayVisible();
 
         // Pass 1: coarse fallback base layer, drawn first so it cannot overpaint sharp primaries.
         drawTilePass(context, plan.fallbackMap().values(), debugMode);
@@ -263,8 +257,8 @@ public class PmTilesRenderer extends MapRenderable {
      * tiles with viewport-distance-weighted priority if the camera is settled.
      *
      * @param tilesToDisplay The set of primary-zoom tiles currently in viewport.
-     * @param minZoom The minimum zoom level available; tiles degrade to ancestors at or below this.
-     * @param settled Whether to register primary tile requests (true) or just classify fallbacks (false).
+     * @param minZoom        The minimum zoom level available; tiles degrade to ancestors at or below this.
+     * @param settled        Whether to register primary tile requests (true) or just classify fallbacks (false).
      * @return A render plan with primary tiles and deduplicated fallback map grouped by resolved key.
      */
     RenderPlan classifyTiles(Set<PmTileKey> tilesToDisplay, int minZoom, boolean settled) {
@@ -317,7 +311,8 @@ public class PmTilesRenderer extends MapRenderable {
                     tile.y0() + renderSize,
                     GuiRenderStateAccess.scissorArea(context)));
 
-            if (debugMode) drawDebugLines(context, tile.key(), Math.round(tile.x0()), Math.round(tile.y0()), renderSize);
+            if (debugMode)
+                drawDebugLines(context, tile.key(), Math.round(tile.x0()), Math.round(tile.y0()), renderSize);
         }
     }
 
@@ -350,6 +345,7 @@ public class PmTilesRenderer extends MapRenderable {
     /**
      * Gets the displayed tile size for the given zoom level, using caching to avoid redundant calculations.
      *
+     * @param tileZoom The tile zoom level.
      * @return the displayed tile size
      */
     private int getDisplayedTileSize(int tileZoom) {
@@ -415,7 +411,7 @@ public class PmTilesRenderer extends MapRenderable {
      * map to the same ancestor.
      *
      * @param primaryTiles List of tiles loaded at the primary zoom level, ready to draw.
-     * @param fallbackMap Deduplicated map of coarser ancestors keyed by their actual {@link PmTileKey}.
+     * @param fallbackMap  Deduplicated map of coarser ancestors keyed by their actual {@link PmTileKey}.
      */
     record RenderPlan(List<TileDraw> primaryTiles, Map<PmTileKey, TileDraw> fallbackMap) {
 

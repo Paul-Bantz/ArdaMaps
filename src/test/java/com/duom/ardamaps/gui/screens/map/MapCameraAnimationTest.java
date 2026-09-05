@@ -116,6 +116,50 @@ class MapCameraAnimationTest {
     }
 
     /**
+     * Verifies that idle animations do not report a target match.
+     */
+    @Test
+    void isTargeting_whenNotRunning_returnsFalse() {
+
+        var clock = new MutableClock(100);
+        var animation = new MapCameraAnimation(clock);
+
+        assertFalse(animation.isTargeting(new Vec2d(110, 220), 1));
+    }
+
+    /**
+     * Verifies that active animation targets are compared using the supplied tolerance.
+     */
+    @Test
+    void isTargeting_whenRunning_usesTolerance() {
+
+        var clock = new MutableClock(100);
+        var animation = new MapCameraAnimation(clock);
+        var camera = new FakeCamera(10, 20, 3);
+
+        animation.start(new Vec2d(110, 220), camera, 8);
+
+        assertTrue(animation.isTargeting(new Vec2d(110.25, 219.75), .5));
+        assertFalse(animation.isTargeting(new Vec2d(110.75, 220), .5));
+        assertFalse(animation.isTargeting(new Vec2d(110, 220.75), .5));
+    }
+
+    /**
+     * Verifies that the animation exposes the target zoom supplied to {@link MapCameraAnimation#start(Vec2d, MapCamera, double)}.
+     */
+    @Test
+    void targetZoom_afterStart_returnsStartTargetZoom() {
+
+        var clock = new MutableClock(100);
+        var animation = new MapCameraAnimation(clock);
+        var camera = new FakeCamera(10, 20, 3);
+
+        animation.start(new Vec2d(110, 220), camera, 8);
+
+        assertEquals(8, animation.targetZoom());
+    }
+
+    /**
      * Mutable fake clock used to advance animation time deterministically in tests.
      */
     private static class MutableClock implements LongSupplier {
@@ -167,6 +211,9 @@ class MapCameraAnimationTest {
             this.worldX = worldX;
             this.worldZ = worldZ;
             this.zoom = zoom;
+            this.targetCameraZoom = zoom;
+            this.minCameraZoom = -100;
+            this.maxCameraZoom = 100;
         }
 
         /**

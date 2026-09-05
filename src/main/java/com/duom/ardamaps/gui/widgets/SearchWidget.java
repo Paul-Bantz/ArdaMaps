@@ -46,8 +46,8 @@ import java.util.*;
 import java.util.function.Function;
 
 /**
- * Implementation for a Search Screen Widget. Displays an input box and a live search is performed.
- * This widget is configured with :
+ * Search overlay hosted by an {@link ArdaMapsScreen}. Displays an input box and performs live search.
+ * This widget is configured with:
  * <ul>
  *     <li>A search function {@link SearchWidget#searchFunction} which given an input string returns a list of results</li>
  *     <li>A result to string function {@link SearchWidget#elementAsString} which translates a result as a String</li>
@@ -62,13 +62,22 @@ public class SearchWidget extends Screen {
     /** Maximum tooltip width before wrapping to multiple lines. */
     private static final int TOOLTIP_MAX_WIDTH = 220;
 
+    /** Vertical gap between consecutive search result buttons. */
+    private static final int RESULT_SPACING = 4;
+
+    /** Half the width of the search field, also the layout unit the field is centred against. */
+    private static final int SEARCH_FIELD_HALF_WIDTH = 90;
+
+    /** Gap in pixels between the search title and the top of the input. */
+    private static final int TITLE_MARGIN_BOTTOM = 4;
+
     /** Rendered result elements currently attached to this screen. */
     private final List<GuiEventListener> searchResults;
 
     /** Tooltip text associated with each rendered result button. */
     private final Map<Button, Component> resultTooltips;
 
-    /** Parent screen rendered underneath this overlay. */
+    /** Parent screen that owns this overlay. */
     private final ArdaMapsScreen parent;
 
     /** Maps a result object to the label shown in the results list. */
@@ -86,7 +95,7 @@ public class SearchWidget extends Screen {
     private Function<Object, String> elementAsTooltip;
 
     /** Editable text field used to enter the search query. */
-    private SimpleTextFieldWidget searchField;
+    private PaddedEditBox searchField;
 
     /** Last query processed, used to avoid redundant recalculation. */
     private String cachedSearchString;
@@ -94,7 +103,7 @@ public class SearchWidget extends Screen {
     /**
      * Creates the search overlay associated with a parent ArdaMaps screen.
      *
-     * @param parent screen to return to when the search overlay is closed
+     * @param parent screen that owns this overlay
      */
     public SearchWidget(ArdaMapsScreen parent) {
 
@@ -113,10 +122,11 @@ public class SearchWidget extends Screen {
 
         super.init();
 
-        var x = (parent.width / 2) - (ModConstants.BUTTON_WIDTH);
-        var y = (parent.height / 2) - (ModConstants.BUTTON_HEIGHT / 2);
+        var x = (width / 2) - SEARCH_FIELD_HALF_WIDTH;
+        var y = (height / 2) - (Button.DEFAULT_HEIGHT / 2);
 
-        this.searchField = new SimpleTextFieldWidget(font, x, y, ModConstants.BUTTON_WIDTH * 2, ModConstants.SMALL_SQUARED_BUTTON_SIZE, Component.empty());
+        this.searchField = new PaddedEditBox(font, x, y, SEARCH_FIELD_HALF_WIDTH * 2,
+                ModConstants.SMALL_SQUARED_BUTTON_SIZE, Component.empty());
         this.searchField.setHint(Component.translatable("ardamaps.client.generic.search"));
         this.searchField.setResponder(this::onSearchChanged);
 
@@ -126,8 +136,10 @@ public class SearchWidget extends Screen {
                 .pos(width - ModConstants.SMALL_SQUARED_BUTTON_SIZE - 10, 10)
                 .build());
 
-        var title = new StringWidget(Component.translatable("ardamaps.client.generic.search"), font);
-        title.setPosition(x, y - ModConstants.BUTTON_HEIGHT / 2);
+        var title = new StringWidget(Component.translatable("ardamaps.client.generic.search.title"), font);
+        title.setPosition(
+                searchField.getX() + (searchField.getWidth() - title.getWidth()) / 2,
+                y - title.getHeight() - TITLE_MARGIN_BOTTOM);
 
         addRenderableWidget(title);
         addRenderableWidget(searchField);
@@ -155,20 +167,23 @@ public class SearchWidget extends Screen {
             return;
         }
 
-        List<?> foundElements = this.searchFunction.apply(searchString);
+        List<?> foundElements = this.searchFunction == null ? null : this.searchFunction.apply(searchString);
+        if (foundElements == null) foundElements = List.of();
+
         this.searchResults.forEach(this::removeWidget);
         this.searchResults.clear();
         this.resultTooltips.clear();
 
-        var resultIndex = 1;
+        int resultIndex = 0;
+        int maxVisibleResults = maxVisibleResults();
         for (Object element : foundElements) {
 
-            if (resultIndex == MAX_RESULTS) break;
+            if (resultIndex >= maxVisibleResults) break;
 
             var elementString = elementAsString.apply(element);
 
             // Estimate max chars that fit in the button width (font is ~6px/char avg)
-            int maxChars = (ModConstants.BUTTON_WIDTH * 2) / 6;
+            int maxChars = (SEARCH_FIELD_HALF_WIDTH * 2) / 6;
             elementString = ellipseAroundMatch(elementString, searchString, maxChars);
 
             MutableComponent text = buildHighlightedText(elementString, searchString, ModConstants.COLOR_BLUE_EMPHASIZED);
@@ -186,12 +201,13 @@ public class SearchWidget extends Screen {
             resultIndex++;
         }
 
-        if (foundElements.size() > MAX_RESULTS) {
+        if (foundElements.size() > resultIndex) {
 
             var moreElementsTextWidget = new StringWidget(Component.literal("..."), font);
 
             var xPosition = width / 2 - moreElementsTextWidget.getWidth() / 2;
-            var yPosition = searchField.getY() + 5 + resultIndex * ModConstants.SMALL_SQUARED_BUTTON_SIZE;
+            var yPosition = searchResultY(resultIndex);
+            if (yPosition + font.lineHeight > height - Button.DEFAULT_SPACING) return;
 
             moreElementsTextWidget.setPosition(xPosition, yPosition);
             this.searchResults.add(moreElementsTextWidget);
@@ -200,18 +216,23 @@ public class SearchWidget extends Screen {
     }
 
     /**
-     * Closes this overlay and restores the parent screen.
+     * Closes this overlay.
      */
     @Override
     public void onClose() {
 
-        this.minecraft.setScreen(parent);
+        parent.closeSearchOverlay();
     }
 
     /**
      * Returns a substring of {@code source} centered around the first occurrence
      * of {@code searchString} (case-insensitive), fitting within {@code maxChars}
      * characters, with "…" ellipses appended/prepended as needed.
+     *
+     * @param source       The source text to shorten.
+     * @param searchString The text to center in the shortened result.
+     * @param maxChars     The maximum number of characters to include.
+     * @return A source substring centered on the match, with ellipses when text is omitted.
      */
     private static String ellipseAroundMatch(String source, String searchString, int maxChars) {
         if (source == null || searchString == null || searchString.isEmpty()) return source;
@@ -239,6 +260,11 @@ public class SearchWidget extends Screen {
     /**
      * Builds text where each occurrence of {@code searchString} in {@code source}
      * is highlighted with the provided colour.
+     *
+     * @param source         The source text to search and render.
+     * @param searchString   The text to highlight in the source.
+     * @param highlightColor The color used for highlighted text.
+     * @return A mutable text component with matching ranges highlighted.
      */
     @SuppressWarnings("SameParameterValue")
     private static MutableComponent buildHighlightedText(String source, String searchString, int highlightColor) {
@@ -275,14 +301,40 @@ public class SearchWidget extends Screen {
      */
     private Button buildSearchResultButton(Component result, Object element, int resultIndex) {
 
-        var height = ModConstants.SMALL_SQUARED_BUTTON_SIZE;
+        var height = Button.DEFAULT_HEIGHT;
 
         return Button.builder(
                         result,
                         _ -> this.resultSelected(element))
-                .size(ModConstants.BUTTON_WIDTH * 2, height)
-                .pos(searchField.getX(), searchField.getY() + 5 + resultIndex * height)
+                .size(SEARCH_FIELD_HALF_WIDTH * 2, height)
+                .pos(searchField.getX(), searchResultY(resultIndex))
                 .build();
+    }
+
+    /**
+     * Computes the y position for a search result row.
+     *
+     * @param resultIndex zero-based result row index
+     * @return the row y position
+     */
+    private int searchResultY(int resultIndex) {
+
+        return searchField.getY() + Button.DEFAULT_HEIGHT + Button.DEFAULT_SPACING
+                + resultIndex * (Button.DEFAULT_HEIGHT + RESULT_SPACING);
+    }
+
+    /**
+     * Computes how many result buttons fit below the search field.
+     *
+     * @return the visible result count
+     */
+    private int maxVisibleResults() {
+
+        int listStartY = searchResultY(0);
+        int availableHeight = height - listStartY - Button.DEFAULT_SPACING;
+
+        return Math.min(MAX_RESULTS, Math.max(0,
+                (availableHeight + RESULT_SPACING) / (Button.DEFAULT_HEIGHT + RESULT_SPACING)));
     }
 
     /**
@@ -336,20 +388,6 @@ public class SearchWidget extends Screen {
     }
 
     /**
-     * Resizes the parent and overlay screens when the window size changes.
-     *
-     * @param width  new window width
-     * @param height new window height
-     */
-    @Override
-    public void resize(int width, int height) {
-
-        if (parent != null) parent.resize(width, height);
-
-        super.resize(width, height);
-    }
-
-    /**
      * Extracts this widget's render state as an overlay on top of the parent screen.
      *
      * @param context draw context
@@ -359,12 +397,6 @@ public class SearchWidget extends Screen {
      */
     @Override
     public void extractRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-
-        // Render this screen as an overlay - force mouse position to -1 so that mouse events don't interact
-        if (parent != null) {
-            parent.extractModBackground(context);
-            parent.extractRenderState(context, -1, -1, delta);
-        }
 
         context.fill(0, 0, this.width, this.height, 0xAA000000);
 

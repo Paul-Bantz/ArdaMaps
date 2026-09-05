@@ -38,28 +38,17 @@ import java.util.Optional;
  */
 record FetchResult(byte[] bytes, int status, String lastModified, long maxAgeSeconds) {
 
+    /** Default tile max age seconds constant. */
     static final long DEFAULT_TILE_MAX_AGE_SECONDS = 86_400L;
+
+    /** Default absent max age seconds constant. */
     static final long DEFAULT_ABSENT_MAX_AGE_SECONDS = 14_400L;
+
+    /** Min max age seconds constant. */
     static final long MIN_MAX_AGE_SECONDS = 300L;
+
+    /** Max max age seconds constant. */
     static final long MAX_MAX_AGE_SECONDS = 604_800L;
-
-    /**
-     * Checks if this fetch result represents an absent tile (no content, not found, or empty).
-     *
-     * @return {@code true} if the tile is absent (status 204/404 or zero-length response).
-     */
-    boolean isAbsent() {
-        return status == 204 || status == 404 || bytes.length == 0;
-    }
-
-    /**
-     * Checks if this fetch result represents a 304 Not Modified response.
-     *
-     * @return {@code true} if the status code is 304.
-     */
-    boolean isNotModified() {
-        return status == 304;
-    }
 
     /**
      * Constructs a FetchResult from an HttpResponse, extracting cache metadata and clamping TTLs.
@@ -98,7 +87,7 @@ record FetchResult(byte[] bytes, int status, String lastModified, long maxAgeSec
     /**
      * Parses the max-age directive from a Cache-Control header.
      *
-     * @param cacheControl The Cache-Control header value, or null/blank to use the default.
+     * @param cacheControl   The Cache-Control header value, or null/blank to use the default.
      * @param defaultSeconds The default max-age to use if the header is absent or unparseable.
      * @return The parsed max-age clamped to {@link #MIN_MAX_AGE_SECONDS} and {@link #MAX_MAX_AGE_SECONDS}.
      */
@@ -129,5 +118,23 @@ record FetchResult(byte[] bytes, int status, String lastModified, long maxAgeSec
     private static long clampMaxAge(long seconds) {
 
         return Math.clamp(seconds, MIN_MAX_AGE_SECONDS, MAX_MAX_AGE_SECONDS);
+    }
+
+    /**
+     * Checks if this fetch result represents an absent tile (no content, not found, or empty).
+     *
+     * @return {@code true} if the tile is absent (status 204/404 or zero-length response).
+     */
+    boolean isAbsent() {
+        return status == 204 || status == 404 || bytes.length == 0;
+    }
+
+    /**
+     * Checks if this fetch result represents a 304 Not Modified response.
+     *
+     * @return {@code true} if the status code is 304.
+     */
+    boolean isNotModified() {
+        return status == 304;
     }
 }

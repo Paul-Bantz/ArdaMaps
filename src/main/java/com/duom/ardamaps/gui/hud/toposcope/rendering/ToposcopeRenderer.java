@@ -34,7 +34,9 @@ import com.duom.ardamaps.core.data.conversion.DistanceUnitConverter;
 import com.duom.ardamaps.core.data.conversion.VectorProjection;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.map.Waypoint;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
+import com.duom.ardamaps.gui.RenderingUtils;
 import com.duom.ardamaps.gui.hud.toposcope.Toposcope;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import net.fabricmc.api.EnvType;
@@ -80,9 +82,16 @@ public class ToposcopeRenderer {
     /** Currently hovered location, if any. */
     private static LocationClient hoveredLocation = null;
 
+    /** Hint mode to render for the currently hovered location. */
+    private static HintMode hoveredHintMode = HintMode.NONE;
+
+    /** Whether the hovered location has an active waypoint. */
+    private static boolean hoveredHasActiveWaypoint = false;
+
     /** Cached screen dimensions to avoid redundant calls. Updated when screen changes dimensions. */
     private static int cachedScreenW = -1;
 
+    /** Cached screen height used to avoid redundant dimension lookups. */
     private static int cachedScreenH = -1;
 
     /** X position of the teleport hint text displayed over the hotbar when location is explored. */
@@ -216,6 +225,8 @@ public class ToposcopeRenderer {
 
         // Track hovered location
         hoveredLocation = null;
+        hoveredHintMode = HintMode.NONE;
+        hoveredHasActiveWaypoint = false;
 
         var matrices = drawContext.pose();
         matrices.pushMatrix();
@@ -237,6 +248,8 @@ public class ToposcopeRenderer {
                 drawMarker(drawContext, group, index, groupAnchor, textRenderer);
         }
         matrices.popMatrix();
+
+        drawHoveredHint(drawContext, textRenderer);
     }
 
     /**
@@ -296,62 +309,62 @@ public class ToposcopeRenderer {
 
         int groupSpacing = 4;
 
-        // Get screen centre (crosshair position)
-        int screenCenterX = Client.getWindowCenterX();
-        int screenCenterY = Client.getWindowCenterY();
-
         var entry = group.get(groupIndex);
         LocationClient location = entry.location;
         boolean isExplored = location.isRevealed();
         int lineHeight = textRenderer.lineHeight;
 
         int nameWidth = textRenderer.width(location.getName());
+        var distanceText = DistanceUnitConverter.asRealWorldUnits(Client.currentDimension(), entry.distance);
+        int contentWidth = Math.max(nameWidth, textRenderer.width(distanceText));
 
         // Centre the whole stack around the group anchor so markers never overlap
         int markerSlot = 2 * lineHeight + groupSpacing;
         int totalHeight = group.size() * markerSlot - groupSpacing;
-        int stackStartY = Math.round(groupAnchor.y) - totalHeight / 2;
-        int baseY = stackStartY + groupIndex * markerSlot;
-        int nameX = Math.round(groupAnchor.x) - nameWidth / 2;
+        int relBaseY = -totalHeight / 2 + groupIndex * markerSlot;
+        int relNameX = -nameWidth / 2;
+        float anchorX = RenderingUtils.toDevicePixel(groupAnchor.x);
+        float anchorY = RenderingUtils.toDevicePixel(groupAnchor.y);
 
         // Check if crosshair is over the name text
-        boolean isHovered = isCrosshairOver(screenCenterX, screenCenterY, nameX, baseY, nameWidth, 2 * lineHeight);
+        boolean isHovered = isCrosshairOver(Client.getWindowCenterX(), Client.getWindowCenterY(),
+                anchorX + relNameX, anchorY + relBaseY, nameWidth, 2 * lineHeight);
 
-        if (isHovered)
+        boolean hasActiveWaypoint;
+        if (isHovered) {
             hoveredLocation = location;
+            hasActiveWaypoint = getLocationActiveWaypoint(location).isPresent();
+            hoveredHasActiveWaypoint = hasActiveWaypoint;
+            hoveredHintMode = isExplored && (ArdaMapsClient.CONFIG.isMapRevealAll() || location.isVisited())
+                    ? HintMode.WAYPOINT_AND_TELEPORT
+                    : HintMode.WAYPOINT;
+        }
 
         var matrices = drawContext.pose();
         matrices.pushMatrix();
+        matrices.translate(anchorX, anchorY);
 
         // Draw underline if hovered
         if (isHovered) {
 
             int iconSize = lineHeight * 2;
-            int iconX = nameX - iconSize - 2;
-            int bgWidth = nameWidth + iconSize + 34;
+            int iconX = relNameX - iconSize - 2;
+            int bgWidth = contentWidth + iconSize + 34;
             int bgHeight = iconSize + lineHeight + 6;
             int bgX = iconX - 16;
-            int bgY = baseY - 8;
+            int bgY = relBaseY - 8;
 
-            drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, ModConstants.SCROLL_BUTTON_SPRITE, bgX, bgY, bgWidth, bgHeight);
-
-            boolean hasActiveWaypoint = getLocationActiveWaypoint(location).isPresent();
+            GuiTextures.blitScrollBackground(drawContext, bgX, bgY, bgWidth, bgHeight);
 
             if (isExplored) {
 
                 var locationIcon = location.getIcon();
 
                 if (locationIcon != null)
-                    drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(locationIcon), iconX, baseY, iconSize, iconSize);
-
-                if (ArdaMapsClient.CONFIG.isMapRevealAll() || location.isVisited())
-                    drawWaypointAndTeleportHints(drawContext, textRenderer, hasActiveWaypoint);
-                else
-                    drawWaypointHint(drawContext, textRenderer, hasActiveWaypoint);
+                    drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(locationIcon), iconX, relBaseY, iconSize, iconSize);
 
             } else {
-                drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.UNKNOWN_ICON), iconX, baseY, iconSize, iconSize);
-                drawWaypointHint(drawContext, textRenderer, hasActiveWaypoint);
+                drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.UNKNOWN_ICON), iconX, relBaseY, iconSize, iconSize);
             }
         }
 
@@ -359,8 +372,8 @@ public class ToposcopeRenderer {
         drawContext.text(
                 textRenderer,
                 location.getName(),
-                nameX,
-                baseY,
+                relNameX,
+                relBaseY,
                 getTextColor(entry.distance, isHovered),
                 !isHovered
         );
@@ -368,9 +381,9 @@ public class ToposcopeRenderer {
         // Draw distance
         drawContext.text(
                 textRenderer,
-                DistanceUnitConverter.asRealWorldUnits(Client.currentDimension(), entry.distance),
-                nameX,
-                baseY + lineHeight,
+                distanceText,
+                relNameX,
+                relBaseY + lineHeight,
                 getTextColor(entry.distance, isHovered),
                 !isHovered
         );
@@ -389,7 +402,7 @@ public class ToposcopeRenderer {
      * @param textHeight text height
      * @return True if the crosshair is over the text, false otherwise.
      */
-    private static boolean isCrosshairOver(int crosshairX, int crosshairY, int textX, int textY, int textWidth, int textHeight) {
+    private static boolean isCrosshairOver(float crosshairX, float crosshairY, float textX, float textY, int textWidth, int textHeight) {
         return crosshairX >= textX && crosshairX <= textX + textWidth && crosshairY >= textY && crosshairY <= textY + textHeight;
     }
 
@@ -402,6 +415,21 @@ public class ToposcopeRenderer {
     public static Optional<Waypoint> getLocationActiveWaypoint(LocationClient location) {
 
         return ArdaMapsClient.CONFIG.getWaypointAtCoordinates(Client.currentDimensionId(), location.getPosition().x(), location.getPosition().z(), 5);
+    }
+
+    /**
+     * Draws the current hovered location hint, if any.
+     *
+     * @param drawContext  the draw context
+     * @param textRenderer the text renderer
+     */
+    private static void drawHoveredHint(GuiGraphicsExtractor drawContext, Font textRenderer) {
+
+        if (hoveredHintMode == HintMode.WAYPOINT_AND_TELEPORT) {
+            drawWaypointAndTeleportHints(drawContext, textRenderer, hoveredHasActiveWaypoint);
+        } else if (hoveredHintMode == HintMode.WAYPOINT) {
+            drawWaypointHint(drawContext, textRenderer, hoveredHasActiveWaypoint);
+        }
     }
 
     /**
@@ -465,7 +493,10 @@ public class ToposcopeRenderer {
         if (focused) return ModConstants.COLOR_DARK_BROWN;
 
         // Far fade: 100% -> 10% as distance approaches the configured draw distance
-        double alphaDelta = (distanceToLandmark - FADE_START) / (ArdaMapsClient.CONFIG.getToposcopeDrawDistanceBlocks(Client.currentDimension()) - FADE_START);
+        double drawDistance = ArdaMapsClient.CONFIG.getToposcopeDrawDistanceBlocks(Client.currentDimension());
+        double alphaDelta = drawDistance <= FADE_START
+                ? 0.0
+                : (distanceToLandmark - FADE_START) / (drawDistance - FADE_START);
         alphaDelta = Mth.clamp(alphaDelta, 0.0, 1.0);
 
         double alphaFactor = 1.0 - alphaDelta;
@@ -500,5 +531,20 @@ public class ToposcopeRenderer {
      */
     private record ScreenMappedLocation(LocationClient location, Vec2 screen, double distance) {
 
+    }
+
+    /**
+     * Hotbar hint variants that may be shown for a hovered location.
+     */
+    private enum HintMode {
+
+        /** No hint is shown. */
+        NONE,
+
+        /** Only the waypoint hint is shown. */
+        WAYPOINT,
+
+        /** Both the waypoint and teleport hints are shown. */
+        WAYPOINT_AND_TELEPORT
     }
 }

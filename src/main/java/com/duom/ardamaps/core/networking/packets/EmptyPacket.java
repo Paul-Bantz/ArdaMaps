@@ -39,22 +39,11 @@ import org.jspecify.annotations.NonNull;
  */
 public record EmptyPacket() implements IPacket {
 
+    /** Fabric custom payload type for this packet. */
     public static final CustomPacketPayload.Type<EmptyPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("guidebook_request"));
 
+    /** Unit codec used for the payload that carries no data. */
     public static final StreamCodec<RegistryFriendlyByteBuf, EmptyPacket> CODEC = StreamCodec.unit(new EmptyPacket());
-
-    /**
-     * Reads an EmptyPacket from the given PacketByteBuf.
-     * <p>
-     * Since this packet has no data, the buffer is not read.
-     *
-     * @param buf The PacketByteBuf to read from (ignored).
-     * @return A new instance of EmptyPacket.
-     */
-    @SuppressWarnings("unused")
-    public static EmptyPacket read(@SuppressWarnings("unused") FriendlyByteBuf buf) {
-        return new EmptyPacket();
-    }
 
     /**
      * Serializes this empty packet to a PacketByteBuf.

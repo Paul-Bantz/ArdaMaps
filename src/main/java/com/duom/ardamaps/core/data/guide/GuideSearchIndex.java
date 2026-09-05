@@ -47,6 +47,7 @@ public final class GuideSearchIndex {
     /** Number of chars kept on each side of the first match in search snippets. */
     private static final int SEARCH_SNIPPET_RADIUS = 64;
 
+    /** Whitespace pattern constant. */
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
 
     /** Signature of the currently cached search index (locale + page/entry identity). */
@@ -67,6 +68,8 @@ public final class GuideSearchIndex {
 
     /**
      * Starts async preload if the cached index is stale for the given book signature.
+     *
+     * @param book The guide book to index or search.
      */
     public static void preloadIfNeeded(@Nullable GuideBook book) {
         if (book == null) return;
@@ -143,6 +146,10 @@ public final class GuideSearchIndex {
 
     /**
      * Searches the cached index and returns ranked navigable results.
+     *
+     * @param book  The guide book to index or search.
+     * @param input The raw search input.
+     * @return Ranked guide search results matching the input.
      */
     public static List<GuideSearchResult> search(@Nullable GuideBook book, @Nullable String input) {
         if (book == null || input == null) return List.of();
@@ -250,6 +257,9 @@ public final class GuideSearchIndex {
 
     /**
      * Converts result payload objects into display labels consumed by SearchWidget.
+     *
+     * @param obj The result payload object to render.
+     * @return The label shown for the result.
      */
     public static String renderResult(Object obj) {
 
@@ -261,6 +271,9 @@ public final class GuideSearchIndex {
 
     /**
      * Converts result payload objects into tooltip content shown on hover.
+     *
+     * @param obj The result payload object to render.
+     * @return Tooltip text for the result, or {@code null} when no tooltip is available.
      */
     @Nullable
     public static String renderTooltip(Object obj) {
@@ -322,6 +335,7 @@ public final class GuideSearchIndex {
         return collapseWhitespace(Jsoup.parse(html).text());
     }
 
+    /** GuideSearchEntry data holder. */
     private record GuideSearchEntry(int pageIndex,
                                     int entryIndex,
                                     String pageTitle,
@@ -333,6 +347,7 @@ public final class GuideSearchIndex {
 
     }
 
+    /** SearchSeed data holder. */
     private record SearchSeed(int pageIndex,
                               int entryIndex,
                               String pageTitle,
@@ -363,5 +378,4 @@ public final class GuideSearchIndex {
 
     }
 }
-
 

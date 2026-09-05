@@ -47,6 +47,18 @@ class DimensionTest {
     }
 
     /**
+     * Dimension center helpers should use the configured world bounds rather than assuming origin zero.
+     */
+    @Test
+    void getCenter_nonSymmetricBounds_returnsMidpoint() {
+
+        Dimension dimension = new Dimension("Test", "test:dimension", 1f, -1000, 3000, -300, 900, false);
+
+        assertEquals(1000.0, dimension.getCenterX());
+        assertEquals(300.0, dimension.getCenterZ());
+    }
+
+    /**
      * A zero scale factor must not create an infinite scale that contaminates distance conversion math.
      */
     @Test

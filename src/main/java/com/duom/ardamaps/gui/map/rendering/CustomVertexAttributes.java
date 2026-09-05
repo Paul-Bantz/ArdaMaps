@@ -37,6 +37,7 @@ import java.lang.reflect.Method;
  */
 final class CustomVertexAttributes {
 
+    /** Begin element constant. */
     private static final Method BEGIN_ELEMENT = findBeginElement();
 
     private CustomVertexAttributes() {

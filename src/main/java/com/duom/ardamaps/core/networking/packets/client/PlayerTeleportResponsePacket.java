@@ -48,8 +48,10 @@ import java.util.UUID;
 public record PlayerTeleportResponsePacket(UUID requestId, boolean success, double x, double y,
                                            double z) implements IRespondablePacket<PlayerTeleportResponsePacket> {
 
+    /** Fabric custom payload type for this packet. */
     public static final CustomPacketPayload.Type<PlayerTeleportResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_ranged_teleport_response"));
 
+    /** Stream codec used to serialize and deserialize ranged teleport responses. */
     public static final StreamCodec<RegistryFriendlyByteBuf, PlayerTeleportResponsePacket> CODEC = IPacket.codec(PlayerTeleportResponsePacket::read);
 
     public PlayerTeleportResponsePacket(boolean success, double x, double y, double z) {

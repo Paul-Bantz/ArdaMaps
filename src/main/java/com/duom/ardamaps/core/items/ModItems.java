@@ -37,6 +37,7 @@ import net.minecraft.world.item.Item;
  */
 public class ModItems {
 
+    /** Guidebook key constant. */
     private static final ResourceKey<Item> GUIDEBOOK_KEY =
             ResourceKey.create(Registries.ITEM, ModConstants.modId("guidebook"));
 

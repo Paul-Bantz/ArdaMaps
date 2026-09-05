@@ -26,6 +26,9 @@
     ],
     "ardapaths:api": [
       "com.duom.ardamaps.core.consumers.ArdaPathsConsumer"
+    ],
+    "modmenu": [
+      "com.duom.ardamaps.core.consumers.ModMenuConsumer"
     ]
   },
   "depends": {
@@ -36,7 +39,8 @@
   "suggests": {
     "arda-regions": "*",
     "ardapaths": "*",
-    "huskhomes": "*"
+    "huskhomes": "*",
+    "modmenu": "*"
   },
   "custom": {
     "ardamaps:api_entrypoint": "com.duom.ardamaps.api.ArdaMapsApiEntrypoint"

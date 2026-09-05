@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.gui.map.rendering;
 
-import com.duom.ardamaps.ArdaMapsClient;
+import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.BlueMapCamera;
@@ -54,6 +54,9 @@ import java.util.*;
  */
 public class BlueMapRenderer extends MapRenderable {
 
+    /** Approximate decoded BlueMap tile cost: measured 501x501 RGBA, about 1 MiB per tile. */
+    static final long APPROX_DECODED_TILE_BYTES = 501L * 501L * 4L;
+
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(BlueMapRenderer.class);
 
@@ -62,9 +65,6 @@ public class BlueMapRenderer extends MapRenderable {
 
     /** Minimum brightness when block light is zero (ambient occlusion floor). */
     private static final float AMBIENT_LIGHT = 0.3f;
-
-    /** Approximate decoded BlueMap tile cost: measured 501x501 RGBA, about 1 MiB per tile. */
-    static final long APPROX_DECODED_TILE_BYTES = 501L * 501L * 4L;
 
     /** Camera for managing view and visible tiles */
     private final BlueMapCamera mapCamera;
@@ -186,13 +186,15 @@ public class BlueMapRenderer extends MapRenderable {
      * Sub-pixel precision is preserved by submitting each tile's floating-point screen
      * bounds directly to the GUI render state.
      * </p>
+     *
+     * @param context The rendering or networking context used by this operation.
      */
     private void renderMap(GuiGraphicsExtractor context) {
 
         int coarsestZoom = mapCamera.getCoarsestZoom();
         int primaryZ = mapCamera.getTileSourceClampedZoom();
         boolean settled = mapCamera.isSettled();
-        boolean debugMode = ArdaMapsClient.CONFIG.isMapDebugDisplay();
+        boolean debugMode = Client.debugOverlayVisible();
 
         provider.beginFrame();
 
@@ -281,8 +283,8 @@ public class BlueMapRenderer extends MapRenderable {
      * LOD fallback is requested to avoid queuing tiles that will scroll off screen.
      *
      * @param coarsestZoom The coarsest LOD level to use for immediate fallback.
-     * @param primaryZ The current primary LOD level whose tiles are in the viewport.
-     * @param settled Whether the camera has been still long enough to request fine-grained primary tiles.
+     * @param primaryZ     The current primary LOD level whose tiles are in the viewport.
+     * @param settled      Whether the camera has been still long enough to request fine-grained primary tiles.
      */
     void requestTilesForFrame(int coarsestZoom, int primaryZ, boolean settled) {
 
@@ -356,6 +358,7 @@ public class BlueMapRenderer extends MapRenderable {
      * @param lod       LOD zoom level shared by all tiles in this pass.
      * @param debugMode Whether to overlay a red tile outline and its {@code Z:x X:y Y:y} key,
      *                  matching {@code PmTilesRenderer}'s debug grid.
+     * @param context   The rendering or networking context used by this operation.
      */
     private void drawTilePass(GuiGraphicsExtractor context, List<TileDraw> tiles, int lod, boolean debugMode) {
 

@@ -41,6 +41,14 @@ public final class ModVertexFormats {
     public static final VertexFormatElement TILE_PARAMS =
             VertexFormatElement.register(freeId(), 0, VertexFormatElement.Type.FLOAT, false, 4);
 
+    /** Region border side coordinate for anti-aliasing. */
+    public static final VertexFormatElement BORDER_SIDE =
+            VertexFormatElement.register(freeId(), 0, VertexFormatElement.Type.FLOAT, false, 1);
+
+    /** Region border dot arc length, period, and radius in pixels. */
+    public static final VertexFormatElement BORDER_DASH =
+            VertexFormatElement.register(freeId(), 0, VertexFormatElement.Type.FLOAT, false, 3);
+
     /** Position + main UV + paper UV. */
     public static final VertexFormat POSITION_TEX_PAPER = VertexFormat.builder()
             .add("Position", VertexFormatElement.POSITION)
@@ -55,9 +63,26 @@ public final class ModVertexFormats {
             .add("TileParams", TILE_PARAMS)
             .build();
 
+    /** Position + color + main UV + border side coordinate + dash parameters. */
+    public static final VertexFormat POSITION_COLOR_BORDER = VertexFormat.builder()
+            .add("Position", VertexFormatElement.POSITION)
+            .add("Color", VertexFormatElement.COLOR)
+            .add("UV0", VertexFormatElement.UV0)
+            .add("BorderSide", BORDER_SIDE)
+            .add("BorderDash", BORDER_DASH)
+            .build();
+
+    /**
+     * Prevents utility class construction.
+     */
     private ModVertexFormats() {
     }
 
+    /**
+     * Finds an unused vertex format element id.
+     *
+     * @return The free element id.
+     */
     private static int freeId() {
 
         for (int id = 0; id < VertexFormatElement.MAX_COUNT; id++)

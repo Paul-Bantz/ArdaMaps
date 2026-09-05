@@ -28,9 +28,8 @@ package com.duom.ardamaps.core.consumers;
 import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.config.Dimension;
-import com.duom.ardamaps.core.data.map.Region;
-import com.duom.ardamaps.core.data.map.RegionLookupBuilder;
-import com.duom.ardamaps.core.data.map.RegionLookupTexture;
+import com.duom.ardamaps.core.data.map.region.RegionGeometry;
+import com.duom.ardamaps.core.data.map.region.RegionGeometryBuilder;
 import com.duom.ardamaps.core.integration.RegionProvider;
 import com.duom.ardamaps.core.integration.Regions;
 import com.duom.ardamaps.core.networking.PacketRegistry;
@@ -168,15 +167,15 @@ public class ArdaRegionsConsumer implements ArdaRegionsApiEntrypoint, RegionProv
     }
 
     /**
-     * Generates a region lookup texture for the given dimension asynchronously.
+     * Generates region geometry for the given dimension asynchronously.
      *
      * @param dimensionId the dimension identifier
-     * @param callback    callback receiving the generated texture, or null if no regions exist
+     * @param callback    callback receiving the generated geometry, or null if no regions exist
      */
     @Override
-    public void generateRegionLookup(String dimensionId, Consumer<RegionLookupTexture> callback) {
+    public void generateRegionGeometry(String dimensionId, Consumer<RegionGeometry> callback) {
         if (api == null || api.getRegionAPI() == null) {
-            LOGGER.warn("Arda Regions API is not ready, skipping region lookup generation.");
+            LOGGER.warn("Arda Regions API is not ready, skipping region geometry generation.");
             return;
         }
 
@@ -185,55 +184,131 @@ public class ArdaRegionsConsumer implements ArdaRegionsApiEntrypoint, RegionProv
                 .findFirst();
 
         if (dimension.isEmpty()) {
-            LOGGER.warn("No dimension found for '{}', skipping region lookup generation.", dimensionId);
+            LOGGER.warn("No dimension found for '{}', skipping region geometry generation.", dimensionId);
             return;
         }
 
-        ArdaMaps.IO_EXECUTOR.submit(() -> generateLut(dimension.get(), callback));
+        ArdaMaps.IO_EXECUTOR.submit(() -> generateGeometry(dimension.get(), callback));
     }
 
     /**
-     * Builds a region lookup texture from the given dimension's regions.
+     * Builds region geometry from the given dimension's regions.
      *
      * @param dimension the dimension to generate lookup for
-     * @param callback  callback receiving the generated texture
+     * @param callback  callback receiving the generated geometry
      */
-    private void generateLut(Dimension dimension, Consumer<RegionLookupTexture> callback) {
-        var regionsForDimension = api.getRegionAPI().getRegionsByWorld(dimension.getId());
+    private void generateGeometry(Dimension dimension, Consumer<RegionGeometry> callback) {
 
-        if (regionsForDimension == null || regionsForDimension.isEmpty()) {
+        Map<String, List<ApiRegion>> regionsByWorld = bucketRegionsByWorld();
+        List<ApiRegion> regionsForDimension = regionsByWorld.getOrDefault(dimension.getId(), List.of());
+
+        if (regionsForDimension.isEmpty()) {
+            regionsForDimension = regionsByWorld.getOrDefault(stripNamespace(dimension.getId()), List.of());
+        }
+
+        if (regionsForDimension.isEmpty()) {
             callback.accept(null);
             return;
         }
 
-        List<Region> regionList = new ArrayList<>();
-        List<List<List<Vec2d>>> regionPolygons = new ArrayList<>();
-        Map<String, Integer> regionIdToIndex = new LinkedHashMap<>();
+        List<RegionGeometryBuilder.RegionSource> sources = new ArrayList<>();
 
         for (ApiRegion apiRegion : regionsForDimension) {
-            if (apiRegion.getParentId() != null) continue;
-
-            regionIdToIndex.put(apiRegion.getId(), regionList.size());
-            regionList.add(new Region(apiRegion.getId(), apiRegion.getName()));
-            regionPolygons.add(new ArrayList<>());
+            sources.add(new RegionGeometryBuilder.RegionSource(
+                    apiRegion.getId(),
+                    apiRegion.getName(),
+                    apiRegion.getParentId(),
+                    transformRegionPolygons(apiRegion, dimension)
+            ));
         }
 
-        for (ApiRegion apiRegion : api.getRegionAPI().getAllRegions()) {
-            if (apiRegion.getParentId() != null) continue;
+        RegionGeometry geometry = RegionGeometryBuilder.build(dimension, sources);
+        LOGGER.info("Built region geometry for {} with {} shapes and {} vertices.",
+                dimension.getId(), geometry.regions().length, countVertices(geometry));
+        callback.accept(geometry);
+    }
 
-            Integer index = regionIdToIndex.get(apiRegion.getId());
-            if (index == null) continue;
+    /**
+     * Buckets all regions by the worlds declared by their polygons.
+     *
+     * @return A region list keyed by polygon world identifier.
+     */
+    private Map<String, List<ApiRegion>> bucketRegionsByWorld() {
 
-            regionPolygons.get(index).addAll(transformRegionPolygons(apiRegion));
+        Map<String, List<ApiRegion>> regionsByWorld = new LinkedHashMap<>();
+
+        for (ApiRegion region : api.getRegionAPI().getAllRegions()) {
+            Set<String> worlds = new LinkedHashSet<>();
+            for (var polygon : region.getPolygons()) {
+                if (polygon.getWorld() != null) worlds.add(polygon.getWorld());
+            }
+
+            for (String world : worlds) {
+                regionsByWorld.computeIfAbsent(world, ignored -> new ArrayList<>()).add(region);
+            }
         }
 
-        if (regionList.isEmpty()) {
-            callback.accept(null);
-            return;
+        return regionsByWorld;
+    }
+
+    /**
+     * Transforms ArdaRegions polygon data to internal Vec2d format for one dimension.
+     *
+     * @param region    the region to transform polygons from
+     * @param dimension the target dimension
+     * @return a list of polygons as Vec2d coordinate lists
+     */
+    private @NonNull List<List<Vec2d>> transformRegionPolygons(ApiRegion region, Dimension dimension) {
+
+        if (region == null) return List.of();
+
+        var transformedPolygons = new ArrayList<List<Vec2d>>();
+        String fullId = dimension.getId();
+        String strippedId = stripNamespace(fullId);
+
+        for (var polygon : region.getPolygons()) {
+            String world = polygon.getWorld();
+            if (!Objects.equals(world, fullId) && !Objects.equals(world, strippedId)) continue;
+
+            var vertices = new ArrayList<Vec2d>();
+
+            for (var vertex : polygon.getVertices()) {
+                vertices.add(new Vec2d(vertex.getX(), vertex.getZ()));
+            }
+
+            transformedPolygons.add(vertices);
         }
 
-        RegionLookupTexture texture = RegionLookupBuilder.build(dimension, regionList, regionPolygons);
-        callback.accept(new RegionLookupTexture(texture.pixels(), texture.regions(), texture.texWidth(),
-                texture.texHeight(), texture.dimensionId(), new Date()));
+        return transformedPolygons;
+    }
+
+    /**
+     * Strips a namespace from an identifier for legacy ArdaRegions world matching.
+     *
+     * @param id The identifier to strip.
+     * @return The path portion after the namespace separator.
+     */
+    private static String stripNamespace(String id) {
+
+        if (id == null) return null;
+        int separator = id.indexOf(':');
+        return separator >= 0 ? id.substring(separator + 1) : id;
+    }
+
+    /**
+     * Counts geometry vertices for logging and debug checks.
+     *
+     * @param geometry The geometry to inspect.
+     * @return The total vertex count.
+     */
+    private static int countVertices(RegionGeometry geometry) {
+
+        int count = 0;
+        for (var shape : geometry.regions()) {
+            for (int[] ring : shape.rings()) {
+                count += ring.length / 2;
+            }
+        }
+        return count;
     }
 }

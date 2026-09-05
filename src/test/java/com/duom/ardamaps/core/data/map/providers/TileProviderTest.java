@@ -489,8 +489,12 @@ class TileProviderTest {
         }
     }
 
+    /**
+     * Tile provider that counts native texture uploads.
+     */
     private static final class UploadCountingTileProvider extends TileProvider<TileKey> {
 
+        /** Number of native texture upload calls. */
         private int uploadCalls;
 
         @Override
@@ -504,8 +508,12 @@ class TileProviderTest {
         }
     }
 
+    /**
+     * Tile provider that counts destroyed textures.
+     */
     private static final class DestroyCountingTileProvider extends TileProvider<TileKey> {
 
+        /** Number of texture destroy calls. */
         private int destroyCalls;
 
         @Override

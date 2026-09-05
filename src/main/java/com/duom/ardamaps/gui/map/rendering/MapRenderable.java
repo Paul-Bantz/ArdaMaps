@@ -96,7 +96,7 @@ public abstract class MapRenderable {
 
     /**
      * Returns one debug line per tile currently loading for this renderable, used by the
-     * map_debug_display "currently loading tiles" panel. Renderables with no asynchronous
+     * map debug overlay's "currently loading tiles" panel. Renderables with no asynchronous
      * tile provider (e.g. flat-image/grid layers) have nothing to report.
      *
      * @return The debug lines describing in-flight tiles, or an empty list if not applicable.
@@ -122,6 +122,8 @@ public abstract class MapRenderable {
 
     /**
      * Renders the fog of war overlay on top of the map layer, using a custom shader to combine the paper texture and fog mask.
+     *
+     * @param context The rendering or networking context used by this operation.
      */
     protected void renderFogOfWar(GuiGraphicsExtractor context) {
 

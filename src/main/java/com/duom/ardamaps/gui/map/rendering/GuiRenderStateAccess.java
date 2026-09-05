@@ -36,18 +36,21 @@ import java.lang.reflect.Method;
 /**
  * Narrow bridge for submitting custom GUI render states through {@link GuiGraphicsExtractor}.
  */
-final class GuiRenderStateAccess {
+public final class GuiRenderStateAccess {
 
+    /** Gui render state constant. */
     private static final Field GUI_RENDER_STATE = findField("guiRenderState");
 
+    /** Scissor stack constant. */
     private static final Field SCISSOR_STACK = findField("scissorStack");
 
+    /** Scissor peek constant. */
     private static final Method SCISSOR_PEEK = findScissorPeek();
 
     private GuiRenderStateAccess() {
     }
 
-    static void add(GuiGraphicsExtractor context, GuiElementRenderState element) {
+    public static void add(GuiGraphicsExtractor context, GuiElementRenderState element) {
 
         try {
             ((GuiRenderState) GUI_RENDER_STATE.get(context)).addGuiElement(element);
@@ -56,7 +59,7 @@ final class GuiRenderStateAccess {
         }
     }
 
-    static ScreenRectangle scissorArea(GuiGraphicsExtractor context) {
+    public static ScreenRectangle scissorArea(GuiGraphicsExtractor context) {
 
         try {
             Object stack = SCISSOR_STACK.get(context);

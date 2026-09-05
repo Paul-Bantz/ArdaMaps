@@ -41,14 +41,6 @@ public abstract class MapCamera {
     /** How long after the last detected pan/zoom the camera is considered settled, in milliseconds. */
     private static final long SETTLE_DELAY_MS = 120L;
 
-    /** worldX/worldZ/zoom as observed at the end of the previous {@link #update} call, to detect motion. */
-    private double lastWorldX = Double.NaN;
-    private double lastWorldZ = Double.NaN;
-    private double lastZoom = Double.NaN;
-
-    /** Wall-clock time of the last detected pan/zoom motion, or 0 if never moved yet. */
-    private long lastMovementMs = 0L;
-
     /** Viewport width - this is the "window into the world" width */
     @Getter
     protected int viewportWidth;
@@ -108,6 +100,18 @@ public abstract class MapCamera {
     @Getter
     protected Dimension dimension;
 
+    /** worldX/worldZ/zoom as observed at the end of the previous {@link #update} call, to detect motion. */
+    private double lastWorldX = Double.NaN;
+
+    /** World Z observed at the end of the previous {@link #update} call. */
+    private double lastWorldZ = Double.NaN;
+
+    /** Zoom observed at the end of the previous {@link #update} call. */
+    private double lastZoom = Double.NaN;
+
+    /** Wall-clock time of the last detected pan/zoom motion, or 0 if never moved yet. */
+    private long lastMovementMs = 0L;
+
     /** World coordinates of the zoom anchor point (world position under mouse when zoom was triggered) */
     private Vec2d zoomAnchorWorld;
 
@@ -133,14 +137,39 @@ public abstract class MapCamera {
     /**
      * @return Current camera scale (pixels per block)
      */
-    @SuppressWarnings("unused")
     public abstract double scale();
 
     /**
      * @return Current render scale (pixels per block) for rendering calculations
      */
-    @SuppressWarnings("unused")
     public abstract double renderScale();
+
+    /**
+     * Linear scale factor relative to identity zoom: 1.0 at identity zoom,
+     * less than 1 when zoomed out, greater than 1 when zoomed in.
+     * Independent of any per-layer scale multiplier.
+     *
+     * @return Scale factor relative to {@link #identityZoom}.
+     */
+    public double identityRelativeScale() {
+        return Math.pow(2.0, zoom - identityZoom);
+    }
+
+    /**
+     * Identity-relative scale factor at the furthest the camera can currently zoom out. This is based
+     * on the larger of the hard minimum zoom and the dynamic fit-to-content zoom floor.
+     *
+     * @return Scale factor relative to {@link #identityZoom} at the effective zoom-out limit.
+     */
+    public double minIdentityRelativeScale() {
+
+        double minZoom = minCameraZoom;
+
+        if (!Double.isNaN(zoomLevelToFitContentArea))
+            minZoom = Math.max(minZoom, zoomLevelToFitContentArea);
+
+        return Math.pow(2.0, minZoom - identityZoom);
+    }
 
     /**
      * Update camera state
@@ -194,37 +223,6 @@ public abstract class MapCamera {
     }
 
     /**
-     * Stamps {@link #lastMovementMs} whenever worldX/worldZ/zoom differ from their values at the
-     * end of the previous frame, so {@link #isSettled()} can tell a fling/zoom animation from a
-     * genuinely still camera.
-     */
-    private void detectMovement() {
-
-        boolean moved = worldX != lastWorldX || worldZ != lastWorldZ || zoom != lastZoom;
-
-        if (moved || lastMovementMs == 0L) {
-            lastMovementMs = System.currentTimeMillis();
-        }
-
-        lastWorldX = worldX;
-        lastWorldZ = worldZ;
-        lastZoom = zoom;
-    }
-
-    /**
-     * Whether the camera has been free of pan/zoom motion for at least {@link #SETTLE_DELAY_MS}.
-     * Renderers use this to gate fine-LOD tile loading behind a short delay, so a fast pan/zoom
-     * only ever requests the (pinned, cheap) coarse fallback pyramid instead of flooding the tile
-     * loader with tiles that will have scrolled off screen before they finish loading.
-     *
-     * @return Whether the camera is currently settled.
-     */
-    public boolean isSettled() {
-
-        return lastMovementMs != 0L && System.currentTimeMillis() - lastMovementMs >= SETTLE_DELAY_MS;
-    }
-
-    /**
      * Snap zoom level to a fixed precision to avoid jitter from tiny floating point differences during smooth zooming.
      *
      * @param zoom The zoom level to snap
@@ -258,8 +256,21 @@ public abstract class MapCamera {
      * Set camera centre X in world coordinates, clamped so WorldBounds edges never scroll past the viewport edge.
      *
      * @param worldX The world X coordinate to set the camera centre to
+     * @param offset The optional screen-space offset to apply.
      */
     public void setWorldX(double worldX, double offset) {
+
+        this.worldX = clampWorldX(worldX, offset);
+    }
+
+    /**
+     * Clamps camera centre X so WorldBounds edges never scroll past the viewport edge.
+     *
+     * @param worldX The world X coordinate to clamp.
+     * @param offset The optional screen-space offset to apply.
+     * @return The clamped world X coordinate.
+     */
+    public double clampWorldX(double worldX, double offset) {
 
         double halfW = viewportWidth / (2.0 * getVisualPixelsPerBlock());
         var worldOffset = offset / getVisualPixelsPerBlock();
@@ -267,13 +278,28 @@ public abstract class MapCamera {
         double lo = dimension.getXMin() + halfW - worldOffset;
         double hi = dimension.getXMax() - halfW + worldOffset;
 
-        this.worldX = lo <= hi ? CameraMath.clamp(worldX, lo, hi) : (dimension.getXMin() + dimension.getXMax()) / 2.0;
+        return lo <= hi ? Math.clamp(worldX, lo, hi) : dimension.getCenterX();
     }
 
     /**
      * Set camera centre Z in world coordinates, clamped so WorldBounds edges never scroll past the viewport edge.
+     *
+     * @param worldZ The world Z coordinate to set the camera centre to.
+     * @param offset The optional screen-space offset to apply.
      */
     public void setWorldZ(double worldZ, double offset) {
+
+        this.worldZ = clampWorldZ(worldZ, offset);
+    }
+
+    /**
+     * Clamps camera centre Z so WorldBounds edges never scroll past the viewport edge.
+     *
+     * @param worldZ The world Z coordinate to clamp.
+     * @param offset The optional screen-space offset to apply.
+     * @return The clamped world Z coordinate.
+     */
+    public double clampWorldZ(double worldZ, double offset) {
 
         double halfH = viewportHeight / (2.0 * getVisualPixelsPerBlock());
         var worldOffset = offset / getVisualPixelsPerBlock();
@@ -281,7 +307,25 @@ public abstract class MapCamera {
         double lo = dimension.getZMin() + halfH - worldOffset;
         double hi = dimension.getZMax() - halfH + worldOffset;
 
-        this.worldZ = lo <= hi ? CameraMath.clamp(worldZ, lo, hi) : (dimension.getZMin() + dimension.getZMax()) / 2.0;
+        return lo <= hi ? Math.clamp(worldZ, lo, hi) : dimension.getCenterZ();
+    }
+
+    /**
+     * Stamps {@link #lastMovementMs} whenever worldX/worldZ/zoom differ from their values at the
+     * end of the previous frame, so {@link #isSettled()} can tell a fling/zoom animation from a
+     * genuinely still camera.
+     */
+    private void detectMovement() {
+
+        boolean moved = worldX != lastWorldX || worldZ != lastWorldZ || zoom != lastZoom;
+
+        if (moved || lastMovementMs == 0L) {
+            lastMovementMs = System.currentTimeMillis();
+        }
+
+        lastWorldX = worldX;
+        lastWorldZ = worldZ;
+        lastZoom = zoom;
     }
 
     /**
@@ -302,6 +346,19 @@ public abstract class MapCamera {
      * @return Visual pixels per block
      */
     public abstract double getVisualPixelsPerBlock();
+
+    /**
+     * Whether the camera has been free of pan/zoom motion for at least {@link #SETTLE_DELAY_MS}.
+     * Renderers use this to gate fine-LOD tile loading behind a short delay, so a fast pan/zoom
+     * only ever requests the (pinned, cheap) coarse fallback pyramid instead of flooding the tile
+     * loader with tiles that will have scrolled off screen before they finish loading.
+     *
+     * @return Whether the camera is currently settled.
+     */
+    public boolean isSettled() {
+
+        return lastMovementMs != 0L && System.currentTimeMillis() - lastMovementMs >= SETTLE_DELAY_MS;
+    }
 
     /**
      * Converts screen coordinates to world coordinates at the given zoom level
@@ -337,6 +394,7 @@ public abstract class MapCamera {
 
         this.minCameraZoom = minZoom;
         this.maxCameraZoom = maxZoom;
+        applyZoomBounds();
     }
 
     /**
@@ -364,7 +422,6 @@ public abstract class MapCamera {
      * Set zoom level so that the visual pixels per block matches the given value as closely as possible.
      * This is used to preserve the visual zoom level when switching between maps.
      */
-    @SuppressWarnings("unused")
     public abstract void setZoomToMatchVisualPixelsPerBlock();
 
     /**
@@ -403,21 +460,7 @@ public abstract class MapCamera {
      */
     public void setZoom(double amount) {
 
-        var newZoom = targetCameraZoom + amount;
-
-        if (newZoom < minCameraZoom || newZoom > maxCameraZoom) {
-            targetCameraZoom = CameraMath.clamp(newZoom, minCameraZoom, maxCameraZoom);
-        } else {
-            targetCameraZoom = newZoom;
-        }
-
-        /*
-         * If minimum zoom to fit content area is defined, enforce it as a lower bound to prevent zooming out so far
-         * that the world becomes smaller than the viewport.
-         */
-        if (!Double.isNaN(zoomLevelToFitContentArea) && targetCameraZoom < zoomLevelToFitContentArea) {
-            targetCameraZoom = zoomLevelToFitContentArea;
-        }
+        targetCameraZoom = clampToZoomBounds(targetCameraZoom + amount);
     }
 
     /**
@@ -435,8 +478,46 @@ public abstract class MapCamera {
      */
     public void updateZoom(double zoom) {
 
-        this.zoom = snapZoom(zoom);
+        this.zoom = snapZoom(clampToZoomBounds(zoom));
         this.targetCameraZoom = this.zoom;
+    }
+
+    /**
+     * Clamps the given zoom value to the current camera zoom bounds.
+     *
+     * @param zoom The zoom value to clamp.
+     * @return The clamped zoom value.
+     */
+    public double clampZoom(double zoom) {
+
+        return clampToZoomBounds(zoom);
+    }
+
+    /**
+     * Clamps the given zoom value to the hard camera bounds and fit-to-content floor.
+     *
+     * @param value The zoom value to clamp.
+     * @return The clamped zoom value.
+     */
+    protected double clampToZoomBounds(double value) {
+
+        double lower = Math.min(minCameraZoom, maxCameraZoom);
+        double upper = Math.max(minCameraZoom, maxCameraZoom);
+        double clamped = Math.clamp(value, lower, upper);
+
+        if (!Double.isNaN(zoomLevelToFitContentArea) && clamped < zoomLevelToFitContentArea)
+            clamped = zoomLevelToFitContentArea;
+
+        return clamped;
+    }
+
+    /**
+     * Re-applies current zoom bounds to both immediate and target zoom values.
+     */
+    protected void applyZoomBounds() {
+
+        zoom = clampToZoomBounds(zoom);
+        targetCameraZoom = clampToZoomBounds(targetCameraZoom);
     }
 
     /**
@@ -468,7 +549,6 @@ public abstract class MapCamera {
      *
      * @return Blocks per pixel
      */
-    @SuppressWarnings("unused")
     public abstract double getBlocksPerPixel();
 
     /**
@@ -498,6 +578,7 @@ public abstract class MapCamera {
             double ppbAtIdentity = getVisualPixelsPerBlock() * Math.pow(2.0, identityZoom - zoom);
 
             zoomLevelToFitContentArea = identityZoom + Math.log(minPpb / ppbAtIdentity) / Math.log(2.0);
+            applyZoomBounds();
         }
     }
 }

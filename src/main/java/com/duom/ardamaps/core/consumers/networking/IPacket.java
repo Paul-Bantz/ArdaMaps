@@ -39,17 +39,7 @@ import java.util.function.Function;
 public interface IPacket extends CustomPacketPayload {
 
     /**
-     * Convert the packet to an instance of the object.
-     *
-     * @param buf The packet byte buffer to read
-     */
-    @SuppressWarnings("unused")
-    static <T> T read(FriendlyByteBuf buf) {
-        return null;
-    }
-
-    /**
-     * Creates a simple payload codec backed by the packet's legacy read/build methods.
+     * Creates a simple payload codec backed by the packet's read/build methods.
      *
      * @param reader The packet reader.
      * @param <T>    The packet type.

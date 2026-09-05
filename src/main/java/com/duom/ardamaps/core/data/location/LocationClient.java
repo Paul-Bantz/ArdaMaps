@@ -160,6 +160,17 @@ public class LocationClient extends BasicLocation implements Serializable {
     }
 
     /**
+     * Returns the stored location name without exploration-state substitution or client-config checks.
+     * Prefer {@link #getName()} for display; use this only where {@code ArdaMapsClient.CONFIG} is unavailable.
+     *
+     * @return The raw stored name field value.
+     */
+    public String rawName() {
+
+        return super.getName();
+    }
+
+    /**
      * Updates the exploration status of this location. Only if its current state is lower than the new state.
      * Progress is persisted in {@link com.duom.ardamaps.core.data.config.client.ClientProgress} as such progress is
      * updated in parallel.

@@ -76,7 +76,12 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
          * Horizontal alignment of an {@link ImageBlock} within the content sub-column.
          */
         public enum Align {
-            LEFT, CENTER, RIGHT;
+            /** Align the image to the left edge of the content column. */
+            LEFT,
+            /** Center the image within the content column. */
+            CENTER,
+            /** Align the image to the right edge of the content column. */
+            RIGHT;
 
             /**
              * Parses an HTML {@code align} attribute value.
@@ -110,8 +115,11 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
         @Getter
         public enum Type {
 
+            /** First-level guide title styling. */
             H1(ModConstants.H1_TEXT_SCALE, ModConstants.COLOR_BLUE),
+            /** Second-level guide title styling. */
             H2(ModConstants.H2_TEXT_SCALE, ModConstants.COLOR_DARK_BROWN),
+            /** Third-level guide title styling. */
             H3(ModConstants.H3_TEXT_SCALE, ModConstants.COLOR_DARK_BROWN);
 
             /** The scale at which to display this title */
@@ -124,6 +132,7 @@ public sealed interface ContentBlock permits ContentBlock.BlockquoteBlock,
              * Construct a new Type given a scale
              *
              * @param scale the title scale
+             * @param color the ARGB text color for the title
              */
             Type(float scale, int color) {
 

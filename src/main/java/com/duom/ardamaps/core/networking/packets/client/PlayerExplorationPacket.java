@@ -54,6 +54,7 @@ public record PlayerExplorationPacket(String dimensionId,
                                       List<List<Vec2d>> parentRegionPolygon,
                                       List<List<Vec2d>> regionPolygon) implements IPacket {
 
+    /** Fabric custom payload type for this packet. */
     public static final CustomPacketPayload.Type<PlayerExplorationPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_exploration_event"));
 
     /** Empty packet */
@@ -68,6 +69,7 @@ public record PlayerExplorationPacket(String dimensionId,
     /** Maximum number of points accepted in a single polygon. */
     private static final int MAX_POINTS_PER_POLYGON = 16_384;
 
+    /** Stream codec used to serialize and deserialize player exploration packets. */
     public static final StreamCodec<RegistryFriendlyByteBuf, PlayerExplorationPacket> CODEC = IPacket.codec(PlayerExplorationPacket::read);
 
     /**

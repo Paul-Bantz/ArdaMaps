@@ -57,6 +57,7 @@ public record MapSourceResponsePacket(UUID requestId,
                                       boolean ardaRegionsAvailable,
                                       List<Dimension> dimensions) implements IRespondablePacket<MapSourceResponsePacket> {
 
+    /** Fabric custom payload type for this packet. */
     public static final CustomPacketPayload.Type<MapSourceResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("map_source_response"));
 
     /** Class logger */
@@ -71,6 +72,7 @@ public record MapSourceResponsePacket(UUID requestId,
     /** Maximum number of ranged layer entries accepted for a single layer. */
     private static final int MAX_RANGES_PER_LAYER = 512;
 
+    /** Stream codec used to serialize and deserialize map source responses. */
     public static final StreamCodec<RegistryFriendlyByteBuf, MapSourceResponsePacket> CODEC = IPacket.codec(MapSourceResponsePacket::read);
 
     /**

@@ -41,8 +41,10 @@ import org.jspecify.annotations.NonNull;
  */
 public record PlayerWarpPacket(String warpName) implements IPacket {
 
+    /** Fabric custom payload type for this packet. */
     public static final CustomPacketPayload.Type<PlayerWarpPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_warp"));
 
+    /** Stream codec used to serialize and deserialize warp packets. */
     public static final StreamCodec<RegistryFriendlyByteBuf, PlayerWarpPacket> CODEC = IPacket.codec(PlayerWarpPacket::read);
 
     /**

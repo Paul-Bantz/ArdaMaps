@@ -5,6 +5,7 @@ plugins {
     id 'net.fabricmc.fabric-loom' version '1.17.17'
     id 'maven-publish'
     id 'net.minecraftforge.licenser' version '1.2.0'
+    id "checkstyle"
 }
 
 version = project.mod_version
@@ -20,6 +21,7 @@ repositories {
     maven { url = "https://maven.enginehub.org/repo/" }
     maven { url = "https://cursemaven.com/" }
     maven { url = "https://api.modrinth.com/maven" }
+    maven { url = "https://maven.terraformersmc.com/releases" }
 }
 
 dependencies {
@@ -66,13 +68,12 @@ dependencies {
     include("com.cronutils:cron-utils:${project.cron_utils_version}")
 
     // Optional integrations - compile against them, never require them at runtime.
+    compileOnly("maven.modrinth:arda-paths:${project.ardapaths_version}")
     compileOnly(files("libs/ArdaRegionsStub-2.0.1+mc.26.1.jar"))
-    compileOnly(files("libs/ArdaPaths-1.5.0+mc.26.1.2.jar"))
     compileOnly(files("libs/HuskHomes-Fabric-4.11-ab42970+mc.26.1.2.jar"))
     compileOnly(files("libs/HuskHomes-Common-4.11-ab42970.jar"))
-
-    // DevAuth Neo - Dev/Debug authentication support (dev runtime only)
-    localRuntime("net.litetex.mcm:dev-auth-neo:${project.devauth_version}")
+    compileOnly("com.terraformersmc:modmenu:${project.modmenu_version}")
+    localRuntime("com.terraformersmc:modmenu:${project.modmenu_version}")
 
     // Testing
     testImplementation "org.junit.jupiter:junit-jupiter:5.10.3"
@@ -89,6 +90,11 @@ license {
     header = rootProject.file('HEADER')
     include '**/*.java'
     newLine = true
+}
+
+checkstyle {
+    toolVersion = "13.4.2"
+    configDirectory = layout.projectDirectory.dir("config/checkstyle")
 }
 
 processResources {
@@ -123,8 +129,6 @@ loom {
             getRunDirectory().set(layout.projectDirectory.dir(clientRunDir))
             getJvmArguments().addAll("-Xmx8G", "-Xms8G")
             getProgramArguments().addAll("--width", "1920", "--height", "1080")
-            getSystemProperties().put("devauth.enabled", "1")
-            getSystemProperties().put("devauth.account", "main")
         }
         server {
             server()
@@ -232,4 +236,10 @@ jar {
     from("LICENSE") {
         rename { "${it}_${project.base.archivesName.get()}"}
     }
+}
+
+tasks.register("javadocLint") {
+    group = "verification"
+    description = "Checks main Java sources for missing Javadoc using Checkstyle."
+    dependsOn tasks.named("checkstyleMain")
 }

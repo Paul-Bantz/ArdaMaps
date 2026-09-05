@@ -115,8 +115,12 @@ class BlueMapRendererTest {
         return keys;
     }
 
+    /**
+     * BlueMap tile provider that records requested priorities.
+     */
     private static final class TestBlueMapTileProvider extends BlueMapTileProvider {
 
+        /** Requested tiles and their lowest observed priority. */
         private final Map<PmTileKey, Integer> requested = new HashMap<>();
 
         private TestBlueMapTileProvider() {

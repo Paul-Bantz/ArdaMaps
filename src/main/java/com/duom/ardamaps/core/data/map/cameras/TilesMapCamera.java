@@ -36,6 +36,7 @@ import org.jspecify.annotations.NonNull;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+/** Base camera implementation for map layers backed by fixed-size image tiles. */
 public abstract class TilesMapCamera extends MapCamera {
 
     /** Tile size in pixels */
@@ -68,7 +69,6 @@ public abstract class TilesMapCamera extends MapCamera {
      *
      * @return Set of visible TileKeys - tiles coordinates at current zoom level
      */
-    @SuppressWarnings("unused")
     public abstract Set<PmTileKey> getVisibleTiles();
 
     /**
@@ -77,7 +77,6 @@ public abstract class TilesMapCamera extends MapCamera {
      * @param tileZoom Zoom level of the tiles to fetch
      * @return Set of visible TileKeys - tiles coordinates at given zoom level
      */
-    @SuppressWarnings("unused")
     public abstract Set<PmTileKey> getVisibleTiles(int tileZoom);
 
     /**
@@ -92,15 +91,6 @@ public abstract class TilesMapCamera extends MapCamera {
     public abstract Set<PmTileKey> getRequestTiles(int tileZoom, int rings);
 
     /**
-     * Get number of blocks per tile for a given zoom level
-     *
-     * @param zoom level of the tile source
-     * @return Number of blocks per tile for the given zoom level
-     */
-    @SuppressWarnings("unused")
-    protected abstract int numberOfBlocksPerTile(int zoom);
-
-    /**
      * Get screen position of a tile on the viewport at a specific zoom level.
      * Use this overload when rendering tiles at a zoom level different from the current camera zoom
      * (e.g. fallback/coarse tiles).
@@ -110,15 +100,14 @@ public abstract class TilesMapCamera extends MapCamera {
      * @param tileZoom The zoom level the tile belongs to
      * @return Screen position as Vec2d
      */
-    @SuppressWarnings("unused")
     public abstract Vec2d tilePositionOnViewport(int worldX, int worldY, int tileZoom);
 
     /**
      * Get displayed tile size in pixels for current zoom level
      *
      * @param tileZoom the zoom level to calculate tile size for
+     * @return The displayed tile size in screen pixels.
      */
-    @SuppressWarnings("unused")
     public abstract int displayedTileSize(int tileZoom);
 
     /**
@@ -127,7 +116,6 @@ public abstract class TilesMapCamera extends MapCamera {
      *
      * @return Current tile zoom level
      */
-    @SuppressWarnings("unused")
     public abstract int getTileSourceClampedZoom();
 
     /**
@@ -174,6 +162,17 @@ public abstract class TilesMapCamera extends MapCamera {
     }
 
     /**
+     * Check whether a tile is at least partially explored. If current exploration is null, return true.
+     *
+     * @param exploration   the exploration state to check against
+     * @param tileX         the tile X coordinate
+     * @param tileY         the tile Y coordinate
+     * @param blocksPerTile the number of blocks per tile at the tile's zoom level
+     * @return whether the tile is at least partially explored
+     */
+    protected abstract boolean tileExplored(PlayerExploration exploration, int tileX, int tileY, int blocksPerTile);
+
+    /**
      * Chebyshev distance, in tiles, between the given tile and the tile currently under the camera
      * centre at the same zoom level. Used to prioritize tile loading centre-out.
      *
@@ -192,15 +191,12 @@ public abstract class TilesMapCamera extends MapCamera {
     }
 
     /**
-     * Check whether a tile is at least partially explored. If current exploration is null, return true.
+     * Get number of blocks per tile for a given zoom level
      *
-     * @param exploration   the exploration state to check against
-     * @param tileX         the tile X coordinate
-     * @param tileY         the tile Y coordinate
-     * @param blocksPerTile the number of blocks per tile at the tile's zoom level
-     * @return whether the tile is at least partially explored
+     * @param zoom level of the tile source
+     * @return Number of blocks per tile for the given zoom level
      */
-    protected abstract boolean tileExplored(PlayerExploration exploration, int tileX, int tileY, int blocksPerTile);
+    protected abstract int numberOfBlocksPerTile(int zoom);
 
     /**
      * Sets the dimension for this camera. References the player exploration if dimension is valid.

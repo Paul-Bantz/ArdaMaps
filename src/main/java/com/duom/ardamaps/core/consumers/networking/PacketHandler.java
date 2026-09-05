@@ -50,6 +50,8 @@ public abstract class PacketHandler<T extends IPacket> implements IPacketHandler
      * Constructs a new PacketHandler with the specified channel name.
      *
      * @param channelId The name of the packet channel, which will be combined with the mod ID to create a unique Identifier.
+     * @param type      The Fabric payload type registered for this channel.
+     * @param codec     The codec used to serialize and deserialize this packet payload.
      */
     public PacketHandler(final String channelId, final CustomPacketPayload.Type<T> type, final StreamCodec<RegistryFriendlyByteBuf, T> codec) {
         this.channelId = Identifier.tryBuild(ArdaMaps.MOD_ID, channelId);

@@ -29,12 +29,15 @@ import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.UnitSystem;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.client.ClientConfig;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * Tests for {@link DistanceUnitConverter} unit selection and threshold formatting behaviour.
@@ -72,7 +75,7 @@ class DistanceUnitConverterTest {
     void asRealWorldUnits_metricBelowThreshold_returnsMeters() {
         setUnitSystem(UnitSystem.METRIC);
 
-        assertEquals("2 km", DistanceUnitConverter.asRealWorldUnits(DIMENSION, 1839));
+        assertDistance("2", "unit.system.metric.unit", DistanceUnitConverter.asRealWorldUnits(DIMENSION, 1839));
     }
 
     /**
@@ -96,7 +99,7 @@ class DistanceUnitConverterTest {
     void asRealWorldUnits_metricAtThreshold_returnsKilometers() {
         setUnitSystem(UnitSystem.METRIC);
 
-        assertEquals("2 km", DistanceUnitConverter.asRealWorldUnits(DIMENSION, 2000));
+        assertDistance("2", "unit.system.metric.unit", DistanceUnitConverter.asRealWorldUnits(DIMENSION, 2000));
     }
 
     /**
@@ -109,7 +112,7 @@ class DistanceUnitConverterTest {
 
         double blocks = DistanceUnitConverter.milesToBlocks(DIMENSION, 0.345f);
 
-        assertEquals("1821.6 feet", DistanceUnitConverter.asRealWorldUnits(DIMENSION, blocks));
+        assertDistance("1821.6", "unit.system.imperial.subunit", DistanceUnitConverter.asRealWorldUnits(DIMENSION, blocks));
     }
 
     /**
@@ -122,7 +125,7 @@ class DistanceUnitConverterTest {
 
         double blocks = DistanceUnitConverter.milesToBlocks(DIMENSION, 0.5f);
 
-        assertEquals("0.5 miles", DistanceUnitConverter.asRealWorldUnits(DIMENSION, blocks));
+        assertDistance("0.5", "unit.system.imperial.unit", DistanceUnitConverter.asRealWorldUnits(DIMENSION, blocks));
     }
 
     /**
@@ -133,6 +136,23 @@ class DistanceUnitConverterTest {
     void asRealWorldUnits_nullDimension_returnsEmptyString() {
         setUnitSystem(UnitSystem.METRIC);
 
-        assertEquals("", DistanceUnitConverter.asRealWorldUnits(null, 1000));
+        assertEquals("", DistanceUnitConverter.asRealWorldUnits(null, 1000).getString());
+    }
+
+    /**
+     * Asserts the formatted distance component shape.
+     *
+     * @param expectedNumber The expected numeric prefix.
+     * @param expectedKey    The expected unit translation key.
+     * @param component      The formatted distance component.
+     */
+    private static void assertDistance(String expectedNumber, String expectedKey, Component component) {
+
+        assertEquals(expectedNumber, component.getString().split(" ")[0]);
+        assertEquals(2, component.getSiblings().size());
+        assertEquals(" ", component.getSiblings().getFirst().getString());
+        TranslatableContents contents = assertInstanceOf(TranslatableContents.class,
+                component.getSiblings().get(1).getContents());
+        assertEquals(expectedKey, contents.getKey());
     }
 }

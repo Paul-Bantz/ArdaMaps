@@ -29,8 +29,13 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -39,6 +44,7 @@ import static org.mockito.Mockito.verify;
  */
 class GuiTexturesTest {
 
+    /** Texture identifier used by GUI texture draw tests. */
     private static final Identifier TEXTURE = ModConstants.modId("textures/gui/test.png");
 
     /**
@@ -71,6 +77,50 @@ class GuiTexturesTest {
     }
 
     /**
+     * Verifies that blitRepeatingScaled repeats full tiles and left-crops the trailing tile.
+     */
+    @Test
+    void blitRepeatingScaled_drawsFullTilesAndLeftCroppedTrailingTile() {
+
+        GuiGraphicsExtractor context = mock(GuiGraphicsExtractor.class);
+
+        GuiTextures.blitRepeatingScaled(context, TEXTURE,
+                5, 7, 26, 12,
+                40, 50, 10, 30,
+                8,
+                256, 256, ModConstants.COLOR_WHITE);
+
+        verify(context).blit(any(RenderPipeline.class), org.mockito.ArgumentMatchers.eq(TEXTURE),
+                org.mockito.ArgumentMatchers.eq(5), org.mockito.ArgumentMatchers.eq(7),
+                org.mockito.ArgumentMatchers.eq(40.0f), org.mockito.ArgumentMatchers.eq(50.0f),
+                org.mockito.ArgumentMatchers.eq(8), org.mockito.ArgumentMatchers.eq(12),
+                org.mockito.ArgumentMatchers.eq(10), org.mockito.ArgumentMatchers.eq(30),
+                org.mockito.ArgumentMatchers.eq(256), org.mockito.ArgumentMatchers.eq(256),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class), org.mockito.ArgumentMatchers.eq(TEXTURE),
+                org.mockito.ArgumentMatchers.eq(13), org.mockito.ArgumentMatchers.eq(7),
+                org.mockito.ArgumentMatchers.eq(40.0f), org.mockito.ArgumentMatchers.eq(50.0f),
+                org.mockito.ArgumentMatchers.eq(8), org.mockito.ArgumentMatchers.eq(12),
+                org.mockito.ArgumentMatchers.eq(10), org.mockito.ArgumentMatchers.eq(30),
+                org.mockito.ArgumentMatchers.eq(256), org.mockito.ArgumentMatchers.eq(256),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class), org.mockito.ArgumentMatchers.eq(TEXTURE),
+                org.mockito.ArgumentMatchers.eq(21), org.mockito.ArgumentMatchers.eq(7),
+                org.mockito.ArgumentMatchers.eq(40.0f), org.mockito.ArgumentMatchers.eq(50.0f),
+                org.mockito.ArgumentMatchers.eq(8), org.mockito.ArgumentMatchers.eq(12),
+                org.mockito.ArgumentMatchers.eq(10), org.mockito.ArgumentMatchers.eq(30),
+                org.mockito.ArgumentMatchers.eq(256), org.mockito.ArgumentMatchers.eq(256),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class), org.mockito.ArgumentMatchers.eq(TEXTURE),
+                org.mockito.ArgumentMatchers.eq(29), org.mockito.ArgumentMatchers.eq(7),
+                org.mockito.ArgumentMatchers.eq(40.0f), org.mockito.ArgumentMatchers.eq(50.0f),
+                org.mockito.ArgumentMatchers.eq(2), org.mockito.ArgumentMatchers.eq(12),
+                org.mockito.ArgumentMatchers.eq(3), org.mockito.ArgumentMatchers.eq(30),
+                org.mockito.ArgumentMatchers.eq(256), org.mockito.ArgumentMatchers.eq(256),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+    }
+
+    /**
      * Verifies that blitNineSliced clamps slices to half the destination size.
      */
     @Test
@@ -95,22 +145,255 @@ class GuiTexturesTest {
     }
 
     /**
-     * Verifies that blitMirroredH uses descending U coordinates for horizontal mirroring.
+     * Verifies that the scroll background draws contiguous full-height slices at label height.
      */
     @Test
-    void blitMirroredH_usesDescendingUCoordinates() {
+    void blitScrollBackground_drawsThreeContiguousFullHeightSlices() {
 
         GuiGraphicsExtractor context = mock(GuiGraphicsExtractor.class);
 
-        GuiTextures.blitMirroredH(context, TEXTURE,
-                10, 20, 30, 40,
-                64, 128, 16, 32,
+        GuiTextures.blitScrollBackground(context, 10, 20, 120, 33);
+
+        verify(context, times(3)).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SCROLL_BUTTON_TEXTURE),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyFloat(), org.mockito.ArgumentMatchers.anyFloat(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.eq(96), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SCROLL_BUTTON_TEXTURE),
+                org.mockito.ArgumentMatchers.eq(10), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(0.0f), org.mockito.ArgumentMatchers.eq(0.0f),
+                org.mockito.ArgumentMatchers.eq(19), org.mockito.ArgumentMatchers.eq(33),
+                org.mockito.ArgumentMatchers.eq(27), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(96), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SCROLL_BUTTON_TEXTURE),
+                org.mockito.ArgumentMatchers.eq(111), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(69.0f), org.mockito.ArgumentMatchers.eq(0.0f),
+                org.mockito.ArgumentMatchers.eq(19), org.mockito.ArgumentMatchers.eq(33),
+                org.mockito.ArgumentMatchers.eq(27), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(96), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SCROLL_BUTTON_TEXTURE),
+                org.mockito.ArgumentMatchers.eq(29), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(27.0f), org.mockito.ArgumentMatchers.eq(0.0f),
+                org.mockito.ArgumentMatchers.eq(82), org.mockito.ArgumentMatchers.eq(33),
+                org.mockito.ArgumentMatchers.eq(42), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(96), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+    }
+
+    /**
+     * Verifies that narrow scroll backgrounds collapse to two side slices without a center slice.
+     */
+    @Test
+    void blitScrollBackground_omitsCenterWhenSidesFillWidth() {
+
+        GuiGraphicsExtractor context = mock(GuiGraphicsExtractor.class);
+
+        GuiTextures.blitScrollBackground(context, 10, 20, 20, 33);
+
+        verify(context, times(2)).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SCROLL_BUTTON_TEXTURE),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyFloat(), org.mockito.ArgumentMatchers.anyFloat(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.eq(96), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SCROLL_BUTTON_TEXTURE),
+                org.mockito.ArgumentMatchers.eq(10), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(0.0f), org.mockito.ArgumentMatchers.eq(0.0f),
+                org.mockito.ArgumentMatchers.eq(10), org.mockito.ArgumentMatchers.eq(33),
+                org.mockito.ArgumentMatchers.eq(27), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(96), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SCROLL_BUTTON_TEXTURE),
+                org.mockito.ArgumentMatchers.eq(20), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(69.0f), org.mockito.ArgumentMatchers.eq(0.0f),
+                org.mockito.ArgumentMatchers.eq(10), org.mockito.ArgumentMatchers.eq(33),
+                org.mockito.ArgumentMatchers.eq(27), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(96), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+    }
+
+    /**
+     * Verifies that wide separators draw every mirrored ornament slice including flourishes.
+     */
+    @Test
+    void blitSeparator_drawsFlourishesAboveThreshold() {
+
+        GuiGraphicsExtractor context = mock(GuiGraphicsExtractor.class);
+        ArgumentCaptor<Float> uCaptor = ArgumentCaptor.forClass(Float.class);
+
+        GuiTextures.blitSeparator(context, 10, 20, 300, 20, ModConstants.COLOR_WHITE);
+
+        verify(context, times(11)).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SEPARATOR_TEXTURE),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                uCaptor.capture(), org.mockito.ArgumentMatchers.anyFloat(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.eq(512), org.mockito.ArgumentMatchers.eq(40),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        assertEquals(List.of(0.0f, 42.0f, 64.0f, 92.0f, 114.0f, 148.0f,
+                364.0f, 398.0f, 420.0f, 448.0f, 470.0f), uCaptor.getAllValues());
+        verify(context).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SEPARATOR_TEXTURE),
+                org.mockito.ArgumentMatchers.eq(42), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(64.0f), org.mockito.ArgumentMatchers.eq(0.0f),
+                org.mockito.ArgumentMatchers.eq(36), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(28), org.mockito.ArgumentMatchers.eq(40),
+                org.mockito.ArgumentMatchers.eq(512), org.mockito.ArgumentMatchers.eq(40),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SEPARATOR_TEXTURE),
+                org.mockito.ArgumentMatchers.eq(242), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(420.0f), org.mockito.ArgumentMatchers.eq(0.0f),
+                org.mockito.ArgumentMatchers.eq(36), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(28), org.mockito.ArgumentMatchers.eq(40),
+                org.mockito.ArgumentMatchers.eq(512), org.mockito.ArgumentMatchers.eq(40),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+    }
+
+    /**
+     * Verifies that narrow separators omit optional flourish slices while keeping mirrored grow bands.
+     */
+    @Test
+    void blitSeparator_omitsFlourishesBelowThreshold() {
+
+        GuiGraphicsExtractor context = mock(GuiGraphicsExtractor.class);
+        ArgumentCaptor<Float> uCaptor = ArgumentCaptor.forClass(Float.class);
+
+        GuiTextures.blitSeparator(context, 10, 20, 220, 20, ModConstants.COLOR_WHITE);
+
+        verify(context, times(9)).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SEPARATOR_TEXTURE),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                uCaptor.capture(), org.mockito.ArgumentMatchers.anyFloat(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.eq(512), org.mockito.ArgumentMatchers.eq(40),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        assertEquals(List.of(0.0f, 42.0f, 64.0f, 92.0f, 148.0f,
+                398.0f, 420.0f, 448.0f, 470.0f), uCaptor.getAllValues());
+        verify(context).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SEPARATOR_TEXTURE),
+                org.mockito.ArgumentMatchers.eq(42), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(64.0f), org.mockito.ArgumentMatchers.eq(0.0f),
+                org.mockito.ArgumentMatchers.eq(13), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(28), org.mockito.ArgumentMatchers.eq(40),
+                org.mockito.ArgumentMatchers.eq(512), org.mockito.ArgumentMatchers.eq(40),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class),
+                org.mockito.ArgumentMatchers.eq(ModConstants.SEPARATOR_TEXTURE),
+                org.mockito.ArgumentMatchers.eq(185), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(420.0f), org.mockito.ArgumentMatchers.eq(0.0f),
+                org.mockito.ArgumentMatchers.eq(13), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(28), org.mockito.ArgumentMatchers.eq(40),
+                org.mockito.ArgumentMatchers.eq(512), org.mockito.ArgumentMatchers.eq(40),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+    }
+
+    /**
+     * Verifies that clamped nine-slice source spans still draw a middle row for short destinations.
+     */
+    @Test
+    void blitNineSlicedStretched_drawsMiddleRowWhenHeightIsLessThanVerticalSlices() {
+
+        GuiGraphicsExtractor context = mock(GuiGraphicsExtractor.class);
+
+        GuiTextures.blitNineSlicedStretched(context, TEXTURE,
+                0, 0, 60, 33,
+                28, 28, 28, 28,
+                96, 48,
+                0, 0,
+                96, 48,
+                ModConstants.COLOR_WHITE);
+
+        verify(context).blit(any(RenderPipeline.class), org.mockito.ArgumentMatchers.eq(TEXTURE),
+                org.mockito.ArgumentMatchers.eq(28), org.mockito.ArgumentMatchers.eq(16),
+                org.mockito.ArgumentMatchers.eq(28.0f), org.mockito.ArgumentMatchers.eq(16.0f),
+                org.mockito.ArgumentMatchers.eq(4), org.mockito.ArgumentMatchers.eq(1),
+                org.mockito.ArgumentMatchers.eq(40), org.mockito.ArgumentMatchers.eq(16),
+                org.mockito.ArgumentMatchers.eq(96), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+    }
+
+    /**
+     * Verifies that blitNineSlicedScaled draws nine stretched regions with scaled destination corners.
+     */
+    @Test
+    void blitNineSlicedScaled_drawsNineScaledRegions() {
+
+        GuiGraphicsExtractor context = mock(GuiGraphicsExtractor.class);
+
+        GuiTextures.blitNineSlicedScaled(context, TEXTURE,
+                10, 20, 100, 80,
+                64, 16,
+                256, 256,
+                0, 0,
                 256, 256);
 
-        verify(context).blit(org.mockito.ArgumentMatchers.eq(TEXTURE),
+        verify(context, times(9)).blit(any(RenderPipeline.class), org.mockito.ArgumentMatchers.eq(TEXTURE),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyFloat(), org.mockito.ArgumentMatchers.anyFloat(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.eq(256), org.mockito.ArgumentMatchers.eq(256),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class), org.mockito.ArgumentMatchers.eq(TEXTURE),
                 org.mockito.ArgumentMatchers.eq(10), org.mockito.ArgumentMatchers.eq(20),
-                org.mockito.ArgumentMatchers.eq(40), org.mockito.ArgumentMatchers.eq(60),
-                org.mockito.ArgumentMatchers.eq(0.3125f), org.mockito.ArgumentMatchers.eq(0.25f),
-                org.mockito.ArgumentMatchers.eq(0.5f), org.mockito.ArgumentMatchers.eq(0.625f));
+                org.mockito.ArgumentMatchers.eq(0.0f), org.mockito.ArgumentMatchers.eq(0.0f),
+                org.mockito.ArgumentMatchers.eq(16), org.mockito.ArgumentMatchers.eq(16),
+                org.mockito.ArgumentMatchers.eq(64), org.mockito.ArgumentMatchers.eq(64),
+                org.mockito.ArgumentMatchers.eq(256), org.mockito.ArgumentMatchers.eq(256),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class), org.mockito.ArgumentMatchers.eq(TEXTURE),
+                org.mockito.ArgumentMatchers.eq(26), org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(64.0f), org.mockito.ArgumentMatchers.eq(0.0f),
+                org.mockito.ArgumentMatchers.eq(68), org.mockito.ArgumentMatchers.eq(16),
+                org.mockito.ArgumentMatchers.eq(128), org.mockito.ArgumentMatchers.eq(64),
+                org.mockito.ArgumentMatchers.eq(256), org.mockito.ArgumentMatchers.eq(256),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+        verify(context).blit(any(RenderPipeline.class), org.mockito.ArgumentMatchers.eq(TEXTURE),
+                org.mockito.ArgumentMatchers.eq(26), org.mockito.ArgumentMatchers.eq(36),
+                org.mockito.ArgumentMatchers.eq(64.0f), org.mockito.ArgumentMatchers.eq(64.0f),
+                org.mockito.ArgumentMatchers.eq(68), org.mockito.ArgumentMatchers.eq(48),
+                org.mockito.ArgumentMatchers.eq(128), org.mockito.ArgumentMatchers.eq(128),
+                org.mockito.ArgumentMatchers.eq(256), org.mockito.ArgumentMatchers.eq(256),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
     }
+
+    /**
+     * Verifies that blitNineSlicedScaled clamps destination corners but keeps source corner regions unchanged.
+     */
+    @Test
+    void blitNineSlicedScaled_clampsDestinationCornerOnly() {
+
+        GuiGraphicsExtractor context = mock(GuiGraphicsExtractor.class);
+
+        GuiTextures.blitNineSlicedScaled(context, TEXTURE,
+                0, 0, 20, 20,
+                64, 16,
+                256, 256,
+                0, 0,
+                256, 256);
+
+        verify(context).blit(any(RenderPipeline.class), org.mockito.ArgumentMatchers.eq(TEXTURE),
+                org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(0),
+                org.mockito.ArgumentMatchers.eq(0.0f), org.mockito.ArgumentMatchers.eq(0.0f),
+                org.mockito.ArgumentMatchers.eq(10), org.mockito.ArgumentMatchers.eq(10),
+                org.mockito.ArgumentMatchers.eq(64), org.mockito.ArgumentMatchers.eq(64),
+                org.mockito.ArgumentMatchers.eq(256), org.mockito.ArgumentMatchers.eq(256),
+                org.mockito.ArgumentMatchers.eq(ModConstants.COLOR_WHITE));
+    }
+
 }

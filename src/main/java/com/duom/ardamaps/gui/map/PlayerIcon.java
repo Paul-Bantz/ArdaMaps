@@ -27,6 +27,7 @@ package com.duom.ardamaps.gui.map;
 
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.gui.ModConstants;
+import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -51,6 +52,9 @@ public class PlayerIcon {
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(PlayerIcon.class);
+
+    /** Stable identifier used for the registered player head texture. */
+    private static final Identifier PLAYER_ICON_ID = ModConstants.modId("player_head_map_marker");
 
     /** The player's head icon as a BufferedImage */
     private static Identifier playerIcon;
@@ -82,7 +86,8 @@ public class PlayerIcon {
 
         TextureManager textureManager = Client.mc().getTextureManager();
         AbstractTexture texture = textureManager.getTexture(skinId);
-        com.mojang.blaze3d.platform.NativeImage skinImage = null;
+        NativeImage skinImage = null;
+        boolean closeSkinImage = false;
 
         if (texture instanceof DynamicTexture nativeTex) {
 
@@ -95,6 +100,7 @@ public class PlayerIcon {
                     skinId.getPath()
             );
             skinImage = loadResourceTexture(skinId);
+            closeSkinImage = skinImage != null;
 
         }
 
@@ -108,9 +114,32 @@ public class PlayerIcon {
             );
             // Should never happen, but be safe
             skinImage = loadResourceTexture(defaultSkinId);
+            closeSkinImage = skinImage != null;
         }
 
-        playerIcon = getIcon(skinImage);
+        if (skinImage == null) {
+            LOGGER.warn("Unable to initialize player icon because no skin image could be loaded.");
+            return;
+        }
+
+        try {
+            playerIcon = getIcon(skinImage);
+        } finally {
+            if (closeSkinImage) skinImage.close();
+        }
+    }
+
+    /**
+     * Releases the cached player icon texture so it can be recreated on demand.
+     */
+    public static void clear() {
+
+        if (playerIcon != null) {
+            Identifier clearedIcon = playerIcon;
+            playerIcon = null;
+
+            Client.onRenderThread(() -> Client.mc().getTextureManager().release(clearedIcon));
+        }
     }
 
     /**
@@ -119,7 +148,7 @@ public class PlayerIcon {
      * @param id The identifier of the texture to load
      * @return The loaded NativeImage, or null if loading failed
      */
-    private static @Nullable com.mojang.blaze3d.platform.NativeImage loadResourceTexture(Identifier id) {
+    private static @Nullable NativeImage loadResourceTexture(Identifier id) {
 
         if (Client.mc().getResourceManager().getResource(id).isPresent()) {
 
@@ -128,7 +157,7 @@ public class PlayerIcon {
                     .get()
                     .open()) {
 
-                return com.mojang.blaze3d.platform.NativeImage.read(in);
+                return NativeImage.read(in);
 
             } catch (IOException e) {
                 LOGGER.warn("Unable to load texture resource: {}", id);
@@ -147,22 +176,32 @@ public class PlayerIcon {
      * @param skin The player's skin image
      * @return The player head icon identifier
      */
-    private static Identifier getIcon(com.mojang.blaze3d.platform.NativeImage skin) {
+    private static Identifier getIcon(NativeImage skin) {
 
         // Final 48x48 head image
-        com.mojang.blaze3d.platform.NativeImage head = new com.mojang.blaze3d.platform.NativeImage(ICON_SIZE, ICON_SIZE, true);
+        NativeImage head = new NativeImage(ICON_SIZE, ICON_SIZE, true);
+        DynamicTexture texture = null;
+        boolean registered = false;
 
-        // Base head (8x8 - 40x40 at (4,4))
-        blit(skin, head, 8, 8, 8, 8, 4, 4, 40, 40);
+        try {
+            // Base head (8x8 - 40x40 at (4,4))
+            blit(skin, head, 8, 8, 8, 8, 4, 4, 40, 40);
 
-        // Hat layer (8x8 - 48x48 at (0,0))
-        blit(skin, head, 40, 8, 8, 8, 0, 0, 48, 48);
+            // Hat layer (8x8 - 48x48 at (0,0))
+            blit(skin, head, 40, 8, 8, 8, 0, 0, 48, 48);
 
-        DynamicTexture texture = new DynamicTexture(() -> "ArdaMaps player head map marker", head);
-        Identifier id = ModConstants.modId("player_head_map_marker");
-        Client.mc().getTextureManager().register(id, texture);
+            texture = new DynamicTexture(() -> "ArdaMaps player head map marker", head);
+            if (playerIcon != null) Client.mc().getTextureManager().release(playerIcon);
+            Client.mc().getTextureManager().register(PLAYER_ICON_ID, texture);
+            registered = true;
 
-        return id;
+            return PLAYER_ICON_ID;
+        } finally {
+            if (!registered) {
+                if (texture != null) texture.close();
+                else head.close();
+            }
+        }
     }
 
     /**
@@ -181,8 +220,8 @@ public class PlayerIcon {
      */
     @SuppressWarnings("SameParameterValue")
     private static void blit(
-            com.mojang.blaze3d.platform.NativeImage src,
-            com.mojang.blaze3d.platform.NativeImage dst,
+            NativeImage src,
+            NativeImage dst,
             int sx, int sy, int sw, int sh,
             int dx, int dy, int dw, int dh
     ) {

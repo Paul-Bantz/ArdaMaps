@@ -35,6 +35,9 @@ import java.util.concurrent.CompletableFuture;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Tests for the locations API implementation.
+ */
 class LocationsApiImplTest {
 
     @Test

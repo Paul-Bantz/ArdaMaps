@@ -43,6 +43,9 @@ public class VectorProjection {
     /**
      * Projects a 3D world position to GUI-scaled 2D screen coordinates.
      * Returns null if the point is behind the camera.
+     *
+     * @param worldPos The world position to project.
+     * @return The GUI-scaled screen position, or {@code null} when the point is behind the camera.
      */
     public static @Nullable Vec2 projectToScreen(Vec3d worldPos) {
 

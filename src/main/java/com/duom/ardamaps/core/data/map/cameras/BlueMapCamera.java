@@ -40,6 +40,9 @@ import java.util.Set;
  */
 public class BlueMapCamera extends TilesMapCamera {
 
+    /** How far (in raw LOD units) the computed LOD must overshoot the current level before switching. */
+    private static final double LOD_HYSTERESIS = 0.15;
+
     /**
      * LOD distance multiplier: each LOD level increases the world footprint of tiles by this factor
      * (e.g., 5 means each LOD level covers 5 times more world area than the previous one).
@@ -55,9 +58,6 @@ public class BlueMapCamera extends TilesMapCamera {
      * animation, churning the visible-tile set. {@code Integer.MIN_VALUE} means "not yet computed".
      */
     private int lastClampedZoom = Integer.MIN_VALUE;
-
-    /** How far (in raw LOD units) the computed LOD must overshoot the current level before switching. */
-    private static final double LOD_HYSTERESIS = 0.15;
 
     /**
      * Constructor for BlueMapCamera.
@@ -213,6 +213,33 @@ public class BlueMapCamera extends TilesMapCamera {
     }
 
     /**
+     * BlueMap zoom values are inverted, so higher zoom values render farther out.
+     *
+     * @return Scale factor relative to {@link #identityZoom}.
+     */
+    @Override
+    public double identityRelativeScale() {
+        return Math.pow(lodFactor, identityZoom - zoom);
+    }
+
+    /**
+     * BlueMap zooms out as zoom values increase, so the effective zoom-out limit is the smaller
+     * of the hard maximum-out value and the dynamic fit-to-content floor.
+     *
+     * @return Scale factor relative to {@link #identityZoom} at the effective zoom-out limit.
+     */
+    @Override
+    public double minIdentityRelativeScale() {
+
+        double maxZoomOut = minCameraZoom;
+
+        if (!Double.isNaN(zoomLevelToFitContentArea))
+            maxZoomOut = Math.min(maxZoomOut, zoomLevelToFitContentArea);
+
+        return Math.pow(lodFactor, identityZoom - maxZoomOut);
+    }
+
+    /**
      * Convert screen coordinates to world coordinates, taking into account the current camera position and zoom level.
      *
      * @param screenX X coordinate on the screen
@@ -278,7 +305,7 @@ public class BlueMapCamera extends TilesMapCamera {
         if (Double.isNaN(preferredRenderScale)) return;
 
         double newZoom = identityZoom - (Math.log(preferredRenderScale) / Math.log(lodFactor));
-        newZoom = CameraMath.clamp(newZoom, maxCameraZoom, minCameraZoom); // note: BlueMap min/max are inverted (higher value = more zoomed out)
+        newZoom = clampToZoomBounds(newZoom);
         this.zoom = newZoom;
         this.targetCameraZoom = newZoom;
 
@@ -312,18 +339,26 @@ public class BlueMapCamera extends TilesMapCamera {
     public void setZoom(double amount) {
 
         // Additional damping here to make zoom less snappy
-        var newZoom = targetCameraZoom - amount * 0.35;
+        targetCameraZoom = clampToZoomBounds(targetCameraZoom - amount * 0.35);
+    }
 
-        if (newZoom < minCameraZoom || newZoom > maxCameraZoom) {
-            targetCameraZoom = CameraMath.clamp(newZoom, maxCameraZoom, minCameraZoom);
+    /**
+     * Clamps BlueMap's inverted zoom value to the hard bounds and fit-to-content limit.
+     *
+     * @param value The zoom value to clamp.
+     * @return The clamped zoom value.
+     */
+    @Override
+    protected double clampToZoomBounds(double value) {
 
-        } else {
-            targetCameraZoom = newZoom;
-        }
+        double lower = Math.min(minCameraZoom, maxCameraZoom);
+        double upper = Math.max(minCameraZoom, maxCameraZoom);
+        double clamped = Math.clamp(value, lower, upper);
 
-        if (!Double.isNaN(zoomLevelToFitContentArea) && targetCameraZoom > zoomLevelToFitContentArea) {
-            targetCameraZoom = zoomLevelToFitContentArea;
-        }
+        if (!Double.isNaN(zoomLevelToFitContentArea) && clamped > zoomLevelToFitContentArea)
+            clamped = zoomLevelToFitContentArea;
+
+        return clamped;
     }
 
     /**
@@ -401,7 +436,7 @@ public class BlueMapCamera extends TilesMapCamera {
             candidate = lastClampedZoom;
         }
 
-        lastClampedZoom = CameraMath.clamp(candidate, maxTileZoom, minTileZoom);
+        lastClampedZoom = Math.clamp(candidate, maxTileZoom, minTileZoom);
         return lastClampedZoom;
     }
 
@@ -452,6 +487,7 @@ public class BlueMapCamera extends TilesMapCamera {
             );
 
             zoomLevelToFitContentArea = identityZoom - Math.log(minPpb) / Math.log(lodFactor);
+            applyZoomBounds();
         }
     }
 }

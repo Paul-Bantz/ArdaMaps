@@ -36,6 +36,7 @@ import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.map.Waypoint;
 import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
+import com.duom.ardamaps.gui.RenderingUtils;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import com.duom.ardamaps.gui.widgets.ToastWidget;
 import net.minecraft.client.gui.Font;
@@ -62,6 +63,7 @@ public class CompassRenderer {
     /** Field of view in degrees **/
     public static final float FOV_DEGREES = 90f;
 
+    /** Cardinals constant. */
     final static List<Cardinal> CARDINALS = List.of(
             new Cardinal("N", 180),
             new Cardinal("E", 270),
@@ -121,7 +123,6 @@ public class CompassRenderer {
 
         var player = Client.player();
         if (player == null) return;
-        if (Client.mc().isLocalServer()) return;
 
         // Skip rendering if map screen is open
         if (Client.isShowingMapScreen()) return;
@@ -222,6 +223,7 @@ public class CompassRenderer {
      * @param yaw          the player yaw
      * @param centerX      the centre of the screen
      * @param textRenderer the text renderer
+     * @param globalAlpha  the alpha multiplier applied to waypoint rendering
      */
     @SuppressWarnings({"ConstantValue", "resource"})
     private static void renderWaypoint(GuiGraphicsExtractor context, Vec3d playerPos, float yaw, int centerX, Font textRenderer, float globalAlpha) {
@@ -258,7 +260,7 @@ public class CompassRenderer {
             var icon = IconSpriteAtlas.retrieveSprite(iconIdentifier);
 
             context.pose().pushMatrix();
-            context.pose().translate(x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET);
+            context.pose().translate(RenderingUtils.toDevicePixel(x - (float) LANDMARK_ICON_SIZE / 2), Y_OFFSET);
 
             if (icon != null
                     && icon.contents() != null
@@ -312,10 +314,16 @@ public class CompassRenderer {
 
                 float alpha = Math.min(getAlpha(x, centerX), globalAlpha);
 
+                context.pose().pushMatrix();
+                context.pose().translate(RenderingUtils.toDevicePixel(x - HALF_COMPASS_TRACK_HEIGHT),
+                        COMPASS_TRACK_OFFSET_Y);
+
                 context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(sprite),
-                        (int) (x - HALF_COMPASS_TRACK_HEIGHT), COMPASS_TRACK_OFFSET_Y,
+                        0, 0,
                         COMPASS_TRACK_HEIGHT, COMPASS_TRACK_HEIGHT,
                         GuiTextures.withAlpha(ModConstants.COLOR_WHITE, alpha));
+
+                context.pose().popMatrix();
             }
         }
     }
@@ -323,7 +331,8 @@ public class CompassRenderer {
     /**
      * Project the landmark position given their relative angle to cardinal angle
      *
-     * @param locations the locations to project
+     * @param locations   the locations to project
+     * @param exploration the player exploration data used for visibility checks
      */
     private static void projectLocations(Map<Double, LocationClient> locations, PlayerExploration exploration) {
 
@@ -355,7 +364,7 @@ public class CompassRenderer {
      * @param angle      The player's current yaw angle in degrees
      * @param otherAngle The target angle (cardinal or landmark) in degrees
      * @param centerX    The screen centre X coordinate
-     * @return The screen X position, or Float.NaN if the target is outside the FOV
+     * @return The screen X position, or positive/negative infinity if the target is outside the FOV
      */
     private static float angleToScreenX(float angle, float otherAngle, int centerX) {
 
@@ -435,7 +444,7 @@ public class CompassRenderer {
         if (textureToDraw == null) return;
 
         context.pose().pushMatrix();
-        context.pose().translate(x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET);
+        context.pose().translate(RenderingUtils.toDevicePixel(x - (float) LANDMARK_ICON_SIZE / 2), Y_OFFSET);
 
         context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(textureToDraw),
                 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE,
@@ -454,7 +463,7 @@ public class CompassRenderer {
     private static void drawUnknownLocationSprite(GuiGraphicsExtractor context, float alpha, float x) {
 
         context.pose().pushMatrix();
-        context.pose().translate(x - (float) LANDMARK_ICON_SIZE / 2, Y_OFFSET);
+        context.pose().translate(RenderingUtils.toDevicePixel(x - (float) LANDMARK_ICON_SIZE / 2), Y_OFFSET);
 
         context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.UNKNOWN_ICON),
                 0, 0, LANDMARK_ICON_SIZE, LANDMARK_ICON_SIZE,

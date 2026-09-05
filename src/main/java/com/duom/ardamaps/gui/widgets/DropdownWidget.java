@@ -28,6 +28,7 @@ package com.duom.ardamaps.gui.widgets;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
+import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import lombok.Getter;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -137,6 +138,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      * @param displayArrows     Whether to show expand/collapse arrows
      * @param expandDirection   The direction in which the dropdown expands
      * @param maxVisibleOptions Maximum number of visible options before scrolling
+     * @param placeholderIcon   The fallback icon rendered when no option is selected.
      */
     public DropdownWidget(
             int x,
@@ -204,6 +206,9 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
     @Override
     protected void extractWidgetRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
+        if (!visible) return;
+
+        handleCursor(context);
         renderMainButton(context, mouseX, mouseY);
 
         renderTitle(context);
@@ -261,7 +266,12 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
             boolean isHovered = isMouseOverItem(mouseX, mouseY, y);
             boolean isSelected = isItemSelected(dropdownItem);
 
-            renderDropdownItem(context, getX(), y, dropdownItem, isHovered, isSelected);
+            if (isHovered) context.requestCursor(CursorTypes.POINTING_HAND);
+
+            boolean drawTopEdge = expandsUp() && i == 0;
+            boolean drawBottomEdge = !expandsUp() && i == visibleCount - 1;
+            renderDropdownItem(context, getX(), y, dropdownItem, isHovered, isSelected,
+                    drawTopEdge, drawBottomEdge, false);
         }
 
         // Render scrollbar if needed
@@ -351,7 +361,9 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
                         mouseY >= y && mouseY <= y + originalHeight;
 
         // Render the main button area as a dropdown item
-        renderDropdownItem(context, x, y, selected, isHovered, false);
+        boolean drawTopEdge = !expanded || !expandsUp();
+        boolean drawBottomEdge = !expanded || expandsUp();
+        renderDropdownItem(context, x, y, selected, isHovered, false, drawTopEdge, drawBottomEdge, displayArrows);
 
         if (displayArrows) {
             renderExpandArrow(context, textRenderer, x, y);
@@ -366,15 +378,20 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      * @param y          Y position
      * @param item       The item to render
      * @param isHovered  Whether the mouse is hovering over this item
-     * @param isSelected whether this item is selected
+     * @param isSelected      whether this item is selected
+     * @param drawTopEdge     whether this item draws its top edge
+     * @param drawBottomEdge  whether this item draws its bottom edge
+     * @param reserveArrow    whether to reserve space for the dropdown arrow
      */
-    private void renderDropdownItem(GuiGraphicsExtractor context, int x, int y, T item, boolean isHovered, boolean isSelected) {
+    private void renderDropdownItem(GuiGraphicsExtractor context, int x, int y, T item,
+                                    boolean isHovered, boolean isSelected,
+                                    boolean drawTopEdge, boolean drawBottomEdge, boolean reserveArrow) {
 
         Font textRenderer = Client.mc().font;
 
         E itemPair = optionDisplay.apply(item);
 
-        drawListSlice(context, x, y, isHovered, isSelected);
+        drawListSlice(context, x, y, isHovered, isSelected, drawTopEdge, drawBottomEdge);
 
         var hasIcon = false;
 
@@ -396,11 +413,14 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
         if (displayLabels) {
 
             Component display = (item == null) ? placeholderText : itemPair.text();
-            int textX = x + TEXT_MARGIN;
+            int textStartX = x + TEXT_MARGIN;
+            int arrowWidth = reserveArrow ? textRenderer.width(getArrowText()) + TEXT_MARGIN : 0;
+            int textEndX = x + originalWidth - TEXT_MARGIN - arrowWidth;
 
             if (hasIcon)
-                textX += iconSize + TEXT_MARGIN;
+                textStartX += iconSize + TEXT_MARGIN;
 
+            int textX = textStartX + Math.max(0, (textEndX - textStartX - textRenderer.width(display)) / 2);
             int textY = y + (originalHeight - textRenderer.lineHeight) / 2;
             context.text(textRenderer, display, textX, textY, getLabelColor(), false);
         }
@@ -415,15 +435,25 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      * @param y            Button Y position
      */
     private void renderExpandArrow(GuiGraphicsExtractor context, Font textRenderer, int x, int y) {
-        boolean isUpDirection = expandDirection == ExpandDirection.UP_LEFT ||
-                expandDirection == ExpandDirection.UP_RIGHT;
-        String arrow = expanded
-                ? (isUpDirection ? "▼" : "▲")
-                : (isUpDirection ? "▲" : "▼");
+        String arrow = getArrowText();
 
         int arrowX = x + originalWidth - textRenderer.width(arrow) - 4;
         int arrowY = y + (originalHeight - textRenderer.lineHeight) / 2;
         context.text(textRenderer, Component.literal(arrow), arrowX, arrowY, ModConstants.COLOR_WHITE);
+    }
+
+    /**
+     * Gets the current expand/collapse arrow text.
+     *
+     * @return The arrow glyph shown on the dropdown button.
+     */
+    private String getArrowText() {
+
+        boolean isUpDirection = expandDirection == ExpandDirection.UP_LEFT ||
+                expandDirection == ExpandDirection.UP_RIGHT;
+        return expanded
+                ? (isUpDirection ? "▼" : "▲")
+                : (isUpDirection ? "▲" : "▼");
     }
 
     /**
@@ -434,13 +464,15 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      * @param y          the button y coordinates
      * @param isHovered  whether the button is hovered
      * @param isSelected whether the button is selected
+     * @param drawTopEdge whether to draw the top edge
+     * @param drawBottomEdge whether to draw the bottom edge
      */
-    protected void drawListSlice(GuiGraphicsExtractor context, int x, int y, boolean isHovered, boolean isSelected) {
+    protected void drawListSlice(GuiGraphicsExtractor context, int x, int y,
+                                 boolean isHovered, boolean isSelected,
+                                 boolean drawTopEdge, boolean drawBottomEdge) {
 
-        Identifier sprite = (isHovered || isSelected)
-                ? Identifier.withDefaultNamespace("widget/button_highlighted")
-                : Identifier.withDefaultNamespace("widget/button");
-        context.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x, y, originalWidth, originalHeight);
+        ConnectedButtonSurface.draw(context, x, y, originalWidth, originalHeight,
+                drawTopEdge, drawBottomEdge, isHovered || isSelected);
     }
 
     /**
@@ -492,7 +524,10 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
         int visibleCount = getVisibleDropdownItemCount(dropdownItems);
 
         if (visibleCount > 0 && isMouseOver(mouseX, mouseY)) {
-            int clickedIndex = (int) ((mouseY - getDropdownListTopY(visibleCount)) / originalHeight);
+            int listTop = getDropdownListTopY(visibleCount);
+            if (mouseY < listTop) return;
+
+            int clickedIndex = (int) ((mouseY - listTop) / originalHeight);
             int actualIndex = scrollbar.getScrollOffset() + clickedIndex;
 
             if (clickedIndex >= 0 && clickedIndex < visibleCount && actualIndex < dropdownItems.size()) {
@@ -564,14 +599,13 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Abstrac
      */
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (expanded) {
+        if (expanded && isMouseOver(mouseX, mouseY)) {
             List<T> dropdownItems = computeDropdownItems(computeItemList());
             int visibleCount = getVisibleDropdownItemCount(dropdownItems);
+            int maxOffset = Math.max(0, dropdownItems.size() - visibleCount);
 
-            if (dropdownItems.size() > visibleCount) {
-                scrollbar.setMaxOffset(dropdownItems.size() - visibleCount);
-                return scrollbar.scroll(verticalAmount);
-            }
+            scrollbar.setMaxOffset(maxOffset);
+            return scrollbar.scroll(verticalAmount);
         }
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }

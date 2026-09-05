@@ -32,7 +32,8 @@ public interface ArdaMapsApiEntrypoint {
 
     /**
      * Called when ArdaMaps has fully initialized and the API is ready to be queried
+     *
+     * @param api The initialized ArdaMaps API facade.
      */
     void onApiReady(ArdaMapsApi api);
 }
-

@@ -56,8 +56,10 @@ import java.util.zip.GZIPOutputStream;
 public record LocationsResponsePacket(UUID requestId,
                                       LocationConfig<LocationClient> data) implements IRespondablePacket<LocationsResponsePacket> {
 
+    /** Fabric custom payload type for this packet. */
     public static final CustomPacketPayload.Type<LocationsResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_data_response"));
 
+    /** Empty constant. */
     public static final LocationsResponsePacket EMPTY = new LocationsResponsePacket(null);
 
     /** Class logger */
@@ -70,6 +72,7 @@ public record LocationsResponsePacket(UUID requestId,
     private static final java.lang.reflect.Type LOCATION_CONFIG_TYPE = new TypeToken<LocationConfig<LocationClient>>() {
     }.getType();
 
+    /** Stream codec used to serialize and deserialize location data responses. */
     public static final StreamCodec<RegistryFriendlyByteBuf, LocationsResponsePacket> CODEC = IPacket.codec(LocationsResponsePacket::read);
 
     /**

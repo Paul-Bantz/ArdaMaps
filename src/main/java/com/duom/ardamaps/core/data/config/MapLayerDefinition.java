@@ -74,7 +74,7 @@ import java.util.Objects;
  * @param tileSize      The tile size in pixels (default is 256)
  * @param scale         The scale factor to apply to the layer (default is 1.0)
  * @param path          The path or URL to the layer data. Optional when ranges are present
- * @param icon          The icon to use for the layer (optional)
+ * @param icon          The icon to use for the layer: an atlas sprite path or absolute http(s) image URL (optional)
  * @param ranges        Optional vertical Y bands with their own path data
  */
 public record MapLayerDefinition(@SerializedName("layer") String layer, @SerializedName("type") MapLayerSource type,
@@ -213,11 +213,9 @@ public record MapLayerDefinition(@SerializedName("layer") String layer, @Seriali
     }
 
     /**
-     * @param y World Y coordinate. Ignored because icons live on the layer.
      * @return The layer icon. Range-specific icons are not supported.
      */
-    @SuppressWarnings("unused")
-    public String effectiveIcon(Double y) {
+    public String effectiveIcon() {
 
         return icon();
     }

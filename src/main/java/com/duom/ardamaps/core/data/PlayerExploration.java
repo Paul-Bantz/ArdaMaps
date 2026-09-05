@@ -107,6 +107,10 @@ public class PlayerExploration implements Serializable {
     /** Set of cell indices that have been modified since the last texture upload. */
     private transient Set<Integer> dirtyCells;
 
+    /** Incremented whenever exploration data changes for render-cache invalidation. */
+    @Getter
+    private transient long revision;
+
     /**
      * The in-memory (CPU-side) fog-of-war mask image, where each pixel corresponds to a cell.
      * This is updated on the go and used by {@link #fogTexture} to upload changes to the GPU.
@@ -147,23 +151,6 @@ public class PlayerExploration implements Serializable {
     }
 
     /**
-     * Factory method to create a PlayerExploration instance for the dimension with the given ID.
-     *
-     * @param dimensionId The ID of the dimension (e.g. "minecraft:overworld").
-     * @return A new PlayerExploration instance for the specified dimension, or null if the dimension is not found in the config.
-     */
-    @SuppressWarnings("unused")
-    public static @Nullable PlayerExploration create(String dimensionId) {
-
-        var dimension = ArdaMapsClient.CONFIG.getDimension(dimensionId);
-
-        if (dimension != null)
-            return create(dimension, null);
-
-        return null;
-    }
-
-    /**
      * Factory method to create a PlayerExploration instance for the given dimension and exploration data, with an option to mark it as auto-generated.
      *
      * @param dimension       Dimension definition providing world extents.
@@ -185,24 +172,44 @@ public class PlayerExploration implements Serializable {
      */
     public static PlayerExploration create(Dimension dimension, Integer rangeIndex, byte[] explorationData) {
 
+        PlayerExploration playerExploration = createWithoutTexture(dimension, rangeIndex, explorationData);
+
+        playerExploration.initializeTexture();
+
+        return playerExploration;
+    }
+
+    /**
+     * Factory method to create a PlayerExploration instance without creating render-thread resources.
+     *
+     * @param dimension       Dimension definition providing world extents.
+     * @param rangeIndex      The vertical range index, or null for non-ranged dimensions.
+     * @param explorationData Backing array; length must equal nbCellsX * nbCellsY, or null to create an empty exploration.
+     * @return A new PlayerExploration instance with CPU-side exploration data only.
+     */
+    public static PlayerExploration createWithoutTexture(Dimension dimension, Integer rangeIndex, byte[] explorationData) {
+
         PlayerExploration playerExploration = new PlayerExploration(dimension, rangeIndex);
 
-        // Check if input data matches the computed cell-size. If not, we warn, ignore it and start fresh.
         int nbCells = (int) Math.ceil((double) dimension.getWidth() / playerExploration.getCellSize())
                 * (int) Math.ceil((double) dimension.getHeight() / playerExploration.getCellSize());
 
-        if (explorationData == null || explorationData.length != nbCells) {
+        if (explorationData == null) {
 
-            LOGGER.warn("Invalid exploration data - expected length {}, got {}. Creating empty exploration.", nbCells, explorationData == null ? "null" : explorationData.length);
+            LOGGER.debug("Creating empty exploration for dimension '{}' range '{}' ({} cells).", dimension.getId(), rangeIndex, nbCells);
+            playerExploration.setExplorationData(null);
+
+        } else if (explorationData.length != nbCells) {
+
+            LOGGER.warn("Discarding exploration data for dimension '{}' range '{}' - expected {} cells, got {}. Creating empty exploration.",
+                    dimension.getId(), rangeIndex, nbCells, explorationData.length);
             playerExploration.setExplorationData(null);
 
         } else {
 
-            LOGGER.info("Initializing exploration with provided data of length {} for dimension '{}' range '{}'.", explorationData.length, dimension.getId(), rangeIndex);
+            LOGGER.debug("Initializing exploration with provided data of length {} for dimension '{}' range '{}'.", explorationData.length, dimension.getId(), rangeIndex);
             playerExploration.setExplorationData(explorationData);
         }
-
-        playerExploration.initializeTexture();
 
         return playerExploration;
     }
@@ -216,6 +223,7 @@ public class PlayerExploration implements Serializable {
 
         this.grid = ExplorationGrid.create(xMin, zMin, cellSize, nbCellsX, nbCellsY, explorationData);
         this.explorationData = grid.getExplorationData();
+        revision++;
     }
 
     /**
@@ -272,25 +280,26 @@ public class PlayerExploration implements Serializable {
      */
     private void releaseTextureResources() {
 
-        if (fogTexture != null) {
+        DynamicTexture releasedTexture = fogTexture;
+        Identifier releasedTextureId = fogTextureId;
+        NativeImage releasedMask = fogMask;
 
-            if (fogTextureId != null) {
+        fogTexture = null;
+        fogTextureId = null;
+        fogMask = null;
 
+        if (releasedTexture == null && releasedTextureId == null && releasedMask == null) return;
+
+        Client.onRenderThread(() -> {
+
+            if (releasedTextureId != null) {
                 Client.mc().getTextureManager()
-                        .release(fogTextureId);
-
-                fogTextureId = null;
+                        .release(releasedTextureId);
             }
 
-            fogTexture.close();
-            fogTexture = null;
-        }
-
-        if (fogMask != null) {
-
-            fogMask.close();
-            fogMask = null;
-        }
+            if (releasedTexture != null) releasedTexture.close();
+            if (releasedMask != null) releasedMask.close();
+        });
 
     }
 
@@ -376,6 +385,23 @@ public class PlayerExploration implements Serializable {
 
         if (dimension != null)
             return create(dimension, rangeIndex, null);
+
+        return null;
+    }
+
+    /**
+     * Factory method to create a PlayerExploration instance without creating render-thread resources.
+     *
+     * @param dimensionId The ID of the dimension.
+     * @param rangeIndex  The vertical range index, or null for non-ranged dimensions.
+     * @return A new PlayerExploration instance, or null if the dimension is not found in the config.
+     */
+    public static @Nullable PlayerExploration createWithoutTexture(String dimensionId, Integer rangeIndex) {
+
+        var dimension = ArdaMapsClient.CONFIG.getDimension(dimensionId);
+
+        if (dimension != null)
+            return createWithoutTexture(dimension, rangeIndex, null);
 
         return null;
     }
@@ -473,7 +499,9 @@ public class PlayerExploration implements Serializable {
     public void markCell(int cellX, int cellY, ExplorationState state, int range) {
 
         if (dirtyCells == null) dirtyCells = new HashSet<>();
-        dirtyCells.addAll(grid().markCell(cellX, cellY, state, range));
+        Set<Integer> changedCells = grid().markCell(cellX, cellY, state, range);
+        dirtyCells.addAll(changedCells);
+        if (!changedCells.isEmpty()) revision++;
     }
 
     /**

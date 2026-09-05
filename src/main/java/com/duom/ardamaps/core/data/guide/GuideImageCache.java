@@ -36,9 +36,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Synchronous, session-scoped cache for guide images loaded from the mod resource pack.
@@ -64,7 +64,7 @@ public final class GuideImageCache {
      * {@code Optional.empty()} marks a path that was already attempted and failed,
      * preventing repeated filesystem lookups for known-missing resources.
      */
-    private static final Map<String, Optional<Identifier>> CACHE = new HashMap<>();
+    private static final Map<String, Optional<Identifier>> CACHE = new ConcurrentHashMap<>();
 
     /** Utility class with no public instances. */
     private GuideImageCache() {
@@ -79,7 +79,7 @@ public final class GuideImageCache {
      * an active GL context.</p>
      *
      * @param src path relative to {@code assets/ardamaps/}
-     *            (e.g. {@code guide/resources/icon_ardacraft_gradient_128px.png})
+     *            (e.g. {@code textures/gui/logo_ardacraft_128px.png})
      * @return the registered texture identifier, or {@code null} if the resource is
      * missing or could not be loaded (a warning is logged in that case)
      */
@@ -132,6 +132,8 @@ public final class GuideImageCache {
      * the updated resource pack.
      */
     public static void clear() {
+        CACHE.values().forEach(identifier ->
+                identifier.ifPresent(Minecraft.getInstance().getTextureManager()::release));
         CACHE.clear();
     }
 }

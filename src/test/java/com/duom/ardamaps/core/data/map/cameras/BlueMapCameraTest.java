@@ -191,6 +191,119 @@ class BlueMapCameraTest {
     }
 
     /**
+     * BlueMap identity-relative scale follows the inverted zoom axis and LOD factor.
+     */
+    @Test
+    void identityRelativeScale_tracksInvertedZoomAroundIdentity() {
+
+        BlueMapCamera camera = new BlueMapCamera(640, 480, 0, 0);
+        camera.setLodFactor(5.0);
+
+        assertEquals(1.0, camera.identityRelativeScale(), 1e-9);
+
+        camera.updateZoom(2);
+        assertEquals(1.0 / 5.0, camera.identityRelativeScale(), 1e-9);
+    }
+
+    /**
+     * BlueMap uses its inverted hard zoom-out limit until a fit-to-content floor is computed.
+     */
+    @Test
+    void minIdentityRelativeScale_withoutFitFloor_usesMinCameraZoom() {
+
+        BlueMapCamera camera = new BlueMapCamera(640, 480, 0, 0);
+        camera.setLodFactor(5.0);
+
+        assertEquals(Math.pow(5.0, 1.0 - 8.0), camera.minIdentityRelativeScale(), 1e-9);
+    }
+
+    /**
+     * For BlueMap, a smaller fit-to-content zoom value becomes the effective zoom-out limit.
+     */
+    @Test
+    void minIdentityRelativeScale_withFitFloor_usesSmallerZoomValue() {
+
+        var config = Mockito.mock(ClientConfig.class);
+        var progress = Mockito.mock(ClientProgress.class);
+
+        Mockito.when(config.getClientProgress()).thenReturn(progress);
+        Mockito.when(progress.getExplorationState(DIMENSION.getId(), false)).thenReturn(null);
+
+        ArdaMapsClient.CONFIG = config;
+
+        BlueMapCamera camera = new BlueMapCamera(640, 480, 0, 0);
+        camera.setLodFactor(5.0);
+        camera.setDimension(DIMENSION);
+
+        camera.computeZoomLevelToFitContentArea(2000, 1000);
+
+        assertEquals(2000.0 / DIMENSION.getWidth(), camera.minIdentityRelativeScale(), 1e-9);
+    }
+
+    /**
+     * Matching a carried render scale should clamp to BlueMap's zoomed-in bound.
+     */
+    @Test
+    void setZoomToMatchVisualPixelsPerBlock_aboveMaxScale_clampsToZoomedInBound() {
+
+        BlueMapCamera camera = configuredCamera();
+        camera.setCameraZoomBounds(6, 2);
+        camera.setPreferredRenderScale(125.0);
+
+        camera.setZoomToMatchVisualPixelsPerBlock();
+
+        assertEquals(2.0, camera.getZoom(), 1e-9);
+        assertEquals(2.0, camera.targetCameraZoom, 1e-9);
+    }
+
+    /**
+     * Matching a carried render scale should clamp to BlueMap's zoomed-out bound.
+     */
+    @Test
+    void setZoomToMatchVisualPixelsPerBlock_belowMinScale_clampsToZoomedOutBound() {
+
+        BlueMapCamera camera = configuredCamera();
+        camera.setCameraZoomBounds(6, 2);
+        camera.setPreferredRenderScale(1.0 / 15625.0);
+
+        camera.setZoomToMatchVisualPixelsPerBlock();
+
+        assertEquals(6.0, camera.getZoom(), 1e-9);
+        assertEquals(6.0, camera.targetCameraZoom, 1e-9);
+    }
+
+    /**
+     * Natural BlueMap config ordering should not trip Math.clamp's min/max validation.
+     */
+    @Test
+    void clampToZoomBounds_naturalBoundsOrdering_clampsWithoutThrowing() {
+
+        BlueMapCamera camera = configuredCamera();
+        camera.setCameraZoomBounds(2, 6);
+
+        assertEquals(2.0, camera.clampToZoomBounds(1.0), 1e-9);
+        assertEquals(4.0, camera.clampToZoomBounds(4.0), 1e-9);
+        assertEquals(6.0, camera.clampToZoomBounds(7.0), 1e-9);
+    }
+
+    /**
+     * Computing BlueMap's fit-to-content limit should immediately pull existing zoom back inside it.
+     */
+    @Test
+    void computeZoomLevelToFitContentArea_existingZoomPastFloor_clampsZoomAndTarget() {
+
+        Dimension smallDimension = new Dimension("Small", "test:small-blue", 1f, 0, 99, 0, 99, false);
+        BlueMapCamera camera = configuredCamera();
+        camera.setDimension(smallDimension);
+        camera.updateZoom(6);
+
+        camera.computeZoomLevelToFitContentArea(1000, 1000);
+
+        assertEquals(1.0 - Math.log(10.0) / Math.log(5.0), camera.getZoom(), 1e-9);
+        assertEquals(camera.getZoom(), camera.targetCameraZoom, 1e-9);
+    }
+
+    /**
      * The prefetch request scope expands by one tile ring, while normal visible tiles remain the
      * draw scope.
      */
@@ -214,5 +327,26 @@ class BlueMapCameraTest {
 
         assertTrue(request.containsAll(visible));
         assertTrue(request.size() > visible.size(), "One-ring request scope should include extra tiles");
+    }
+
+    /**
+     * Creates a BlueMap camera with stable defaults for zoom clamping tests.
+     *
+     * @return The configured camera.
+     */
+    private static BlueMapCamera configuredCamera() {
+
+        var config = Mockito.mock(ClientConfig.class);
+        var progress = Mockito.mock(ClientProgress.class);
+
+        Mockito.when(config.getClientProgress()).thenReturn(progress);
+        Mockito.when(progress.getExplorationState(DIMENSION.getId(), false)).thenReturn(null);
+
+        ArdaMapsClient.CONFIG = config;
+
+        BlueMapCamera camera = new BlueMapCamera(640, 480, 0, 0);
+        camera.setDimension(DIMENSION);
+        camera.setLodFactor(5.0);
+        return camera;
     }
 }

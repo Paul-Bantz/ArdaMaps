@@ -34,8 +34,11 @@ import com.mojang.blaze3d.platform.NativeImage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import javax.imageio.ImageIO;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.net.Authenticator;
 import java.net.CookieHandler;
@@ -55,6 +58,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -63,6 +67,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class HttpImageProviderTest {
 
+    /** Temporary directory used as the disk cache. */
     @TempDir
     private Path tempDir;
 
@@ -108,6 +113,22 @@ class HttpImageProviderTest {
         byte[] bytes = new byte[]{0, 1, 2};
 
         assertEquals(ImageFileType.JPEG, HttpImageProvider.detectImageFileType(bytes, URI.create("https://example.test/layer.jpeg")));
+    }
+
+    /**
+     * Verifies JPEG decoding avoids Scrimage's ServiceLoader-backed ImageReaders initializer.
+     */
+    @Test
+    void decodeImage_jpegBytes_returnsNativeImage() throws Exception {
+
+        byte[] bytes = jpegBytes(3, 2);
+        var provider = new HttpImageProvider(tempDir, new DelegatingHttpClient(new FakeHttpClient()));
+
+        try (NativeImage image = provider.decodeImage(bytes, URI.create("https://example.test/overlay.jpg"))) {
+            assertNotNull(image);
+            assertEquals(3, image.getWidth());
+            assertEquals(2, image.getHeight());
+        }
     }
 
     /**
@@ -237,7 +258,6 @@ class HttpImageProviderTest {
     /**
      * Verifies a 204 response takes the absent path and persists the negative cache for later calls.
      */
-    @SuppressWarnings("resource")
     @Test
     void loadImage_absentResponse_usesNegativeCacheTtl() throws Exception {
 
@@ -252,8 +272,10 @@ class HttpImageProviderTest {
         assertEquals(14_400L, firstTtl);
         assertEquals(14_400L, secondTtl);
         assertEquals(1, client.requests.get(), "Fresh negative cache entry should suppress network");
-        assertTrue(Files.list(tempDir).anyMatch(path -> path.getFileName().toString().endsWith(".1")),
-                "Absent metadata should be persisted");
+        try (Stream<Path> files = Files.list(tempDir)) {
+            assertTrue(files.anyMatch(path -> path.getFileName().toString().endsWith(".1")),
+                    "Absent metadata should be persisted");
+        }
     }
 
     /**
@@ -282,8 +304,12 @@ class HttpImageProviderTest {
         assertArrayEquals(new byte[]{9}, provider.decodedBytes.getLast());
     }
 
+    /**
+     * HTTP image provider that rejects image load submissions.
+     */
     private static final class RejectingHttpImageProvider extends HttpImageProvider {
 
+        /** Number of attempted image load submissions. */
         private int submitAttempts;
 
         private RejectingHttpImageProvider(Path diskCacheDirectory, FakeHttpClient client) {
@@ -298,8 +324,12 @@ class HttpImageProviderTest {
         }
     }
 
+    /**
+     * HTTP image provider that counts destroyed textures.
+     */
     private static final class CountingDestroyHttpImageProvider extends HttpImageProvider {
 
+        /** Number of destroyed textures. */
         private final AtomicInteger destroyedTextures = new AtomicInteger();
 
         private CountingDestroyHttpImageProvider(Path diskCacheDirectory, FakeHttpClient client) {
@@ -338,6 +368,16 @@ class HttpImageProviderTest {
         return new HttpImageProvider.TextureData(ModConstants.modId("test/cached"), 1, 1);
     }
 
+    @SuppressWarnings("SameParameterValue")
+    private static byte[] jpegBytes(int width, int height) throws Exception {
+
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            assertTrue(ImageIO.write(image, "jpg", out), "JRE should provide a JPEG writer");
+            return out.toByteArray();
+        }
+    }
+
     private static void awaitLoad(CapturingHttpImageProvider provider, String url) throws Exception {
 
         CountDownLatch latch = new CountDownLatch(1);
@@ -357,8 +397,12 @@ class HttpImageProviderTest {
         return ttl[0];
     }
 
+    /**
+     * HTTP image provider that captures raw bytes passed to the decoder.
+     */
     private static final class CapturingHttpImageProvider extends HttpImageProvider {
 
+        /** Raw byte payloads received by the decoder. */
         private final ArrayDeque<byte[]> decodedBytes = new ArrayDeque<>();
 
         private CapturingHttpImageProvider(Path diskCacheDirectory, FakeHttpClient client) {
@@ -385,10 +429,16 @@ class HttpImageProviderTest {
         }
     }
 
+    /**
+     * HTTP client test double backed by queued responses.
+     */
     private static final class FakeHttpClient extends HttpClient {
 
+        /** Queued HTTP responses to return from sendAsync. */
         private final ArrayDeque<HttpResponse<byte[]>> responses = new ArrayDeque<>();
+        /** Number of observed HTTP requests. */
         private final AtomicInteger requests = new AtomicInteger();
+        /** Most recent HTTP request received by the client. */
         private HttpRequest lastRequest;
 
         private void enqueue(int status, byte[] body, Map<String, String> headers) {
@@ -447,6 +497,13 @@ class HttpImageProviderTest {
 
     }
 
+    /**
+     * Minimal byte-array HTTP response used by {@link FakeHttpClient}.
+     *
+     * @param statusCode the HTTP status code
+     * @param body the response body bytes
+     * @param headerMap response headers by name
+     */
     private record FakeResponse(int statusCode, byte[] body, Map<String, String> headerMap) implements HttpResponse<byte[]> {
 
         @Override

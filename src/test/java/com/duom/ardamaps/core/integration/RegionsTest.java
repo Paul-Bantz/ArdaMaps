@@ -37,14 +37,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 class RegionsTest {
 
     /**
-     * Verifies that region lookup methods are unavailable and callback-less when no provider is installed.
+     * Verifies that region geometry methods are unavailable and callback-less when no provider is installed.
      */
     @Test
     void noProviderIsUnavailableAndNoOp() {
         AtomicBoolean callbackRan = new AtomicBoolean(false);
 
         assertFalse(Regions.isAvailable());
-        Regions.generateRegionLookup("minecraft:overworld", ignored -> callbackRan.set(true));
+        Regions.generateRegionGeometry("minecraft:overworld", ignored -> callbackRan.set(true));
 
         assertFalse(callbackRan.get());
     }

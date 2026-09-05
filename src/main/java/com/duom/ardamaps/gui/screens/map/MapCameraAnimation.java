@@ -92,6 +92,10 @@ public class MapCameraAnimation {
 
     /**
      * Starts an animation to the target world position and zoom.
+     *
+     * @param target     The target world position for the camera.
+     * @param camera     The camera being animated or positioned.
+     * @param targetZoom The target zoom level.
      */
     public void start(Vec2d target, MapCamera camera, double targetZoom) {
 
@@ -115,8 +119,35 @@ public class MapCameraAnimation {
     }
 
     /**
+     * Checks whether the active animation is heading toward the supplied target.
+     *
+     * @param target    The target world position to compare.
+     * @param tolerance Maximum coordinate difference to treat as equal.
+     * @return True when running and the animation target is within tolerance.
+     */
+    public boolean isTargeting(Vec2d target, double tolerance) {
+
+        return running
+                && Math.abs(animTargetX - target.x()) <= tolerance
+                && Math.abs(animTargetZ - target.y()) <= tolerance;
+    }
+
+    /**
+     * Gets the zoom level targeted by the current or most recent animation.
+     *
+     * @return The animation target zoom.
+     */
+    public double targetZoom() {
+
+        return animTargetZoom;
+    }
+
+    /**
      * Applies the current animation step to the camera.
      *
+     * @param camera       The camera being animated or positioned.
+     * @param contentLeftX The left edge of the map content area.
+     * @param contentTopY  The top edge of the map content area.
      * @return True if the animation remains active after this step.
      */
     public boolean apply(MapCamera camera, int contentLeftX, int contentTopY) {

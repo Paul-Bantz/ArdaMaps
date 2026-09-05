@@ -41,6 +41,6 @@ public class Compass {
     public void registerRenderer() {
 
         HudElementRegistry.addLast(ModConstants.modId("compass"), (context, delta) ->
-                CompassRenderer.render(context, delta.getGameTimeDeltaTicks()));
+                CompassRenderer.render(context, delta.getGameTimeDeltaPartialTick(false)));
     }
 }

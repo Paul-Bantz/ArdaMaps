@@ -144,7 +144,7 @@ public class MapLayerLoader {
                 mapLayerDefinition.tileSize(),
                 mapLayerDefinition.scale(),
                 selectedRange != null ? selectedRange.path() : mapLayerDefinition.effectivePath(playerY),
-                mapLayerDefinition.effectiveIcon(playerY),
+                mapLayerDefinition.effectiveIcon(),
                 mapLayerDefinition.ranges());
     }
 

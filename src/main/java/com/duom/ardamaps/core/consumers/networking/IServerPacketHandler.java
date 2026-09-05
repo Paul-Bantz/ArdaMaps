@@ -46,6 +46,9 @@ public interface IServerPacketHandler<T extends IPacket> extends IPacketHandler 
 
     /**
      * Handle an incoming packet on the server.
+     *
+     * @param packet  The decoded packet payload.
+     * @param context The Fabric server networking context for the packet.
      */
     void receive(T packet, net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.Context context);
 }

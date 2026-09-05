@@ -98,7 +98,11 @@ public class GridRenderer extends MapRenderable {
         renderFogOfWar(context);
     }
 
-    /** Fill the entire viewport with the background colour. */
+    /**
+     * Fill the entire viewport with the background colour.
+     *
+     * @param context The draw context for the current frame.
+     */
     private void renderBackground(GuiGraphicsExtractor context) {
         context.fill(0, 0, camera.getViewportWidth(), camera.getViewportHeight(), COLOR_BACKGROUND);
     }
@@ -106,6 +110,8 @@ public class GridRenderer extends MapRenderable {
     /**
      * Draw an adaptive grid whose cell size (in blocks) is the smallest entry in {@link #GRID_STEPS}
      * that produces cells of at least {@link #MIN_CELL_PX} pixels on screen.
+     *
+     * @param context The rendering or networking context used by this operation.
      */
     private void renderGrid(GuiGraphicsExtractor context) {
 

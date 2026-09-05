@@ -26,18 +26,23 @@
 package com.duom.ardamaps.gui.screens;
 
 import com.duom.ardamaps.ArdaMapsClient;
-import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.guide.GuideScreenLink;
+import com.duom.ardamaps.core.KeyBinds;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.screens.rendering.BackgroundRenderer;
-import com.duom.ardamaps.gui.widgets.BookmarkButtonType;
-import com.duom.ardamaps.gui.widgets.BookmarkButtonWidget;
+import com.duom.ardamaps.gui.screens.rendering.ScreenHintsRenderer;
 import com.duom.ardamaps.gui.widgets.SearchWidget;
-import com.duom.ardamaps.gui.widgets.builders.BookmarkButtonBuilder;
+import com.duom.ardamaps.gui.widgets.TopBookmarkButtonType;
+import com.duom.ardamaps.gui.widgets.TopBookmarkButtonWidget;
+import com.duom.ardamaps.gui.widgets.builders.TopBookmarkButtonBuilder;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.PreeditEvent;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
@@ -52,14 +57,11 @@ import java.util.function.Function;
  */
 public abstract class ArdaMapsScreen extends Screen {
 
-    /** The size of the ArdaCraft logo used in the GUI. */
-    protected static final int ARDACRAFT_LOGO_SIZE = 64;
-
-    /** The half size of the ArdaCraft logo, used for centering purposes. */
-    protected static final int ARDACRAFT_LOGO_HALF_SIZE = ARDACRAFT_LOGO_SIZE / 2;
-
     /** The vertical offset for static buttons (map, configuration, exit) from the top of the content area. */
-    private static final int STATIC_BUTTON_OFFSET_Y = 12;
+    private static final int STATIC_BUTTON_OFFSET_Y = 16;
+
+    /** Source-space icon size for top bookmark tabs. */
+    private static final int TOP_BOOKMARK_ICON_SIZE = 48;
 
     /** The BackgroundRenderer instance responsible for rendering the background of the screen. */
     private final BackgroundRenderer guiBackgroundRenderer;
@@ -77,16 +79,19 @@ public abstract class ArdaMapsScreen extends Screen {
     private BackgroundRenderer.GuiLayout paddedContentArea;
 
     /** The map button widget, which opens the MapScreen when clicked. */
-    private BookmarkButtonWidget mapButton;
+    private TopBookmarkButtonWidget mapButton;
 
     /** The configuration button widget, which opens the ConfigurationScreen when clicked. */
-    private BookmarkButtonWidget configurationButton;
+    private TopBookmarkButtonWidget configurationButton;
 
     /** The guide button widget, which opens the GuideScreen when clicked. */
-    private BookmarkButtonWidget guideButton;
+    private TopBookmarkButtonWidget guideButton;
 
     /** The exit button widget, which closes the current screen and returns to the parent screen when clicked. */
-    private BookmarkButtonWidget exitButton;
+    private TopBookmarkButtonWidget exitButton;
+
+    /** Search overlay hosted by this screen, or null when search is closed. */
+    private @Nullable SearchWidget searchOverlay;
 
     /**
      * Constructs a new ArdaMapsScreen with the specified parent screen and title.
@@ -111,13 +116,26 @@ public abstract class ArdaMapsScreen extends Screen {
 
         invalidateCachedLayouts();
 
-        configureMapButton();
-        configureConfigurationButton();
-        configureGuideButton();
+        if (showsNavigationBookmarks()) {
+            configureMapButton();
+            configureConfigurationButton();
+            configureGuideButton();
+        }
+
         configureExitButton();
         updateStaticButtonsPositions();
 
         manageBookmarkButtons();
+    }
+
+    /**
+     * Whether the map, guide and configuration bookmarks should be shown on this screen.
+     *
+     * @return true when the navigation bookmarks should be created
+     */
+    protected boolean showsNavigationBookmarks() {
+
+        return true;
     }
 
     /**
@@ -154,13 +172,11 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureExitButton() {
 
-        this.exitButton = BookmarkButtonBuilder.create()
-                .setButtonStyle(BookmarkButtonType.BOOKMARK_CLOSE)
-                .setOnClick(() -> {
-                    this.onClose();
-                    minecraft.setScreen(null);
-                })
-                .setSize(ModConstants.SQUARED_BUTTON_SIZE, ModConstants.SQUARED_BUTTON_SIZE)
+        this.exitButton = TopBookmarkButtonBuilder.create()
+                .setButtonStyle(TopBookmarkButtonType.BOOKMARK_CLOSE)
+                .setOnClick(this::onExitButtonPressed)
+                .setIconSize(TOP_BOOKMARK_ICON_SIZE)
+                .setWidth(ModConstants.SQUARED_BUTTON_SIZE)
                 .setPosition(0, 0).build();
 
         this.exitButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.generic.close")));
@@ -169,17 +185,27 @@ public abstract class ArdaMapsScreen extends Screen {
     }
 
     /**
+     * Handles the exit bookmark, closing the ArdaMaps GUI entirely and returning to the game.
+     */
+    protected void onExitButtonPressed() {
+
+        this.onClose();
+        minecraft.setScreen(null);
+    }
+
+    /**
      * Configures the map button, which opens the MapScreen when clicked.
      */
     private void configureMapButton() {
 
-        this.mapButton = BookmarkButtonBuilder.create()
-                .setButtonStyle(BookmarkButtonType.BOOKMARK_MAP)
+        this.mapButton = TopBookmarkButtonBuilder.create()
+                .setButtonStyle(TopBookmarkButtonType.BOOKMARK_MAP)
                 .setOnClick(() -> {
                     ArdaMapsClient.CONFIG.setLastPage(GuideScreenLink.GUIDE_MAP);
                     minecraft.setScreen(new MapScreen(this));
                 })
-                .setSize(ModConstants.SQUARED_BUTTON_SIZE, ModConstants.SQUARED_BUTTON_SIZE)
+                .setIconSize(TOP_BOOKMARK_ICON_SIZE)
+                .setWidth(ModConstants.SQUARED_BUTTON_SIZE)
                 .setPosition(0, 0).build();
 
         this.mapButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.map.tooltip")));
@@ -193,13 +219,14 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureConfigurationButton() {
 
-        this.configurationButton = BookmarkButtonBuilder.create()
-                .setButtonStyle(BookmarkButtonType.BOOKMARK_CONFIGURATION)
+        this.configurationButton = TopBookmarkButtonBuilder.create()
+                .setButtonStyle(TopBookmarkButtonType.BOOKMARK_CONFIGURATION)
                 .setOnClick(() -> {
                     ArdaMapsClient.CONFIG.setLastPage(GuideScreenLink.GUIDE_CONFIG);
                     minecraft.setScreen(new ConfigurationScreen(this));
                 })
-                .setSize(ModConstants.SQUARED_BUTTON_SIZE, ModConstants.SQUARED_BUTTON_SIZE)
+                .setIconSize(TOP_BOOKMARK_ICON_SIZE)
+                .setWidth(ModConstants.SQUARED_BUTTON_SIZE)
                 .setPosition(0, 0).build();
 
         this.configurationButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.configuration.tooltip")));
@@ -212,10 +239,11 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureGuideButton() {
 
-        this.guideButton = BookmarkButtonBuilder.create()
-                .setButtonStyle(BookmarkButtonType.BOOKMARK_GUIDE)
+        this.guideButton = TopBookmarkButtonBuilder.create()
+                .setButtonStyle(TopBookmarkButtonType.BOOKMARK_GUIDE)
                 .setOnClick(() -> minecraft.setScreen(new GuideScreen(this, ArdaMapsClient.CONFIG.getLastPage())))
-                .setSize(ModConstants.SQUARED_BUTTON_SIZE, ModConstants.SQUARED_BUTTON_SIZE)
+                .setIconSize(TOP_BOOKMARK_ICON_SIZE)
+                .setWidth(ModConstants.SQUARED_BUTTON_SIZE)
                 .setPosition(0, 0).build();
 
         this.guideButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.guide.tooltip")));
@@ -229,8 +257,13 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     @Override
     public void removed() {
+        closeSearchOverlay();
         super.removed();
         ArdaMapsClient.CONFIG_MANAGER.save();
+    }
+
+    public void closeSearchOverlay() {
+        searchOverlay = null;
     }
 
     /**
@@ -315,42 +348,71 @@ public abstract class ArdaMapsScreen extends Screen {
         var y = contentArea.topLeftY();
 
         if (exitButton != null)
-            this.exitButton.setPosition(rightX - ModConstants.BUTTON_HEIGHT, y - STATIC_BUTTON_OFFSET_Y);
+            this.exitButton.setPosition(rightX - ModConstants.SQUARED_BUTTON_SIZE, y - STATIC_BUTTON_OFFSET_Y);
 
         if (configurationButton != null)
-            this.configurationButton.setPosition(rightX - ModConstants.BUTTON_HEIGHT * 2, y - STATIC_BUTTON_OFFSET_Y);
+            this.configurationButton.setPosition(rightX - ModConstants.SQUARED_BUTTON_SIZE * 2, y - STATIC_BUTTON_OFFSET_Y);
 
         if (guideButton != null)
             this.guideButton.setPosition(contentArea.topLeftX(), y - STATIC_BUTTON_OFFSET_Y);
 
         if (mapButton != null) {
-            var offsetX = guideButton != null ? ModConstants.BUTTON_HEIGHT : 0;
+            var offsetX = guideButton != null ? ModConstants.SQUARED_BUTTON_SIZE : 0;
             this.mapButton.setPosition(contentArea.topLeftX() + offsetX, y - STATIC_BUTTON_OFFSET_Y);
         }
     }
 
     /**
-     * Key press handling
+     * Extracts this screen's render state, then renders the hosted search overlay when present.
      *
-     * @param event the initiating event
-     * @return true if the event was consumed, false otherwise
+     * @param context the draw context
+     * @param mouseX  the x position of the mouse cursor
+     * @param mouseY  the y position of the mouse cursor
+     * @param delta   the time since last frame
      */
     @Override
-    public boolean keyPressed(KeyEvent event) {
+    public final void extractRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        if (searchOverlay != null) {
+            extractScreenRenderState(context, -1, -1, delta);
+            searchOverlay.extractRenderState(context, mouseX, mouseY, delta);
+        } else {
+            extractScreenRenderState(context, mouseX, mouseY, delta);
+            ScreenHintsRenderer.render(context, font, width, height, getScreenHints());
+        }
+    }
+
+    /**
+     * Gets the input hints displayed for this screen.
+     *
+     * @return The screen input hints.
+     */
+    protected List<ScreenHintsRenderer.Hint> getScreenHints() {
+
+        return List.of();
+    }
+
+    protected void extractScreenRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        super.extractRenderState(context, mouseX, mouseY, delta);
+    }
+
+    @Override
+    public final boolean keyPressed(@NonNull KeyEvent event) {
+        if (searchOverlay != null) return searchOverlay.keyPressed(event);
+        return screenKeyPressed(event);
+    }
+
+    protected boolean screenKeyPressed(KeyEvent event) {
         int keyCode = event.key();
         int modifiers = event.modifiers();
 
+        if (KeyBinds.OPEN_MAP.matches(event) && !isTextInputFocused()) {
+            onClose();
+            return true;
+        }
+
         // Detect Ctrl+F (or Cmd+F on macOS)
         if (keyCode == GLFW.GLFW_KEY_F && (modifiers & (GLFW.GLFW_MOD_CONTROL | GLFW.GLFW_MOD_SUPER)) != 0 && isSearchable()) {
-
-            SearchWidget searchWidget = new SearchWidget(this);
-            searchWidget.setSearchFunction(getSearchFunction());
-            searchWidget.setResultDisplayFunction(getSearchResultRenderFunction());
-            searchWidget.setResultTooltipFunction(getSearchResultTooltipFunction());
-            searchWidget.setOnSearchResultSelected(getOnSearcheResultSelectedFunction());
-
-            Client.mc().setScreen(searchWidget);
-
+            openSearchOverlay();
             return true;
         }
 
@@ -358,9 +420,30 @@ public abstract class ArdaMapsScreen extends Screen {
     }
 
     /**
+     * Checks whether keyboard input is currently owned by a text field.
+     *
+     * @return True when the focused child is a text input.
+     */
+    private boolean isTextInputFocused() {
+
+        return getFocused() instanceof EditBox;
+    }
+
+    /**
      * @return true if this screen is searchable false otherwise
      */
     protected abstract boolean isSearchable();
+
+    private void openSearchOverlay() {
+        SearchWidget searchWidget = new SearchWidget(this);
+        searchWidget.setSearchFunction(getSearchFunction());
+        searchWidget.setResultDisplayFunction(getSearchResultRenderFunction());
+        searchWidget.setResultTooltipFunction(getSearchResultTooltipFunction());
+        searchWidget.setOnSearchResultSelected(getOnSearcheResultSelectedFunction());
+
+        searchOverlay = searchWidget;
+        searchOverlay.init(width, height);
+    }
 
     /**
      * Gets the search function that is called when searching an element on screen via the search widget.
@@ -393,6 +476,109 @@ public abstract class ArdaMapsScreen extends Screen {
      * @return the function called when a search result is selected
      */
     protected abstract Function<Object, Void> getOnSearcheResultSelectedFunction();
+
+    @Override
+    public final boolean keyReleased(@NonNull KeyEvent event) {
+        if (searchOverlay != null) return searchOverlay.keyReleased(event);
+        return screenKeyReleased(event);
+    }
+
+    protected boolean screenKeyReleased(KeyEvent event) {
+        return super.keyReleased(event);
+    }
+
+    @Override
+    public final boolean charTyped(@NonNull CharacterEvent event) {
+        if (searchOverlay != null) return searchOverlay.charTyped(event);
+        return screenCharTyped(event);
+    }
+
+    protected boolean screenCharTyped(CharacterEvent event) {
+        return super.charTyped(event);
+    }
+
+    @Override
+    public final boolean preeditUpdated(PreeditEvent event) {
+        if (searchOverlay != null) return searchOverlay.preeditUpdated(event);
+        return screenPreeditUpdated(event);
+    }
+
+    protected boolean screenPreeditUpdated(PreeditEvent event) {
+        return super.preeditUpdated(event);
+    }
+
+    @Override
+    public final boolean mouseClicked(@NonNull MouseButtonEvent event, boolean doubleClick) {
+        if (searchOverlay != null) return searchOverlay.mouseClicked(event, doubleClick);
+        return screenMouseClicked(event, doubleClick);
+    }
+
+    protected boolean screenMouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        return super.mouseClicked(event, doubleClick);
+    }
+
+    @Override
+    public final boolean mouseReleased(@NonNull MouseButtonEvent event) {
+        if (searchOverlay != null) return searchOverlay.mouseReleased(event);
+        return screenMouseReleased(event);
+    }
+
+    protected boolean screenMouseReleased(MouseButtonEvent event) {
+        return super.mouseReleased(event);
+    }
+
+    @Override
+    public final boolean mouseDragged(@NonNull MouseButtonEvent event, double dx, double dy) {
+        if (searchOverlay != null) return searchOverlay.mouseDragged(event, dx, dy);
+        return screenMouseDragged(event, dx, dy);
+    }
+
+    protected boolean screenMouseDragged(MouseButtonEvent event, double dx, double dy) {
+        return super.mouseDragged(event, dx, dy);
+    }
+
+    @Override
+    public final boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (searchOverlay != null) return searchOverlay.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+        return screenMouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    protected boolean screenMouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    @Override
+    public final void mouseMoved(double mouseX, double mouseY) {
+        if (searchOverlay != null) {
+            searchOverlay.mouseMoved(mouseX, mouseY);
+        } else {
+            screenMouseMoved(mouseX, mouseY);
+        }
+    }
+
+    protected void screenMouseMoved(double mouseX, double mouseY) {
+        super.mouseMoved(mouseX, mouseY);
+    }
+
+    @Override
+    public final void tick() {
+        screenTick();
+        if (searchOverlay != null) searchOverlay.tick();
+    }
+
+    protected void screenTick() {
+        super.tick();
+    }
+
+    @Override
+    public final void resize(int width, int height) {
+        screenResize(width, height);
+        if (searchOverlay != null) searchOverlay.init(width, height);
+    }
+
+    protected void screenResize(int width, int height) {
+        super.resize(width, height);
+    }
 
     /**
      * Returns the amount of padding to apply around the content area when calculating the padded content area.

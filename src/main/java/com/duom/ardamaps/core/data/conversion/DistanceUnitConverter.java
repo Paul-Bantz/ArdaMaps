@@ -28,49 +28,104 @@ package com.duom.ardamaps.core.data.conversion;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.UnitSystem;
 import com.duom.ardamaps.core.data.config.Dimension;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Locale;
 
 /**
  * Utility class for converting distances between in-game blocks and real-world units.
  */
 public class DistanceUnitConverter {
 
+    /** Conversion factor from kilometers to miles. */
     public static final float KM_TO_MILES = 0.621371f;
 
+    /** Kilometer threshold below which metric distances are displayed as meters. */
     public static final double METRIC_UNIT_SWITCH_THRESHOLD = 1d;
 
+    /** Mile threshold below which imperial distances are displayed as feet. */
     public static final double IMPERIAL_UNIT_SWITCH_THRESHOLD = 0.5d;
 
+    /** Conversion factor from kilometers to meters. */
     public static final double KM_TO_METERS = 1000d;
 
+    /** Conversion factor from miles to feet. */
     public static final double MILES_TO_FEET = 5280d;
 
     /**
-     * Converts in-game blocks to a string representation in real-world units (kilometers or miles)
+     * Converts in-game blocks to a localized component in real-world units (kilometers or miles)
      * based on the configured unit system.
      *
      * @param dimension The dimension definition to use for the conversion.
      * @param nbBlocks  Distance in blocks.
-     * @return A string representing the distance in the selected real-world units.
+     * @return A component representing the distance in the selected real-world units.
      */
-    public static @NotNull String asRealWorldUnits(Dimension dimension, double nbBlocks) {
+    public static @NotNull Component asRealWorldUnits(Dimension dimension, double nbBlocks) {
 
-        if (dimension == null) return "";
+        if (dimension == null) return Component.empty();
 
         double distance = blocksToRealWorldUnits(dimension, nbBlocks);
+        UnitSystem unitSystem = ArdaMapsClient.CONFIG.getUnitSystem();
+        String formattedDistance;
+        String unitKey;
 
-        if (ArdaMapsClient.CONFIG.getUnitSystem() == UnitSystem.IMPERIAL) {
+        if (unitSystem == UnitSystem.IMPERIAL) {
 
-            if (distance < IMPERIAL_UNIT_SWITCH_THRESHOLD)
-                return String.format("%.1f feet", distance * MILES_TO_FEET);
+            if (distance < IMPERIAL_UNIT_SWITCH_THRESHOLD) {
+                formattedDistance = formatDistance("%.1f", distance * MILES_TO_FEET);
+                unitKey = unitSystem.getDisplayNameKey() + ".subunit";
+            } else {
+                formattedDistance = formatDistance("%.1f", distance);
+                unitKey = unitSystem.getDisplayNameKey() + ".unit";
+            }
 
-            return String.format("%.1f miles", distance);
+        } else if (distance < METRIC_UNIT_SWITCH_THRESHOLD) {
+
+            formattedDistance = formatDistance("%.0f", distance * KM_TO_METERS);
+            unitKey = unitSystem.getDisplayNameKey() + ".subunit";
+
+        } else {
+
+            formattedDistance = formatDistance("%.0f", distance);
+            unitKey = unitSystem.getDisplayNameKey() + ".unit";
         }
 
-        if (distance < METRIC_UNIT_SWITCH_THRESHOLD)
-            return String.format("%.0f meters", distance * KM_TO_METERS);
+        return Component.literal(formattedDistance)
+                .append(" ")
+                .append(Component.translatable(unitKey));
+    }
 
-        return String.format("%.0f km", distance);
+    /**
+     * Formats a numeric distance using the current Minecraft language locale when available.
+     *
+     * @param pattern The {@link String#format} pattern.
+     * @param value   The numeric value to format.
+     * @return The formatted number.
+     */
+    private static String formatDistance(String pattern, double value) {
+
+        return String.format(selectedLocale(), pattern, value);
+    }
+
+    /**
+     * Resolves the current Minecraft language as a {@link Locale}, falling back for tests and early startup.
+     *
+     * @return The selected locale, or {@link Locale#ROOT} when unavailable.
+     */
+    private static Locale selectedLocale() {
+
+        try {
+            var minecraft = Minecraft.getInstance();
+            String selected = minecraft.getLanguageManager().getSelected();
+            if (!selected.isBlank())
+                return Locale.forLanguageTag(selected.replace('_', '-'));
+        } catch (LinkageError | RuntimeException ignored) {
+            return Locale.ROOT;
+        }
+
+        return Locale.ROOT;
     }
 
     /**
@@ -78,6 +133,7 @@ public class DistanceUnitConverter {
      *
      * @param dimension The dimension definition to use for the conversion.
      * @param blocks    Distance in blocks.
+     * @return Distance expressed in the currently selected real-world unit system.
      */
     public static double blocksToRealWorldUnits(Dimension dimension, double blocks) {
 
@@ -92,7 +148,8 @@ public class DistanceUnitConverter {
     /**
      * Converts a distance in miles to the corresponding distance in in-game blocks based on Ardacraft scale.
      *
-     * @param miles Distance in miles.
+     * @param dimension The dimension definition whose scale is used for conversion.
+     * @param miles     Distance in miles.
      * @return Distance in blocks.
      */
     public static float milesToBlocks(Dimension dimension, float miles) {

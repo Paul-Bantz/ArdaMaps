@@ -45,8 +45,10 @@ import java.util.UUID;
  */
 public record LocationsRequestPacket(UUID requestId, Date date) implements IRespondablePacket<LocationsRequestPacket> {
 
+    /** Fabric custom payload type for this packet. */
     public static final CustomPacketPayload.Type<LocationsRequestPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_data_request"));
 
+    /** Stream codec used to serialize and deserialize location data requests. */
     public static final StreamCodec<RegistryFriendlyByteBuf, LocationsRequestPacket> CODEC = IPacket.codec(LocationsRequestPacket::read);
 
     /**

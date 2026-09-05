@@ -3,8 +3,8 @@
   "marker_background_visited": "icons/map_marker_visited",
   "map_marker_background_size": 52,
   "map_marker_icon_size": 32,
-  "map_marker_icon_x_offset": 10,
-  "map_marker_icon_y_offset": 10,
+  "map_marker_icon_x_offset": 11,
+  "map_marker_icon_y_offset": 11,
   "unknown_type": {
     "name": "Unknown",
     "icon": "icons/icon_unknown",

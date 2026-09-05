@@ -129,6 +129,7 @@ public final class GuideLoader {
         try (Reader reader = new InputStreamReader(resource.get().open(), StandardCharsets.UTF_8)) {
 
             titles = GSON.fromJson(reader, Map.class);
+            if (titles == null) titles = Map.of();
         } catch (Exception e) {
 
             LOGGER.error("[GuideLoader] Failed to load titles.json", e);

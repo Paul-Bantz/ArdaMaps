@@ -44,20 +44,28 @@ public class PacketRegistry {
     /** Server-bound packet handlers */
     public static final GuidebookRequestHandler GUIDEBOOK_REQUEST_HANDLER = register(new GuidebookRequestHandler());
 
+    /** Map sources request constant. */
     public static final MapSourcesRequestHandler MAP_SOURCES_REQUEST = register(new MapSourcesRequestHandler());
 
+    /** Locations update request constant. */
     public static final LocationsRequestHandler LOCATIONS_UPDATE_REQUEST = register(new LocationsRequestHandler());
 
-    public static final RegionsLutRequestHandler REGION_LUT_UPDATE_REQUEST = register(new RegionsLutRequestHandler());
+    /** Region geometry update request constant. */
+    public static final RegionsGeometryRequestHandler REGION_GEOMETRY_UPDATE_REQUEST = register(new RegionsGeometryRequestHandler());
 
+    /** Player teleport request constant. */
     public static final PlayerTeleportHandler PLAYER_TELEPORT_REQUEST = register(new PlayerTeleportHandler());
 
+    /** Player ranged teleport request constant. */
     public static final PlayerRangedTeleportHandler PLAYER_RANGED_TELEPORT_REQUEST = register(new PlayerRangedTeleportHandler());
 
+    /** Player warp request constant. */
     public static final PlayerWarpHandler PLAYER_WARP_REQUEST = register(new PlayerWarpHandler());
 
+    /** Location details request constant. */
     public static final LocationDetailsRequestHandler LOCATION_DETAILS_REQUEST = register(new LocationDetailsRequestHandler());
 
+    /** Player exploration event constant. */
     public static final PlayerExplorationEventHandler PLAYER_EXPLORATION_EVENT = registerClient(new PlayerExplorationEventHandler());
 
     /** Class logger */
@@ -194,7 +202,7 @@ public class PacketRegistry {
         clearPendingResponses(GUIDEBOOK_REQUEST_HANDLER);
         clearPendingResponses(MAP_SOURCES_REQUEST);
         clearPendingResponses(LOCATIONS_UPDATE_REQUEST);
-        clearPendingResponses(REGION_LUT_UPDATE_REQUEST);
+        clearPendingResponses(REGION_GEOMETRY_UPDATE_REQUEST);
         clearPendingResponses(PLAYER_TELEPORT_REQUEST);
         clearPendingResponses(PLAYER_RANGED_TELEPORT_REQUEST);
         clearPendingResponses(PLAYER_WARP_REQUEST);

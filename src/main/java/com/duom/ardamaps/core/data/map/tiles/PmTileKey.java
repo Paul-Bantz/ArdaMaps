@@ -42,18 +42,6 @@ public class PmTileKey extends TileKey {
     }
 
     /**
-     * Convert ZXY tile coordinates to a PMTiles tile ID using Hilbert curve indexing.
-     *
-     * @see <a href="https://github.com/tileverse-io/tileverse-pmtiles/blob/main/docs/pmtiles_format_specification.md#22-tile-id-calculation">PMTiles Tile ID Calculation</a> for details.
-     */
-    public long toTileId() {
-
-        long zoomOffset = ((1L << (2 * z)) - 1) / 3;
-        long hilbert = hilbertIndex(z, x, y);
-        return zoomOffset + hilbert;
-    }
-
-    /**
      * Exclusive upper bound on TileIDs for all tiles at zoom {@code <= maxZoomInclusive}.
      *
      * @param maxZoomInclusive Maximum zoom included in the prefix.
@@ -62,6 +50,19 @@ public class PmTileKey extends TileKey {
     public static long tileIdUpperBound(int maxZoomInclusive) {
 
         return (((1L << (2 * (maxZoomInclusive + 1))) - 1) / 3);
+    }
+
+    /**
+     * Convert ZXY tile coordinates to a PMTiles tile ID using Hilbert curve indexing.
+     *
+     * @return The PMTiles Hilbert tile identifier for this key.
+     * @see <a href="https://github.com/tileverse-io/tileverse-pmtiles/blob/main/docs/pmtiles_format_specification.md#22-tile-id-calculation">PMTiles Tile ID Calculation</a> for details.
+     */
+    public long toTileId() {
+
+        long zoomOffset = ((1L << (2 * z)) - 1) / 3;
+        long hilbert = hilbertIndex(z, x, y);
+        return zoomOffset + hilbert;
     }
 
     /**

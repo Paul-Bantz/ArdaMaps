@@ -41,6 +41,8 @@ public class PmTilesMapCamera extends TilesMapCamera {
      *
      * @param viewportWidth  Viewport width in pixels
      * @param viewPortHeight Viewport height in pixels
+     * @param centerX        The horizontal center coordinate.
+     * @param centerY        The vertical center coordinate.
      */
     public PmTilesMapCamera(int viewportWidth, int viewPortHeight, int centerX, int centerY) {
 
@@ -84,6 +86,17 @@ public class PmTilesMapCamera extends TilesMapCamera {
         return getRequestTiles(tileZoom, 0);
     }
 
+    /**
+     * Get current zoom level clamped allowed by the tiles source configuration
+     * Zoom levels outside this range are possible by scaling the underlying tiles,
+     *
+     * @return Current tile zoom level
+     */
+    @Override
+    public int getTileSourceClampedZoom() {
+        return (int) Math.clamp(zoom, minTileZoom, maxTileZoom);
+    }
+
     @Override
     public Set<PmTileKey> getRequestTiles(int tileZoom, int rings) {
 
@@ -121,17 +134,6 @@ public class PmTilesMapCamera extends TilesMapCamera {
         maxTileY = Math.min(maxTileY + expansion, tilesBoundY);
 
         return getVisibleExploredTiles(tileZoom, minTileX, maxTileX, minTileY, maxTileY, blocksPerTile);
-    }
-
-    /**
-     * Get current zoom level clamped allowed by the tiles source configuration
-     * Zoom levels outside this range are possible by scaling the underlying tiles,
-     *
-     * @return Current tile zoom level
-     */
-    @Override
-    public int getTileSourceClampedZoom() {
-        return (int) CameraMath.clamp(zoom, minTileZoom, maxTileZoom);
     }
 
     /**
@@ -174,6 +176,7 @@ public class PmTilesMapCamera extends TilesMapCamera {
      * Get current scale factor at the given zoom (pixels per world unit)
      *
      * @param zoom the zoom level to get the scale for
+     * @return The scale factor in pixels per world unit.
      */
     private double scale(double zoom) {
 
@@ -241,6 +244,9 @@ public class PmTilesMapCamera extends TilesMapCamera {
      * Get render scale (pixels per world unit) at the given zoom level
      * This is scale adjusted by tile scale factor, this affects
      * the size of rendered tiles on screen and the coordinates conversion
+     *
+     * @param zoom The map zoom level.
+     * @return The render scale in screen pixels per world unit.
      */
     private double renderScale(double zoom) {
         return scale(zoom) * this.scale;
@@ -343,7 +349,7 @@ public class PmTilesMapCamera extends TilesMapCamera {
         if (Double.isNaN(preferredRenderScale)) return;
 
         double newZoom = (Math.log(preferredRenderScale / scale) / Math.log(2.0)) + identityZoom;
-        newZoom = CameraMath.clamp(newZoom, minCameraZoom, maxCameraZoom);
+        newZoom = clampToZoomBounds(newZoom);
         this.zoom = newZoom;
         this.targetCameraZoom = newZoom;
 

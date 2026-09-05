@@ -33,6 +33,7 @@ import com.duom.ardamaps.core.data.Vec2d;
  */
 public class GridCamera extends MapCamera {
 
+    /** Identity constant. */
     private static final int IDENTITY = 8;
 
     /**
@@ -116,8 +117,8 @@ public class GridCamera extends MapCamera {
     public void setZoomToMatchVisualPixelsPerBlock() {
         if (!Double.isNaN(preferredRenderScale) && preferredRenderScale > 0) {
             double targetZoom = IDENTITY + Math.log(preferredRenderScale) / Math.log(2.0);
-            zoom = targetZoom;
-            targetCameraZoom = targetZoom;
+            zoom = clampToZoomBounds(targetZoom);
+            targetCameraZoom = zoom;
         }
     }
 

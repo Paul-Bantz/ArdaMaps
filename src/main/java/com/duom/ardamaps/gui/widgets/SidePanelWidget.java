@@ -38,21 +38,23 @@ import com.duom.ardamaps.core.networking.PacketRegistry;
 import com.duom.ardamaps.core.networking.packets.server.LocationDetailsRequestPacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerWarpPacket;
-import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.screens.MapScreen;
-import com.duom.ardamaps.gui.screens.ScreenRenderingUtils;
+import com.duom.ardamaps.gui.RenderingUtils;
 import com.duom.ardamaps.gui.screens.rendering.TextContentBlockRenderer;
-import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
+import com.duom.ardamaps.gui.widgets.popup.PopupCloseButton;
+import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import lombok.Getter;
 import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.navigation.FocusNavigationEvent;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.ClickEvent;
@@ -108,6 +110,9 @@ public class SidePanelWidget implements GuiEventListener {
     /** The camera zoom when this location is focused */
     private final double cameraFocusZoom;
 
+    /** Callback that closes the owning side panel. */
+    private final Runnable onClose;
+
     /** The detailed information about the location */
     private LocationDetails locationDetails;
 
@@ -149,13 +154,13 @@ public class SidePanelWidget implements GuiEventListener {
     private List<ContentBlock> descriptionBlocks = List.of();
 
     /** Set waypoint button */
-    private StyledButtonWidget setWaypointButton;
+    private Button setWaypointButton;
 
     /** Teleport button */
-    private StyledButtonWidget teleportButton;
+    private Button teleportButton;
 
     /** Explore in depth button */
-    private StyledButtonWidget exploreInDepthButton;
+    private Button exploreInDepthButton;
 
     /**
      * Constructs a SidePanelWidget.
@@ -165,8 +170,10 @@ public class SidePanelWidget implements GuiEventListener {
      * @param displayedLocation        The location to display details for
      * @param cameraFocusWorldPosition The camera focus offset in world coordinates
      * @param cameraFocusZoom          the camera focus zoom
+     * @param onClose                  Callback that closes the owning side panel.
      */
-    public SidePanelWidget(Screen parent, Font textRenderer, LocationClient displayedLocation, Vec2d cameraFocusWorldPosition, double cameraFocusZoom) {
+    public SidePanelWidget(Screen parent, Font textRenderer, LocationClient displayedLocation,
+                           Vec2d cameraFocusWorldPosition, double cameraFocusZoom, Runnable onClose) {
 
         this.parent = parent;
         this.textRenderer = textRenderer;
@@ -174,6 +181,7 @@ public class SidePanelWidget implements GuiEventListener {
         this.textContentBlockRenderer = new TextContentBlockRenderer(textRenderer, ModConstants.COLOR_DARK_BROWN);
         this.cameraFocusWorldPosition = cameraFocusWorldPosition;
         this.cameraFocusZoom = cameraFocusZoom;
+        this.onClose = onClose;
 
         init();
     }
@@ -187,25 +195,27 @@ public class SidePanelWidget implements GuiEventListener {
 
         /* Buttons */
 
-        setWaypointButton = StyledButtonBuilder.create()
-                .setText(Component.translatable("ardamaps.client.generic.set.waypoint"))
-                .setOnClick(() -> ArdaMapsClient.CONFIG.setWaypoint(displayedLocation.getPosition().x(), displayedLocation.getPosition().z(), displayedLocation.getWorld()))
-                .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
+        setWaypointButton = Button.builder(
+                        Component.translatable("ardamaps.client.generic.set.waypoint"),
+                        _ -> ArdaMapsClient.CONFIG.setWaypoint(displayedLocation.getPosition().x(), displayedLocation.getPosition().z(), displayedLocation.getWorld()))
+                .size(Button.SMALL_WIDTH, Button.DEFAULT_HEIGHT)
                 .build();
 
-        teleportButton = StyledButtonBuilder.create()
-                .setText(Component.translatable("ardamaps.client.generic.teleport"))
-                .setOnClick(this::requestTeleport)
-                .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
+        teleportButton = Button.builder(
+                        Component.translatable("ardamaps.client.generic.teleport"),
+                        _ -> {
+
+                            requestTeleport();
+                            onClose.run();
+                        })
+                .size(Button.SMALL_WIDTH, Button.DEFAULT_HEIGHT)
                 .build();
 
-        exploreInDepthButton = StyledButtonBuilder.create()
-                .setText(Component.translatable("ardamaps.client.map.screen.side.panel.explore_in_depth"))
-                .setOnClick(this::exploreInDepth)
-                .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
+        exploreInDepthButton = Button.builder(
+                        Component.translatable("ardamaps.client.map.screen.side.panel.explore_in_depth"),
+                        _ -> exploreInDepth())
+                .size(Button.SMALL_WIDTH, Button.DEFAULT_HEIGHT)
                 .build();
-
-        assert exploreInDepthButton != null;
 
         if (displayedLocation.isVisited()) {
             exploreInDepthButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.side.panel.explore_in_depth.tooltip")));
@@ -351,6 +361,7 @@ public class SidePanelWidget implements GuiEventListener {
 
         renderBackground(context);
         renderGuiElements(context, mouseX, mouseY);
+        PopupCloseButton.render(context, screenX1, screenY1, width, mouseX, mouseY);
     }
 
     /**
@@ -360,12 +371,8 @@ public class SidePanelWidget implements GuiEventListener {
      */
     private void renderBackground(GuiGraphicsExtractor context) {
 
-        GuiTextures.blitNineSliced(context, ModConstants.PAPER_TEXTURE,
-                screenX1, screenY1, screenX2 - screenX1, screenY2 - screenY1,
-                64, 64,
-                256, 256,
-                0, 0,
-                ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, ModConstants.PAPER_SPRITE,
+                screenX1, screenY1, screenX2 - screenX1, screenY2 - screenY1);
 
     }
 
@@ -387,19 +394,20 @@ public class SidePanelWidget implements GuiEventListener {
                 && !displayedLocation.getPathfinder().isEmpty();
 
         y += renderTitle(context, centerX, y, mouseX, mouseY) + ELEMENT_SPACING * 3;
-        y += ScreenRenderingUtils.renderSeparator(context, usableWidth, screenX1 + PADDING, y) + ELEMENT_SPACING * 3;
+        y += RenderingUtils.renderSeparator(context, usableWidth, screenX1 + PADDING, y) + ELEMENT_SPACING * 3;
 
-        var bottomButtonsSpacing = ModConstants.BUTTON_HEIGHT + ELEMENT_SPACING + PADDING;
-        if (hasProjectInfo) bottomButtonsSpacing += ModConstants.BUTTON_HEIGHT;
+        var bottomButtonsSpacing = Button.DEFAULT_HEIGHT + Button.DEFAULT_SPACING + PADDING;
+        if (hasProjectInfo) bottomButtonsSpacing += Button.DEFAULT_HEIGHT + Button.DEFAULT_SPACING;
 
         var remainingVisibleHeight = screenY2 - y - bottomButtonsSpacing;
 
-        y += renderDescription(context, mouseX, mouseY, usableWidth, centerX, y, halfUsableWidth, remainingVisibleHeight) + ELEMENT_SPACING;
+        y += renderDescription(context, mouseX, mouseY, usableWidth, centerX, y, halfUsableWidth, remainingVisibleHeight) + Button.DEFAULT_SPACING;
 
         if (hasProjectInfo)
-            y += renderExploreInDepth(context, centerX, y, mouseX, mouseY) + ELEMENT_SPACING * 3;
+            y += renderExploreInDepth(context, screenX1 + PADDING, usableWidth, y, mouseX, mouseY)
+                    + Button.DEFAULT_SPACING;
 
-        renderButtons(context, usableWidth, screenX1, y, mouseX, mouseY);
+        renderButtons(context, screenX1 + PADDING, usableWidth, y, mouseX, mouseY);
     }
 
     /**
@@ -419,26 +427,12 @@ public class SidePanelWidget implements GuiEventListener {
         this.titleX = centerX - (titleWidth / 2);
         this.titleY = y;
 
-        context.pose().pushMatrix();
-        context.pose().translate(titleX, titleY);
-        context.pose().scale(ModConstants.H1_TEXT_SCALE, ModConstants.H1_TEXT_SCALE);
-
         int color = mouseOverTitle(mouseX, mouseY) ?
                 ModConstants.COLOR_BLUE_HIGHLIGHT :
                 ModConstants.COLOR_BLUE;
+        if (mouseOverTitle(mouseX, mouseY)) context.requestCursor(CursorTypes.POINTING_HAND);
 
-        context.text(
-                textRenderer,
-                locationDetails.name(),
-                0,
-                0,
-                color,
-                false
-        );
-
-        context.pose().popMatrix();
-
-        return (int) (textRenderer.lineHeight * ModConstants.H1_TEXT_SCALE);
+        return RenderingUtils.renderH1(context, textRenderer, locationDetails.name(), titleX, titleY, color);
     }
 
     /**
@@ -488,13 +482,15 @@ public class SidePanelWidget implements GuiEventListener {
         // Handle hover tooltip and click events
         Style hoveredStyle = result.hoveredStyle;
         if (hoveredStyle != null) {
-            if (hoveredStyle.getHoverEvent() instanceof HoverEvent.ShowText(Component value)) {
-                context.setTooltipForNextFrame(textRenderer, value, (int) mouseX, (int) mouseY);
-            }
 
-            if (clicked && hoveredStyle.getClickEvent() instanceof ClickEvent.OpenUrl) {
+            if (hoveredStyle.getHoverEvent() instanceof HoverEvent.ShowText(Component value))
+                context.setTooltipForNextFrame(textRenderer, value, (int) mouseX, (int) mouseY);
+
+            if (hoveredStyle.getClickEvent() instanceof ClickEvent.OpenUrl)
+                context.requestCursor(CursorTypes.POINTING_HAND);
+
+            if (clicked && hoveredStyle.getClickEvent() instanceof ClickEvent.OpenUrl)
                 handleLinkClick(hoveredStyle.getClickEvent());
-            }
         }
 
         return visibleHeight;
@@ -504,31 +500,35 @@ public class SidePanelWidget implements GuiEventListener {
      * Renders the explore in-depth button of the location if more information is available.
      *
      * @param context The drawing context
-     * @param centerX The centre X coordinate of the panel
-     * @param y       The Y coordinate for rendering the button
-     * @param mouseX  Current mouse X position
-     * @param mouseY  Current mouse Y position
+     * @param startX      The X coordinate of the usable panel area
+     * @param usableWidth The width available for panel content
+     * @param y           The Y coordinate for rendering the button
+     * @param mouseX      Current mouse X position
+     * @param mouseY      Current mouse Y position
      * @return The height of the rendered button
      */
-    private int renderExploreInDepth(GuiGraphicsExtractor context, int centerX, int y, int mouseX, int mouseY) {
+    private int renderExploreInDepth(GuiGraphicsExtractor context, int startX, int usableWidth,
+                                     int y, int mouseX, int mouseY) {
 
-        exploreInDepthButton.setPosition(centerX - ModConstants.BUTTON_WIDTH / 2, y);
+        exploreInDepthButton.setPosition(startX, y);
+        exploreInDepthButton.setWidth(usableWidth);
         exploreInDepthButton.extractRenderState(context, mouseX, mouseY, 0);
 
-        return ModConstants.BUTTON_HEIGHT;
+        return Button.DEFAULT_HEIGHT;
     }
 
     /**
      * Renders the action buttons within the side panel.
      *
      * @param context     The drawing context
-     * @param usableWidth The usable width for button rendering
-     * @param x           The X coordinate for rendering the buttons
+     * @param startX      The X coordinate of the usable panel area
+     * @param usableWidth The width available for panel content
      * @param y           The Y coordinate for rendering the buttons
      * @param mouseX      The current mouse X position
      * @param mouseY      The current mouse Y position
      */
-    private void renderButtons(GuiGraphicsExtractor context, int usableWidth, int x, int y, int mouseX, int mouseY) {
+    private void renderButtons(GuiGraphicsExtractor context, int startX, int usableWidth,
+                               int y, int mouseX, int mouseY) {
 
         // Check that the teleport and set waypoint doesn't lead to world origin
         if (displayedLocation.getPosition() != null) {
@@ -540,23 +540,23 @@ public class SidePanelWidget implements GuiEventListener {
                 return;
         }
 
-        var buttonWidth = (usableWidth - ELEMENT_SPACING) / 2;
-
         if (!displayedLocation.isRevealed() || !displayedLocation.isVisited()) {
 
-            setWaypointButton.setX(x + PADDING + (usableWidth - ModConstants.BUTTON_WIDTH) / 2);
+            setWaypointButton.setX(startX);
             setWaypointButton.setY(y);
-            setWaypointButton.setWidth(ModConstants.BUTTON_WIDTH);
+            setWaypointButton.setWidth(usableWidth);
             setWaypointButton.extractRenderState(context, mouseX, mouseY, 0f);
 
         } else {
 
-            setWaypointButton.setX(x + PADDING);
+            int buttonWidth = (usableWidth - Button.DEFAULT_SPACING) / 2;
+
+            setWaypointButton.setX(startX);
             setWaypointButton.setY(y);
             setWaypointButton.setWidth(buttonWidth);
             setWaypointButton.extractRenderState(context, mouseX, mouseY, 0f);
 
-            teleportButton.setX(x + PADDING + buttonWidth + ELEMENT_SPACING);
+            teleportButton.setX(startX + buttonWidth + Button.DEFAULT_SPACING);
             teleportButton.setY(y);
             teleportButton.setWidth(buttonWidth);
             teleportButton.extractRenderState(context, mouseX, mouseY, 0f);
@@ -609,6 +609,12 @@ public class SidePanelWidget implements GuiEventListener {
      */
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         MouseButtonEvent event = new MouseButtonEvent(mouseX, mouseY, new net.minecraft.client.input.MouseButtonInfo(button, 0));
+
+        if (button == 0 && PopupCloseButton.isMouseOver(screenX1, screenY1, width, mouseX, mouseY)) {
+
+            onClose.run();
+            return true;
+        }
 
         if (mouseOverTitle((int) mouseX, (int) mouseY)) {
 

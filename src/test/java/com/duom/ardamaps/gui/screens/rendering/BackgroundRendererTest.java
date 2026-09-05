@@ -25,15 +25,11 @@
 
 package com.duom.ardamaps.gui.screens.rendering;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.*;
 
 /**
  * Background renderer validation
@@ -67,6 +63,7 @@ class BackgroundRendererTest {
      *
      * @param renderer  the renderer
      * @param fieldName the name of the private int field to read
+     * @return the field value
      */
     private static int getInt(BackgroundRenderer renderer, String fieldName) throws Exception {
         Field field = BackgroundRenderer.class.getDeclaredField(fieldName);
@@ -138,31 +135,4 @@ class BackgroundRendererTest {
         assertEquals(pw1, pw2, "pageWidth must be stable across repeated invalidate() calls with same dimensions");
     }
 
-    /**
-     * Verifies that the left page renders using descending U coordinates for horizontal mirroring.
-     */
-    @Test
-    void render_leftPageUsesMirroredUCoordinates() {
-
-        BackgroundRenderer renderer = new BackgroundRenderer();
-        GuiGraphicsExtractor context = mock(GuiGraphicsExtractor.class);
-
-        renderer.render(context, 800, 600);
-
-        ArgumentCaptor<Float> u0 = ArgumentCaptor.forClass(Float.class);
-        ArgumentCaptor<Float> u1 = ArgumentCaptor.forClass(Float.class);
-        verify(context, atLeastOnce()).blit(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyInt(),
-                org.mockito.ArgumentMatchers.anyInt(),
-                org.mockito.ArgumentMatchers.anyInt(),
-                org.mockito.ArgumentMatchers.anyInt(),
-                u0.capture(),
-                u1.capture(),
-                org.mockito.ArgumentMatchers.anyFloat(),
-                org.mockito.ArgumentMatchers.anyFloat());
-
-        assertTrue(u0.getAllValues().stream().anyMatch(value -> value > u1.getAllValues().get(u0.getAllValues().indexOf(value))),
-                "At least one left-page patch must use descending U coordinates for horizontal mirroring");
-    }
 }

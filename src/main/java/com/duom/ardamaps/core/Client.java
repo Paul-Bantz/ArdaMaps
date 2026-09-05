@@ -30,7 +30,7 @@ import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.gui.screens.ArdaMapsScreen;
-import com.duom.ardamaps.gui.widgets.SearchWidget;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -83,6 +83,17 @@ public class Client {
      */
     public static @NotNull Minecraft mc() {
         return Minecraft.getInstance();
+    }
+
+    /**
+     * Runs the provided action on the render thread.
+     *
+     * @param action The action to run.
+     */
+    public static void onRenderThread(Runnable action) {
+
+        if (RenderSystem.isOnRenderThread()) action.run();
+        else mc().execute(action);
     }
 
     /**
@@ -145,9 +156,14 @@ public class Client {
      * @return True if the Arda Maps screen is currently being shown, otherwise false
      */
     public static boolean isShowingMapScreen() {
-        return mc().screen != null
-                && mc().screen instanceof ArdaMapsScreen
-                || mc().screen instanceof SearchWidget;
+        return mc().screen instanceof ArdaMapsScreen;
+    }
+
+    /**
+     * @return True if the vanilla debug overlay is being displayed, otherwise false
+     */
+    public static boolean debugOverlayVisible() {
+        return mc().getDebugOverlay().showDebugScreen();
     }
 
     /**
@@ -162,6 +178,14 @@ public class Client {
      */
     public static int getScaledWindowWidth() {
         return mc().getWindow().getGuiScaledWidth();
+    }
+
+    /**
+     * @return The current GUI scale factor.
+     */
+    public static int getGuiScale() {
+
+        return mc().getWindow().getGuiScale();
     }
 
     /**

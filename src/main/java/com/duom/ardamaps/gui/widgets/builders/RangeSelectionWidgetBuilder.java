@@ -48,9 +48,6 @@ public class RangeSelectionWidgetBuilder {
     /** fixed label displayed before range cells */
     private Component label = Component.empty();
 
-    /** ranges displayed by the range selection widget */
-    private List<MapLayerRange> ranges = List.of();
-
     /** fixed range cell width, or zero to compute width automatically */
     private int itemWidth = 0;
 
@@ -61,7 +58,11 @@ public class RangeSelectionWidgetBuilder {
     private RangeSelectionWidgetBuilder() {
     }
 
-    /** Static factory method to create a new instance of RangeSelectionWidgetBuilder. */
+    /**
+     * Static factory method to create a new instance of RangeSelectionWidgetBuilder.
+     *
+     * @return A new range selection widget builder.
+     */
     public static RangeSelectionWidgetBuilder create() {
         return new RangeSelectionWidgetBuilder();
     }
@@ -87,18 +88,6 @@ public class RangeSelectionWidgetBuilder {
      */
     public RangeSelectionWidgetBuilder setLabel(Component label) {
         this.label = label;
-        return this;
-    }
-
-    /**
-     * Sets the ranges displayed by the range selection widget.
-     *
-     * @param ranges ranges displayed by the range selection widget
-     * @return the current instance of RangeSelectionWidgetBuilder for method chaining
-     */
-    @SuppressWarnings("unused")
-    public RangeSelectionWidgetBuilder setRanges(List<MapLayerRange> ranges) {
-        this.ranges = ranges;
         return this;
     }
 
@@ -138,7 +127,7 @@ public class RangeSelectionWidgetBuilder {
                     width,
                     height,
                     label,
-                    ranges,
+                    List.of(),
                     onSelect
             );
         }
@@ -149,7 +138,7 @@ public class RangeSelectionWidgetBuilder {
                 width,
                 height,
                 label,
-                ranges,
+                List.of(),
                 itemWidth,
                 onSelect
         );

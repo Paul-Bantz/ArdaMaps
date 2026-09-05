@@ -50,6 +50,8 @@ class ToastWidgetTest {
 
     /**
      * Use a mocked Component to avoid triggering Minecraft's text serialization stack in tests.
+     *
+     * @return a mocked text component
      */
     private static Component text() {
         return mock(Component.class);

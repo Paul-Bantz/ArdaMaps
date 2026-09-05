@@ -152,6 +152,8 @@ public class WebpRenderer extends MapRenderable {
 
     /**
      * Synchronizes the texture dimensions with the map camera.
+     *
+     * @param provider The tile provider supplying rendered content.
      */
     private void syncTextureDimensions(HttpImageProvider provider) {
 

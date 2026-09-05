@@ -59,15 +59,6 @@ import java.util.function.LongSupplier;
  */
 public abstract class TileProvider<T extends TileKey> {
 
-    /** Class logger. */
-    private static final Logger LOGGER = LoggerFactory.getLogger(TileProvider.class);
-
-    /** Maximum negative-cache entry count for small key-only caches. */
-    protected static final int MAX_CACHE_SIZE = 256;
-
-    /** Default decoded texture memory budget: 128 MiB. */
-    protected static final long DEFAULT_TEXTURE_CACHE_BUDGET_BYTES = 128L << 20;
-
     /** Priority band for primary-zoom viewport tiles. */
     public static final int PRIMARY_VIEWPORT_PRIORITY_BASE = 0;
 
@@ -80,14 +71,14 @@ public abstract class TileProvider<T extends TileKey> {
     /** Priority band for the settled-camera adjacent zoom-step viewport. */
     public static final int ZOOM_STEP_PRIORITY_BASE = 15_000;
 
+    /** Maximum negative-cache entry count for small key-only caches. */
+    protected static final int MAX_CACHE_SIZE = 256;
+
+    /** Default decoded texture memory budget: 128 MiB. */
+    protected static final long DEFAULT_TEXTURE_CACHE_BUDGET_BYTES = 128L << 20;
+
     /** Maximum number of completed NativeImages uploaded to GL during one render frame. */
     protected static final int MAX_TEXTURE_UPLOADS_PER_FRAME = 4;
-
-    /** Speculative zoom-step prefetch may consume at most this fraction of the texture budget. */
-    private static final int ZOOM_STEP_BUDGET_DIVISOR = 4;
-
-    /** Records the first decoded tile dimensions once per provider classloader. */
-    private static final AtomicBoolean LOGGED_TEXTURE_DIMENSIONS = new AtomicBoolean();
 
     /** How long a transport/IO failure suppresses retries for a tile key. */
     protected static final long TRANSPORT_FAILURE_TTL_MS = 30_000L;
@@ -98,14 +89,23 @@ public abstract class TileProvider<T extends TileKey> {
     /** Tiles submitted per {@link #endFrame()} call, so a burst of newly-visible tiles can't be issued in one frame. */
     protected static final int MAX_SUBMITS_PER_FRAME = 4;
 
+    /** Default absent-tile retry TTL: 4 hours, matching BlueMap's measured 204 cache lifetime. */
+    protected static final long DEFAULT_MISSING_TTL_MS = 4L * 60 * 60 * 1000;
+
+    /** Class logger. */
+    private static final Logger LOGGER = LoggerFactory.getLogger(TileProvider.class);
+
+    /** Speculative zoom-step prefetch may consume at most this fraction of the texture budget. */
+    private static final int ZOOM_STEP_BUDGET_DIVISOR = 4;
+
+    /** Records the first decoded tile dimensions once per provider classloader. */
+    private static final AtomicBoolean LOGGED_TEXTURE_DIMENSIONS = new AtomicBoolean();
+
     /** Set of tile keys currently being loaded (thread-safe) */
     protected final Set<T> loading = ConcurrentHashMap.newKeySet();
 
     /** Keys that hit transport/IO failures, mapped to failure timestamp. */
     protected final ConcurrentHashMap<T, Long> transportFailedKeys = new ConcurrentHashMap<>();
-
-    /** Default absent-tile retry TTL: 4 hours, matching BlueMap's measured 204 cache lifetime. */
-    protected static final long DEFAULT_MISSING_TTL_MS = 4L * 60 * 60 * 1000;
 
     /** Keys confirmed absent from the source (not a failure), mapped to their retry-after timestamp. */
     protected final Cache<T, Long> missingKeys = Caffeine.newBuilder()
@@ -118,11 +118,11 @@ public abstract class TileProvider<T extends TileKey> {
     /** Keys abandoned after repeated decode failures; unlike generic missing keys, this is not LRU-evicted. */
     protected final Set<T> decodeAbandonedKeys = ConcurrentHashMap.newKeySet();
 
-    /** Set once {@link #close()} has run; lets in-flight async loads bail out instead of touching released state. */
-    protected volatile boolean closed;
-
-    /** Time source for retry TTL checks; overridable in tests. */
-    private LongSupplier clock = System::currentTimeMillis;
+    /**
+     * Textures for the pinned (coarsest) zoom level, held outside the LRU so a fallback tile is
+     * always available and can never be evicted by churn at other zoom levels.
+     */
+    protected final Map<T, Identifier> pinnedTextures = new ConcurrentHashMap<>();
 
     /**
      * Textures for tiles drawn this frame, held outside the LRU so on-screen primary tiles cannot
@@ -158,16 +158,6 @@ public abstract class TileProvider<T extends TileKey> {
     private final Queue<PendingTexture<T>> pendingTextureUploads = new ConcurrentLinkedQueue<>();
 
     /**
-     * Textures for the pinned (coarsest) zoom level, held outside the LRU so a fallback tile is
-     * always available and can never be evicted by churn at other zoom levels.
-     */
-    protected final Map<T, Identifier> pinnedTextures = new ConcurrentHashMap<>();
-
-    /** Zoom level whose textures are routed into {@link #pinnedTextures} instead of the LRU cache. */
-    @Setter
-    protected volatile int pinnedZoom = Integer.MIN_VALUE;
-
-    /**
      * Candidates registered this frame via {@link #request(TileKey, int)}, mapped to their best
      * (lowest) requested priority. Not thread-safe: frame methods must only be called from the
      * render thread, matching how renderers already drive this class.
@@ -181,6 +171,13 @@ public abstract class TileProvider<T extends TileKey> {
      */
     private final Queue<T> bootstrapRequests = new ArrayDeque<>();
 
+    /** Set once {@link #close()} has run; lets in-flight async loads bail out instead of touching released state. */
+    protected volatile boolean closed;
+
+    /** Zoom level whose textures are routed into {@link #pinnedTextures} instead of the LRU cache. */
+    @Setter
+    protected volatile int pinnedZoom = Integer.MIN_VALUE;
+
     /** Minimum zoom level available in the PMTiles file */
     @Getter
     protected int minZoom = 0;
@@ -188,6 +185,19 @@ public abstract class TileProvider<T extends TileKey> {
     /** Maximum zoom level available in the PMTiles file */
     @Getter
     protected int maxZoom = 0;
+
+    /** Time source for retry TTL checks; overridable in tests. */
+    private LongSupplier clock = System::currentTimeMillis;
+
+    /**
+     * Byte ceiling a settled-frame zoom-step layer may request before it is skipped.
+     *
+     * @return The maximum byte budget available for one settled-frame zoom-step layer.
+     */
+    public static long zoomStepByteCeiling() {
+
+        return textureCacheBudgetBytes() / ZOOM_STEP_BUDGET_DIVISOR;
+    }
 
     /**
      * Registers the given NativeImage as a texture in Minecraft and associates it with the tile key.
@@ -204,6 +214,12 @@ public abstract class TileProvider<T extends TileKey> {
             return;
         }
 
+        if (closed) {
+            image.close();
+            loading.remove(key);
+            return;
+        }
+
         pendingTextureUploads.add(new PendingTexture<>(prefix, image, key));
     }
 
@@ -214,6 +230,62 @@ public abstract class TileProvider<T extends TileKey> {
     public void beginFrame() {
         drainTextureUploads();
         frameRequests.clear();
+    }
+
+    /**
+     * Uploads a bounded number of completed tile images to GL. Renderers call {@link #beginFrame()}
+     * from the render thread, so draining here coalesces bursts of async completions into a small,
+     * predictable per-frame cost instead of posting one client task per completed tile.
+     */
+    void drainTextureUploads() {
+
+        for (int i = 0; i < MAX_TEXTURE_UPLOADS_PER_FRAME; i++) {
+            PendingTexture<T> pending = pendingTextureUploads.poll();
+            if (pending == null) return;
+            uploadTexture(pending);
+        }
+    }
+
+    private void uploadTexture(PendingTexture<T> pending) {
+
+        T key = pending.key();
+        String textureName = pending.prefix() + key.z + "_" + key.x + "_" + key.y;
+        NativeImage image = pending.image();
+        Identifier id = com.duom.ardamaps.gui.ModConstants.modId(textureName);
+        if (LOGGED_TEXTURE_DIMENSIONS.compareAndSet(false, true)) {
+            LOGGER.info("[ArdaMaps] First decoded tile texture is {}x{} px; decoded texture cache budget is {} bytes.",
+                    image.getWidth(), image.getHeight(), textureCacheBudgetBytes());
+        }
+        uploadNativeTexture(textureName, image, id);
+
+        if (key.z == pinnedZoom) {
+            pinnedTextures.put(key, id);
+        } else if (protectedTextures.containsKey(key)) {
+            protectedTextures.put(key, new TextureData(id, image.getWidth(), image.getHeight()));
+        } else {
+            textures.put(key, new TextureData(id, image.getWidth(), image.getHeight()));
+        }
+        loading.remove(key);
+    }
+
+    static long textureCacheBudgetBytes() {
+
+        String configured = System.getProperty("ardamaps.textureCacheBudgetBytes");
+        if (configured == null || configured.isBlank()) return DEFAULT_TEXTURE_CACHE_BUDGET_BYTES;
+
+        try {
+            return Math.max(1L, Long.parseLong(configured));
+        } catch (NumberFormatException ignored) {
+            return DEFAULT_TEXTURE_CACHE_BUDGET_BYTES;
+        }
+    }
+
+    protected void uploadNativeTexture(String textureName, NativeImage image, Identifier id) {
+
+        DynamicTexture tex = new DynamicTexture(() -> textureName, image);
+        Minecraft.getInstance()
+                .getTextureManager()
+                .register(id, tex);
     }
 
     /**
@@ -243,6 +315,55 @@ public abstract class TileProvider<T extends TileKey> {
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Returns the cached texture for the given key, if already loaded, without triggering a load
+     * or otherwise mutating any transient state. Intended for fallback lookups (e.g. coarser zoom
+     * levels) that should not themselves count as tile requests.
+     *
+     * @param key The tile key.
+     * @return The cached texture identifier, or empty if not currently loaded.
+     */
+    public Optional<Identifier> peek(T key) {
+
+        Identifier pinned = pinnedTextures.get(key);
+        if (pinned != null) return Optional.of(pinned);
+
+        TextureData protectedData = protectedTextures.get(key);
+        if (protectedData != null) return Optional.of(protectedData.id());
+
+        TextureData data = textures.getIfPresent(key);
+        return data == null ? Optional.empty() : Optional.of(data.id());
+    }
+
+    private boolean isMissing(T key, long now) {
+
+        Long retryAfter = missingKeys.getIfPresent(key);
+        if (retryAfter == null) return false;
+
+        if (now < retryAfter) return true;
+
+        missingKeys.invalidate(key);
+        return false;
+    }
+
+    /**
+     * Returns whether the key is still in its transport-failure retry cooldown.
+     *
+     * @param key The tile key.
+     * @param now Current epoch milliseconds.
+     * @return Whether retry should be suppressed.
+     */
+    private boolean isTransportFailed(T key, long now) {
+
+        Long failedAt = transportFailedKeys.get(key);
+        if (failedAt == null) return false;
+
+        if (now - failedAt <= TRANSPORT_FAILURE_TTL_MS) return true;
+
+        transportFailedKeys.remove(key, failedAt);
+        return false;
     }
 
     /**
@@ -278,20 +399,6 @@ public abstract class TileProvider<T extends TileKey> {
         pumpBootstrap();
     }
 
-    /**
-     * Adds coarse pyramid tiles to the background bootstrap queue.
-     *
-     * @param keys Tile keys to load opportunistically after viewport work is idle.
-     */
-    public void enqueueBootstrapTiles(Collection<T> keys) {
-
-        for (T key : keys) {
-            if (peek(key).isPresent()) continue;
-            if (decodeAbandonedKeys.contains(key)) continue;
-            bootstrapRequests.add(key);
-        }
-    }
-
     private void pumpBootstrap() {
 
         if (!loading.isEmpty()) return;
@@ -310,23 +417,29 @@ public abstract class TileProvider<T extends TileKey> {
     }
 
     /**
-     * Returns the cached texture for the given key, if already loaded, without triggering a load
-     * or otherwise mutating any transient state. Intended for fallback lookups (e.g. coarser zoom
-     * levels) that should not themselves count as tile requests.
+     * Asynchronously loads a map tile for the given tile key.
+     * <p>
+     * When this method is invoked by {@link #endFrame()}, the key has already been added to
+     * {@link #loading}. Implementors must <em>not</em> call {@code loading.add(key)} again; doing
+     * so would always return {@code false} and silently abort the fetch.
+     * </p>
      *
-     * @param key The tile key.
-     * @return The cached texture identifier, or empty if not currently loaded.
+     * @param key The tile key identifying the tile to load.
      */
-    public Optional<Identifier> peek(T key) {
+    protected abstract void loadTile(T key);
 
-        Identifier pinned = pinnedTextures.get(key);
-        if (pinned != null) return Optional.of(pinned);
+    /**
+     * Adds coarse pyramid tiles to the background bootstrap queue.
+     *
+     * @param keys Tile keys to load opportunistically after viewport work is idle.
+     */
+    public void enqueueBootstrapTiles(Collection<T> keys) {
 
-        TextureData protectedData = protectedTextures.get(key);
-        if (protectedData != null) return Optional.of(protectedData.id());
-
-        TextureData data = textures.getIfPresent(key);
-        return data == null ? Optional.empty() : Optional.of(data.id());
+        for (T key : keys) {
+            if (peek(key).isPresent()) continue;
+            if (decodeAbandonedKeys.contains(key)) continue;
+            bootstrapRequests.add(key);
+        }
     }
 
     protected void cacheTexture(T key, Identifier texture) {
@@ -366,115 +479,24 @@ public abstract class TileProvider<T extends TileKey> {
     }
 
     /**
-     * Uploads a bounded number of completed tile images to GL. Renderers call {@link #beginFrame()}
-     * from the render thread, so draining here coalesces bursts of async completions into a small,
-     * predictable per-frame cost instead of posting one client task per completed tile.
-     */
-    void drainTextureUploads() {
-
-        for (int i = 0; i < MAX_TEXTURE_UPLOADS_PER_FRAME; i++) {
-            PendingTexture<T> pending = pendingTextureUploads.poll();
-            if (pending == null) return;
-            uploadTexture(pending);
-        }
-    }
-
-    private void uploadTexture(PendingTexture<T> pending) {
-
-        T key = pending.key();
-        String textureName = pending.prefix() + key.z + "_" + key.x + "_" + key.y;
-        NativeImage image = pending.image();
-        Identifier id = com.duom.ardamaps.gui.ModConstants.modId(textureName);
-        if (LOGGED_TEXTURE_DIMENSIONS.compareAndSet(false, true)) {
-            LOGGER.info("[ArdaMaps] First decoded tile texture is {}x{} px; decoded texture cache budget is {} bytes.",
-                    image.getWidth(), image.getHeight(), textureCacheBudgetBytes());
-        }
-        uploadNativeTexture(textureName, image, id);
-
-        if (key.z == pinnedZoom) {
-            pinnedTextures.put(key, id);
-        } else if (protectedTextures.containsKey(key)) {
-            protectedTextures.put(key, new TextureData(id, image.getWidth(), image.getHeight()));
-        } else {
-            textures.put(key, new TextureData(id, image.getWidth(), image.getHeight()));
-        }
-        loading.remove(key);
-    }
-
-    protected void uploadNativeTexture(String textureName, NativeImage image, Identifier id) {
-
-        DynamicTexture tex = new DynamicTexture(() -> textureName, image);
-        Minecraft.getInstance()
-                .getTextureManager()
-                .register(id, tex);
-    }
-
-    static long textureCacheBudgetBytes() {
-
-        String configured = System.getProperty("ardamaps.textureCacheBudgetBytes");
-        if (configured == null || configured.isBlank()) return DEFAULT_TEXTURE_CACHE_BUDGET_BYTES;
-
-        try {
-            return Math.max(1L, Long.parseLong(configured));
-        } catch (NumberFormatException ignored) {
-            return DEFAULT_TEXTURE_CACHE_BUDGET_BYTES;
-        }
-    }
-
-    /** Byte ceiling a settled-frame zoom-step layer may request before it is skipped. */
-    public static long zoomStepByteCeiling() {
-
-        return textureCacheBudgetBytes() / ZOOM_STEP_BUDGET_DIVISOR;
-    }
-
-    /**
-     * Returns whether the key is still in its transport-failure retry cooldown.
-     *
-     * @param key The tile key.
-     * @param now Current epoch milliseconds.
-     * @return Whether retry should be suppressed.
-     */
-    private boolean isTransportFailed(T key, long now) {
-
-        Long failedAt = transportFailedKeys.get(key);
-        if (failedAt == null) return false;
-
-        if (now - failedAt <= TRANSPORT_FAILURE_TTL_MS) return true;
-
-        transportFailedKeys.remove(key, failedAt);
-        return false;
-    }
-
-    private boolean isMissing(T key, long now) {
-
-        Long retryAfter = missingKeys.getIfPresent(key);
-        if (retryAfter == null) return false;
-
-        if (now < retryAfter) return true;
-
-        missingKeys.invalidate(key);
-        return false;
-    }
-
-    /**
-     * Asynchronously loads a map tile for the given tile key.
-     * <p>
-     * When this method is invoked by {@link #endFrame()}, the key has already been added to
-     * {@link #loading}. Implementors must <em>not</em> call {@code loading.add(key)} again; doing
-     * so would always return {@code false} and silently abort the fetch.
-     * </p>
-     *
-     * @param key The tile key identifying the tile to load.
-     */
-    protected abstract void loadTile(T key);
-
-    /**
      * Marks a key as transport-failed (IO/network error): this provider instance will not retry it.
+     *
+     * @param key The tile key to load.
      */
     protected void markTransportFailure(T key) {
 
         transportFailedKeys.put(key, System.currentTimeMillis());
         clearLoading(key);
+    }
+
+    /**
+     * Clears transient async state for the given key.
+     *
+     * @param key The key whose in-flight state should be cleared.
+     */
+    protected void clearLoading(T key) {
+
+        loading.remove(key);
     }
 
     /**
@@ -523,16 +545,6 @@ public abstract class TileProvider<T extends TileKey> {
     void setClock(LongSupplier clock) {
 
         this.clock = clock == null ? System::currentTimeMillis : clock;
-    }
-
-    /**
-     * Clears transient async state for the given key.
-     *
-     * @param key The key whose in-flight state should be cleared.
-     */
-    protected void clearLoading(T key) {
-
-        loading.remove(key);
     }
 
     /**
@@ -600,8 +612,8 @@ public abstract class TileProvider<T extends TileKey> {
     /**
      * A cached tile texture with its dimensions, used for calculating byte weight in the texture cache.
      *
-     * @param id The texture identifier registered in Minecraft.
-     * @param width The decoded texture width in pixels.
+     * @param id     The texture identifier registered in Minecraft.
+     * @param width  The decoded texture width in pixels.
      * @param height The decoded texture height in pixels.
      */
     protected record TextureData(Identifier id, int width, int height) {
@@ -621,8 +633,8 @@ public abstract class TileProvider<T extends TileKey> {
      * A completed image decode waiting for a bounded GL upload to the render thread.
      *
      * @param prefix The texture name prefix (e.g. "bluemap_" or "pmtiles_").
-     * @param image The decoded NativeImage ready for GPU upload.
-     * @param key The tile key this image corresponds to.
+     * @param image  The decoded NativeImage ready for GPU upload.
+     * @param key    The tile key this image corresponds to.
      */
     private record PendingTexture<T extends TileKey>(String prefix, NativeImage image, T key) {
 

@@ -27,6 +27,7 @@ package com.duom.ardamaps;
 
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.KeyBinds;
+import com.duom.ardamaps.core.PendingMapFocus;
 import com.duom.ardamaps.core.commands.ClientCommands;
 import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.PlayerExploration;
@@ -40,19 +41,21 @@ import com.duom.ardamaps.core.data.guide.GuideImageCache;
 import com.duom.ardamaps.core.data.guide.GuideScreenLink;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.location.LocationProvider;
-import com.duom.ardamaps.core.data.map.RegionLookupTexture;
 import com.duom.ardamaps.core.data.map.markers.MarkersDefinition;
 import com.duom.ardamaps.core.data.map.markers.MarkersManager;
 import com.duom.ardamaps.core.data.map.providers.HttpImageProvider;
+import com.duom.ardamaps.core.data.map.region.RegionGeometry;
+import com.duom.ardamaps.core.data.map.region.RegionSpatialIndex;
 import com.duom.ardamaps.core.items.ModItems;
 import com.duom.ardamaps.core.networking.PacketRegistry;
 import com.duom.ardamaps.core.networking.packets.server.LocationsRequestPacket;
 import com.duom.ardamaps.core.networking.packets.server.MapSourcesRequestPacket;
-import com.duom.ardamaps.core.networking.packets.server.RegionsLutRequestPacket;
+import com.duom.ardamaps.core.networking.packets.server.RegionsGeometryRequestPacket;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.hud.compass.Compass;
 import com.duom.ardamaps.gui.hud.toposcope.Toposcope;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
+import com.duom.ardamaps.gui.map.PlayerIcon;
 import com.duom.ardamaps.gui.screens.ConfigurationScreen;
 import com.duom.ardamaps.gui.screens.GuideScreen;
 import com.duom.ardamaps.gui.screens.MapScreen;
@@ -81,11 +84,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -109,23 +108,6 @@ public class ArdaMapsClient implements ClientModInitializer {
     );
 
     /**
-     * Creates the daemon thread factory for {@link #IMAGE_EXECUTOR}, naming threads so image
-     * decode tasks are identifiable in logs and thread dumps.
-     *
-     * @return A thread factory producing named daemon threads.
-     */
-    private static ThreadFactory imageExecutorThreadFactory() {
-
-        AtomicInteger threadId = new AtomicInteger();
-        return runnable -> {
-            Thread thread = new Thread(runnable);
-            thread.setDaemon(true);
-            thread.setName("ardamaps-image-%02d".formatted(threadId.incrementAndGet()));
-            return thread;
-        };
-    }
-
-    /**
      * Dedicated executor for PMTiles range reads. Kept separate from {@link #IMAGE_EXECUTOR} so a
      * slow or unresponsive PMTiles source (blocking HTTP range reads) cannot starve BlueMap/WebP
      * image loading, which shares {@link #IMAGE_EXECUTOR}. Bounded with a fixed-size queue so a
@@ -138,23 +120,6 @@ public class ArdaMapsClient implements ClientModInitializer {
             new ArrayBlockingQueue<>(256),
             tileExecutorThreadFactory()
     );
-
-    /**
-     * Creates the daemon thread factory for {@link #TILE_EXECUTOR}, naming threads so PMTiles
-     * tasks are identifiable in logs and thread dumps (rather than the generic {@code pool-N-thread-M}).
-     *
-     * @return A thread factory producing named daemon threads.
-     */
-    private static ThreadFactory tileExecutorThreadFactory() {
-
-        AtomicInteger threadId = new AtomicInteger();
-        return runnable -> {
-            Thread thread = new Thread(runnable);
-            thread.setDaemon(true);
-            thread.setName("ardamaps-pmtiles-tile-%02d".formatted(threadId.incrementAndGet()));
-            return thread;
-        };
-    }
 
     /** How long (ms) the near-locations cache is valid before refreshing. */
     public static final long LOCATION_CACHE_MS = 100L;
@@ -186,7 +151,10 @@ public class ArdaMapsClient implements ClientModInitializer {
      * The map is keyed by distance to the player
      * Updated every {@link #LOCATION_CACHE_MS} by {@link #refreshNearLocations}.
      */
-    public static TreeMap<Double, LocationClient> NEAR_LOCATIONS = new TreeMap<>();
+    public static volatile TreeMap<Double, LocationClient> NEAR_LOCATIONS = new TreeMap<>();
+
+    /** Region spatial indexes keyed by dimension identifier. */
+    private static final Map<String, RegionSpatialIndex> REGION_SPATIAL_INDEXES = new ConcurrentHashMap<>();
 
     /**
      * Screen scheduled to be opened on the next client tick (once the chat screen has closed).
@@ -213,6 +181,42 @@ public class ArdaMapsClient implements ClientModInitializer {
     private boolean rightMouseButtonWasDown = false;
 
     /**
+     * Creates the daemon thread factory for {@link #IMAGE_EXECUTOR}, naming threads so image
+     * decode tasks are identifiable in logs and thread dumps.
+     *
+     * @return A thread factory producing named daemon threads.
+     */
+    private static ThreadFactory imageExecutorThreadFactory() {
+
+        AtomicInteger threadId = new AtomicInteger();
+        return runnable -> {
+            Thread thread = new Thread(runnable);
+            thread.setDaemon(true);
+            thread.setContextClassLoader(ArdaMapsClient.class.getClassLoader());
+            thread.setName("ardamaps-image-%02d".formatted(threadId.incrementAndGet()));
+            return thread;
+        };
+    }
+
+    /**
+     * Creates the daemon thread factory for {@link #TILE_EXECUTOR}, naming threads so PMTiles
+     * tasks are identifiable in logs and thread dumps (rather than the generic {@code pool-N-thread-M}).
+     *
+     * @return A thread factory producing named daemon threads.
+     */
+    private static ThreadFactory tileExecutorThreadFactory() {
+
+        AtomicInteger threadId = new AtomicInteger();
+        return runnable -> {
+            Thread thread = new Thread(runnable);
+            thread.setDaemon(true);
+            thread.setContextClassLoader(ArdaMapsClient.class.getClassLoader());
+            thread.setName("ardamaps-pmtiles-tile-%02d".formatted(threadId.incrementAndGet()));
+            return thread;
+        };
+    }
+
+    /**
      * Initializes the client-side components of the Arda Maps mod, including setting up the configuration manager,
      * registering resource reload listeners, and setting up event handlers for player exploration tracking and data synchronization with the server.
      */
@@ -223,7 +227,7 @@ public class ArdaMapsClient implements ClientModInitializer {
         CONFIG_MANAGER = new ClientConfigManager(
                 "./config/arda-maps/config.json",
                 "./config/arda-maps/locations.json",
-                "./config/arda-maps/region-texture-lookup.json",
+                "./config/arda-maps/client-region-texture-lookup.json",
                 "./config/arda-maps/progress.json"
         );
         CONFIG = CONFIG_MANAGER.getConfig();
@@ -299,11 +303,6 @@ public class ArdaMapsClient implements ClientModInitializer {
     @SuppressWarnings("unused")
     private void initModInternals(ClientPacketListener clientPlayNetworkHandler, PacketSender packetSender, Minecraft client) {
 
-        if (client.isLocalServer()) {
-            LOGGER.info("ArdaMaps is a client/server mod - skipping initialization");
-            return;
-        }
-
         LOGGER.info("Joined world, initializing mod internals");
 
         // initializeTextures() calls registerDynamicTexture which requires the render/GL thread.
@@ -312,11 +311,14 @@ public class ArdaMapsClient implements ClientModInitializer {
         // Network request dispatches
         ArdaMapsClient.refreshLocations();
         ArdaMapsClient.refreshMapSources();
-        ArdaMapsClient.refreshRegionsLut();
+        ArdaMapsClient.refreshRegionsGeometry();
     }
 
     /**
      * Clears all state scoped to a single play connection.
+     *
+     * @param handler The packet handler receiving the response.
+     * @param client  The minecraft client instance.
      */
     @SuppressWarnings("unused")
     private void onDisconnect(ClientPacketListener handler, Minecraft client) {
@@ -327,9 +329,12 @@ public class ArdaMapsClient implements ClientModInitializer {
         lastNearLocationsUpdate = 0L;
         lastNearLocationsDimensionId = null;
         pendingScreen = null;
+        PendingMapFocus.clear();
 
         Client.invalidateCachedDimension();
         PacketRegistry.clearPendingResponses();
+        // The disconnect event may run on Netty's IO thread; callees defer GL teardown.
+        PlayerIcon.clear();
 
         if (CONFIG != null) CONFIG.clearSessionState();
     }
@@ -345,8 +350,6 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         if (client.level == null) return;
 
-        if (client.isLocalServer()) return;
-
         // Poll keybindings and update toggle state first.
         KeyBinds.tick();
 
@@ -359,7 +362,7 @@ public class ArdaMapsClient implements ClientModInitializer {
         // Open the map screen when M is pressed (independent of right-click).
         if (KeyBinds.consumeMapPress() && client.screen == null) {
 
-            Client.mc().setScreen(new MapScreen(null));
+            Client.mc().setScreen(new MapScreen(null, PendingMapFocus.consume()));
         }
 
         // Open a screen requested by a client command (deferred to avoid the chat-screen close race).
@@ -468,7 +471,7 @@ public class ArdaMapsClient implements ClientModInitializer {
         ArdaMaps.IO_EXECUTOR.execute(() -> {
 
             Date lastUpdate = ArdaMapsClient.CONFIG.getLocationConfig().getLastUpdate();
-            PacketRegistry.LOCATIONS_UPDATE_REQUEST.send(new LocationsRequestPacket(lastUpdate), response -> {
+            executeWhenConnected("location refresh", () -> PacketRegistry.LOCATIONS_UPDATE_REQUEST.send(new LocationsRequestPacket(lastUpdate), response -> {
 
                 LocationConfig<LocationClient> data = response.data();
 
@@ -484,7 +487,7 @@ public class ArdaMapsClient implements ClientModInitializer {
 
                 // Reinit map markers here since location data might have changed
                 MarkersManager.rebind();
-            });
+            }));
         });
     }
 
@@ -493,7 +496,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      */
     public static void refreshMapSources() {
 
-        PacketRegistry.MAP_SOURCES_REQUEST.send(new MapSourcesRequestPacket(), response -> {
+        executeWhenConnected("map source refresh", () -> PacketRegistry.MAP_SOURCES_REQUEST.send(new MapSourcesRequestPacket(), response -> {
 
             List<Dimension> dimensions = response.dimensions();
 
@@ -523,32 +526,118 @@ public class ArdaMapsClient implements ClientModInitializer {
                 LOGGER.info("Per-dimension exploration instances initialised ({} dimension(s)).",
                         dimensions.size());
             });
+        }));
+    }
+
+    /**
+     * Refreshes the region geometry from the server.
+     */
+    public static void refreshRegionsGeometry() {
+
+        ArdaMaps.IO_EXECUTOR.execute(() -> {
+            Map<String, Date> knownGeometry = new HashMap<>();
+            CONFIG.getRegionGeometryByDimension().forEach((dimensionId, geometry) -> {
+                if (geometry != null && geometry.lastUpdate() != null) {
+                    knownGeometry.put(dimensionId, geometry.lastUpdate());
+                }
+            });
+
+            executeWhenConnected("region geometry refresh", () -> PacketRegistry.REGION_GEOMETRY_UPDATE_REQUEST.send(
+                    new RegionsGeometryRequestPacket(knownGeometry), regionsGeometryResponsePacket -> {
+
+                boolean changed = false;
+
+                for (RegionGeometry geometry : regionsGeometryResponsePacket.geometries()) {
+                    ArdaMapsClient.CONFIG.setRegionGeometry(geometry);
+                    evictRegionSpatialIndex(geometry.dimensionId());
+                    changed = true;
+                }
+
+                if (!regionsGeometryResponsePacket.serverDimensionIds().isEmpty()) {
+                    Set<String> serverDimensionIds = new HashSet<>(regionsGeometryResponsePacket.serverDimensionIds());
+                    List<String> staleDimensionIds = ArdaMapsClient.CONFIG.getRegionGeometryByDimension().keySet().stream()
+                            .filter(dimensionId -> !serverDimensionIds.contains(dimensionId))
+                            .toList();
+
+                    for (String dimensionId : staleDimensionIds) {
+                        ArdaMapsClient.CONFIG.getRegionGeometryByDimension().remove(dimensionId);
+                        evictRegionSpatialIndex(dimensionId);
+                        changed = true;
+                    }
+                }
+
+                if (changed) {
+                    ArdaMapsClient.CONFIG_MANAGER.saveRegionGeometry();
+                    LOGGER.info("Region geometry updated for {} dimension(s).", regionsGeometryResponsePacket.geometries().size());
+                } else {
+                    LOGGER.info("Region geometry data is up to date.");
+                }
+            }));
         });
     }
 
     /**
-     * Refreshes the regions LUT from the server.
+     * Runs a client-packet action on the client thread only while a play connection is active.
+     *
+     * @param description Description used when logging a skipped action.
+     * @param action      The packet action to run.
      */
-    public static void refreshRegionsLut() {
+    private static void executeWhenConnected(String description, Runnable action) {
 
-        ArdaMaps.IO_EXECUTOR.execute(() -> {
-            Date lastUpdate = ArdaMapsClient.CONFIG.getRegionLookupTexture().lastUpdate();
-            PacketRegistry.REGION_LUT_UPDATE_REQUEST.send(new RegionsLutRequestPacket(lastUpdate), regionsLutResponsePacket -> {
+        Client.mc().execute(() -> {
+            if (Client.mc().getConnection() == null) {
+                LOGGER.debug("Skipping {} because there is no active client connection.", description);
+                return;
+            }
 
-                RegionLookupTexture data = regionsLutResponsePacket.data();
-
-                if (data != null) {
-
-                    ArdaMapsClient.CONFIG.setRegionLookupTexture(data);
-                    ArdaMapsClient.CONFIG_MANAGER.saveRegionTextureLookup();
-                    LOGGER.info("Region LUT data updated from server.");
-
-                } else {
-
-                    LOGGER.info("Region LUT data is up to date.");
-                }
-            });
+            action.run();
         });
+    }
+
+    /**
+     * Clears all cached region spatial indexes.
+     */
+    public static void clearRegionSpatialIndexes() {
+
+        REGION_SPATIAL_INDEXES.clear();
+    }
+
+    /**
+     * Evicts the cached spatial index for one dimension.
+     *
+     * @param dimensionId The dimension identifier.
+     */
+    public static void evictRegionSpatialIndex(String dimensionId) {
+
+        REGION_SPATIAL_INDEXES.remove(dimensionId);
+    }
+
+    /**
+     * Gets the region spatial index for a dimension.
+     *
+     * @param dimensionId The dimension identifier.
+     * @return The spatial index, or null when unavailable.
+     */
+    public static RegionSpatialIndex getRegionSpatialIndex(String dimensionId) {
+
+        RegionSpatialIndex index = REGION_SPATIAL_INDEXES.get(dimensionId);
+        if (index != null) return index;
+
+        RegionGeometry geometry = CONFIG.getRegionGeometry(dimensionId);
+        if (geometry == null || geometry.lastUpdate() == null) return null;
+
+        var dimensions = CONFIG.getDimensions();
+        if (dimensions == null) return null;
+
+        Dimension dimension = dimensions.stream()
+                .filter(candidate -> candidate.getId().equals(dimensionId))
+                .findFirst()
+                .orElse(null);
+        if (dimension == null) return null;
+
+        RegionSpatialIndex builtIndex = new RegionSpatialIndex(geometry, dimension);
+        REGION_SPATIAL_INDEXES.put(dimensionId, builtIndex);
+        return builtIndex;
     }
 
     /**
@@ -573,11 +662,17 @@ public class ArdaMapsClient implements ClientModInitializer {
                 nearestLocation.setVisited(true);
 
                 // Don't spam toasts on client start
-                if (player.tickCount > 20)
+                if (player.tickCount > 20) {
+                    Component key = KeyBinds.OPEN_MAP.getTranslatedKeyMessage().copy()
+                            .withStyle(style -> style
+                                    .withColor(ModConstants.COLOR_BLUE_EMPHASIZED & 0xFFFFFF)
+                                    .withBold(true));
                     showToast(new ToastWidget(
-                            Component.translatable("ardamaps.client.notification.location.visited", nearestLocation.getName()),
+                            Component.translatable("ardamaps.client.notification.location.visited", key),
                             ModConstants.ICON_BOOK
                     ));
+                    PendingMapFocus.set(nearestLocation);
+                }
 
                 ArdaMapsClient.CONFIG_MANAGER.saveProgress();
             }
@@ -591,6 +686,8 @@ public class ArdaMapsClient implements ClientModInitializer {
      * and marks the player's cell as {@link ExplorationState#REVEALED}.  Also keeps the
      * static active instance in sync so that UI code using the backward-compat delegates
      * always operates on the correct dimension.</p>
+     *
+     * @param player The player whose exploration data is being checked.
      */
     private void trackExploration(@NotNull LocalPlayer player) {
 
@@ -626,7 +723,7 @@ public class ArdaMapsClient implements ClientModInitializer {
         int cellX = exploration.toCellX(player.getX());
         int cellZ = exploration.toCellZ(player.getZ());
 
-        if (exploration.stateAt(cellX, cellZ) != ExplorationState.REVEALED) {//Tick -1455.6197844287037 -675.1320489133536
+        if (exploration.stateAt(cellX, cellZ) != ExplorationState.REVEALED) {
 
             exploration.markCell(cellX, cellZ, ExplorationState.REVEALED, 2);
             exploration.flushTexture();
@@ -778,6 +875,7 @@ public class ArdaMapsClient implements ClientModInitializer {
         protected void apply(Void value, @NonNull SharedState state) {
 
             GuideImageCache.clear();
+            PlayerIcon.clear();
         }
     }
 }

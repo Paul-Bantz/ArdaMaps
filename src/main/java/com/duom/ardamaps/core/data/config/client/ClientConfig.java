@@ -64,16 +64,17 @@ public class ClientConfig extends Configuration<LocationClient> {
     @SerializedName("unit_system")
     private UnitSystem unitSystem;
 
-    /** Whether to display map debug information - defaults to false */
-    @Getter
-    @SerializedName("map_debug_display")
-    private boolean mapDebugDisplay;
-
     /** Whether to reveal the entire map by default - defaults to false */
     @Setter
     @Getter
     @SerializedName("map_reveal_all")
     private boolean mapRevealAll = false;
+
+    /** Whether to render region borders and labels on the map - defaults to true */
+    @Setter
+    @Getter
+    @SerializedName("show_region_borders")
+    private boolean showRegionBorders = true;
 
     /** Compass opacity - defaults to 1.0 (fully opaque) */
     @Setter
@@ -89,6 +90,10 @@ public class ClientConfig extends Configuration<LocationClient> {
     @Setter
     @SerializedName("last_page")
     private String lastPage = "guide";
+
+    /** Last selected map layer per dimension ID, restored when the map screen reopens. */
+    @SerializedName("last_map_layers")
+    private Map<String, String> lastMapLayers = new HashMap<>();
 
     /** Client exploration progress - persisted in an external file */
     @Setter
@@ -330,7 +335,49 @@ public class ClientConfig extends Configuration<LocationClient> {
      * or {@code "guide:page:<pageId>/<entryId>"}. Defaults to {@code "guide"}.
      */
     public String getLastPage() {
+
         return lastPage == null || lastPage.isBlank() ? "guide" : lastPage;
+    }
+
+    /**
+     * Stores the last selected map layer for a dimension.
+     *
+     * @param dimension The dimension owning the selected layer.
+     * @param layerId   The selected layer ID.
+     */
+    public void setLastMapLayer(@Nullable Dimension dimension, @Nullable String layerId) {
+
+        if (dimension == null || dimension.getId() == null || dimension.getId().isBlank()
+                || layerId == null || layerId.isBlank())
+            return;
+
+        lastMapLayers().put(dimension.getId(), layerId);
+    }
+
+    /**
+     * Lazily creates the persisted map layer memory after older config deserialisation.
+     *
+     * @return The mutable dimension-to-layer map.
+     */
+    private Map<String, String> lastMapLayers() {
+
+        if (lastMapLayers == null)
+            lastMapLayers = new HashMap<>();
+
+        return lastMapLayers;
+    }
+
+    /**
+     * Returns the last selected map layer for a dimension.
+     *
+     * @param dimension The dimension to look up.
+     * @return The remembered layer ID, or null when none is stored.
+     */
+    public @Nullable String getLastMapLayer(@Nullable Dimension dimension) {
+
+        if (dimension == null) return null;
+
+        return lastMapLayers().get(dimension.getId());
     }
 
 }

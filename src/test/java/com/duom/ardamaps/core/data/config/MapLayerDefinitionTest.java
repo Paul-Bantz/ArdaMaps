@@ -105,9 +105,9 @@ class MapLayerDefinitionTest {
         MapLayerDefinition layer = rangedLayer();
 
         assertEquals("upper.pmtiles", layer.effectivePath(12d));
-        assertEquals("fallback.png", layer.effectiveIcon(12d));
+        assertEquals("fallback.png", layer.effectiveIcon());
         assertEquals("lower.pmtiles", layer.effectivePath(null));
-        assertEquals("fallback.png", layer.effectiveIcon(null));
+        assertEquals("fallback.png", layer.effectiveIcon());
     }
 
     /**
@@ -120,7 +120,7 @@ class MapLayerDefinitionTest {
         MapLayerDefinition layer = flatLayer();
 
         assertEquals("flat.webp", layer.effectivePath(12d));
-        assertEquals("flat.png", layer.effectiveIcon(12d));
+        assertEquals("flat.png", layer.effectiveIcon());
     }
 
     /**

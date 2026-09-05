@@ -143,6 +143,101 @@ class PmTilesMapCameraTest {
     }
 
     /**
+     * Identity-relative scale ignores tile-layer scale and follows powers of two around identity zoom.
+     */
+    @Test
+    void identityRelativeScale_tracksZoomAroundIdentity() {
+
+        assertEquals(1.0, camera.identityRelativeScale(), 1e-9);
+
+        camera.updateZoom(7);
+        assertEquals(0.5, camera.identityRelativeScale(), 1e-9);
+
+        camera.updateZoom(9);
+        assertEquals(2.0, camera.identityRelativeScale(), 1e-9);
+    }
+
+    /**
+     * The effective minimum scale uses the hard zoom floor until a fit-to-content floor is computed.
+     */
+    @Test
+    void minIdentityRelativeScale_withoutFitFloor_usesMinCameraZoom() {
+
+        assertEquals(1.0 / 64.0, camera.minIdentityRelativeScale(), 1e-9);
+    }
+
+    /**
+     * A fit-to-content zoom floor above the hard minimum becomes the effective zoom-out limit.
+     */
+    @Test
+    void minIdentityRelativeScale_withFitFloor_usesLargerZoomValue() {
+
+        camera.computeZoomLevelToFitContentArea(640, 480);
+
+        assertEquals(640.0 / DIMENSION.getWidth(), camera.minIdentityRelativeScale(), 1e-9);
+    }
+
+    /**
+     * Updating zoom directly should still respect the configured camera bounds.
+     */
+    @Test
+    void updateZoom_beyondMaxCameraZoom_clampsToBound() {
+
+        camera.setCameraZoomBounds(4, 6);
+
+        camera.updateZoom(12);
+
+        assertEquals(6.0, camera.getZoom(), 1e-9);
+        assertEquals(6.0, camera.targetCameraZoom, 1e-9);
+    }
+
+    /**
+     * Matching a carried render scale should clamp to the lower configured zoom bound.
+     */
+    @Test
+    void setZoomToMatchVisualPixelsPerBlock_belowMinCameraZoom_clampsToBound() {
+
+        camera.setCameraZoomBounds(4, 6);
+        camera.setPreferredRenderScale(1.0 / 256.0);
+
+        camera.setZoomToMatchVisualPixelsPerBlock();
+
+        assertEquals(4.0, camera.getZoom(), 1e-9);
+        assertEquals(4.0, camera.targetCameraZoom, 1e-9);
+    }
+
+    /**
+     * Matching a carried render scale should clamp to the upper configured zoom bound.
+     */
+    @Test
+    void setZoomToMatchVisualPixelsPerBlock_aboveMaxCameraZoom_clampsToBound() {
+
+        camera.setCameraZoomBounds(4, 6);
+        camera.setPreferredRenderScale(256.0);
+
+        camera.setZoomToMatchVisualPixelsPerBlock();
+
+        assertEquals(6.0, camera.getZoom(), 1e-9);
+        assertEquals(6.0, camera.targetCameraZoom, 1e-9);
+    }
+
+    /**
+     * Computing the fit-to-content floor should immediately pull existing zoom up to that floor.
+     */
+    @Test
+    void computeZoomLevelToFitContentArea_existingZoomBelowFloor_clampsZoomAndTarget() {
+
+        Dimension smallDimension = new Dimension("Small", "test:small", 1f, 0, 99, 0, 99, false);
+        camera.setDimension(smallDimension);
+        camera.updateZoom(4);
+
+        camera.computeZoomLevelToFitContentArea(1000, 1000);
+
+        assertEquals(8.0 + Math.log(10.0) / Math.log(2.0), camera.getZoom(), 1e-9);
+        assertEquals(camera.getZoom(), camera.targetCameraZoom, 1e-9);
+    }
+
+    /**
      * Blocks-per-pixel is the inverse of render scale.
      */
     @Test

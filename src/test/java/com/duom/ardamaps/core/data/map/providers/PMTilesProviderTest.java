@@ -279,17 +279,17 @@ class PMTilesProviderTest {
     /**
      * Verifies a 416-like range failure aborts the prewarm without escaping to configure callers.
      */
-    @SuppressWarnings("resource")
     @Test
     void bootstrap_rangeNotSatisfiable_isCaught() {
 
         var provider = new TestPMTilesProvider();
         provider.minZoom = 0;
         provider.maxZoom = 3;
-        var rangeReader = new RecordingRangeReader();
-        rangeReader.failOnRead = 2;
+        try (var rangeReader = new RecordingRangeReader()) {
+            rangeReader.failOnRead = 2;
 
-        assertDoesNotThrow(() -> provider.runRemoteBootstrap(rangeReader, mockBootstrapReader(), header(true)));
+            assertDoesNotThrow(() -> provider.runRemoteBootstrap(rangeReader, mockBootstrapReader(), header(true)));
+        }
     }
 
     /**
@@ -299,8 +299,12 @@ class PMTilesProviderTest {
     private static final class TestPMTilesProvider extends PMTilesProvider {
     }
 
+    /**
+     * PMTiles provider that counts tile load calls.
+     */
     private static final class CountingPMTilesProvider extends PMTilesProvider {
 
+        /** Number of loadTile calls. */
         private int loadCalls;
 
         @Override
@@ -310,6 +314,9 @@ class PMTilesProviderTest {
         }
     }
 
+    /**
+     * PMTiles provider that rejects submitted tile loads.
+     */
     private static final class RejectingPMTilesProvider extends PMTilesProvider {
 
         @Override
@@ -318,8 +325,12 @@ class PMTilesProviderTest {
         }
     }
 
+    /**
+     * PMTiles provider used to verify bootstrap-triggered tile loads.
+     */
     private static final class BootstrapPMTilesProvider extends PMTilesProvider {
 
+        /** Number of loadTile calls. */
         private int loadCalls;
 
         @Override
@@ -379,13 +390,24 @@ class PMTilesProviderTest {
         return directory;
     }
 
+    /**
+     * Range read request captured by {@link RecordingRangeReader}.
+     *
+     * @param offset byte offset of the read
+     * @param length requested byte length
+     */
     private record RangeRead(long offset, int length) {
 
     }
 
+    /**
+     * Range reader that records reads and can fail at a configured read count.
+     */
     private static final class RecordingRangeReader implements RangeReader {
 
+        /** Captured range read requests. */
         private final List<RangeRead> reads = new ArrayList<>();
+        /** One-based read index that should throw an IO exception, or -1. */
         private int failOnRead = -1;
 
         @Override

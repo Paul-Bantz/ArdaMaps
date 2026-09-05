@@ -28,6 +28,7 @@ package com.duom.ardamaps.core;
 import com.duom.ardamaps.ArdaMaps;
 import com.mojang.blaze3d.platform.InputConstants;
 import lombok.Getter;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
@@ -42,7 +43,7 @@ import org.slf4j.LoggerFactory;
  *
  * <ul>
  *   <li><b>M</b> – opens the map screen; consume with {@link #consumeMapPress()}.</li>
- *   <li><b>V</b> – toggles the toposcope; query with {@link #isToposcopeEnabled()}.</li>
+ *   <li><b>F</b> – toggles the toposcope; query with {@link #isToposcopeEnabled()}.</li>
  * </ul>
  */
 public final class KeyBinds {
@@ -54,19 +55,23 @@ public final class KeyBinds {
     private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(ArdaMaps.MOD_ID, "category"));
 
     /** Opens the Arda Maps map screen. */
-    public static final KeyMapping OPEN_MAP = new KeyMapping(
-            "key." + ArdaMaps.MOD_ID + ".open_map",
-            InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_M,
-            CATEGORY
+    public static final KeyMapping OPEN_MAP = KeyMappingHelper.registerKeyMapping(
+            new KeyMapping(
+                    "key." + ArdaMaps.MOD_ID + ".open_map",
+                    InputConstants.Type.KEYSYM,
+                    GLFW.GLFW_KEY_M,
+                    CATEGORY
+            )
     );
 
     /** Toggles the toposcope HUD overlay. */
-    public static final KeyMapping TOGGLE_TOPOSCOPE = new KeyMapping(
-            "key." + ArdaMaps.MOD_ID + ".toggle_toposcope",
-            InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_F,
-            CATEGORY
+    public static final KeyMapping TOGGLE_TOPOSCOPE = KeyMappingHelper.registerKeyMapping(
+            new KeyMapping(
+                    "key." + ArdaMaps.MOD_ID + ".toggle_toposcope",
+                    InputConstants.Type.KEYSYM,
+                    GLFW.GLFW_KEY_F,
+                    CATEGORY
+            )
     );
 
     /** Whether the toposcope is currently enabled. Off by default. */
@@ -79,12 +84,12 @@ public final class KeyBinds {
 
     /**
      * Triggers static initialization of this class so that both keybindings are
-     * initialized. Must be called once from
+     * registered with Fabric. Must be called once from
      * {@code onInitializeClient()}.
      */
     public static void register() {
         // Referencing the class is enough; the static fields handle registration.
-        LOGGER.info("ArdaMaps keybindings registered (M = open map, V = toggle toposcope).");
+        LOGGER.info("ArdaMaps keybindings registered (M = open map, F = toggle toposcope).");
     }
 
     /**
@@ -94,7 +99,7 @@ public final class KeyBinds {
      */
     public static void tick() {
 
-        // Consume every queued press of V and flip the toggle once per logical press.
+        // Consume every queued press of F and flip the toggle once per logical press.
         while (TOGGLE_TOPOSCOPE.consumeClick())
             toposcopeEnabled = !toposcopeEnabled;
     }

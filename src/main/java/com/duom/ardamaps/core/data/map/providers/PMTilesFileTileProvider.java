@@ -43,6 +43,7 @@ public class PMTilesFileTileProvider extends PMTilesProvider {
      * This constructor is expected to fail with an IOException if the file is inaccessible.
      *
      * @param filePath The path to the PMTiles file
+     * @return A tile provider backed by the requested PMTiles file.
      */
     public static TileProvider<PmTileKey> init(String filePath) throws IOException {
 

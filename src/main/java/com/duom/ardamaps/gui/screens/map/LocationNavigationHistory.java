@@ -47,6 +47,8 @@ public class LocationNavigationHistory {
 
     /**
      * Pushes a new location, truncating forward entries and evicting the oldest entry over the cap.
+     *
+     * @param location The location to add to the navigation history.
      */
     public void push(LocationClient location) {
 

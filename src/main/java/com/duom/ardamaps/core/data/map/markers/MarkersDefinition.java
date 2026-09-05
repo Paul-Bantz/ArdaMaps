@@ -141,9 +141,7 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
 
         for (LocationClient location : locations) {
 
-            MarkerType markerType = getMarkerType(location.getTypes().isEmpty() ?
-                    null :
-                    location.getTypes().getFirst().toUpperCase());
+            MarkerType markerType = getMarkerType(markerTypeKey(location.getTypes()));
 
             location.setIcon(ModConstants.id(markerType.icon()));
             location.setColor(markerType.color());
@@ -169,5 +167,22 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
         if (unknownType != null) return unknownType;
 
         throw new IllegalStateException("Markers definition has neither a default nor an unknown marker type");
+    }
+
+    /**
+     * Resolves the effective marker type key for the supplied location type list.
+     *
+     * @param locationTypes The location type list, ordered by priority.
+     * @return The uppercase marker type key that should be used for marker binding.
+     */
+    public String markerTypeKey(List<String> locationTypes) {
+
+        if (locationTypes != null && !locationTypes.isEmpty()) {
+
+            String key = locationTypes.getFirst().toUpperCase();
+            if (types().containsKey(key)) return key;
+        }
+
+        return defaultType().name().toUpperCase();
     }
 }

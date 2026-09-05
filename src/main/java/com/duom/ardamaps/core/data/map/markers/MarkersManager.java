@@ -36,7 +36,7 @@ import org.jetbrains.annotations.NotNull;
 public class MarkersManager {
 
     /** Definition for map markers, loaded from resources and bound to location data. */
-    private static @NotNull MarkersDefinition MARKERS_DEFINITION = MarkersDefinition.createDefault();
+    private static volatile @NotNull MarkersDefinition MARKERS_DEFINITION = MarkersDefinition.createDefault();
 
     /**
      * Sets the current marker definition and rebinds it to loaded location data.

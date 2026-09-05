@@ -55,8 +55,10 @@ public record PlayerRangedTeleportPacket(
         double scanMaxBoundY
 ) implements IRespondablePacket<PlayerRangedTeleportPacket> {
 
+    /** Fabric custom payload type for this packet. */
     public static final CustomPacketPayload.Type<PlayerRangedTeleportPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_ranged_teleport"));
 
+    /** Stream codec used to serialize and deserialize ranged teleport requests. */
     public static final StreamCodec<RegistryFriendlyByteBuf, PlayerRangedTeleportPacket> CODEC = IPacket.codec(PlayerRangedTeleportPacket::read);
 
     /**

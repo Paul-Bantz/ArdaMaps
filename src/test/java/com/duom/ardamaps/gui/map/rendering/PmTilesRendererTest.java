@@ -267,8 +267,12 @@ class PmTilesRendererTest {
         return keys;
     }
 
+    /**
+     * Tile provider that records requested priorities.
+     */
     private static final class TestTileProvider extends TileProvider<PmTileKey> {
 
+        /** Requested tiles and their lowest observed priority. */
         private final Map<PmTileKey, Integer> requested = new HashMap<>();
 
         private void setMaxZoom() {

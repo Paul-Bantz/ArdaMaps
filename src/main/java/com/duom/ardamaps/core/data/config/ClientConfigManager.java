@@ -26,6 +26,7 @@
 package com.duom.ardamaps.core.data.config;
 
 import com.duom.ardamaps.ArdaMaps;
+import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.UnitSystem;
 import com.duom.ardamaps.core.data.config.client.ClientConfig;
@@ -154,6 +155,7 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
      * Save the client's exploration progress to file.
      */
     public void saveProgress() {
+
         ClientProgress snapshot = config.getClientProgress().snapshot();
         final String json;
         try {
@@ -176,6 +178,39 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
 
             } catch (RuntimeException | IOException e) {
                 LOGGER.error("Failed to save exploration progress file", e);
+            }
+
+        }, ArdaMaps.IO_EXECUTOR);
+    }
+
+    /**
+     * Resets the client's exploration progress in the current runtime context.
+     */
+    public void resetProgress() {
+
+        if (Client.world() != null) {
+            config.getClientProgress().reset(false);
+            saveProgress();
+            return;
+        }
+
+        resetProgressOffline();
+    }
+
+    /**
+     * Clears offline progress state and deletes the persisted progress file.
+     */
+    private void resetProgressOffline() {
+
+        config.getClientProgress().clearSessionState();
+        synchronizeLocationExplorationProgress();
+
+        CompletableFuture.runAsync(() -> {
+
+            try {
+                Files.deleteIfExists(clientProgressFile);
+            } catch (IOException e) {
+                LOGGER.error("Failed to delete exploration progress file", e);
             }
 
         }, ArdaMaps.IO_EXECUTOR);

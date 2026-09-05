@@ -107,16 +107,15 @@ public class ScrollbarWidget {
      * The offset is always clamped to {@code [0, maxOffset]}.
      *
      * @param delta Raw mouse-wheel delta (positive = scroll up)
-     * @return {@code true} if the scroll offset actually changed; {@code false} otherwise
+     * @return {@code true} when the scroll event is consumed.
      */
     public boolean scroll(double delta) {
 
-        if (maxOffset <= 0) return false;
+        if (maxOffset <= 0) return true;
 
-        int prev = scrollOffset;
         scrollOffset = Mth.clamp(scrollOffset - (int) (delta * scrollSpeed), 0, maxOffset);
 
-        return scrollOffset != prev;
+        return true;
     }
 
     /**
@@ -135,12 +134,16 @@ public class ScrollbarWidget {
     public void render(GuiGraphicsExtractor context, int trackX, int trackY, int trackHeight,
                        int visibleCount, int totalCount) {
 
+        if (trackHeight <= 0) return;
+
         // Track background
         context.fill(trackX, trackY, trackX + width, trackY + trackHeight, trackColor);
 
         // Thumb - proportional height, clamped to minThumbHeight
-        int thumbHeight = Math.max(minThumbHeight,
-                (int) ((float) visibleCount / totalCount * trackHeight));
+        int thumbHeight = totalCount <= 0
+                ? trackHeight
+                : Math.max(minThumbHeight, (int) ((float) visibleCount / totalCount * trackHeight));
+        thumbHeight = Math.min(thumbHeight, trackHeight);
         int scrollRange = trackHeight - thumbHeight;
         int thumbY = trackY + (maxOffset > 0
                 ? (int) ((float) scrollOffset / maxOffset * scrollRange)
@@ -149,4 +152,3 @@ public class ScrollbarWidget {
         context.fill(trackX, thumbY, trackX + width, thumbY + thumbHeight, thumbColor);
     }
 }
-

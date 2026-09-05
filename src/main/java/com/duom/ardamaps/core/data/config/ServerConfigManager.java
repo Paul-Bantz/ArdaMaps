@@ -45,6 +45,21 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerConfigManager.class);
 
+    /** Default configured dimension identifier. */
+    private static final String DEFAULT_DIMENSION_ID = "minecraft:overworld";
+
+    /** Default configured dimension display name. */
+    private static final String DEFAULT_DIMENSION_NAME = "overworld";
+
+    /** Default configured dimension scale factor. */
+    private static final float DEFAULT_DIMENSION_SCALE_FACTOR = 1f;
+
+    /** Default configured dimension minimum X and Z coordinate. */
+    private static final int DEFAULT_DIMENSION_MIN = -25000;
+
+    /** Default configured dimension maximum X and Z coordinate. */
+    private static final int DEFAULT_DIMENSION_MAX = 24999;
+
     /**
      * Constructor for ConfigManager.
      *
@@ -68,11 +83,33 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
         ServerConfig serverConfig = new ServerConfig();
 
         var dimensions = new ArrayList<Dimension>();
+        Dimension overworld = new Dimension(DEFAULT_DIMENSION_NAME,
+                DEFAULT_DIMENSION_ID,
+                DEFAULT_DIMENSION_SCALE_FACTOR,
+                DEFAULT_DIMENSION_MIN,
+                DEFAULT_DIMENSION_MAX,
+                DEFAULT_DIMENSION_MIN,
+                DEFAULT_DIMENSION_MAX,
+                false,
+                false);
+        overworld.getMapLayers().add(MapLayerDefinition.DEFAULT_GRID_LAYER);
+        dimensions.add(overworld);
 
         serverConfig.setDimensions(dimensions);
         serverConfig.setRefreshCron(CronScheduleHelper.DEFAULT_CRON);
 
         return serverConfig;
+    }
+
+    /**
+     * Normalizes loaded server configuration before it is saved back to disk.
+     *
+     * @param loadedConfig The loaded server configuration.
+     */
+    @Override
+    protected void postLoad(ServerConfig loadedConfig) {
+
+        if (loadedConfig.getDimensions() == null) loadedConfig.setDimensions(new ArrayList<>());
     }
 
     /**

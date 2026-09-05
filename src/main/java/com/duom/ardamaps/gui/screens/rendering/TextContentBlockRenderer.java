@@ -28,6 +28,7 @@ package com.duom.ardamaps.gui.screens.rendering;
 import com.duom.ardamaps.core.data.conversion.ContentBlock;
 import com.duom.ardamaps.core.data.guide.GuideImageCache;
 import com.duom.ardamaps.gui.ModConstants;
+import com.duom.ardamaps.gui.RenderingUtils;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -68,13 +69,22 @@ public final class TextContentBlockRenderer {
     /** Gap (px) between the bullet square and the list-item text. */
     private static final int BULLET_GAP = 5;
 
+    /** Line gap constant. */
     private static final int LINE_GAP = 1;
 
     /** Total horizontal indent per list item (bullet + gap). */
     private static final int LIST_INDENT = BULLET_SIZE + BULLET_GAP;
 
+    /** Horizontal pixels a key-cap sprite bleeds past its inline text run on each side. */
+    private static final int KEYCAP_OVERHANG_X = ModConstants.COMMAND_PADDING * 2;
+
+    /** Vertical pixels a key-cap sprite bleeds above and below its text line box. */
+    private static final int KEYCAP_OVERHANG_Y = 3;
+
+    /** Font renderer used to measure and draw content text. */
     private final Font textRenderer;
 
+    /** Default text color used when a block has no explicit style color. */
     private final int defaultColor;
 
     /** The {@code wrapWidth} that produced {@link #cachedLayouts}; {@code -1} = no cache. */
@@ -106,11 +116,14 @@ public final class TextContentBlockRenderer {
      *   <li>Text wrapping via {@link Font#split}.</li>
      *   <li>Per-glyph width measurement via {@link #parseGlyphRuns} (O(n) per line).</li>
      * </ul>
+     *
+     * @param blocks    The content blocks to lay out.
+     * @param wrapWidth The maximum line width before wrapping.
      */
     private void buildLayouts(List<ContentBlock> blocks, int wrapWidth) {
 
         int fontHeight = textRenderer.lineHeight;
-        int itemWrapWidth = wrapWidth - LIST_INDENT;
+        int itemWrapWidth = Math.max(1, wrapWidth - LIST_INDENT);
 
         List<BlockLayout> layouts = new ArrayList<>(blocks.size());
 
@@ -283,40 +296,45 @@ public final class TextContentBlockRenderer {
             int mouseX,
             int mouseY) {
 
+        int contentX = topX + KEYCAP_OVERHANG_X;
+        int contentWrapWidth = Math.max(1, wrapWidth - KEYCAP_OVERHANG_X * 2);
+
         // Rebuild the layout cache only when blocks reference or wrap width has changed.
-        if (wrapWidth != cachedWrapWidth || blocks != cachedBlocks) {
-            buildLayouts(blocks, wrapWidth);
+        if (contentWrapWidth != cachedWrapWidth || blocks != cachedBlocks) {
+            buildLayouts(blocks, contentWrapWidth);
         }
 
-        int startY = topY - scrollOffset;
+        int startY = topY + KEYCAP_OVERHANG_Y - scrollOffset;
         RenderResult renderResult = new RenderResult();
 
         for (BlockLayout layout : cachedLayouts) {
 
             if (layout instanceof TextLayout textLayout) {
 
-                renderTextLayout(context, textLayout, topX, topY, startY, bottomY, mouseX, mouseY, renderResult);
+                renderTextLayout(context, textLayout, contentX, topY, startY, bottomY, mouseX, mouseY, renderResult);
 
             } else if (layout instanceof ImageLayout imageLayout) {
 
-                renderImageLayout(context, imageLayout, wrapWidth, topX, topY, startY, bottomY, renderResult);
+                renderImageLayout(context, imageLayout, contentWrapWidth, contentX, topY, startY, bottomY, renderResult);
 
             } else if (layout instanceof ListLayout listLayout) {
 
-                renderListLayout(context, listLayout, topX, topY, startY, bottomY, mouseX, mouseY, renderResult);
+                renderListLayout(context, listLayout, contentX, topY, startY, bottomY, mouseX, mouseY, renderResult);
 
             } else if (layout instanceof BlockquoteLayout blockquoteLayout) {
 
-                renderBlockquoteLayout(context, blockquoteLayout, topX, topY, startY, bottomY, mouseX, mouseY, renderResult);
+                renderBlockquoteLayout(context, blockquoteLayout, contentX, topY, startY, bottomY, mouseX, mouseY, renderResult);
 
             } else if (layout instanceof LineBreakLayout(int height)) {
 
                 renderResult.totalHeight += height;
             } else if (layout instanceof TitleLayout titleLayout) {
 
-                renderTitleLayout(context, titleLayout, topX, topY, startY, bottomY, renderResult);
+                renderTitleLayout(context, titleLayout, contentX, topY, startY, bottomY, renderResult);
             }
         }
+
+        renderResult.totalHeight += KEYCAP_OVERHANG_Y * 2;
 
         return renderResult;
     }
@@ -346,7 +364,7 @@ public final class TextContentBlockRenderer {
 
             int drawY = startY + renderResult.totalHeight;
 
-            if (drawY + fontHeight >= topY && drawY <= bottomY) {
+            if (drawY + fontHeight + KEYCAP_OVERHANG_Y >= topY && drawY - KEYCAP_OVERHANG_Y <= bottomY) {
                 drawLine(context, lineLayout, topX, drawY, renderResult, mouseX, mouseY, fontHeight);
             }
 
@@ -490,7 +508,7 @@ public final class TextContentBlockRenderer {
             // Bullet on the first line only, vertically centred
             int firstDrawY = startY + renderResult.totalHeight;
 
-            if (firstDrawY + fontHeight >= topY && firstDrawY <= bottomY) {
+            if (firstDrawY + fontHeight + KEYCAP_OVERHANG_Y >= topY && firstDrawY - KEYCAP_OVERHANG_Y <= bottomY) {
                 int bulletY = firstDrawY + (fontHeight - BULLET_SIZE) / 2;
                 context.fill(topX, bulletY,
                         topX + BULLET_SIZE, bulletY + BULLET_SIZE,
@@ -501,7 +519,7 @@ public final class TextContentBlockRenderer {
 
                 int drawY = startY + renderResult.totalHeight;
 
-                if (drawY + fontHeight >= topY && drawY <= bottomY) {
+                if (drawY + fontHeight + KEYCAP_OVERHANG_Y >= topY && drawY - KEYCAP_OVERHANG_Y <= bottomY) {
                     drawLine(context, lineLayout, topX + LIST_INDENT, drawY, renderResult, mouseX, mouseY, fontHeight);
                 }
 
@@ -557,7 +575,7 @@ public final class TextContentBlockRenderer {
 
             int drawY = startY + renderResult.totalHeight;
 
-            if (drawY + fontHeight >= topY && drawY <= bottomY) {
+            if (drawY + fontHeight + KEYCAP_OVERHANG_Y >= topY && drawY - KEYCAP_OVERHANG_Y <= bottomY) {
                 drawSpecialRunBackgrounds(context, lineLayout.glyphRuns(), textX, drawY);
                 context.text(textRenderer, lineLayout.line(), textX, drawY + LINE_GAP, bqColor, false);
                 renderResult.hoveredStyle = pickHoverStyle(mouseX, mouseY, fontHeight,
@@ -645,23 +663,8 @@ public final class TextContentBlockRenderer {
                 String label = glyphRuns.get(i).style().getInsertion();
                 if (label == null || label.isBlank()) label = "?";
 
-                int labelWidth = textRenderer.width(label);
-                int faceWidth = backgroundEndX - backgroundX;
-                int faceHeight = backgroundEndY - backgroundY;
                 int keycapY = backgroundY - textRenderer.lineHeight / 2;
-
-                // Key-cap face (three drawTexture slices: left cap, centre stretch, right cap)
-                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.ICON_KEYBIND,
-                        backgroundX, keycapY, 0, 0, 4, 16, 4, 16, 16, 16);
-                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.ICON_KEYBIND,
-                        backgroundX + 4, keycapY, 4, 0, faceWidth - 8, 16, 8, 16, 16, 16);
-                context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.ICON_KEYBIND,
-                        backgroundX + faceWidth - 4, keycapY, 12, 0, 4, 16, 4, 16, 16, 16);
-
-                // Label centred inside the face rect
-                int labelX = backgroundX + (faceWidth - labelWidth) / 2;
-                int labelY = backgroundY + (faceHeight - fontHeight) / 2;
-                context.text(textRenderer, label, labelX, labelY, ModConstants.KEYBIND_LABEL_COLOR, false);
+                RenderingUtils.renderKeycap(context, textRenderer, label, backgroundX, keycapY, ModConstants.COLOR_WHITE);
             }
 
             i = j;
@@ -676,6 +679,9 @@ public final class TextContentBlockRenderer {
      *   <li>{@code 2} – keybind    ({@link ModConstants#RUN_FONT_KEYBIND})</li>
      *   <li>{@code 0} – normal text (any other font, including the default)</li>
      * </ul>
+     *
+     * @param style The text style to inspect.
+     * @return The special run type marker, or {@code 0} for normal text.
      */
     private int detectSpecialRunType(Style style) {
         FontDescription font = style.getFont();
@@ -687,6 +693,15 @@ public final class TextContentBlockRenderer {
     /**
      * Returns the {@link Style} of the character under the mouse cursor for the given
      * rendered line, or {@code previous} if the mouse is not on this line.
+     *
+     * @param mouseX     The current mouse X coordinate.
+     * @param mouseY     The current mouse Y coordinate.
+     * @param fontHeight The height of one rendered font line.
+     * @param glyphRuns  The shaped glyph runs being examined.
+     * @param drawY      The Y coordinate used for drawing text.
+     * @param startX     The starting X coordinate for the glyph run.
+     * @param previous   The previous glyph hit candidate.
+     * @return The style under the cursor, or {@code previous} when this line is not hovered.
      */
     private @Nullable Style pickHoverStyle(int mouseX, int mouseY,
                                            int fontHeight,

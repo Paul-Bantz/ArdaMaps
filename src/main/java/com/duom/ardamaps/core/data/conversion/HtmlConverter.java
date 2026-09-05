@@ -786,11 +786,17 @@ public class HtmlConverter {
      */
     private static final class ParseBuffer {
 
+        /** Text value. */
         private MutableComponent text = Component.empty();
 
+        /** Has content value. */
         private boolean hasContent = false;
 
-        /** Appends a pre-styled fragment and marks the buffer as non-empty. */
+        /**
+         * Appends a pre-styled fragment and marks the buffer as non-empty.
+         *
+         * @param fragment The fragment to append to this buffer.
+         */
         void append(MutableComponent fragment) {
             text.append(fragment);
             hasContent = true;

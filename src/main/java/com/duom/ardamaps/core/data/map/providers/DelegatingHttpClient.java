@@ -50,11 +50,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class DelegatingHttpClient extends HttpClient {
 
+    /** Maximum time allowed when opening an HTTP connection. */
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(30);
 
     /** Default per-request timeout applied when a request doesn't already specify one. */
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
+    /** Underlying JDK HTTP client that performs the actual requests. */
     private final HttpClient delegate;
 
     /**
@@ -229,6 +231,22 @@ public final class DelegatingHttpClient extends HttpClient {
     }
 
     /**
+     * Returns the request unchanged if it already specifies a timeout, otherwise rebuilds it with
+     * the default {@link #REQUEST_TIMEOUT} so a stalled server can never block a caller indefinitely.
+     *
+     * @param request The request to check.
+     * @return The request, with a default timeout applied if none was set.
+     */
+    private static HttpRequest withRequestTimeout(HttpRequest request) {
+
+        if (request.timeout().isPresent()) return request;
+
+        return HttpRequest.newBuilder(request, (_, _) -> true)
+                .timeout(REQUEST_TIMEOUT)
+                .build();
+    }
+
+    /**
      * Send an HTTP request asynchronously.
      *
      * @param request             The HTTP request to send.
@@ -262,22 +280,6 @@ public final class DelegatingHttpClient extends HttpClient {
     ) {
 
         return delegate.sendAsync(withRequestTimeout(request), responseBodyHandler, pushPromiseHandler);
-    }
-
-    /**
-     * Returns the request unchanged if it already specifies a timeout, otherwise rebuilds it with
-     * the default {@link #REQUEST_TIMEOUT} so a stalled server can never block a caller indefinitely.
-     *
-     * @param request The request to check.
-     * @return The request, with a default timeout applied if none was set.
-     */
-    private static HttpRequest withRequestTimeout(HttpRequest request) {
-
-        if (request.timeout().isPresent()) return request;
-
-        return HttpRequest.newBuilder(request, (_, _) -> true)
-                .timeout(REQUEST_TIMEOUT)
-                .build();
     }
 
     /**

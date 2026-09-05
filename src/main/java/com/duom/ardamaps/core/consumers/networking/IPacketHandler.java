@@ -38,6 +38,8 @@ public interface IPacketHandler {
 
     /**
      * Get the channel ID for this packet handler.
+     *
+     * @return The identifier for the packet channel handled by this instance.
      */
     @SuppressWarnings("unused")
     Identifier getChannelId();

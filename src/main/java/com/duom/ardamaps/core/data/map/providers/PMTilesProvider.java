@@ -25,7 +25,6 @@
 
 package com.duom.ardamaps.core.data.map.providers;
 
-import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
 import com.mojang.blaze3d.platform.NativeImage;
@@ -40,9 +39,9 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Optional;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Supplier;
@@ -56,12 +55,6 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(PMTilesProvider.class);
 
-    /** PMTiles reader for accessing tile data */
-    protected volatile PMTilesReader reader;
-
-    /** Human-readable archive path/URI for diagnostics. */
-    protected volatile String archivePath = "unknown PMTiles archive";
-
     /**
      * Remote PMTiles bootstrap target: min zoom plus three levels. On the measured archive this is
      * z<=3, 55 tiles, about 3.8 MB of contiguous tile data after the leaf directory section.
@@ -70,6 +63,28 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
 
     /** Abort coarse data prewarm if the resolved contiguous span is larger than this. */
     private static final long MAX_BOOTSTRAP_EXTENT_BYTES = 32L * 1024 * 1024;
+
+    /** PMTiles reader for accessing tile data */
+    protected volatile PMTilesReader reader;
+
+    /** Human-readable archive path/URI for diagnostics. */
+    protected volatile String archivePath = "unknown PMTiles archive";
+
+    private static int checkedLength(long length) {
+
+        if (length > Integer.MAX_VALUE) throw new IllegalArgumentException("Range too large: " + length);
+        return (int) length;
+    }
+
+    private static boolean isRangeNotSatisfiable(Throwable throwable) {
+
+        Throwable current = throwable;
+        while (current != null) {
+            if (current.getMessage() != null && current.getMessage().contains("416")) return true;
+            current = current.getCause();
+        }
+        return false;
+    }
 
     /**
      * Asynchronously loads a map tile for the given tile key.
@@ -129,7 +144,7 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
             }).whenComplete((image, ex) -> {
                 if (ex != null) {
                     LOGGER.error("Unexpected async failure loading PMTiles tile {}", key, ex);
-                    clearLoading(key);
+                    markTransportFailure(key);
                     return;
                 }
 
@@ -176,8 +191,8 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
     /**
      * Configures the TileProvider with the given PMTilesReader.
      *
-     * @param rangeReader      The PMTilesReader to use for tile retrieval.
-     * @param bootstrapRemote  Whether to start remote coarse-pyramid bootstrap after configuration.
+     * @param rangeReader     The PMTilesReader to use for tile retrieval.
+     * @param bootstrapRemote Whether to start remote coarse-pyramid bootstrap after configuration.
      */
     public void configureReader(RangeReader rangeReader, boolean bootstrapRemote) throws IOException {
 
@@ -194,7 +209,7 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
 
     private void scheduleRemoteBootstrap(RangeReader rangeReader, PMTilesReader activeReader, PMTilesHeader header) {
 
-        CompletableFuture.runAsync(() -> runRemoteBootstrap(rangeReader, activeReader, header), ArdaMaps.IO_EXECUTOR)
+        CompletableFuture.runAsync(() -> runRemoteBootstrap(rangeReader, activeReader, header), ArdaMapsClient.TILE_EXECUTOR)
                 .exceptionally(ex -> {
                     LOGGER.warn("PMTiles coarse pyramid bootstrap failed for {}", archivePath, ex);
                     return null;
@@ -286,22 +301,6 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
         return Math.min(maxZoom, minZoom + COARSE_PYRAMID_EXTRA_ZOOMS);
     }
 
-    private static int checkedLength(long length) {
-
-        if (length > Integer.MAX_VALUE) throw new IllegalArgumentException("Range too large: " + length);
-        return (int) length;
-    }
-
-    private static boolean isRangeNotSatisfiable(Throwable throwable) {
-
-        Throwable current = throwable;
-        while (current != null) {
-            if (current.getMessage() != null && current.getMessage().contains("416")) return true;
-            current = current.getCause();
-        }
-        return false;
-    }
-
     /**
      * Releases PMTiles reader resources and registered tile textures.
      */
@@ -325,14 +324,21 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
         }
     }
 
+    /** Extent data holder. */
     private record Extent(long offset, long length) {
 
     }
 
+    /** Accumulates the byte range required to read multiple PMTiles entries in one request. */
     private static final class ExtentAccumulator {
 
+        /** Absolute offset of the PMTiles tile data section. */
         private final long tileDataOffset;
+
+        /** Smallest absolute byte offset needed for the accumulated entries. */
         private long minOffset = Long.MAX_VALUE;
+
+        /** Exclusive end offset of the accumulated byte range. */
         private long maxEnd = Long.MIN_VALUE;
 
         private ExtentAccumulator(long tileDataOffset) {

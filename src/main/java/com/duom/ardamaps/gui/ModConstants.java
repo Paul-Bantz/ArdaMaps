@@ -26,8 +26,10 @@
 package com.duom.ardamaps.gui;
 
 import com.duom.ardamaps.ArdaMaps;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.FontDescription;
 import net.minecraft.resources.Identifier;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A utility class that holds constants for the map GUI, such as button dimensions and texture identifiers.
@@ -38,86 +40,101 @@ public class ModConstants {
     /** Date format string for displaying timestamps. */
     public static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
-    /** Height of standard buttons in pixels. */
-    public static final int BUTTON_HEIGHT = 32;
-
-    /** Width of standard buttons in pixels. */
-    public static final int BUTTON_WIDTH = 90;
-
     /** Size of square buttons in pixels. */
-    public static final int SQUARED_BUTTON_SIZE = BUTTON_HEIGHT;
+    public static final int SQUARED_BUTTON_SIZE = 32;
 
-    /** Size of small square buttons in pixels. */
-    public static final int SMALL_SQUARED_BUTTON_SIZE = 20;
-
-    /** Vertical spacing between rows in pixels. */
-    public static final int ROW_SPACING = 12;
+    /** Size of small square buttons in pixels, matching the vanilla button height. */
+    public static final int SMALL_SQUARED_BUTTON_SIZE = Button.DEFAULT_HEIGHT;
 
     /** Texture identifier for the fog of war overlay. */
     public static final Identifier FOG_OF_WAR_TEXTURE = modId("textures/gui/fog_of_war_texture.png");
 
-    /** Texture identifier for the paper background using 9-slice scaling. */
-    public static final Identifier PAPER_TEXTURE = modId("textures/gui/paper_tex_9slices_512px.png");
+    /** Texture identifier for a fully revealed fog mask. */
+    public static final Identifier FOG_MASK_REVEALED_TEXTURE = modId("textures/gui/fog_mask_revealed.png");
 
-    /** Texture identifier for map GUI elements using 9-slice scaling. */
-    public static final Identifier MAP_FRAME_TEXTURE = modId("textures/gui/map_frame.png");
+    /** Sprite identifier for the paper background, nine-sliced via its mcmeta sidecar. */
+    public static final Identifier PAPER_SPRITE = modId("widgets/paper");
 
-    /** Sprite identifier for the normal map button background. */
-    public static final Identifier MAP_BUTTON_SPRITE = modId("widgets/map_button_normal");
+    /** Sprite identifier for the highlighted paper background used on hovered popup rows. */
+    public static final Identifier PAPER_HIGHLIGHT_SPRITE = modId("widgets/paper_highlight");
 
-    /** Sprite identifier for the hovered map button background. */
-    public static final Identifier MAP_BUTTON_HOVERED_SPRITE = modId("widgets/map_button_hovered");
+    /** Sprite identifier for inline guide key-cap backgrounds. */
+    public static final Identifier KEYCAP_SPRITE = modId("widgets/keycap");
 
-    /** Sprite identifier for the pressed/toggled map button background. */
-    public static final Identifier MAP_BUTTON_PRESSED_SPRITE = modId("widgets/map_button_pressed");
+    /** Inset in pixels between a popup's edge and its content. */
+    public static final int POPUP_CORNER = 16;
 
-    /** Sprite identifier for the red bookmark button background. */
-    public static final Identifier BOOKMARK_BUTTON_RED_SPRITE = modId("widgets/bookmark_button_red");
+    /** Sprite identifier for the nine-sliced map frame. */
+    public static final Identifier MAP_FRAME_SPRITE = modId("widgets/map_frame");
 
-    /** Sprite identifier for the blue bookmark button background. */
-    public static final Identifier BOOKMARK_BUTTON_BLUE_SPRITE = modId("widgets/bookmark_button_blue");
+    /** Raw-PNG path for the blue side-map button background. */
+    public static final Identifier SIDE_MAP_BUTTON_BLUE_TEXTURE = modId("textures/gui/buttons/side_map_button.png");
 
-    /** Sprite identifier for the violet bookmark button background. */
-    public static final Identifier BOOKMARK_BUTTON_VIOLET_SPRITE = modId("widgets/bookmark_button_violet");
+    /** Raw-PNG path for the highlighted blue side-map button background. */
+    public static final Identifier SIDE_MAP_BUTTON_BLUE_HIGHLIGHT_TEXTURE = modId("textures/gui/buttons/side_map_button_highlight.png");
 
-    /** Sprite identifier for the green bookmark button background. */
-    public static final Identifier BOOKMARK_BUTTON_GREEN_SPRITE = modId("widgets/bookmark_button_green");
+    /** Raw-PNG path for the red top-map button background. */
+    public static final Identifier TOP_BOOKMARK_BUTTON_RED_TEXTURE = modId("textures/gui/buttons/top_map_button_red.png");
 
-    /** Sprite identifier for the square dropdown button background. */
-    public static final Identifier SQUARE_BUTTON_SPRITE = modId("widgets/square_button");
+    /** Raw-PNG path for the highlighted red top-map button background. */
+    public static final Identifier TOP_BOOKMARK_BUTTON_RED_HIGHLIGHT_TEXTURE = modId("textures/gui/buttons/top_map_button_red_highlight.png");
 
-    /** Sprite identifier for the highlighted square dropdown button background. */
-    public static final Identifier SQUARE_BUTTON_HIGHLIGHT_SPRITE = modId("widgets/square_button_highlight");
+    /** Raw-PNG path for the blue top-map button background. */
+    public static final Identifier TOP_BOOKMARK_BUTTON_BLUE_TEXTURE = modId("textures/gui/buttons/top_map_button_blue.png");
 
-    /** Sprite identifier for the scroll-style label background. */
-    public static final Identifier SCROLL_BUTTON_SPRITE = modId("widgets/scroll_button");
+    /** Raw-PNG path for the highlighted blue top-map button background. */
+    public static final Identifier TOP_BOOKMARK_BUTTON_BLUE_HIGHLIGHT_TEXTURE = modId("textures/gui/buttons/top_map_button_blue_highlight.png");
 
-    /** Sprite identifier for the edge-style button indicator. */
-    public static final Identifier EDGE_INDICATOR_SPRITE = modId("widgets/edge_indicator");
+    /** Raw-PNG path for the violet top-map button background. */
+    public static final Identifier TOP_BOOKMARK_BUTTON_VIOLET_TEXTURE = modId("textures/gui/buttons/top_map_button_violet.png");
 
-    /** Sprite identifier for the page separator base. */
-    public static final Identifier PAGE_SEPARATOR_SPRITE = modId("widgets/page_separator");
+    /** Raw-PNG path for the highlighted violet top-map button background. */
+    public static final Identifier TOP_BOOKMARK_BUTTON_VIOLET_HIGHLIGHT_TEXTURE = modId("textures/gui/buttons/top_map_button_violet_highlight.png");
 
-    /** Sprite identifier for the page separator center ornament. */
-    public static final Identifier PAGE_SEPARATOR_CENTER_SPRITE = modId("widgets/page_separator_center");
+    /** Raw-PNG path for the green top-map button background. */
+    public static final Identifier TOP_BOOKMARK_BUTTON_GREEN_TEXTURE = modId("textures/gui/buttons/top_map_button_green.png");
 
-    /** Texture identifier for the book GUI using 9-slice scaling. */
-    public static final Identifier GUI_TEXTURE = modId("textures/gui/gui_tex_book_9slices_512px.png");
+    /** Raw-PNG path for the highlighted green top-map button background. */
+    public static final Identifier TOP_BOOKMARK_BUTTON_GREEN_HIGHLIGHT_TEXTURE = modId("textures/gui/buttons/top_map_button_green_highlight.png");
+
+    /** Texture identifier for the side-map button icon alpha mask. */
+    public static final Identifier SIDE_MAP_BUTTON_ICON_MASK = modId("textures/gui/buttons/side_map_button_mask_icon.png");
+
+    /** Height of book-label buttons in pixels. */
+    public static final int BOOK_LABEL_BUTTON_HEIGHT = 32;
+
+    /** Raw-PNG path for the scroll-style label, used for alpha-tinted nine-slice rendering. */
+    public static final Identifier SCROLL_BUTTON_TEXTURE = modId("textures/gui/sprites/widgets/scroll_button.png");
+
+    /** Raw-PNG path for the ornamented page separator. */
+    public static final Identifier SEPARATOR_TEXTURE = modId("textures/gui/separator.png");
+
+    /** Nominal drawn height of ornamented page separators. */
+    public static final int SEPARATOR_HEIGHT = 20;
+
+    /** Sprite identifier for the left book page background, nine-sliced via its mcmeta sidecar. */
+    public static final Identifier BOOK_PAGE_LEFT_SPRITE = modId("book/page_left");
+
+    /** Sprite identifier for the right book page background, nine-sliced via its mcmeta sidecar. */
+    public static final Identifier BOOK_PAGE_RIGHT_SPRITE = modId("book/page_right");
 
     /** Texture identifier for the ArdaCraft logo. */
-    public static final Identifier ARDACRAFT_LOGO = modId("textures/icons/icon_ardacraft_gradient_128px.png");
-
-    /**
-     * Legacy GUI nine-slice calls address 512px sheets through vanilla's old 256-unit texture space.
-     * Direct full-sheet blits still use the real texture dimensions.
-     */
-    public static final int LEGACY_TEXTURE_SPACE = 256;
+    public static final Identifier ARDACRAFT_LOGO = modId("textures/gui/logo_ardacraft_128px.png");
 
     /** Icon identifier for the close button. */
     public static final Identifier CLOSE_ICON = modId("icons/icon_close");
 
     /** Icon identifier for the map icon. */
     public static final Identifier MAP_ICON = modId("icons/icon_map");
+
+    /** Sprite for the map-layer selection label. */
+    public static final Identifier LAYERS_ICON = modId("icons/icon_layers");
+
+    /** Sprite for the display options label. */
+    public static final Identifier EYE_ICON = modId("icons/icon_eye");
+
+    /** Sprite for the dimension selection label. */
+    public static final Identifier WORLD_ICON = modId("icons/icon_world");
 
     /** Icon identifier for the configuration icon. */
     public static final Identifier CONFIGURATION_ICON = modId("icons/icon_configuration");
@@ -136,6 +153,9 @@ public class ModConstants {
 
     /** Icon identifier for the visited map marker. */
     public static final Identifier MAP_MARKER_VISITED_ICON = modId("icons/map_marker_visited");
+
+    /** Icon identifier for the tintable map marker highlight. */
+    public static final Identifier MAP_MARKER_HIGHLIGHT_ICON = modId("icons/map_marker_highlight");
 
     /** Icon identifier for waypoint markers. */
     public static final Identifier ICON_WAYPOINT = modId("icons/icon_waypoint");
@@ -161,14 +181,8 @@ public class ModConstants {
     /** Texture identifier for the compass background. */
     public static final Identifier COMPASS_BACKGROUND = modId("textures/gui/compass_texture.png");
 
-    /** Icon identifier for "all" or generic selection. */
-    public static final Identifier ICON_ALL = modId("icons/icon_all");
-
     /** Icon identifier for the book/guide icon. */
     public static final Identifier ICON_BOOK = modId("icons/icon_book");
-
-    /** Icon identifier for keybind display. */
-    public static final Identifier ICON_KEYBIND = modId("textures/icons/icon_keybind.png");
 
     /** ARGB colour constant for white. */
     public static final int COLOR_WHITE = 0xFFFFFFFF;
@@ -235,6 +249,9 @@ public class ModConstants {
     /** ARGB colour constant for key label text drawn inside the key-cap face. */
     public static final int KEYBIND_LABEL_COLOR = 0xFF454545;
 
+    /** Rendered key-cap height in pixels. */
+    public static final int KEYCAP_HEIGHT = 16;
+
     /**
      * Minimum placeholder width in pixels for a keybind run to ensure single-character keys
      * produce a cap wide enough to look like a key.
@@ -259,6 +276,24 @@ public class ModConstants {
     public static Identifier id(String path) {
         if (path == null) return UNKNOWN_ICON;
         return Identifier.parse(path);
+    }
+
+    /**
+     * Parses an identifier path, returning null when the value is not a valid identifier.
+     *
+     * @param path The identifier path.
+     * @return The parsed identifier, or null when the value is unusable.
+     */
+    @Nullable
+    public static Identifier idOrNull(String path) {
+
+        if (path == null || path.isBlank()) return null;
+
+        try {
+            return Identifier.parse(path);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     /**

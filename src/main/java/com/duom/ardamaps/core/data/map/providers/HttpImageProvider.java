@@ -36,6 +36,7 @@ import com.google.gson.Gson;
 import com.jakewharton.disklrucache.DiskLruCache;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.sksamuel.scrimage.ImmutableImage;
+import com.sksamuel.scrimage.nio.ImageIOReader;
 import com.sksamuel.scrimage.pixels.Pixel;
 import com.sksamuel.scrimage.webp.WebpImageReader;
 import net.minecraft.client.Minecraft;
@@ -92,6 +93,7 @@ public class HttpImageProvider {
     /** Disk entries older than this are removed by periodic maintenance. */
     private static final long STALE_ENTRY_TTL_MS = 7L * 24 * 60 * 60 * 1000;
 
+    /** Gson constant. */
     private static final Gson GSON = new Gson();
 
     /** Set of URLs currently being loaded (thread-safe) */
@@ -118,7 +120,10 @@ public class HttpImageProvider {
         return t;
     });
 
+    /** Directory that stores cached HTTP image responses. */
     private final Path diskCacheDirectory;
+
+    /** HTTP client used to fetch uncached images. */
     private final DelegatingHttpClient httpClient;
 
     /** Lazily-initialised DiskLruCache */
@@ -172,6 +177,8 @@ public class HttpImageProvider {
     /**
      * Returns the DiskLruCache, initializing it on first call.
      * Returns {@code null} if the cache could not be opened.
+     *
+     * @return The opened disk cache, or {@code null} when initialization failed.
      */
     private @Nullable DiskLruCache getDiskCache() {
 
@@ -192,6 +199,16 @@ public class HttpImageProvider {
             }
         }
         return diskCache;
+    }
+
+    private @Nullable CacheMetadata readMetadata(Path path) {
+
+        try {
+            return GSON.fromJson(Files.readString(path), CacheMetadata.class);
+        } catch (IOException | RuntimeException e) {
+            LOGGER.debug("Failed to read disk cache metadata {}", path, e);
+            return null;
+        }
     }
 
     /**
@@ -236,7 +253,40 @@ public class HttpImageProvider {
     }
 
     /**
-     * Closes the underlying DiskLruCache and the maintenance scheduler.
+     * Returns a DiskLruCache-safe key for {@code uri}: a short filename hint plus 128 bits of
+     * SHA-256 over the full URL. The hash supplies collision resistance; the hint keeps cache files
+     * inspectable while staying below DiskLruCache's 64-character key limit.
+     *
+     * @param uri The URI to generate a cache key for
+     * @return A sanitized cache key derived from the URI
+     */
+    static @NotNull String getDiskCacheKey(URI uri) {
+
+        String path = URLDecoder.decode(uri.getPath(), StandardCharsets.UTF_8);
+        String filename = path.substring(path.lastIndexOf('/') + 1);
+        int dotIndex = filename.lastIndexOf('.');
+        if (dotIndex != -1) filename = filename.substring(0, dotIndex);
+
+        String sanitized = filename.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
+        if (sanitized.isEmpty()) sanitized = "url";
+        if (sanitized.length() > 24) sanitized = sanitized.substring(0, 24);
+
+        return sanitized + "-" + sha256Prefix(uri.toString());
+    }
+
+    private static String sha256Prefix(String value) {
+
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash, 0, 16);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
+    }
+
+    /**
+     * Closes the underlying HTTP client, DiskLruCache and maintenance scheduler.
      * Call during mod shutdown.
      */
     public void close() {
@@ -259,6 +309,30 @@ public class HttpImageProvider {
                 diskCache.close();
             } catch (IOException e) {
                 LOGGER.error("Failed to close DiskLruCache", e);
+            }
+        }
+
+        httpClient.close();
+    }
+
+    /**
+     * Clears the provider's in-memory and disk-backed caches.
+     */
+    public void clearDiskCache() {
+
+        textures.invalidateAll();
+        textures.cleanUp();
+        loading.clear();
+
+        synchronized (this) {
+            if (diskCache == null) return;
+
+            try {
+                diskCache.delete();
+            } catch (IOException e) {
+                LOGGER.warn("[ArdaMaps] Failed to clear HTTP image disk cache", e);
+            } finally {
+                diskCache = null;
             }
         }
     }
@@ -374,6 +448,7 @@ public class HttpImageProvider {
                         try {
                             onComplete.accept(loadedImage == null ? null : new Tuple<>(loadedImage, url));
                         } catch (RuntimeException e) {
+                            if (loadedImage != null) loadedImage.close();
                             LOGGER.error("Image completion callback failed for @\"{}\"", url, e);
                             loading.remove(url);
                         }
@@ -386,6 +461,8 @@ public class HttpImageProvider {
             loading.remove(url);
         }
     }
+
+    /* Disk I/O */
 
     CompletableFuture<NativeImage> submitImageLoad(Supplier<NativeImage> supplier) {
 
@@ -432,8 +509,6 @@ public class HttpImageProvider {
         textures.put(url, new TextureData(texture, imageData.getWidth(), imageData.getHeight()));
         loading.remove(url);
     }
-
-    /* Disk I/O */
 
     private CompletableFuture<LoadResult> loadBytesAsync(URI uri) {
 
@@ -516,16 +591,6 @@ public class HttpImageProvider {
         }
     }
 
-    private @Nullable CacheMetadata readMetadata(Path path) {
-
-        try {
-            return GSON.fromJson(Files.readString(path), CacheMetadata.class);
-        } catch (IOException | RuntimeException e) {
-            LOGGER.debug("Failed to read disk cache metadata {}", path, e);
-            return null;
-        }
-    }
-
     private void writeDiskEntry(@Nullable DiskLruCache cache, String key, byte @Nullable [] bytes, CacheMetadata metadata) {
 
         if (cache == null) return;
@@ -555,6 +620,8 @@ public class HttpImageProvider {
         }
     }
 
+    /* Helpers */
+
     /**
      * Loads a WebP image from raw bytes using Scrimage and converts it to a NativeImage.
      *
@@ -578,42 +645,7 @@ public class HttpImageProvider {
      */
     private @NotNull NativeImage loadJpegImage(byte[] imageData) throws IOException {
 
-        return scrimageToNativeImage(ImmutableImage.loader().fromBytes(imageData));
-    }
-
-    /* Helpers */
-
-    /**
-     * Returns a DiskLruCache-safe key for {@code uri}: a short filename hint plus 128 bits of
-     * SHA-256 over the full URL. The hash supplies collision resistance; the hint keeps cache files
-     * inspectable while staying below DiskLruCache's 64-character key limit.
-     *
-     * @param uri The URI to generate a cache key for
-     * @return A sanitized cache key derived from the URI
-     */
-    static @NotNull String getDiskCacheKey(URI uri) {
-
-        String path = URLDecoder.decode(uri.getPath(), StandardCharsets.UTF_8);
-        String filename = path.substring(path.lastIndexOf('/') + 1);
-        int dotIndex = filename.lastIndexOf('.');
-        if (dotIndex != -1) filename = filename.substring(0, dotIndex);
-
-        String sanitized = filename.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
-        if (sanitized.isEmpty()) sanitized = "url";
-        if (sanitized.length() > 24) sanitized = sanitized.substring(0, 24);
-
-        return sanitized + "-" + sha256Prefix(uri.toString());
-    }
-
-    private static String sha256Prefix(String value) {
-
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash, 0, 16);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 unavailable", e);
-        }
+        return scrimageToNativeImage(new ImageIOReader().read(imageData));
     }
 
     /**
@@ -684,6 +716,7 @@ public class HttpImageProvider {
         }
     }
 
+    /** CacheMetadata data holder. */
     private record CacheMetadata(String lastModified, long fetchedAt, long maxAgeSeconds, int status) {
 
         static CacheMetadata fromFetch(FetchResult fetch, long now) {
@@ -706,6 +739,7 @@ public class HttpImageProvider {
         }
     }
 
+    /** DiskEntry data holder. */
     private record DiskEntry(byte[] bytes, CacheMetadata metadata) {
 
         boolean isFresh(long now) {
@@ -714,6 +748,7 @@ public class HttpImageProvider {
         }
     }
 
+    /** LoadResult data holder. */
     private record LoadResult(URI uri, byte @Nullable [] bytes, boolean absent, long absentTtlSeconds) {
 
         static LoadResult fromDisk(URI uri, DiskEntry entry) {
@@ -722,14 +757,14 @@ public class HttpImageProvider {
             return fromBytes(uri, entry.bytes());
         }
 
-        static LoadResult fromBytes(URI uri, byte[] bytes) {
-
-            return new LoadResult(uri, bytes, false, 0L);
-        }
-
         static LoadResult absent(URI uri, long absentTtlSeconds) {
 
             return new LoadResult(uri, null, true, absentTtlSeconds);
+        }
+
+        static LoadResult fromBytes(URI uri, byte[] bytes) {
+
+            return new LoadResult(uri, bytes, false, 0L);
         }
 
         static LoadResult empty(URI uri) {
