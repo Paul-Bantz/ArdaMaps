@@ -1,0 +1,118 @@
+{
+  "marker_background": "icons/map_marker",
+  "marker_background_visited": "icons/map_marker_visited",
+  "map_marker_background_size": 52,
+  "map_marker_icon_size": 32,
+  "map_marker_icon_x_offset": 10,
+  "map_marker_icon_y_offset": 10,
+  "unknown_type": {
+    "name": "Unknown",
+    "icon": "icons/icon_unknown",
+    "color": "#AE7D53",
+    "highlight_color": "#C2936B"
+  },
+  "default_type": {
+    "name": "Landmark",
+    "icon": "icons/icon_landmark",
+    "color": "#AE7D53",
+    "highlight_color": "#C2936B"
+  },
+  "types": {
+    "LANDMARK": {
+      "name": "Landmark",
+      "icon": "icons/icon_landmark",
+      "color": "#AE7D53",
+      "highlight_color": "#C2936B"
+    },
+    "CITY": {
+      "name": "City",
+      "icon": "icons/icon_town",
+      "color": "#D54848",
+      "highlight_color": "#EB7575"
+    },
+    "TOWN": {
+      "name": "Town",
+      "icon": "icons/icon_town",
+      "color": "#D54848",
+      "highlight_color": "#EB7575"
+    },
+    "VILLAGE": {
+      "name": "Village",
+      "icon": "icons/icon_village",
+      "color": "#D54848",
+      "highlight_color": "#EB7575"
+    },
+    "CAMP": {
+      "name": "Camp",
+      "icon": "icons/icon_camp",
+      "color": "#D54848",
+      "highlight_color": "#EB7575"
+    },
+    "HAMLET": {
+      "name": "Hamlet",
+      "icon": "icons/icon_hamlet",
+      "color": "#D54848",
+      "highlight_color": "#EB7575"
+    },
+    "HOMESTEAD": {
+      "name": "Homestead",
+      "icon": "icons/icon_homestead",
+      "color": "#44A546",
+      "highlight_color": "#61C765"
+    },
+    "MANOR": {
+      "name": "Manor",
+      "icon": "icons/icon_manor",
+      "color": "#3EA6A0",
+      "highlight_color": "#5BC2BC"
+    },
+    "MANOR-ESTATES": {
+      "name": "Manor-Estates",
+      "icon": "icons/icon_manor",
+      "color": "#3EA6A0",
+      "highlight_color": "#5BC2BC"
+    },
+    "HOUSE": {
+      "name": "House",
+      "icon": "icons/icon_house",
+      "color": "#A63E79",
+      "highlight_color": "#BF5893"
+    },
+    "HALLS": {
+      "name": "Halls",
+      "icon": "icons/icon_halls",
+      "color": "#A23EA6",
+      "highlight_color": "#C65ECC"
+    },
+    "FORTIFICATION": {
+      "name": "Fortification",
+      "icon": "icons/icon_fortification",
+      "color": "#6E3EA9",
+      "highlight_color": "#8859C2"
+    },
+    "RUIN": {
+      "name": "Ruin",
+      "icon": "icons/icon_ruins",
+      "color": "#107EAC",
+      "highlight_color": "#2FA0CC"
+    },
+    "CAVE": {
+      "name": "Cave",
+      "icon": "icons/icon_cave",
+      "color": "#A9A9A9",
+      "highlight_color": "#C4C4C4"
+    },
+    "FOREST": {
+      "name": "Forest",
+      "icon": "icons/icon_forest",
+      "color": "#6C6C5F",
+      "highlight_color": "#919181"
+    },
+    "MOUNTAIN": {
+      "name": "Mountain",
+      "icon": "icons/icon_mountains",
+      "color": "#4CAD44",
+      "highlight_color": "#6AC961"
+    }
+  }
+}
