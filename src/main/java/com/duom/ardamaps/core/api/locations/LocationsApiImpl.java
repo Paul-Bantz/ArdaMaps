@@ -46,29 +46,8 @@ public class LocationsApiImpl implements ILocationsApi {
     /** Class logger. */
     private static final Logger LOGGER = LoggerFactory.getLogger(LocationsApiImpl.class);
 
-    /** The source for the locations data. */
+    /** The source for the location data. */
     private @Nullable Supplier<CompletableFuture<List<ApiLocation>>> locationSource;
-
-    @Override
-    public void setLocationSource(Supplier<CompletableFuture<List<ApiLocation>>> source) {
-        if (source == null) throw new IllegalArgumentException("LocationSource must not be null");
-
-        if (locationSource != null) {
-            LOGGER.warn(
-                    "[ArdaMapsApi] LocationSource overridden: {} -> {}",
-                    locationSource.getClass().getName(),
-                    source.getClass().getName()
-            );
-        }
-
-        LOGGER.info("[ArdaMapsApi] LocationSource registered: {}", source.getClass().getName());
-        locationSource = source;
-    }
-
-    @Override
-    public Optional<Supplier<CompletableFuture<List<ApiLocation>>>> getLocationSource() {
-        return Optional.ofNullable(locationSource);
-    }
 
     /**
      * Converts a public location DTO into the internal model.
@@ -91,5 +70,26 @@ public class LocationsApiImpl implements ILocationsApi {
         server.setDescription(location.description());
         server.setExternalUrl(location.externalUrl());
         return server;
+    }
+
+    @Override
+    public Optional<Supplier<CompletableFuture<List<ApiLocation>>>> getLocationSource() {
+        return Optional.ofNullable(locationSource);
+    }
+
+    @Override
+    public void setLocationSource(Supplier<CompletableFuture<List<ApiLocation>>> source) {
+        if (source == null) throw new IllegalArgumentException("LocationSource must not be null");
+
+        if (locationSource != null) {
+            LOGGER.warn(
+                    "[ArdaMapsApi] LocationSource overridden: {} -> {}",
+                    locationSource.getClass().getName(),
+                    source.getClass().getName()
+            );
+        }
+
+        LOGGER.info("[ArdaMapsApi] LocationSource registered: {}", source.getClass().getName());
+        locationSource = source;
     }
 }

@@ -34,11 +34,13 @@ import com.duom.ardamaps.gui.widgets.BookmarkButtonType;
 import com.duom.ardamaps.gui.widgets.BookmarkButtonWidget;
 import com.duom.ardamaps.gui.widgets.SearchWidget;
 import com.duom.ardamaps.gui.widgets.builders.BookmarkButtonBuilder;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -92,7 +94,7 @@ public abstract class ArdaMapsScreen extends Screen {
      * @param ignoredParent The parent screen that opened this screen.
      * @param title         The title of the screen, displayed at the top of the GUI.
      */
-    protected ArdaMapsScreen(Screen ignoredParent, Text title) {
+    protected ArdaMapsScreen(Screen ignoredParent, Component title) {
 
         super(title);
         guiBackgroundRenderer = new BackgroundRenderer();
@@ -152,20 +154,18 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureExitButton() {
 
-        assert client != null;
-
         this.exitButton = BookmarkButtonBuilder.create()
                 .setButtonStyle(BookmarkButtonType.BOOKMARK_CLOSE)
                 .setOnClick(() -> {
-                    this.close();
-                    client.setScreen(null);
+                    this.onClose();
+                    minecraft.setScreen(null);
                 })
                 .setSize(ModConstants.SQUARED_BUTTON_SIZE, ModConstants.SQUARED_BUTTON_SIZE)
                 .setPosition(0, 0).build();
 
-        this.exitButton.setTooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.generic.close")));
+        this.exitButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.generic.close")));
 
-        addDrawableChild(exitButton);
+        addRenderableWidget(exitButton);
     }
 
     /**
@@ -173,20 +173,18 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureMapButton() {
 
-        assert client != null;
-
         this.mapButton = BookmarkButtonBuilder.create()
                 .setButtonStyle(BookmarkButtonType.BOOKMARK_MAP)
                 .setOnClick(() -> {
                     ArdaMapsClient.CONFIG.setLastPage(GuideScreenLink.GUIDE_MAP);
-                    client.setScreen(new MapScreen(this));
+                    minecraft.setScreen(new MapScreen(this));
                 })
                 .setSize(ModConstants.SQUARED_BUTTON_SIZE, ModConstants.SQUARED_BUTTON_SIZE)
                 .setPosition(0, 0).build();
 
-        this.mapButton.setTooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.map.tooltip")));
+        this.mapButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.map.tooltip")));
 
-        addDrawableChild(mapButton);
+        addRenderableWidget(mapButton);
 
     }
 
@@ -195,20 +193,18 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureConfigurationButton() {
 
-        assert client != null;
-
         this.configurationButton = BookmarkButtonBuilder.create()
                 .setButtonStyle(BookmarkButtonType.BOOKMARK_CONFIGURATION)
                 .setOnClick(() -> {
                     ArdaMapsClient.CONFIG.setLastPage(GuideScreenLink.GUIDE_CONFIG);
-                    client.setScreen(new ConfigurationScreen(this));
+                    minecraft.setScreen(new ConfigurationScreen(this));
                 })
                 .setSize(ModConstants.SQUARED_BUTTON_SIZE, ModConstants.SQUARED_BUTTON_SIZE)
                 .setPosition(0, 0).build();
 
-        this.configurationButton.setTooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.configuration.tooltip")));
+        this.configurationButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.configuration.tooltip")));
 
-        addDrawableChild(configurationButton);
+        addRenderableWidget(configurationButton);
     }
 
     /**
@@ -216,17 +212,15 @@ public abstract class ArdaMapsScreen extends Screen {
      */
     private void configureGuideButton() {
 
-        assert client != null;
-
         this.guideButton = BookmarkButtonBuilder.create()
                 .setButtonStyle(BookmarkButtonType.BOOKMARK_GUIDE)
-                .setOnClick(() -> client.setScreen(new GuideScreen(this, ArdaMapsClient.CONFIG.getLastPage())))
+                .setOnClick(() -> minecraft.setScreen(new GuideScreen(this, ArdaMapsClient.CONFIG.getLastPage())))
                 .setSize(ModConstants.SQUARED_BUTTON_SIZE, ModConstants.SQUARED_BUTTON_SIZE)
                 .setPosition(0, 0).build();
 
-        this.guideButton.setTooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.guide.tooltip")));
+        this.guideButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.guide.tooltip")));
 
-        addDrawableChild(guideButton);
+        addRenderableWidget(guideButton);
     }
 
     /**
@@ -246,10 +240,18 @@ public abstract class ArdaMapsScreen extends Screen {
      * @param context The DrawContext used for rendering the background.
      */
     @Override
-    public void renderBackground(DrawContext context) {
+    public void extractBackground(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
-        super.renderBackground(context);
+        super.extractBackground(context, mouseX, mouseY, delta);
+        extractModBackground(context);
+    }
 
+    /**
+     * Draws only the ArdaMaps panel background, without triggering the vanilla screen background or blur.
+     *
+     * @param context The DrawContext used for rendering the background.
+     */
+    public void extractModBackground(GuiGraphicsExtractor context) {
         guiBackgroundRenderer.render(context, width, height);
     }
 
@@ -330,16 +332,16 @@ public abstract class ArdaMapsScreen extends Screen {
     /**
      * Key press handling
      *
-     * @param keyCode   the code of the key that was pressed
-     * @param scanCode  the scan code of the key that was pressed
-     * @param modifiers the modifiers
+     * @param event the initiating event
      * @return true if the event was consumed, false otherwise
      */
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
+        int keyCode = event.key();
+        int modifiers = event.modifiers();
 
         // Detect Ctrl+F (or Cmd+F on macOS)
-        if (keyCode == GLFW.GLFW_KEY_F && hasControlDown() && isSearchable()) {
+        if (keyCode == GLFW.GLFW_KEY_F && (modifiers & (GLFW.GLFW_MOD_CONTROL | GLFW.GLFW_MOD_SUPER)) != 0 && isSearchable()) {
 
             SearchWidget searchWidget = new SearchWidget(this);
             searchWidget.setSearchFunction(getSearchFunction());
@@ -352,15 +354,13 @@ public abstract class ArdaMapsScreen extends Screen {
             return true;
         }
 
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     /**
-     * Gets the function that is called when a search result is selected via the search widget.
-     *
-     * @return the function called when a search result is selected
+     * @return true if this screen is searchable false otherwise
      */
-    protected abstract Function<Object, Void> getOnSearcheResultSelectedFunction();
+    protected abstract boolean isSearchable();
 
     /**
      * Gets the search function that is called when searching an element on screen via the search widget.
@@ -388,9 +388,11 @@ public abstract class ArdaMapsScreen extends Screen {
     }
 
     /**
-     * @return true if this screen is searchable false otherwise
+     * Gets the function that is called when a search result is selected via the search widget.
+     *
+     * @return the function called when a search result is selected
      */
-    protected abstract boolean isSearchable();
+    protected abstract Function<Object, Void> getOnSearcheResultSelectedFunction();
 
     /**
      * Returns the amount of padding to apply around the content area when calculating the padded content area.

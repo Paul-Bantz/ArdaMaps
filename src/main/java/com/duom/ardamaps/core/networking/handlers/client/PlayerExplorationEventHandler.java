@@ -31,7 +31,7 @@ import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.networking.packets.client.PlayerExplorationPacket;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,18 +43,27 @@ import java.util.List;
  */
 public class PlayerExplorationEventHandler extends ServerToClientPacketHandler<PlayerExplorationPacket> {
 
-    /** Class logger */
-    private static final Logger LOGGER = LoggerFactory.getLogger(PlayerExplorationEventHandler.class);
-    
     /** The channel identifier for the PlayerExplorationPacket. */
     public static final String RESP_CHANNEL = "player_exploration_event";
 
+    /** Class logger */
+    private static final Logger LOGGER = LoggerFactory.getLogger(PlayerExplorationEventHandler.class);
+
+    /**
+     * Constructs a new PlayerExplorationEventHandler.
+     */
     public PlayerExplorationEventHandler() {
-        super(RESP_CHANNEL, PlayerExplorationPacket::read);
+        super(RESP_CHANNEL, PlayerExplorationPacket.TYPE, PlayerExplorationPacket.CODEC);
     }
 
+    /**
+     * Handles incoming player exploration packets by updating the client's exploration state and saving progress.
+     *
+     * @param client The Minecraft client instance.
+     * @param packet The player exploration packet containing region exploration data.
+     */
     @Override
-    protected void handle(MinecraftClient client, PlayerExplorationPacket packet) {
+    protected void handle(Minecraft client, PlayerExplorationPacket packet) {
         client.execute(() -> {
 
             // Discard packet if empty or null

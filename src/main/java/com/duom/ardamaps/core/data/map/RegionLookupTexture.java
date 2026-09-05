@@ -42,13 +42,13 @@ import java.util.Objects;
  * (0 = no region). With fewer than 128 regions a {@code byte[]} is 4× smaller
  * than the previous {@code int[]} representation and fits entirely in L1/L2 cache.</p>
  *
- * @param pixels     Per-pixel region index in row-major order (row = Z axis, column = X axis).
- *                   Value 0 means "no region". Value {@code k > 0} maps to {@code regions[k-1]}.
- * @param regions    Ordered array of root regions; index {@code i} corresponds to pixel value {@code i+1}.
- * @param texWidth   Width  of the texture in pixels.
- * @param texHeight  Height of the texture in pixels.
+ * @param pixels      Per-pixel region index in row-major order (row = Z axis, column = X axis).
+ *                    Value 0 means "no region". Value {@code k > 0} maps to {@code regions[k-1]}.
+ * @param regions     Ordered array of root regions; index {@code i} corresponds to pixel value {@code i+1}.
+ * @param texWidth    Width  of the texture in pixels.
+ * @param texHeight   Height of the texture in pixels.
  * @param dimensionId ID of the dimension this texture corresponds to
- * @param lastUpdate Timestamp of the last update of the region data, used for cache invalidation.
+ * @param lastUpdate  Timestamp of the last update of the region data, used for cache invalidation.
  */
 public record RegionLookupTexture(byte[] pixels,
                                   Region[] regions,
@@ -67,8 +67,8 @@ public record RegionLookupTexture(byte[] pixels,
      * <p>This is an O(1), allocation-free hot-path safe to call every render frame.</p>
      *
      * @param dimension The dimension to query.
-     * @param worldX World X coordinate.
-     * @param worldZ World Z coordinate.
+     * @param worldX    World X coordinate.
+     * @param worldZ    World Z coordinate.
      * @return The region name, or {@code null}.
      */
     public String getRegionAt(Dimension dimension, double worldX, double worldZ) {
@@ -79,7 +79,7 @@ public record RegionLookupTexture(byte[] pixels,
 
         if (!Objects.equals(dimension.getId(), dimensionId)) return null;
 
-        int texX = (int) Math.floor((worldX - dimension.getXMin()) / (double) dimension.getWidth()  * texWidth);
+        int texX = (int) Math.floor((worldX - dimension.getXMin()) / (double) dimension.getWidth() * texWidth);
         int texZ = (int) Math.floor((worldZ - dimension.getZMin()) / (double) dimension.getHeight() * texHeight);
 
         if (texX < 0 || texX >= texWidth || texZ < 0 || texZ >= texHeight) return null;

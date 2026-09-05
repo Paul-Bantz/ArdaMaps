@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SafeTeleportScannerTest {
 
     /**
-     * Tests that an empty candidate above a full block resolves to the candidate Y itself.
+     * Verifies that an empty candidate above a full block resolves to the candidate Y itself.
      */
     @Test
     void resolveStandYAcceptsFullBlockSupportBelowFeet() {
@@ -47,7 +47,7 @@ class SafeTeleportScannerTest {
     }
 
     /**
-     * Tests that a partial support inside the feet block preserves its fractional standing height.
+     * Verifies that a partial support inside the feet block preserves its fractional standing height.
      */
     @Test
     void resolveStandYAcceptsPartialSupportInsideFeetBlock() {
@@ -56,7 +56,7 @@ class SafeTeleportScannerTest {
     }
 
     /**
-     * Tests that a full block at the candidate feet level is deferred to the next candidate block.
+     * Verifies that a full block at the candidate feet level is deferred to the next candidate block.
      */
     @Test
     void resolveStandYRejectsFullBlockAtFeet() {
@@ -65,7 +65,7 @@ class SafeTeleportScannerTest {
     }
 
     /**
-     * Tests that unsupported non-water candidates are not standable.
+     * Verifies that unsupported non-water candidates are not standable.
      */
     @Test
     void resolveStandYRejectsUnsupportedNonWaterBlock() {
@@ -74,7 +74,7 @@ class SafeTeleportScannerTest {
     }
 
     /**
-     * Tests that unsupported water candidates resolve to the candidate Y for swimming teleports.
+     * Verifies that unsupported water candidates resolve to the candidate Y for swimming teleports.
      */
     @Test
     void resolveStandYAcceptsUnsupportedWaterBlock() {
@@ -83,7 +83,7 @@ class SafeTeleportScannerTest {
     }
 
     /**
-     * Tests that block-center snapping handles positive, centered, and negative coordinates.
+     * Verifies that block-centre snapping handles positive, centered, and negative coordinates.
      */
     @Test
     void blockCenterSnapsCoordinatesToContainingBlockCenter() {

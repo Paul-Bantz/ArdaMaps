@@ -25,7 +25,9 @@
 
 package com.duom.ardamaps.gui.widgets;
 
-import net.minecraft.text.Text;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
+import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -34,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
- * Tests for {@link DropdownWidget} dropdown layout and click selection behavior.
+ * Tests for {@link DropdownWidget} dropdown layout and click selection behaviour.
  */
 class DropdownWidgetTest {
 
@@ -69,8 +71,8 @@ class DropdownWidgetTest {
                 100,
                 80,
                 20,
-                Text.empty(),
-                Text.empty(),
+                Component.empty(),
+                Component.empty(),
                 null,
                 List.of("a", "b", "c", "d", "e"),
                 value -> new TextIdentifierPairItem(value, null),
@@ -110,9 +112,35 @@ class DropdownWidgetTest {
 
         DropdownWidget<String, TextIdentifierPairItem> widget = widget(DropdownWidget.ExpandDirection.UP_LEFT);
 
-        widget.onClick(10, 100);
-        widget.onClick(10, 65);
+        widget.onClick(mouse(10, 100), false);
+        widget.onClick(mouse(10, 65), false);
 
         assertEquals("c", widget.getSelected());
+    }
+
+    /**
+     * Verifies that the widget's reported height stays at the button height while expanded.
+     * This protects parent row layout from shifting the trigger when the option list opens.
+     */
+    @Test
+    void onClick_expandsWithoutChangingReportedHeight() {
+
+        DropdownWidget<String, TextIdentifierPairItem> widget = widget(DropdownWidget.ExpandDirection.DOWN_RIGHT);
+
+        widget.onClick(mouse(10, 100), false);
+
+        assertEquals(20, widget.getHeight());
+    }
+
+    /**
+     * Creates a mouse button event at the supplied screen coordinates.
+     *
+     * @param x The screen X coordinate.
+     * @param y The screen Y coordinate.
+     * @return A mouse button event fixture.
+     */
+    @SuppressWarnings("SameParameterValue")
+    private static MouseButtonEvent mouse(double x, double y) {
+        return new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0));
     }
 }

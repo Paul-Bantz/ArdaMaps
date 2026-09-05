@@ -28,8 +28,8 @@ package com.duom.ardamaps.gui.widgets.builders;
 import com.duom.ardamaps.gui.widgets.DropdownWidget;
 import com.duom.ardamaps.gui.widgets.MapDropdownWidget;
 import com.duom.ardamaps.gui.widgets.TextIdentifierPairItem;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -43,7 +43,7 @@ import java.util.function.Function;
  * @param <T> The type of items stored in the dropdown
  * @param <E> The type of display pair (must extend {@link TextIdentifierPairItem})
  */
-public class MapDropdownBuilder<T, E extends TextIdentifierPairItem> extends DropdownBuilder<T,E> {
+public class MapDropdownBuilder<T, E extends TextIdentifierPairItem> extends DropdownBuilder<T, E> {
 
     /**
      * Creates a new instance of the builder.
@@ -163,7 +163,7 @@ public class MapDropdownBuilder<T, E extends TextIdentifierPairItem> extends Dro
      * @param placeholderText The placeholder text
      * @return This builder for method chaining
      */
-    public MapDropdownBuilder<T, E> setPlaceholderText(Text placeholderText) {
+    public MapDropdownBuilder<T, E> setPlaceholderText(Component placeholderText) {
         this.placeholderText = placeholderText;
         return this;
     }

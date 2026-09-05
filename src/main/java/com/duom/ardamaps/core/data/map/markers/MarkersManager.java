@@ -39,12 +39,13 @@ public class MarkersManager {
     private static @NotNull MarkersDefinition MARKERS_DEFINITION = MarkersDefinition.createDefault();
 
     /**
-     * Reloads the map markers definitions file and rebind them to the location data.
-     * This method should be called on client initialization or whenever a resource refresh even fires.
+     * Sets the current marker definition and rebinds it to loaded location data.
+     *
+     * @param definition the marker definition to apply
      */
-    public static void reload() {
+    public static void set(@NotNull MarkersDefinition definition) {
 
-        MARKERS_DEFINITION = MarkersDefinition.loadMarkersDefinition();
+        MARKERS_DEFINITION = definition;
         rebind();
     }
 

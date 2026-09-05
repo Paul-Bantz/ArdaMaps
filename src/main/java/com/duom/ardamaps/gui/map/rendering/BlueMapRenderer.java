@@ -29,19 +29,17 @@ import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.BlueMapCamera;
+import com.duom.ardamaps.core.data.map.cameras.MapCamera;
 import com.duom.ardamaps.core.data.map.providers.BlueMapTileProvider;
 import com.duom.ardamaps.core.data.map.providers.TileProvider;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
+import com.duom.ardamaps.core.data.map.tiles.TileKey;
 import com.duom.ardamaps.gui.ModConstants;
-import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.*;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Pair;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL13;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Tuple;
+import org.joml.Matrix3x2f;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,8 +49,8 @@ import java.util.*;
  * Renderer for BlueMap layers using PMTiles.
  * <br/>This class handles rendering map tiles from a PMTiles source, managing visible tiles based on the camera position and zoom level.
  * It optimizes rendering by minimizing texture binds and only rendering fully loaded tiles.
- * <br/>Tiles are rendered in LOD-grouped batched passes: fallback tiles grouped by their actual resolved LOD first,
- * then primary tiles, so sharper loaded tiles are not repainted by coarse opaque fallbacks.
+ * <br/>Tiles are rendered in LOD-grouped batched passes: primary tiles first, then fallback tiles grouped by
+ * their actual resolved LOD, so that shader uniforms are updated at most once per unique LOD per frame.
  */
 public class BlueMapRenderer extends MapRenderable {
 
@@ -65,8 +63,8 @@ public class BlueMapRenderer extends MapRenderable {
     /** Minimum brightness when block light is zero (ambient occlusion floor). */
     private static final float AMBIENT_LIGHT = 0.3f;
 
-    /** Approximate decoded byte weight of one BlueMap zoom-step viewport tile. */
-    private static final long APPROX_DECODED_TILE_BYTES = 501L * 501L * 4L;
+    /** Approximate decoded BlueMap tile cost: measured 501x501 RGBA, about 1 MiB per tile. */
+    static final long APPROX_DECODED_TILE_BYTES = 501L * 501L * 4L;
 
     /** Camera for managing view and visible tiles */
     private final BlueMapCamera mapCamera;
@@ -83,7 +81,7 @@ public class BlueMapRenderer extends MapRenderable {
      * @param textRenderer TextRenderer instance for rendering loading text when tiles are not yet available.
      * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public BlueMapRenderer(BlueMapCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
+    public BlueMapRenderer(BlueMapCamera camera, Font textRenderer, PlayerExploration exploration) {
 
         super(camera, textRenderer, exploration);
         this.mapCamera = camera;
@@ -110,30 +108,36 @@ public class BlueMapRenderer extends MapRenderable {
         mapCamera.setLodFactor(layer.lodFactor());
         mapCamera.setPreferredRenderScale(renderScale);
         mapCamera.setZoomToMatchVisualPixelsPerBlock();
+
+        // Pin the coarsest LOD outside the LRU so it can never be evicted by request churn at
+        // other zoom levels. The full-map pyramid itself is now loaded incrementally through the
+        // per-frame bounded/prioritised pipeline in renderMap(), at the lowest urgency tier, rather
+        // than being force-loaded here - that let a large coarse pyramid flood the executor queue
+        // ahead of whatever the player actually pans to first.
         provider.setPinnedZoom(mapCamera.getCoarsestZoom());
 
-        enqueueCoarsestGrid();
+        List<PmTileKey> coarsePyramidTiles = enumerateCoarsePyramidTiles(layer);
+        LOGGER.info("BlueMap coarse pyramid bootstrap queued {} tiles for {}", coarsePyramidTiles.size(), layer.layer());
+        provider.enqueueBootstrapTiles(coarsePyramidTiles);
     }
 
-    /**
-     * Queue the coarsest BlueMap tiles that cover the current dimension.
-     */
-    private void enqueueCoarsestGrid() {
+    List<PmTileKey> enumerateCoarsePyramidTiles(MapLayerDefinition layer) {
 
         int lod = mapCamera.getCoarsestZoom();
-        int blocksPerTile = (int) Math.round(mapCamera.getTileSize() * Math.pow(mapCamera.getLodFactor(), lod - 1));
+        int blocksPerTile = (int) Math.round(layer.tileSize() * Math.pow(layer.lodFactor(), lod - 1));
+
         int minTileX = (int) Math.floor((double) getDimension().getXMin() / blocksPerTile);
         int maxTileX = (int) Math.floor((double) getDimension().getXMax() / blocksPerTile);
         int minTileY = (int) Math.floor((double) getDimension().getZMin() / blocksPerTile);
         int maxTileY = (int) Math.floor((double) getDimension().getZMax() / blocksPerTile);
+
         List<PmTileKey> keys = new ArrayList<>();
-
-        for (int x = minTileX; x <= maxTileX; x++)
-            for (int y = minTileY; y <= maxTileY; y++)
+        for (int x = minTileX; x <= maxTileX; x++) {
+            for (int y = minTileY; y <= maxTileY; y++) {
                 keys.add(new PmTileKey(lod, x, y));
-
-        LOGGER.info("[ArdaMaps] Enqueuing {} BlueMap coarse bootstrap tiles at LOD {}", keys.size(), lod);
-        provider.enqueueBootstrapTiles(keys);
+            }
+        }
+        return keys;
     }
 
     /**
@@ -143,7 +147,7 @@ public class BlueMapRenderer extends MapRenderable {
      * @param context DrawContext for rendering operations
      */
     @Override
-    public void render(DrawContext context) {
+    public void render(GuiGraphicsExtractor context) {
 
         // Handle loading state - if provider is not initialized, show placeholder
         if (provider == null) {
@@ -151,11 +155,260 @@ public class BlueMapRenderer extends MapRenderable {
             return;
         }
 
-        if (!renderMap(context)) {
+        renderMap(context);
+        renderFogOfWar(context);
+    }
+
+    /**
+     * Renders the map tiles in LOD-grouped batched passes.
+     * <p>
+     * Tile loading is bounded and prioritised via {@link TileProvider#beginFrame()} /
+     * {@link TileProvider#request(TileKey, int)} / {@link TileProvider#endFrame()} across two
+     * tiers, most urgent first: primary-LOD tiles actually in the viewport (tier 0, ranked by
+     * distance from the viewport centre), the one-tile ring just outside the viewport, coarse-LOD
+     * tiles in the viewport backing the immediate visual fallback, and the adjacent BlueMap
+     * zoom-step viewport at {@code primaryZ - 1} when its estimated decoded footprint fits the
+     * speculative budget. Primary-LOD requests are only registered once the camera has been still for a short delay
+     * ({@link MapCamera#isSettled()}) - during a fast pan or zoom animation only the (pinned, cheap)
+     * viewport coarse fallback is requested, so the queue never fills with tiles that will have
+     * scrolled off screen before they load.
+     * </p>
+     * <p>
+     * A single classification loop separates tiles into:
+     * <ul>
+     *   <li><b>Primary tiles</b> — loaded at the current LOD; all share {@code primaryZ}.</li>
+     *   <li><b>Fallback tiles</b> — resolved by {@link #findFallbackTile}, which returns the
+     *       <em>first</em> loaded ancestor up the LOD hierarchy. This ancestor may be at any
+     *       intermediate LOD, not necessarily {@code coarsestZoom}. Tiles are deduplicated by
+     *       their {@link PmTileKey} (many primary tiles can resolve to the same coarser tile)
+     *       and then grouped by their actual LOD so shader uniforms and quad geometry are correct.</li>
+     * </ul>
+     * Sub-pixel precision is preserved by submitting each tile's floating-point screen
+     * bounds directly to the GUI render state.
+     * </p>
+     */
+    private void renderMap(GuiGraphicsExtractor context) {
+
+        int coarsestZoom = mapCamera.getCoarsestZoom();
+        int primaryZ = mapCamera.getTileSourceClampedZoom();
+        boolean settled = mapCamera.isSettled();
+        boolean debugMode = ArdaMapsClient.CONFIG.isMapDebugDisplay();
+
+        provider.beginFrame();
+
+        Set<PmTileKey> tilesToDisplay = mapCamera.getVisibleTiles();
+        requestTilesForFrame(coarsestZoom, primaryZ, settled);
+
+        // Classify
+        List<TileDraw> primaryTiles = new ArrayList<>();
+
+        // Deduplicate fallbacks by their PmTileKey: many primary tiles can map to the same coarser
+        // tile; drawing it multiple times per frame causes alpha-blend overdraw and flickering.
+        // LinkedHashMap preserves insertion order so draw order is deterministic.
+        Map<PmTileKey, TileDraw> fallbackMap = new LinkedHashMap<>();
+
+        for (PmTileKey key : tilesToDisplay) {
+
+            Optional<Identifier> tex = provider.peek(key);
+
+            // Tier 0: primary-LOD tiles actually in the viewport - the most urgent tier.
+            if (settled) {
+                int ring = mapCamera.centerTileDistance(key.x, key.y, primaryZ);
+                provider.request(key, TileProvider.PRIMARY_VIEWPORT_PRIORITY_BASE + ring);
+            }
+
+            if (tex.isPresent()) {
+                var screenPos = mapCamera.tilePositionOnViewport(key.x, key.y, key.z);
+                primaryTiles.add(new TileDraw(tex.get(), (float) screenPos.x(), (float) screenPos.y(), key));
+
+            } else {
+                Tuple<PmTileKey, Optional<Identifier>> fallback =
+                        findFallbackTile(key, coarsestZoom, mapCamera.getLodFactor());
+
+                PmTileKey fbKey = fallback.getA();
+                // fbKey.z is the tile's actual LOD — findFallbackTile returns the *first*
+                // loaded ancestor which can be at any intermediate LOD, not necessarily coarsestZoom.
+                // Using the wrong LOD produces incorrect quad size, UV extents, LodScale and TexelSize.
+                if (fallback.getB().isPresent() && !fallbackMap.containsKey(fbKey)) {
+                    var fbPos = mapCamera.tilePositionOnViewport(fbKey.x, fbKey.y, fbKey.z);
+                    fallbackMap.put(fbKey, new TileDraw(
+                            fallback.getB().get(),
+                            (float) fbPos.x(), (float) fbPos.y(),
+                            fbKey));
+                }
+            }
+        }
+
+        provider.endFrame();
+
+        if (primaryTiles.isEmpty() && fallbackMap.isEmpty()) {
+            provider.protectDrawnTiles(Set.of());
             super.renderLoadingText(context);
             return;
         }
-        renderFogOfWar();
+
+        Set<PmTileKey> drawnTiles = new HashSet<>();
+        primaryTiles.forEach(tile -> drawnTiles.add(tile.key()));
+        drawnTiles.addAll(fallbackMap.keySet());
+        provider.protectDrawnTiles(drawnTiles);
+
+        // Pass 1: fallback tiles (coarse base layer), grouped by their actual resolved LOD.
+        // Each unique lod gets exactly one uniform update before its tiles are drawn. Drawn
+        // *before* the primary pass: these are opaque quads painted in plain 2D order (no depth
+        // test), and a single coarse tile's footprint overlaps several primary-tile positions -
+        // drawing it after primary would repaint over already-finished primary tiles every frame,
+        // hiding them until every primary tile in view had loaded.
+        if (!fallbackMap.isEmpty()) {
+            Map<Integer, List<TileDraw>> byLod = new LinkedHashMap<>();
+            for (TileDraw tile : fallbackMap.values()) {
+                byLod.computeIfAbsent(tile.key().z, _ -> new ArrayList<>()).add(tile);
+            }
+            byLod.forEach((lod, tiles) -> drawTilePass(context, tiles, lod, debugMode));
+        }
+
+        // Pass 2: primary LOD tiles (all same lod -> one uniform update), drawn on top of the
+        // coarse base layer wherever they've finished loading.
+        if (!primaryTiles.isEmpty()) {
+            drawTilePass(context, primaryTiles, primaryZ, debugMode);
+        }
+
+    }
+
+    /**
+     * Registers tile load requests for this frame across multiple priority tiers: coarse-LOD fallback tiles,
+     * primary-LOD prefetch ring, and optionally the coarser zoom-step viewport (primaryZ - 1) if budget permits.
+     * Only primary-LOD tiles are requested when the camera is settled; during pans/zooms only the coarse
+     * LOD fallback is requested to avoid queuing tiles that will scroll off screen.
+     *
+     * @param coarsestZoom The coarsest LOD level to use for immediate fallback.
+     * @param primaryZ The current primary LOD level whose tiles are in the viewport.
+     * @param settled Whether the camera has been still long enough to request fine-grained primary tiles.
+     */
+    void requestTilesForFrame(int coarsestZoom, int primaryZ, boolean settled) {
+
+        // Tier 1: coarse-LOD tiles within the current viewport - the immediate visual fallback.
+        for (PmTileKey key : mapCamera.getVisibleTiles(coarsestZoom)) {
+            provider.request(key, TileProvider.VIEWPORT_FALLBACK_PRIORITY_BASE
+                    + mapCamera.centerTileDistance(key.x, key.y, coarsestZoom));
+        }
+
+        if (!settled) return;
+
+        for (PmTileKey key : mapCamera.getRequestTiles(primaryZ, 1)) {
+            provider.request(key, TileProvider.PRIMARY_PREFETCH_PRIORITY_BASE
+                    + mapCamera.centerTileDistance(key.x, key.y, primaryZ));
+        }
+
+        int zoomStep = primaryZ - 1;
+        int lowerBound = Math.min(provider.getMinZoom(), provider.getMaxZoom());
+        int upperBound = Math.max(provider.getMinZoom(), provider.getMaxZoom());
+        if (zoomStep >= lowerBound && zoomStep <= upperBound) {
+            Set<PmTileKey> zoomStepTiles = mapCamera.getVisibleTiles(zoomStep);
+            long estimatedBytes = (long) zoomStepTiles.size() * APPROX_DECODED_TILE_BYTES;
+            if (estimatedBytes > TileProvider.zoomStepByteCeiling()) return;
+
+            for (PmTileKey key : zoomStepTiles) {
+                provider.request(key, TileProvider.ZOOM_STEP_PRIORITY_BASE
+                        + mapCamera.centerTileDistance(key.x, key.y, zoomStep));
+            }
+        }
+    }
+
+    /**
+     * Finds the nearest loaded fallback tile for the given tile key by traversing up the LOD hierarchy.
+     * <p>
+     * Uses {@link TileProvider#peek(TileKey)}, not {@code request}/{@code get}: this is a read-only
+     * probe over already-cached ancestors and must never itself trigger a load. Doing otherwise
+     * previously meant every missing primary tile fanned out into load requests for every
+     * intermediate ancestor LOD, multiplying request volume by the LOD depth.
+     * </p>
+     *
+     * @param key       The original tile key for which to find a fallback
+     * @param maxLod    The maximum LOD level to search up to (coarsest zoom)
+     * @param lodFactor The factor by which each LOD level reduces resolution (e.g. 2 means each level halves resolution)
+     * @return A pair containing the fallback tile key and its texture identifier if found, or empty if no fallback is loaded
+     */
+    private Tuple<PmTileKey, Optional<Identifier>> findFallbackTile(PmTileKey key, int maxLod, double lodFactor) {
+        PmTileKey current = key;
+        if (lodFactor < 1.0) lodFactor = 1.0;
+
+        while (current.z < maxLod) {
+            current = new PmTileKey(
+                    current.z + 1,
+                    (int) Math.floor(current.x / lodFactor),
+                    (int) Math.floor(current.y / lodFactor)
+            );
+
+            Optional<Identifier> tex = provider.peek(current);
+            if (tex.isPresent()) return new Tuple<>(current, tex);
+
+        }
+
+        return new Tuple<>(key, Optional.empty());
+    }
+
+    /**
+     * Draws a batch of tiles that all belong to the same LOD level.
+     * Uniforms specific to the LOD ({@code LodScale}, {@code TexelSize}) are set once before
+     * iterating, and each tile receives only a texture bind + one quad draw call.
+     *
+     * @param tiles     List of pre-resolved tiles to draw.
+     * @param lod       LOD zoom level shared by all tiles in this pass.
+     * @param debugMode Whether to overlay a red tile outline and its {@code Z:x X:y Y:y} key,
+     *                  matching {@code PmTilesRenderer}'s debug grid.
+     */
+    private void drawTilePass(GuiGraphicsExtractor context, List<TileDraw> tiles, int lod, boolean debugMode) {
+
+        int renderSize = getDisplayedTileSize(lod);
+        int imageSize = renderSize + 1;   // BlueMap adds a 1-pixel overlap on the right/bottom edge
+        float uMax = (float) renderSize / imageSize;
+        float vMax = (float) renderSize / (imageSize * 2);
+        float lodScale = (float) Math.pow(mapCamera.getLodFactor(), lod - 1);
+        float texelSizeX = 1f / imageSize;
+        Matrix3x2f pose = new Matrix3x2f(context.pose());
+        var scissorArea = GuiRenderStateAccess.scissorArea(context);
+
+        for (TileDraw tile : tiles) {
+            GuiRenderStateAccess.add(context, new BlueMapTileRenderState(
+                    tile.texture(),
+                    pose,
+                    tile.x0(),
+                    tile.y0(),
+                    tile.x0() + renderSize,
+                    tile.y0() + renderSize,
+                    SUNLIGHT_STRENGTH,
+                    AMBIENT_LIGHT,
+                    lodScale,
+                    texelSizeX,
+                    uMax,
+                    vMax,
+                    scissorArea));
+
+            if (debugMode) {
+                int screenX = Math.round(tile.x0());
+                int screenY = Math.round(tile.y0());
+                context.outline(screenX, screenY, renderSize, renderSize, ModConstants.COLOR_RED);
+                context.text(
+                        textRenderer,
+                        "Z:%d X:%d Y:%d".formatted(tile.key().z, tile.key().x, tile.key().y),
+                        screenX + 5,
+                        screenY + 5,
+                        ModConstants.COLOR_WHITE,
+                        true
+                );
+            }
+        }
+    }
+
+    /**
+     * Calculates the displayed tile size based on the current zoom level and camera settings.
+     *
+     * @param z Zoom level of the tile
+     * @return Displayed tile size in pixels
+     */
+    private int getDisplayedTileSize(int z) {
+
+        return mapCamera.displayedTileSize(z);
     }
 
     /**
@@ -188,275 +441,6 @@ public class BlueMapRenderer extends MapRenderable {
     }
 
     /**
-     * Renders the map tiles in LOD-grouped batched passes.
-     * <p>
-     * A single classification loop separates tiles into:
-     * <ul>
-     *   <li><b>Primary tiles</b> — loaded at the current LOD; all share {@code primaryZ}.</li>
-     *   <li><b>Fallback tiles</b> — resolved by {@link #findFallbackTile}, which returns the
-     *       <em>first</em> loaded ancestor up the LOD hierarchy. This ancestor may be at any
-     *       intermediate LOD, not necessarily {@code coarsestZoom}. Tiles are deduplicated by
-     *       their {@link PmTileKey} (many primary tiles can resolve to the same coarser tile)
-     *       and then grouped by their actual LOD so shader uniforms and quad geometry are correct.</li>
-     * </ul>
-     * Sub-pixel precision is preserved by encoding the exact floating-point screen position directly
-     * into vertex coordinates rather than using a matrix push/translate/pop.
-     * </p>
-     * @return true when rendering completed, or false when no tiles were available.
-     */
-    private boolean renderMap(DrawContext context) {
-
-        int coarsestZoom = mapCamera.getCoarsestZoom();
-        int primaryZ = mapCamera.getTileSourceClampedZoom();
-
-        if (!BlueMapTileShader.isLoaded()) return true;
-
-        provider.beginFrame();
-        Set<PmTileKey> tilesToDisplay = mapCamera.getVisibleTiles();
-        boolean settled = mapCamera.isSettled();
-        requestTilesForFrame(coarsestZoom, primaryZ, settled);
-
-        // Classify
-        List<TileDraw> primaryTiles = new ArrayList<>();
-
-        // Deduplicate fallbacks by their PmTileKey: many primary tiles can map to the same coarser
-        // tile; drawing it multiple times per frame causes alpha-blend overdraw and flickering.
-        // LinkedHashMap preserves insertion order so draw order is deterministic.
-        Map<PmTileKey, TileDraw> fallbackMap = new LinkedHashMap<>();
-
-        for (PmTileKey key : tilesToDisplay) {
-
-            Optional<Identifier> tex = provider.peek(key);
-
-            if (settled) {
-                provider.request(key, TileProvider.PRIMARY_VIEWPORT_PRIORITY_BASE
-                        + mapCamera.centerTileDistance(key.x, key.y, key.z));
-            }
-
-            if (tex.isPresent()) {
-                var screenPos = mapCamera.tilePositionOnViewport(key.x, key.y, key.z);
-                primaryTiles.add(new TileDraw(tex.get(), (float) screenPos.x(), (float) screenPos.y(), key));
-
-            } else {
-                Pair<PmTileKey, Optional<Identifier>> fallback =
-                        findFallbackTile(key, coarsestZoom, mapCamera.getLodFactor());
-
-                PmTileKey fbKey = fallback.getLeft();
-                // Store fbKey.z as the tile's actual LOD — findFallbackTile returns the *first*
-                // loaded ancestor which can be at any intermediate LOD, not necessarily coarsestZoom.
-                // Using the wrong LOD produces incorrect quad size, UV extents, LodScale and TexelSize.
-                if (fallback.getRight().isPresent() && !fallbackMap.containsKey(fbKey)) {
-                    var fbPos = mapCamera.tilePositionOnViewport(fbKey.x, fbKey.y, fbKey.z);
-                    fallbackMap.put(fbKey, new TileDraw(
-                            fallback.getRight().get(),
-                            (float) fbPos.x(), (float) fbPos.y(),
-                            fbKey));
-                }
-            }
-        }
-        provider.endFrame();
-
-        if (primaryTiles.isEmpty() && fallbackMap.isEmpty()) {
-            provider.protectDrawnTiles(Set.of());
-            return false;
-        }
-
-        Set<PmTileKey> drawnTiles = new HashSet<>();
-        primaryTiles.forEach(tile -> drawnTiles.add(tile.key()));
-        drawnTiles.addAll(fallbackMap.keySet());
-        provider.protectDrawnTiles(drawnTiles);
-
-        // Shared shader setup (once for the whole frame)
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(BlueMapTileShader::blueMapTile);
-        BlueMapTileShader.setSunlightStrength(SUNLIGHT_STRENGTH);
-        BlueMapTileShader.setAmbientLight(AMBIENT_LIGHT);
-
-        // Pass 1: fallback tiles. They are opaque quads, so they must draw before sharper primary tiles.
-        // Each unique lod gets exactly one uniform update before its tiles are drawn.
-        if (!fallbackMap.isEmpty()) {
-            // Coarser = higher lod. Draw coarsest-first (descending lod) so a finer fallback
-            // always paints over the coarser one it overlaps (blur -> sharp); primaries then
-            // paint over all fallbacks.
-            Map<Integer, List<TileDraw>> byLod = new TreeMap<>(Comparator.reverseOrder());
-            for (TileDraw tile : fallbackMap.values()) {
-                byLod.computeIfAbsent(tile.key().z, k -> new ArrayList<>()).add(tile);
-            }
-            byLod.forEach((lod, tiles) -> drawTilePass(tiles, lod));
-        }
-
-        // Pass 2: primary LOD tiles (all same lod -> one uniform update)
-        if (!primaryTiles.isEmpty()) {
-            drawTilePass(primaryTiles, primaryZ);
-        }
-
-        RenderSystem.disableBlend();
-
-        // Debug grid overlay. Drawn after the tile passes rather than inside them: the tile passes
-        // run under a custom shader set once via RenderSystem.setShader(BlueMapTileShader::...), and
-        // DrawContext.drawBorder/drawText flush immediately and reset shader state, so interleaving
-        // them mid-batch would corrupt subsequent tile draws.
-        if (ArdaMapsClient.CONFIG.isMapDebugDisplay()) {
-            drawDebugGrid(context, fallbackMap.values());
-            drawDebugGrid(context, primaryTiles);
-        }
-
-        return true;
-    }
-
-    /**
-     * Overlays a red outline and a {@code Z:x X:y Y:z} label on each drawn tile, matching
-     * {@link PmTilesRenderer}'s debug grid. Only invoked when {@code map_debug_display} is enabled.
-     *
-     * @param context The draw context.
-     * @param tiles   The tiles drawn this frame to annotate.
-     */
-    private void drawDebugGrid(DrawContext context, Iterable<TileDraw> tiles) {
-
-        for (TileDraw tile : tiles) {
-            int renderSize = getDisplayedTileSize(tile.key().z);
-            int screenX = Math.round(tile.x0());
-            int screenY = Math.round(tile.y0());
-
-            context.drawBorder(screenX, screenY, renderSize, renderSize, ModConstants.COLOR_RED);
-            context.drawText(
-                    textRenderer,
-                    "Z:%d X:%d Y:%d".formatted(tile.key().z, tile.key().x, tile.key().y),
-                    screenX + 5,
-                    screenY + 5,
-                    ModConstants.COLOR_WHITE,
-                    true
-            );
-        }
-    }
-
-    /**
-     * Request the visible and prefetched tiles for the current frame.
-     * <p>
-     * Only the coarse pinned fallback, the same-LOD primary + 1-ring prefetch, and the
-     * budget-gated adjacent zoom-step viewport are requested. Visible tiles are protected outside
-     * the LRU so speculative churn cannot evict them back to a coarse fallback loop.
-     *
-     * @param coarsestZoom Coarsest tile zoom that should remain pinned.
-     * @param primaryZ Primary zoom level currently being rendered.
-     * @param settled Whether the camera has been still long enough to prefetch aggressively.
-     */
-    void requestTilesForFrame(int coarsestZoom, int primaryZ, boolean settled) {
-
-        for (PmTileKey key : mapCamera.getVisibleTiles(coarsestZoom)) {
-            provider.request(key, TileProvider.VIEWPORT_FALLBACK_PRIORITY_BASE
-                    + mapCamera.centerTileDistance(key.x, key.y, key.z));
-        }
-
-        if (!settled) return;
-
-        for (PmTileKey key : mapCamera.getRequestTiles(primaryZ, 1)) {
-            provider.request(key, TileProvider.PRIMARY_PREFETCH_PRIORITY_BASE
-                    + mapCamera.centerTileDistance(key.x, key.y, primaryZ));
-        }
-
-        int zoomStep = primaryZ - 1;
-        int lowerBound = Math.min(provider.getMinZoom(), provider.getMaxZoom());
-        int upperBound = Math.max(provider.getMinZoom(), provider.getMaxZoom());
-        if (zoomStep < lowerBound || zoomStep > upperBound) return;
-
-        Set<PmTileKey> zoomStepTiles = mapCamera.getVisibleTiles(zoomStep);
-        long estimatedBytes = (long) zoomStepTiles.size() * APPROX_DECODED_TILE_BYTES;
-        if (estimatedBytes > TileProvider.zoomStepByteCeiling()) return;
-
-        for (PmTileKey key : zoomStepTiles) {
-            provider.request(key, TileProvider.ZOOM_STEP_PRIORITY_BASE
-                    + mapCamera.centerTileDistance(key.x, key.y, zoomStep));
-        }
-    }
-
-    /**
-     * Finds the nearest loaded fallback tile for the given tile key by traversing up the LOD hierarchy.
-     *
-     * @param key       The original tile key for which to find a fallback
-     * @param maxLod    The maximum LOD level to search up to (coarsest zoom)
-     * @param lodFactor The factor by which each LOD level reduces resolution (e.g. 2 means each level halves resolution)
-     * @return A pair containing the fallback tile key and its texture identifier if found, or empty if no fallback is loaded
-     */
-    private Pair<PmTileKey, Optional<Identifier>> findFallbackTile(PmTileKey key, int maxLod, double lodFactor) {
-        PmTileKey current = key;
-        if (lodFactor < 1.0) lodFactor = 1.0;
-
-        while (current.z < maxLod) {
-            current = new PmTileKey(
-                    current.z + 1,
-                    (int) Math.floor(current.x / lodFactor),
-                    (int) Math.floor(current.y / lodFactor)
-            );
-
-            Optional<Identifier> tex = provider.peek(current);
-            if (tex.isPresent()) return new Pair<>(current, tex);
-
-        }
-
-        return new Pair<>(key, Optional.empty());
-    }
-
-    /**
-     * Draws a batch of tiles that all belong to the same LOD level.
-     * Uniforms specific to the LOD ({@code LodScale}, {@code TexelSize}) are set once before
-     * iterating, and each tile receives only a texture bind + one quad draw call.
-     *
-     * @param tiles List of pre-resolved tiles to draw.
-     * @param lod   LOD zoom level shared by all tiles in this pass.
-     */
-    private void drawTilePass(List<TileDraw> tiles, int lod) {
-
-        int renderSize = getDisplayedTileSize(lod);
-        int imageSize = renderSize + 1;   // BlueMap adds a 1-pixel overlap on the right/bottom edge
-        float uMax = (float) renderSize / imageSize;
-        float vMax = (float) renderSize / (imageSize * 2);
-        float lodScale = (float) Math.pow(mapCamera.getLodFactor(), lod - 1);
-
-        // Set LOD-dependent uniforms once for the whole pass
-        BlueMapTileShader.setLodScale(lodScale);
-        BlueMapTileShader.setTexelSize(1f / imageSize, 1f / (imageSize * 2));
-
-        var textureManager = MinecraftClient.getInstance().getTextureManager();
-        Tessellator tessellator = Tessellator.getInstance();
-
-        for (TileDraw tile : tiles) {
-
-            // Bind texture and set NEAREST filtering (parameters are stored per GL texture object
-            // so newly loaded tiles also get the correct filter on first bind)
-            RenderSystem.activeTexture(GL13.GL_TEXTURE0);
-            textureManager.bindTexture(tile.texture());
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
-            RenderSystem.setShaderTexture(0, tile.texture());
-
-            float x0 = tile.x0();
-            float y0 = tile.y0();
-
-            // Sub-pixel offset baked directly into vertex positions — no matrix push/translate/pop
-            BufferBuilder buffer = tessellator.getBuffer();
-            buffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
-            buffer.vertex(x0, y0 + renderSize, 0).texture(0, vMax).next();
-            buffer.vertex(x0 + renderSize, y0 + renderSize, 0).texture(uMax, vMax).next();
-            buffer.vertex(x0 + renderSize, y0, 0).texture(uMax, 0).next();
-            buffer.vertex(x0, y0, 0).texture(0, 0).next();
-            BufferRenderer.drawWithGlobalProgram(buffer.end());
-        }
-    }
-
-    /**
-     * Calculates the displayed tile size based on the current zoom level and camera settings.
-     *
-     * @param z Zoom level of the tile
-     * @return Displayed tile size in pixels
-     */
-    private int getDisplayedTileSize(int z) {
-
-        return mapCamera.displayedTileSize(z);
-    }
-
-    /**
      * Lightweight carrier for a resolved tile ready to be drawn.
      *
      * @param texture The loaded tile texture identifier.
@@ -466,5 +450,6 @@ public class BlueMapRenderer extends MapRenderable {
      *                and shader uniforms), {@code key.x}/{@code key.y} are used for the debug label.
      */
     private record TileDraw(Identifier texture, float x0, float y0, PmTileKey key) {
+
     }
 }

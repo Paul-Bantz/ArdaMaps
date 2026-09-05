@@ -43,6 +43,9 @@ class MarkerTypeTypeAdapterTest {
             .registerTypeAdapter(MarkerType.class, new MarkerTypeTypeAdapter())
             .create();
 
+    /**
+     * Verifies that bare icon paths without a namespace are qualified with the mod namespace.
+     */
     @Test
     void bareIconPath_isQualifiedWithModNamespace() {
 
@@ -51,6 +54,27 @@ class MarkerTypeTypeAdapterTest {
         assertEquals("ardamaps:icons/icon_town", markerType.icon());
     }
 
+    /**
+     * Constructs test JSON for a marker with the supplied icon path.
+     *
+     * @param icon the icon path to include in the JSON.
+     * @return JSON string representing a marker type.
+     */
+    private String markerJson(String icon) {
+
+        return """
+                {
+                  "name": "Town",
+                  "icon": "%s",
+                  "color": "#ffffff",
+                  "highlight_color": "#000000"
+                }
+                """.formatted(icon);
+    }
+
+    /**
+     * Verifies that icon paths already qualified with a namespace are not re-qualified.
+     */
     @Test
     void alreadyQualifiedIconPath_isUnchanged() {
 
@@ -59,6 +83,9 @@ class MarkerTypeTypeAdapterTest {
         assertEquals("ardamaps:icons/icon_town", markerType.icon());
     }
 
+    /**
+     * Verifies that icon paths with a foreign namespace are not modified.
+     */
     @Test
     void foreignNamespaceIconPath_isUnchanged() {
 
@@ -67,6 +94,9 @@ class MarkerTypeTypeAdapterTest {
         assertEquals("minecraft:foo", markerType.icon());
     }
 
+    /**
+     * Verifies that JSON missing the required icon field throws a parse exception.
+     */
     @Test
     void missingIconField_throwsJsonParseException() {
 
@@ -79,17 +109,5 @@ class MarkerTypeTypeAdapterTest {
                 """;
 
         assertThrows(JsonParseException.class, () -> gson.fromJson(json, MarkerType.class));
-    }
-
-    private String markerJson(String icon) {
-
-        return """
-                {
-                  "name": "Town",
-                  "icon": "%s",
-                  "color": "#ffffff",
-                  "highlight_color": "#000000"
-                }
-                """.formatted(icon);
     }
 }

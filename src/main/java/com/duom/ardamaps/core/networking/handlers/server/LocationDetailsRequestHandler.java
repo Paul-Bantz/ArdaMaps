@@ -30,10 +30,8 @@ import com.duom.ardamaps.core.consumers.networking.RespondablePacketHandler;
 import com.duom.ardamaps.core.data.location.LocationDetails;
 import com.duom.ardamaps.core.networking.packets.client.LocationDetailsResponsePacket;
 import com.duom.ardamaps.core.networking.packets.server.LocationDetailsRequestPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 
 /**
  * A packet handler that processes LocationDetailsRequestPacket sent from the client and responds with a LocationDetailsResponsePacket containing detailed information about a specific location.
@@ -50,21 +48,20 @@ public class LocationDetailsRequestHandler extends RespondablePacketHandler<Loca
      * Constructs a new LocationDetailsRequestHandler, specifying the request and response channels and packet readers.
      */
     public LocationDetailsRequestHandler() {
-        super(REQ_CHANNEL, LocationDetailsRequestPacket::read, RESP_CHANNEL, LocationDetailsResponsePacket::read);
+        super(REQ_CHANNEL, LocationDetailsRequestPacket.TYPE, LocationDetailsRequestPacket.CODEC,
+                RESP_CHANNEL, LocationDetailsResponsePacket.TYPE, LocationDetailsResponsePacket.CODEC);
     }
 
     /**
      * Handles the incoming LocationDetailsRequestPacket by retrieving the details of the requested location and responding with a LocationDetailsResponsePacket containing the relevant information.
      *
-     * @param server  The Minecraft server instance.
-     * @param player  The player who sent the request.
-     * @param handler The network handler for the player's connection.
-     * @param packet  The LocationDetailsRequestPacket containing the request data, including the location identifier.
-     * @param sender  The packet sender to send the response back to the client.
+     * @param server The Minecraft server instance.
+     * @param player The player who sent the request.
+     * @param packet The LocationDetailsRequestPacket containing the request data, including the location identifier.
      * @return A LocationDetailsResponsePacket containing detailed information about the requested location, or default values if the location is not found.
      */
     @Override
-    public LocationDetailsResponsePacket handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, LocationDetailsRequestPacket packet, PacketSender sender) {
+    public LocationDetailsResponsePacket handle(MinecraftServer server, ServerPlayer player, LocationDetailsRequestPacket packet) {
 
         var locations = ArdaMaps.CONFIG.getLocations();
         var location = locations.stream()

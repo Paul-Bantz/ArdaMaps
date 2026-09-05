@@ -38,8 +38,16 @@ public abstract class MapCamera {
     /** Epsilon value for snapping zoom levels to avoid jitter from tiny floating point differences during smooth zooming. */
     private static final double ZOOM_EPSILON = 0.001;
 
-    /** Delay after the last observed movement before high-detail tile requests resume. */
-    public static final long SETTLE_DELAY_MS = 120L;
+    /** How long after the last detected pan/zoom the camera is considered settled, in milliseconds. */
+    private static final long SETTLE_DELAY_MS = 120L;
+
+    /** worldX/worldZ/zoom as observed at the end of the previous {@link #update} call, to detect motion. */
+    private double lastWorldX = Double.NaN;
+    private double lastWorldZ = Double.NaN;
+    private double lastZoom = Double.NaN;
+
+    /** Wall-clock time of the last detected pan/zoom motion, or 0 if never moved yet. */
+    private long lastMovementMs = 0L;
 
     /** Viewport width - this is the "window into the world" width */
     @Getter
@@ -80,7 +88,7 @@ public abstract class MapCamera {
     @Getter
     protected double zoom;
 
-    /** Target zoom level for smooth zooming. */
+    /** Target zoom level for smooth zooming */
     protected double targetCameraZoom;
 
     /** Camera centre X in world coordinates */
@@ -91,9 +99,6 @@ public abstract class MapCamera {
     @Getter
     protected double worldZ;
 
-    /** Last time the camera position or zoom target changed. */
-    protected long lastMovementMs = System.currentTimeMillis();
-
     /** Current scale (pixels per block) */
     @Setter
     protected double scale;
@@ -103,10 +108,10 @@ public abstract class MapCamera {
     @Getter
     protected Dimension dimension;
 
-    /** World coordinates of the zoom anchor point, captured when zooming starts. */
+    /** World coordinates of the zoom anchor point (world position under mouse when zoom was triggered) */
     private Vec2d zoomAnchorWorld;
 
-    /** Screen coordinates of the zoom anchor point, captured when zooming starts. */
+    /** Screen coordinates of the zoom anchor point (mouse position when zoom was triggered) */
     private Vec2d zoomAnchorScreen;
 
     /** Preferred zoom level for displaying this map */
@@ -145,10 +150,6 @@ public abstract class MapCamera {
      * @param frameOffsetZ map frame outer vertical for panning adjustment
      */
     public void update(double deltaTime, double frameOffsetX, double frameOffsetZ) {
-
-        double previousZoom = zoom;
-        double previousWorldX = worldX;
-        double previousWorldZ = worldZ;
 
         var zoomDiff = targetCameraZoom - zoom;
 
@@ -189,26 +190,38 @@ public abstract class MapCamera {
         setWorldX(worldX, frameOffsetX);
         setWorldZ(worldZ, frameOffsetZ);
 
-        if (Math.abs(previousZoom - zoom) > ZOOM_EPSILON ||
-                Math.abs(previousWorldX - worldX) > ZOOM_EPSILON ||
-                Math.abs(previousWorldZ - worldZ) > ZOOM_EPSILON ||
-                Math.abs(targetCameraZoom - zoom) > 0.01) {
-            markMovement();
-        }
+        detectMovement();
     }
 
     /**
-     * Returns whether the camera has been still long enough to request high-detail tiles.
+     * Stamps {@link #lastMovementMs} whenever worldX/worldZ/zoom differ from their values at the
+     * end of the previous frame, so {@link #isSettled()} can tell a fling/zoom animation from a
+     * genuinely still camera.
+     */
+    private void detectMovement() {
+
+        boolean moved = worldX != lastWorldX || worldZ != lastWorldZ || zoom != lastZoom;
+
+        if (moved || lastMovementMs == 0L) {
+            lastMovementMs = System.currentTimeMillis();
+        }
+
+        lastWorldX = worldX;
+        lastWorldZ = worldZ;
+        lastZoom = zoom;
+    }
+
+    /**
+     * Whether the camera has been free of pan/zoom motion for at least {@link #SETTLE_DELAY_MS}.
+     * Renderers use this to gate fine-LOD tile loading behind a short delay, so a fast pan/zoom
+     * only ever requests the (pinned, cheap) coarse fallback pyramid instead of flooding the tile
+     * loader with tiles that will have scrolled off screen before they finish loading.
+     *
+     * @return Whether the camera is currently settled.
      */
     public boolean isSettled() {
-        return System.currentTimeMillis() - lastMovementMs >= SETTLE_DELAY_MS;
-    }
 
-    /**
-     * Marks the camera as recently moved.
-     */
-    protected void markMovement() {
-        lastMovementMs = System.currentTimeMillis();
+        return lastMovementMs != 0L && System.currentTimeMillis() - lastMovementMs >= SETTLE_DELAY_MS;
     }
 
     /**
@@ -254,9 +267,7 @@ public abstract class MapCamera {
         double lo = dimension.getXMin() + halfW - worldOffset;
         double hi = dimension.getXMax() - halfW + worldOffset;
 
-        double nextWorldX = lo <= hi ? CameraMath.clamp(worldX, lo, hi) : (dimension.getXMin() + dimension.getXMax()) / 2.0;
-        if (Math.abs(this.worldX - nextWorldX) > ZOOM_EPSILON) markMovement();
-        this.worldX = nextWorldX;
+        this.worldX = lo <= hi ? CameraMath.clamp(worldX, lo, hi) : (dimension.getXMin() + dimension.getXMax()) / 2.0;
     }
 
     /**
@@ -270,9 +281,7 @@ public abstract class MapCamera {
         double lo = dimension.getZMin() + halfH - worldOffset;
         double hi = dimension.getZMax() - halfH + worldOffset;
 
-        double nextWorldZ = lo <= hi ? CameraMath.clamp(worldZ, lo, hi) : (dimension.getZMin() + dimension.getZMax()) / 2.0;
-        if (Math.abs(this.worldZ - nextWorldZ) > ZOOM_EPSILON) markMovement();
-        this.worldZ = nextWorldZ;
+        this.worldZ = lo <= hi ? CameraMath.clamp(worldZ, lo, hi) : (dimension.getZMin() + dimension.getZMax()) / 2.0;
     }
 
     /**
@@ -409,8 +418,6 @@ public abstract class MapCamera {
         if (!Double.isNaN(zoomLevelToFitContentArea) && targetCameraZoom < zoomLevelToFitContentArea) {
             targetCameraZoom = zoomLevelToFitContentArea;
         }
-
-        markMovement();
     }
 
     /**
@@ -430,7 +437,6 @@ public abstract class MapCamera {
 
         this.zoom = snapZoom(zoom);
         this.targetCameraZoom = this.zoom;
-        markMovement();
     }
 
     /**

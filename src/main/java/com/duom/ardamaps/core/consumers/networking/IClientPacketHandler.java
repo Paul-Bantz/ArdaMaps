@@ -25,18 +25,14 @@
 
 package com.duom.ardamaps.core.consumers.networking;
 
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
-import net.minecraft.network.PacketByteBuf;
-
 /**
  * Interface for handling incoming packets on the client.
  * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
-public interface IClientPacketHandler extends IPacketHandler {
+public interface IClientPacketHandler<T extends IPacket> extends IPacketHandler {
+
     /**
      * Handle an incoming packet on the client.
      */
-    void handle(MinecraftClient client, ClientPlayNetworkHandler ignoredHandler, PacketByteBuf buf, PacketSender ignoredSender);
+    void receive(T packet, net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.Context context);
 }

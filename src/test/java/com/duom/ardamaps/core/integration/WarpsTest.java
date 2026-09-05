@@ -32,8 +32,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Tests for {@link Warps} graceful degradation when HuskHomes is not installed.
+ */
 class WarpsTest {
 
+    /**
+     * Verifies that warp operations are unavailable and invoke the fallback when HuskHomes is absent.
+     */
     @Test
     void unavailableWhenHuskHomesIsAbsentAndRunsFallback() {
         AtomicBoolean fallbackRan = new AtomicBoolean(false);

@@ -26,7 +26,7 @@
 package com.duom.ardamaps.gui.widgets.builders;
 
 import com.duom.ardamaps.gui.widgets.StyledButtonWidget;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 /**
  * Builder class for constructing {@link StyledButtonWidget} instances with a fluent API.
@@ -42,7 +42,7 @@ public class StyledButtonBuilder {
     private int height;
 
     /** text displayed on the button widget */
-    private Text text = Text.empty();
+    private Component text = Component.empty();
 
     /** Button style */
     private StyledButtonWidget.Style style = StyledButtonWidget.Style.DEFAULT;
@@ -51,10 +51,13 @@ public class StyledButtonBuilder {
     private Runnable onSelect;
 
     /** Private constructor to prevent direct instantiation. Use the static create() method instead. */
-    private StyledButtonBuilder() { }
+    private StyledButtonBuilder() {
+    }
 
     /** Static factory method to create a new instance of StyledButtonBuilder. */
-    public static StyledButtonBuilder create(){ return new StyledButtonBuilder(); }
+    public static StyledButtonBuilder create() {
+        return new StyledButtonBuilder();
+    }
 
     /**
      * Sets the size of the button widget.
@@ -82,16 +85,18 @@ public class StyledButtonBuilder {
 
     /**
      * Sets the text of the button widget.
+     *
      * @param text displayed on the button widget
      * @return the current instance of StyledButtonBuilder for method chaining
      */
-    public StyledButtonBuilder setText(Text text) {
+    public StyledButtonBuilder setText(Component text) {
         this.text = text;
         return this;
     }
 
     /**
      * Sets the style of the button widget.
+     *
      * @param style display style
      * @return the current instance of StyledButtonBuilder for method chaining
      */
@@ -102,10 +107,10 @@ public class StyledButtonBuilder {
 
     /**
      * Builds and returns a new instance of StyledButtonWidget based on the configured properties of this builder.
+     *
      * @return a new instance of StyledButtonWidget with the configured properties
      */
-    public StyledButtonWidget build()
-    {
+    public StyledButtonWidget build() {
         return new StyledButtonWidget(
                 0,
                 0,

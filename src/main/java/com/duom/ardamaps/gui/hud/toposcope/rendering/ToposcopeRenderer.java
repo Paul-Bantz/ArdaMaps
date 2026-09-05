@@ -39,12 +39,13 @@ import com.duom.ardamaps.gui.hud.toposcope.Toposcope;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec2f;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec2;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -68,13 +69,13 @@ public class ToposcopeRenderer {
     private static final List<ScreenMappedLocation> screenMappings = new ArrayList<>();
 
     /** Hint text to display over the hotbar when hovering a location. */
-    private static final Text TELEPORT_HINT = Text.translatable("ardamaps.client.generic.teleport");
+    private static final Component TELEPORT_HINT = Component.translatable("ardamaps.client.generic.teleport");
 
     /** Hint text to display over the hotbar when hovering a location that can be set as a waypoint. */
-    private static final Text SET_WAYPOINT_HINT = Text.translatable("ardamaps.client.generic.set.waypoint");
+    private static final Component SET_WAYPOINT_HINT = Component.translatable("ardamaps.client.generic.set.waypoint");
 
     /** Hint text to display over the hotbar when hovering a location that already has a waypoint. */
-    private static final Text REMOVE_WAYPOINT_HINT = Text.translatable("ardamaps.client.generic.remove.waypoint");
+    private static final Component REMOVE_WAYPOINT_HINT = Component.translatable("ardamaps.client.generic.remove.waypoint");
 
     /** Currently hovered location, if any. */
     private static LocationClient hoveredLocation = null;
@@ -110,7 +111,7 @@ public class ToposcopeRenderer {
      *
      * @param drawContext The drawing context.
      */
-    public static void render(DrawContext drawContext) {
+    public static void render(GuiGraphicsExtractor drawContext) {
 
         if (!Toposcope.overlayEnabled) return;
 
@@ -132,7 +133,7 @@ public class ToposcopeRenderer {
             maxToposcopeRenderDistanceSquared = blockToposcopeRenderDistance * blockToposcopeRenderDistance;
         }
 
-        TextRenderer textRenderer = Client.mc().textRenderer;
+        Font textRenderer = Client.mc().font;
 
         var exploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(Client.currentDimensionId(), false);
 
@@ -149,9 +150,9 @@ public class ToposcopeRenderer {
             cachedScreenH = Client.getScaledWindowHeight();
 
             var halfScreenW = cachedScreenW / 2;
-            int waypointHintWidth = Math.max(textRenderer.getWidth(SET_WAYPOINT_HINT), textRenderer.getWidth(REMOVE_WAYPOINT_HINT));
-            exploredTeleportHintXPosition = halfScreenW - (textRenderer.getWidth(TELEPORT_HINT) + waypointHintWidth + 32) / 2;
-            exploredSetWaypointHintXPosition = exploredTeleportHintXPosition + 20 + textRenderer.getWidth(TELEPORT_HINT);
+            int waypointHintWidth = Math.max(textRenderer.width(SET_WAYPOINT_HINT), textRenderer.width(REMOVE_WAYPOINT_HINT));
+            exploredTeleportHintXPosition = halfScreenW - (textRenderer.width(TELEPORT_HINT) + waypointHintWidth + 32) / 2;
+            exploredSetWaypointHintXPosition = exploredTeleportHintXPosition + 20 + textRenderer.width(TELEPORT_HINT);
             unknownSetWaypointHintXPosition = halfScreenW - (waypointHintWidth + 12) / 2;
 
             // Hotbar is 22px high, add 18px padding to position hint text above it
@@ -169,7 +170,7 @@ public class ToposcopeRenderer {
      * @param exploration The player's exploration state, used to determine which locations are hidden.
      * @param player      The player entity, used to calculate distances to locations.
      */
-    private static void refreshScreenMappings(Map<Double, LocationClient> locations, PlayerExploration exploration, ClientPlayerEntity player) {
+    private static void refreshScreenMappings(Map<Double, LocationClient> locations, PlayerExploration exploration, LocalPlayer player) {
 
         screenMappings.clear();
 
@@ -187,11 +188,11 @@ public class ToposcopeRenderer {
             if (!ArdaMapsClient.CONFIG.isMapRevealAll()) {
 
                 // Skip if location is hidden in exploration
-                var explorationState = exploration.stateAtWorldPos(location.getPosition().x, location.getPosition().z);
+                var explorationState = exploration.stateAtWorldPos(location.getPosition().x(), location.getPosition().z());
                 if (explorationState == ExplorationState.HIDDEN) continue;
             }
 
-            Vec2f screen = VectorProjection.projectToScreen(location.getPosition());
+            Vec2 screen = VectorProjection.projectToScreen(location.getPosition());
 
             if (screen == null) continue;
 
@@ -210,21 +211,19 @@ public class ToposcopeRenderer {
      * @param drawContext  The drawing context for rendering operations.
      * @param textRenderer The text renderer for drawing location names and distances.
      */
-    private static void renderScreenMappedLocations(DrawContext drawContext, TextRenderer textRenderer) {
+    private static void renderScreenMappedLocations(GuiGraphicsExtractor drawContext, Font textRenderer) {
         List<List<ScreenMappedLocation>> groups = groupByScreenPosition();
 
         // Track hovered location
         hoveredLocation = null;
 
-        var matrices = drawContext.getMatrices();
-        matrices.push();
-        matrices.translate(0, 0, -150);
-
+        var matrices = drawContext.pose();
+        matrices.pushMatrix();
         for (var group : groups) {
 
             // Stable sort by world position so the render order never changes between frames
-            group.sort(Comparator.comparingDouble((ScreenMappedLocation loc) -> loc.location.getPosition().x)
-                    .thenComparingDouble(loc -> loc.location.getPosition().z));
+            group.sort(Comparator.comparingDouble((ScreenMappedLocation loc) -> loc.location.getPosition().x())
+                    .thenComparingDouble(loc -> loc.location.getPosition().z()));
 
             // Compute the average screen position of all group members as a stable anchor
             float sumX = 0, sumY = 0;
@@ -232,12 +231,12 @@ public class ToposcopeRenderer {
                 sumX += m.screen.x;
                 sumY += m.screen.y;
             }
-            Vec2f groupAnchor = new Vec2f(sumX / group.size(), sumY / group.size());
+            Vec2 groupAnchor = new Vec2(sumX / group.size(), sumY / group.size());
 
             for (int index = 0; index < group.size(); index++)
                 drawMarker(drawContext, group, index, groupAnchor, textRenderer);
         }
-        matrices.pop();
+        matrices.popMatrix();
     }
 
     /**
@@ -293,7 +292,7 @@ public class ToposcopeRenderer {
      * @param groupAnchor  The stable average screen position of the group.
      * @param textRenderer The text renderer for the location label.
      */
-    private static void drawMarker(DrawContext drawContext, List<ScreenMappedLocation> group, int groupIndex, Vec2f groupAnchor, TextRenderer textRenderer) {
+    private static void drawMarker(GuiGraphicsExtractor drawContext, List<ScreenMappedLocation> group, int groupIndex, Vec2 groupAnchor, Font textRenderer) {
 
         int groupSpacing = 4;
 
@@ -304,9 +303,9 @@ public class ToposcopeRenderer {
         var entry = group.get(groupIndex);
         LocationClient location = entry.location;
         boolean isExplored = location.isRevealed();
-        int lineHeight = textRenderer.fontHeight;
+        int lineHeight = textRenderer.lineHeight;
 
-        int nameWidth = textRenderer.getWidth(location.getName());
+        int nameWidth = textRenderer.width(location.getName());
 
         // Centre the whole stack around the group anchor so markers never overlap
         int markerSlot = 2 * lineHeight + groupSpacing;
@@ -321,9 +320,8 @@ public class ToposcopeRenderer {
         if (isHovered)
             hoveredLocation = location;
 
-        var matrices = drawContext.getMatrices();
-        matrices.translate(0, 0, 200);
-        matrices.push();
+        var matrices = drawContext.pose();
+        matrices.pushMatrix();
 
         // Draw underline if hovered
         if (isHovered) {
@@ -335,16 +333,7 @@ public class ToposcopeRenderer {
             int bgX = iconX - 16;
             int bgY = baseY - 8;
 
-            drawContext.drawNineSlicedTexture(ModConstants.MAP_GUI_ELEMENTS,
-                    bgX, bgY,
-                    bgWidth, bgHeight,
-                    16,
-                    16,
-                    16,
-                    16,
-                    96,
-                    48,
-                    144, 160);
+            drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, ModConstants.SCROLL_BUTTON_SPRITE, bgX, bgY, bgWidth, bgHeight);
 
             boolean hasActiveWaypoint = getLocationActiveWaypoint(location).isPresent();
 
@@ -353,7 +342,7 @@ public class ToposcopeRenderer {
                 var locationIcon = location.getIcon();
 
                 if (locationIcon != null)
-                    drawContext.drawSprite(iconX, baseY, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(locationIcon));
+                    drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(locationIcon), iconX, baseY, iconSize, iconSize);
 
                 if (ArdaMapsClient.CONFIG.isMapRevealAll() || location.isVisited())
                     drawWaypointAndTeleportHints(drawContext, textRenderer, hasActiveWaypoint);
@@ -361,13 +350,13 @@ public class ToposcopeRenderer {
                     drawWaypointHint(drawContext, textRenderer, hasActiveWaypoint);
 
             } else {
-                drawContext.drawSprite(iconX, baseY, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(ModConstants.UNKNOWN_ICON));
+                drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.UNKNOWN_ICON), iconX, baseY, iconSize, iconSize);
                 drawWaypointHint(drawContext, textRenderer, hasActiveWaypoint);
             }
         }
 
         // Draw location name
-        drawContext.drawText(
+        drawContext.text(
                 textRenderer,
                 location.getName(),
                 nameX,
@@ -377,7 +366,7 @@ public class ToposcopeRenderer {
         );
 
         // Draw distance
-        drawContext.drawText(
+        drawContext.text(
                 textRenderer,
                 DistanceUnitConverter.asRealWorldUnits(Client.currentDimension(), entry.distance),
                 nameX,
@@ -386,7 +375,7 @@ public class ToposcopeRenderer {
                 !isHovered
         );
 
-        matrices.pop();
+        matrices.popMatrix();
     }
 
     /**
@@ -412,7 +401,7 @@ public class ToposcopeRenderer {
      */
     public static Optional<Waypoint> getLocationActiveWaypoint(LocationClient location) {
 
-        return ArdaMapsClient.CONFIG.getWaypointAtCoordinates(Client.currentDimensionId(), location.getPosition().x, location.getPosition().z, 5);
+        return ArdaMapsClient.CONFIG.getWaypointAtCoordinates(Client.currentDimensionId(), location.getPosition().x(), location.getPosition().z(), 5);
     }
 
     /**
@@ -422,11 +411,11 @@ public class ToposcopeRenderer {
      * @param textRenderer      the text renderer
      * @param hasActiveWaypoint whether there is an active waypoint or not to adjust the hint text
      */
-    private static void drawWaypointAndTeleportHints(DrawContext drawContext, TextRenderer textRenderer, boolean hasActiveWaypoint) {
+    private static void drawWaypointAndTeleportHints(GuiGraphicsExtractor drawContext, Font textRenderer, boolean hasActiveWaypoint) {
 
-        Text waypointHint = hasActiveWaypoint ? REMOVE_WAYPOINT_HINT : SET_WAYPOINT_HINT;
-        drawContext.drawSprite(exploredTeleportHintXPosition, hintYPosition, 0, 8, 8, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_MOUSE_LEFT_CLICK));
-        drawContext.drawText(
+        Component waypointHint = hasActiveWaypoint ? REMOVE_WAYPOINT_HINT : SET_WAYPOINT_HINT;
+        drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_MOUSE_LEFT_CLICK), exploredTeleportHintXPosition, hintYPosition, 8, 8);
+        drawContext.text(
                 textRenderer,
                 TELEPORT_HINT,
                 exploredTeleportHintXPosition + 12,
@@ -434,8 +423,8 @@ public class ToposcopeRenderer {
                 ModConstants.COLOR_WHITE,
                 true);
 
-        drawContext.drawSprite(exploredSetWaypointHintXPosition, hintYPosition, 0, 8, 8, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_MOUSE_RIGHT_CLICK));
-        drawContext.drawText(
+        drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_MOUSE_RIGHT_CLICK), exploredSetWaypointHintXPosition, hintYPosition, 8, 8);
+        drawContext.text(
                 textRenderer,
                 waypointHint,
                 exploredSetWaypointHintXPosition + 12,
@@ -451,10 +440,10 @@ public class ToposcopeRenderer {
      * @param textRenderer      the text renderer
      * @param hasActiveWaypoint whether there is an active waypoint or not to adjust the hint text
      */
-    private static void drawWaypointHint(DrawContext drawContext, TextRenderer textRenderer, boolean hasActiveWaypoint) {
-        Text waypointHint = hasActiveWaypoint ? REMOVE_WAYPOINT_HINT : SET_WAYPOINT_HINT;
-        drawContext.drawSprite(unknownSetWaypointHintXPosition, hintYPosition, 0, 8, 8, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_MOUSE_RIGHT_CLICK));
-        drawContext.drawText(
+    private static void drawWaypointHint(GuiGraphicsExtractor drawContext, Font textRenderer, boolean hasActiveWaypoint) {
+        Component waypointHint = hasActiveWaypoint ? REMOVE_WAYPOINT_HINT : SET_WAYPOINT_HINT;
+        drawContext.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(ModConstants.ICON_MOUSE_RIGHT_CLICK), unknownSetWaypointHintXPosition, hintYPosition, 8, 8);
+        drawContext.text(
                 textRenderer,
                 waypointHint,
                 unknownSetWaypointHintXPosition + 12,
@@ -477,7 +466,7 @@ public class ToposcopeRenderer {
 
         // Far fade: 100% -> 10% as distance approaches the configured draw distance
         double alphaDelta = (distanceToLandmark - FADE_START) / (ArdaMapsClient.CONFIG.getToposcopeDrawDistanceBlocks(Client.currentDimension()) - FADE_START);
-        alphaDelta = MathHelper.clamp(alphaDelta, 0.0, 1.0);
+        alphaDelta = Mth.clamp(alphaDelta, 0.0, 1.0);
 
         double alphaFactor = 1.0 - alphaDelta;
         alphaFactor = Math.max(alphaFactor, 0.1);
@@ -485,7 +474,7 @@ public class ToposcopeRenderer {
         // Near fade: 100% -> 0% as distance approaches NEAR_FADE_END (= sqrt(LOCATION_NEAR_DISTANCE))
         if (distanceToLandmark < NEAR_FADE_START) {
             double nearAlphaDelta = (distanceToLandmark - NEAR_FADE_END) / (NEAR_FADE_START - NEAR_FADE_END);
-            nearAlphaDelta = MathHelper.clamp(nearAlphaDelta, 0.0, 1.0);
+            nearAlphaDelta = Mth.clamp(nearAlphaDelta, 0.0, 1.0);
             alphaFactor *= nearAlphaDelta;
         }
 
@@ -502,7 +491,14 @@ public class ToposcopeRenderer {
         return hoveredLocation;
     }
 
-    /** A record to hold location data along with its screen position and distance. */
-    private record ScreenMappedLocation(LocationClient location, Vec2f screen, double distance) {
+    /**
+     * Holds a location and its screen-mapped position for rendering on the HUD.
+     *
+     * @param location The location being rendered.
+     * @param screen   The screen coordinates where the location should be drawn.
+     * @param distance The distance from the player to the location in blocks.
+     */
+    private record ScreenMappedLocation(LocationClient location, Vec2 screen, double distance) {
+
     }
 }

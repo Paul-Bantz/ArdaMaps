@@ -25,16 +25,15 @@
 
 package com.duom.ardamaps.core.data.map.providers;
 
-import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
+import com.mojang.blaze3d.platform.NativeImage;
 import io.tileverse.pmtiles.PMTilesDirectory;
 import io.tileverse.pmtiles.PMTilesEntry;
 import io.tileverse.pmtiles.PMTilesHeader;
 import io.tileverse.pmtiles.PMTilesReader;
 import io.tileverse.rangereader.RangeReader;
-import net.minecraft.client.texture.NativeImage;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -42,91 +41,193 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
+/**
+ * Tests for {@link PMTilesProvider}'s tile-loading lifecycle: the reader/closed race that used to
+ * surface as a repeating {@link NullPointerException}, and the transport-failure/missing-tile
+ * bookkeeping that keeps a broken or sparse source from being retried every frame.
+ */
 class PMTilesProviderTest {
 
     /**
-     * Verify that loading after close is a no-op.
+     * Verifies an {@link IOException} from the reader marks the key transport-failed rather than
+     * leaving it immediately retriable.
      */
     @Test
-    void loadTileAfterCloseIsCleanNoOp() {
+    @Timeout(5)
+    void loadTile_readerIOException_marksTransportFailure() throws IOException {
 
-        var provider = new TestPmTilesProvider();
-        var key = new PmTileKey(3, 1, 1);
+        var provider = new TestPMTilesProvider();
+        var reader = mock(PMTilesReader.class);
+        var key = new PmTileKey(4, 1, 1);
 
-        provider.loading.add(key);
-        provider.close();
-        provider.loadTile(key);
-
-        assertFalse(provider.loading.contains(key));
-    }
-
-    /**
-     * Verify that executor rejection does not escape and clears the in-flight key.
-     */
-    @Test
-    void executorRejectionDoesNotEscapeAndClearsLoadingKey() throws Exception {
-
-        assertInstanceOf(ThreadPoolExecutor.class, ArdaMapsClient.TILE_EXECUTOR);
-        ThreadPoolExecutor executor = (ThreadPoolExecutor) ArdaMapsClient.TILE_EXECUTOR;
-        var provider = new TestPmTilesProvider();
-        var key = new PmTileKey(3, 1, 1);
-        var blockers = saturate(executor);
-
-        provider.reader = Mockito.mock(PMTilesReader.class);
-
-        try {
-            provider.beginFrame();
-            provider.request(key, 0);
-
-            assertDoesNotThrow(provider::endFrame);
-            assertFalse(provider.loading.contains(key));
-        } finally {
-            blockers.releaseAll();
-            provider.close();
-        }
-    }
-
-    /**
-     * Verify that an undecodable tile is retried three times and then marked missing.
-     */
-    @Test
-    void undecodableTileIsAttemptedThreeTimesThenMarkedMissing() throws IOException {
-
-        var provider = new CountingPmTilesProvider();
-        var key = new PmTileKey(3, 2, 2);
-        var reader = Mockito.mock(PMTilesReader.class);
-
-        Mockito.when(reader.getTile(Mockito.anyLong())).thenReturn(Optional.of(ByteBuffer.wrap(new byte[]{1, 2, 3, 4})));
+        when(reader.getTile(anyLong())).thenThrow(new IOException("boom"));
         provider.reader = reader;
 
-        for (int i = 0; i < 3; i++) {
-            provider.loading.add(key);
-            provider.loadTile(key);
-        }
+        provider.loadTile(key);
 
-        assertEquals(3, provider.loadCalls);
-        assertNotNull(provider.missingKeys.getIfPresent(key));
+        awaitTrue(() -> !provider.loading.contains(key));
+
+        assertTrue(provider.peek(key).isEmpty());
 
         provider.beginFrame();
         provider.request(key, 0);
         provider.endFrame();
 
-        assertEquals(3, provider.loadCalls);
+        assertTrue(provider.peek(key).isEmpty(), "Transport-failed key must not load");
     }
 
     /**
-     * Verify that clustered archives prewarm the leaf directory and contiguous coarse span.
+     * Verifies an empty {@link Optional} tile (present in range but absent from the archive) marks
+     * the key as missing so it is never retried, distinguishing it from a transport failure.
      */
     @Test
-    void bootstrapClusteredArchiveReadsLeafSectionThenCoarseExtent() {
+    @Timeout(5)
+    void loadTile_emptyOptional_marksMissing() throws IOException {
 
-        var provider = new TestPmTilesProvider();
+        var provider = new TestPMTilesProvider();
+        var reader = mock(PMTilesReader.class);
+        var key = new PmTileKey(4, 2, 2);
+
+        when(reader.getTile(anyLong())).thenReturn(Optional.empty());
+        provider.reader = reader;
+
+        provider.loadTile(key);
+
+        awaitTrue(() -> provider.missingKeys.getIfPresent(key) != null);
+    }
+
+    /**
+     * Verifies {@code close()} while a load is queued does not throw and leaves the provider's
+     * transient state clean, reproducing the conditions that used to surface as a repeating NPE.
+     */
+    @Test
+    @Timeout(5)
+    void close_whileLoadInFlight_doesNotThrowAndClearsLoadingState() throws IOException {
+
+        var provider = new TestPMTilesProvider();
+        var reader = mock(PMTilesReader.class);
+        var key = new PmTileKey(4, 3, 3);
+
+        // Block the reader call so close() can race the in-flight task deterministically.
+        var releaseLatch = new CountDownLatch(1);
+        when(reader.getTile(anyLong())).thenAnswer(_ -> {
+            releaseLatch.await();
+            return Optional.empty();
+        });
+        provider.reader = reader;
+
+        assertTrue(provider.loading.add(key));
+        provider.loadTile(key);
+
+        assertDoesNotThrow(provider::close);
+        releaseLatch.countDown();
+
+        awaitTrue(() -> !provider.loading.contains(key));
+    }
+
+    /**
+     * Polls the given condition until it becomes true, failing the test after a bounded timeout
+     * instead of hanging (the surrounding {@code @Timeout} is the hard backstop).
+     *
+     * @param condition The condition to poll.
+     */
+    @SuppressWarnings("BusyWait")
+    private static void awaitTrue(BooleanSupplier condition) {
+
+        long deadline = System.currentTimeMillis() + 2000;
+        while (System.currentTimeMillis() < deadline) {
+            if (condition.getAsBoolean()) return;
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                fail("Interrupted while waiting for async condition");
+            }
+        }
+        fail("Condition not met within timeout");
+    }
+
+    /**
+     * Verifies a null reader (e.g. never configured, or already closed) is a no-op rather than an NPE.
+     */
+    @Test
+    void loadTile_nullReader_clearsLoadingWithoutThrowing() {
+
+        var provider = new TestPMTilesProvider();
+        var key = new PmTileKey(4, 4, 4);
+
+        provider.loading.add(key);
+
+        assertDoesNotThrow(() -> provider.loadTile(key));
+
+        assertFalse(provider.loading.contains(key));
+    }
+
+    /**
+     * Verifies undecodable tile bytes are attempted exactly three times, then abandoned as missing.
+     */
+    @Test
+    @Timeout(5)
+    void loadTile_undecodableBytes_attemptedThreeTimesThenMarkedMissing() throws IOException {
+
+        var provider = new CountingPMTilesProvider();
+        var reader = mock(PMTilesReader.class);
+        var key = new PmTileKey(4, 5, 5);
+
+        when(reader.getTile(anyLong())).thenReturn(Optional.of(ByteBuffer.wrap(new byte[]{1, 2, 3, 4})));
+        provider.reader = reader;
+
+        for (int i = 0; i < 3; i++) {
+            provider.loading.add(key);
+            provider.loadTile(key);
+            awaitTrue(() -> !provider.loading.contains(key));
+        }
+
+        assertEquals(3, provider.loadCalls);
+        assertNotNull(provider.missingKeys.getIfPresent(key), "Third decode failure should mark the key missing");
+
+        provider.beginFrame();
+        provider.request(key, 0);
+        provider.endFrame();
+
+        assertEquals(3, provider.loadCalls, "Decode-abandoned key must not be loaded again");
+    }
+
+    /**
+     * Verifies a rejected tile executor submission cannot escape the provider or strand the key in
+     * the in-flight set.
+     */
+    @Test
+    void endFrame_executorRejection_clearsLoadingWithoutThrowing() {
+
+        var provider = new RejectingPMTilesProvider();
+        provider.reader = mock(PMTilesReader.class);
+        var key = new PmTileKey(4, 6, 6);
+
+        provider.beginFrame();
+        provider.request(key, 0);
+
+        assertDoesNotThrow(provider::endFrame);
+        assertFalse(provider.loading.contains(key), "Rejected submission should be retriable next frame");
+    }
+
+    /**
+     * Verifies remote PMTiles bootstrap reads exactly the leaf-directory section and then one
+     * contiguous coarse tile-data span through the supplied shared range reader.
+     */
+    @Test
+    void bootstrap_clusteredArchive_readsLeafSectionThenCoarseExtent() {
+
+        var provider = new TestPMTilesProvider();
         provider.minZoom = 0;
         provider.maxZoom = 3;
         var rangeReader = new RecordingRangeReader();
@@ -134,16 +235,16 @@ class PMTilesProviderTest {
 
         provider.runRemoteBootstrap(rangeReader, reader, header(true));
 
-        assertEquals(List.of(new RangeRead(300, 50), new RangeRead(1000, 200)), rangeReader.reads);
+        assertEquals(List.of(new RangeRead(300, 50), new RangeRead(1_000, 200)), rangeReader.reads);
     }
 
     /**
-     * Verify that unclustered archives skip bootstrap reads.
+     * Verifies an unclustered archive skips bootstrap reads entirely.
      */
     @Test
-    void bootstrapUnclusteredArchiveSkipsReads() {
+    void bootstrap_unclusteredArchive_skipsReads() {
 
-        var provider = new TestPmTilesProvider();
+        var provider = new TestPMTilesProvider();
         provider.minZoom = 0;
         provider.maxZoom = 3;
         var rangeReader = new RecordingRangeReader();
@@ -154,12 +255,12 @@ class PMTilesProviderTest {
     }
 
     /**
-     * Verify that oversized bootstrap extents fall back to queued coarse tiles.
+     * Verifies oversized coarse extents abort the data prewarm but still enqueue pump work.
      */
     @Test
-    void bootstrapExtentGuardAbortsDataReadButPumpStillRuns() {
+    void bootstrap_extentGuard_abortsDataReadButPumpStillRuns() {
 
-        var provider = new BootstrapPmTilesProvider();
+        var provider = new BootstrapPMTilesProvider();
         provider.minZoom = 0;
         provider.maxZoom = 3;
         var rangeReader = new RecordingRangeReader();
@@ -176,13 +277,13 @@ class PMTilesProviderTest {
     }
 
     /**
-     * Verify that an unsatisfiable range is caught and does not fail the bootstrap path.
+     * Verifies a 416-like range failure aborts the prewarm without escaping to configure callers.
      */
     @SuppressWarnings("resource")
     @Test
-    void bootstrapRangeNotSatisfiableIsCaught() {
+    void bootstrap_rangeNotSatisfiable_isCaught() {
 
-        var provider = new TestPmTilesProvider();
+        var provider = new TestPMTilesProvider();
         provider.minZoom = 0;
         provider.maxZoom = 3;
         var rangeReader = new RecordingRangeReader();
@@ -192,56 +293,13 @@ class PMTilesProviderTest {
     }
 
     /**
-     * Saturate the executor so submission rejection can be tested.
-     *
-     * @param executor Executor to saturate.
-     * @return Handle for releasing the blocked tasks.
-     * @throws InterruptedException If waiting for task start is interrupted.
+     * Minimal concrete {@link PMTilesProvider} for testing; PMTilesProvider itself is abstract only
+     * to force construction through the file/HTTP {@code init(...)} factories.
      */
-    private static Blockers saturate(ThreadPoolExecutor executor) throws InterruptedException {
-
-        int tasks = executor.getCorePoolSize() + executor.getQueue().remainingCapacity();
-        CountDownLatch release = new CountDownLatch(1);
-        CountDownLatch started = new CountDownLatch(executor.getCorePoolSize());
-        List<Future<?>> futures = new ArrayList<>();
-
-        for (int i = 0; i < tasks; i++) {
-            futures.add(executor.submit(() -> {
-                started.countDown();
-                try {
-                    release.await();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }));
-        }
-
-        assertTrue(started.await(5, TimeUnit.SECONDS));
-        assertEquals(0, executor.getQueue().remainingCapacity());
-        return new Blockers(release, futures);
+    private static final class TestPMTilesProvider extends PMTilesProvider {
     }
 
-    /**
-     * Handles release and cancellation of the saturated executor tasks.
-     */
-    private record Blockers(CountDownLatch release, List<Future<?>> futures) {
-
-        private void releaseAll() {
-            release.countDown();
-            futures.forEach(future -> future.cancel(true));
-        }
-    }
-
-    /**
-     * PMTiles provider with default behavior for bootstrap tests.
-     */
-    private static final class TestPmTilesProvider extends PMTilesProvider {
-    }
-
-    /**
-     * PMTiles provider that counts load attempts.
-     */
-    private static final class CountingPmTilesProvider extends PMTilesProvider {
+    private static final class CountingPMTilesProvider extends PMTilesProvider {
 
         private int loadCalls;
 
@@ -250,17 +308,17 @@ class PMTilesProviderTest {
             loadCalls++;
             super.loadTile(key);
         }
+    }
+
+    private static final class RejectingPMTilesProvider extends PMTilesProvider {
 
         @Override
         CompletableFuture<NativeImage> submitTileLoad(Supplier<NativeImage> supplier) {
-            return CompletableFuture.completedFuture(supplier.get());
+            throw new RejectedExecutionException("full");
         }
     }
 
-    /**
-     * PMTiles provider that only records bootstrap load calls.
-     */
-    private static final class BootstrapPmTilesProvider extends PMTilesProvider {
+    private static final class BootstrapPMTilesProvider extends PMTilesProvider {
 
         private int loadCalls;
 
@@ -271,12 +329,6 @@ class PMTilesProviderTest {
         }
     }
 
-    /**
-     * Build a synthetic PMTiles header for bootstrap tests.
-     *
-     * @param clustered Whether the archive should report clustered layout.
-     * @return Synthetic PMTiles header.
-     */
     private static PMTilesHeader header(boolean clustered) {
 
         return new PMTilesHeader(
@@ -306,12 +358,6 @@ class PMTilesProviderTest {
                 0);
     }
 
-    /**
-     * Build a mock PMTiles reader with a scripted root and leaf directory.
-     *
-     * @param tileEntries Entries to place in the leaf directory.
-     * @return Mocked PMTiles reader.
-     */
     private static PMTilesReader mockBootstrapReader(PMTilesEntry... tileEntries) {
 
         PMTilesEntry rootLeaf = PMTilesEntry.of(0, 0, 50, 0);
@@ -320,35 +366,23 @@ class PMTilesProviderTest {
                 ? directory(PMTilesEntry.of(0, 0, 100, 1), PMTilesEntry.of(1, 100, 100, 1))
                 : directory(tileEntries);
 
-        PMTilesReader reader = Mockito.mock(PMTilesReader.class);
+        PMTilesReader reader = mock(PMTilesReader.class);
         when(reader.getRootDirectory()).thenReturn(root);
         when(reader.getDirectory(rootLeaf)).thenReturn(leaf);
         return reader;
     }
 
-    /**
-     * Build a mock PMTiles directory from a fixed set of entries.
-     *
-     * @param entries Entries exposed by the directory iterator.
-     * @return Mocked PMTiles directory.
-     */
     private static PMTilesDirectory directory(PMTilesEntry... entries) {
 
-        PMTilesDirectory directory = Mockito.mock(PMTilesDirectory.class);
-        when(directory.iterator()).thenAnswer(ignored -> List.of(entries).iterator());
+        PMTilesDirectory directory = mock(PMTilesDirectory.class);
+        when(directory.iterator()).thenAnswer(_ -> List.of(entries).iterator());
         return directory;
     }
 
-    /**
-     * Captured range read parameters.
-     */
     private record RangeRead(long offset, int length) {
 
     }
 
-    /**
-     * Range reader that records each request for later assertions.
-     */
     private static final class RecordingRangeReader implements RangeReader {
 
         private final List<RangeRead> reads = new ArrayList<>();

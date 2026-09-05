@@ -26,16 +26,38 @@
 package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
+import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
 import com.duom.ardamaps.core.data.location.LocationDetails;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
+
+import java.util.UUID;
 
 /**
  * A packet sent from the server to the client containing detailed information about a specific location.
  *
  * @param details The LocationDetails object containing the information about the location.
  */
-public record LocationDetailsResponsePacket(LocationDetails details) implements IPacket {
+public record LocationDetailsResponsePacket(UUID requestId,
+                                            LocationDetails details) implements IRespondablePacket<LocationDetailsResponsePacket> {
+
+    public static final CustomPacketPayload.Type<LocationDetailsResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_details_response"));
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, LocationDetailsResponsePacket> CODEC = IPacket.codec(LocationDetailsResponsePacket::read);
+
+    /**
+     * Constructs a LocationDetailsResponsePacket with location details.
+     *
+     * @param details The location details to include in the response.
+     */
+    public LocationDetailsResponsePacket(LocationDetails details) {
+        this(new UUID(0L, 0L), details);
+    }
 
     /**
      * Reads a LocationDetailsResponsePacket from the given PacketByteBuf.
@@ -43,26 +65,43 @@ public record LocationDetailsResponsePacket(LocationDetails details) implements 
      * @param buf The PacketByteBuf to read from.
      * @return A new LocationDetailsResponsePacket instance.
      */
-    public static LocationDetailsResponsePacket read(PacketByteBuf buf) {
+    public static LocationDetailsResponsePacket read(FriendlyByteBuf buf) {
 
-        return new LocationDetailsResponsePacket(new LocationDetails(buf.readString(),  buf.readBoolean(), buf.readString(), buf.readString()));
+        return new LocationDetailsResponsePacket(buf.readUUID(), new LocationDetails(buf.readUtf(), buf.readBoolean(), buf.readUtf(), buf.readUtf()));
     }
 
     /**
-     * Builds a PacketByteBuf from this LocationDetailsResponsePacket.
+     * Serializes this packet into a PacketByteBuf for transmission over the network.
      *
      * @return A PacketByteBuf representing this LocationDetailsResponsePacket.
      */
     @Override
-    public PacketByteBuf build() {
+    public FriendlyByteBuf build() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
 
-        buf.writeString(details.name() != null ? details.name() : "");
+        buf.writeUUID(requestId);
+        buf.writeUtf(details.name() != null ? details.name() : "");
         buf.writeBoolean(details.canon());
-        buf.writeString(details.description() != null ? details.description() : "");
-        buf.writeString(details.externalUrl() != null ? details.externalUrl() : "");
+        buf.writeUtf(details.description() != null ? details.description() : "");
+        buf.writeUtf(details.externalUrl() != null ? details.externalUrl() : "");
 
         return buf;
+    }
+
+    /**
+     * Creates a new LocationDetailsResponsePacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this response.
+     * @return A new LocationDetailsResponsePacket with the updated request identifier.
+     */
+    @Override
+    public LocationDetailsResponsePacket withRequestId(UUID requestId) {
+        return new LocationDetailsResponsePacket(requestId, details);
+    }
+
+    @Override
+    public CustomPacketPayload.@NonNull Type<LocationDetailsResponsePacket> type() {
+        return TYPE;
     }
 }

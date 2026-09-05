@@ -27,7 +27,9 @@ package com.duom.ardamaps.core.data.map.tiles;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * Tests tile-key equality symmetry across subclasses.
@@ -35,7 +37,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class TileKeyTest {
 
     /**
-     * Verify that the base tile key and PMTiles tile key remain unequal across classes.
+     * Verifies that TileKey and PmTileKey instances with identical coordinates are not equal across different classes.
+     * This enforces type-safe tile-key comparisons so heterogeneous collections do not incorrectly match.
      */
     @Test
     void tileKeyAndPmTileKey_areNotEqualAcrossClasses() {
@@ -48,32 +51,39 @@ class TileKeyTest {
     }
 
     /**
-     * Verify that PMTiles tile-id banding separates successive zoom levels.
+     * Verifies the PMTiles TileID prefix bound for all zooms up to six. The bound must sit after
+     * every tile at zooms {@code <= B} and before or at the first tile at zoom {@code B + 1}.
      */
     @Test
-    void pmTileKeyUpperBoundSeparatesZoomBandsThroughSix() {
+    void pmTileKey_tileIdUpperBound_exhaustiveThroughZoomSix() {
 
         long[] expected = {1, 5, 21, 85, 341, 1365, 5461};
 
         for (int boundZoom = 0; boundZoom <= 6; boundZoom++) {
             long bound = PmTileKey.tileIdUpperBound(boundZoom);
-            long maxBelowOrAt = Long.MIN_VALUE;
-            long minNext = Long.MAX_VALUE;
+            assertEquals(expected[boundZoom], bound);
 
-            for (int z = 0; z <= boundZoom + 1; z++) {
+            long maxIncluded = Long.MIN_VALUE;
+            for (int z = 0; z <= boundZoom; z++) {
                 int edge = 1 << z;
                 for (int x = 0; x < edge; x++) {
                     for (int y = 0; y < edge; y++) {
-                        long tileId = new PmTileKey(z, x, y).toTileId();
-                        if (z <= boundZoom) maxBelowOrAt = Math.max(maxBelowOrAt, tileId);
-                        if (z == boundZoom + 1) minNext = Math.min(minNext, tileId);
+                        maxIncluded = Math.max(maxIncluded, new PmTileKey(z, x, y).toTileId());
                     }
                 }
             }
 
-            assertEquals(expected[boundZoom], bound);
-            assertTrue(maxBelowOrAt < bound, "Bound must exceed every tile ID at or below zoom " + boundZoom);
-            assertTrue(bound <= minNext, "Bound must not exceed the first tile ID at zoom " + (boundZoom + 1));
+            long minExcluded = Long.MAX_VALUE;
+            int nextZoom = boundZoom + 1;
+            int edge = 1 << nextZoom;
+            for (int x = 0; x < edge; x++) {
+                for (int y = 0; y < edge; y++) {
+                    minExcluded = Math.min(minExcluded, new PmTileKey(nextZoom, x, y).toTileId());
+                }
+            }
+
+            assertTrue(maxIncluded < bound, "Bound must exclude all TileIDs up to zoom " + boundZoom);
+            assertTrue(bound <= minExcluded, "Bound must not skip into zoom " + nextZoom);
         }
     }
 }

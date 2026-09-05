@@ -175,23 +175,6 @@ class PmTilesMapCameraTest {
     }
 
     /**
-     * Verify that the settled-state timer flips from false to true after movement cools down.
-     */
-    @Test
-    void isSettled_falseAfterMovementThenTrueAfterDelay() throws InterruptedException {
-
-        Thread.sleep(MapCamera.SETTLE_DELAY_MS + 20);
-        assertTrue(camera.isSettled());
-
-        camera.setZoom(1);
-
-        assertFalse(camera.isSettled());
-
-        Thread.sleep(MapCamera.SETTLE_DELAY_MS + 20);
-        assertTrue(camera.isSettled());
-    }
-
-    /**
      * At zoom=8, scale=1, the 640×480 viewport is 640×480 blocks wide.
      * With 256 blocks/tile the camera covers 2.5 × 1.875 tiles - at least some tiles visible.
      */
@@ -231,5 +214,19 @@ class PmTilesMapCameraTest {
         Set<PmTileKey> tiles = camera.getVisibleTiles(8);
 
         assertTrue(tiles.stream().noneMatch(key -> key.x == 8 || key.y == 8));
+    }
+
+    /**
+     * The prefetch request scope expands by one tile ring, while the draw-visible scope remains
+     * unchanged.
+     */
+    @Test
+    void getRequestTiles_oneRing_expandsBeyondVisibleTiles() {
+
+        Set<PmTileKey> visible = camera.getVisibleTiles(8);
+        Set<PmTileKey> request = camera.getRequestTiles(8, 1);
+
+        assertTrue(request.containsAll(visible));
+        assertTrue(request.size() > visible.size(), "One-ring request scope should include extra tiles");
     }
 }

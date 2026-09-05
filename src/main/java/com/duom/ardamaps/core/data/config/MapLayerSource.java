@@ -29,20 +29,22 @@ import com.google.gson.annotations.SerializedName;
 
 /**
  * Enum representing the source type of map layer.
- * WEBP: Tiles are served as individual WebP images.
- * PMTILES: Tiles are served from a PMTiles file.
  */
 public enum MapLayerSource {
 
+    /** Tiles are served as individual WebP images. */
     @SerializedName("webp")
     WEBP,
 
+    /** Tiles are served from a PMTiles file. */
     @SerializedName("pmtiles")
     PMTILES,
 
+    /** Tiles are served from a BlueMap data source. */
     @SerializedName("bluemap")
     BLUEMAP,
 
+    /** A debug grid layer. */
     @SerializedName("grid")
     GRID
 }

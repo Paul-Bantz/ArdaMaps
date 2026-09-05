@@ -54,17 +54,20 @@ import com.duom.ardamaps.gui.widgets.*;
 import com.duom.ardamaps.gui.widgets.builders.MapDropdownBuilder;
 import com.duom.ardamaps.gui.widgets.builders.RangeSelectionWidgetBuilder;
 import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,7 +90,7 @@ public class MapScreen extends ArdaMapsScreen {
     private static final Logger LOGGER = LoggerFactory.getLogger(MapScreen.class);
 
     /** Precalculated half size of the Ardacraft logo, used for centering the placeholder */
-    private static final int ARDACRAFT_LOGO_HALF_SIZE_WITH_SPACING = ARDACRAFT_LOGO_HALF_SIZE + Client.mc().textRenderer.fontHeight;
+    private static final int ARDACRAFT_LOGO_HALF_SIZE_WITH_SPACING = ARDACRAFT_LOGO_HALF_SIZE + Client.mc().font.lineHeight;
 
     /** Precalculated click threshold squared for marker interaction (to avoid sqrt calculations) */
     private static final double CLICK_THRESHOLD_SQUARED = 4.0;
@@ -111,7 +114,7 @@ public class MapScreen extends ArdaMapsScreen {
     private final LocationNavigationHistory locationHistory = new LocationNavigationHistory();
 
     /** Cached text for unknown region tooltip to avoid repeated translations and allocations */
-    private final String unknownRegionText = Text.translatable("ardamaps.client.map.screen.unknown.region").getString();
+    private final String unknownRegionText = Component.translatable("ardamaps.client.map.screen.unknown.region").getString();
 
     /** The map layer selection dropdown */
     private MapDropdownWidget<MapLayerDefinition, TextIdentifierPairItem> layerSelectionDropdown;
@@ -188,7 +191,7 @@ public class MapScreen extends ArdaMapsScreen {
      */
     public MapScreen(Screen parent) {
 
-        super(parent, Text.translatable("ardamaps.client.map.screen.map"));
+        super(parent, Component.translatable("ardamaps.client.map.screen.map"));
     }
 
     /**
@@ -201,7 +204,9 @@ public class MapScreen extends ArdaMapsScreen {
 
         super.init();
 
+        removed = false;
         var previousSidePanel = locationContextPanel;
+        int layerGenerationBeforeWidgets = layerLoadGeneration;
 
         configureCoordinatesButton();
         configureDimensionSelectionDropDown();
@@ -216,6 +221,9 @@ public class MapScreen extends ArdaMapsScreen {
 
         if (previousSidePanel != null)
             locationContextPanel = previousSidePanel;
+
+        if (mapRenderer == null && layerLoadGeneration == layerGenerationBeforeWidgets)
+            reloadSelectedLayer();
     }
 
     /**
@@ -225,7 +233,7 @@ public class MapScreen extends ArdaMapsScreen {
      */
     private void configureCoordinatesButton() {
 
-        if (coordinatesButton != null) remove(coordinatesButton);
+        if (coordinatesButton != null) removeWidget(coordinatesButton);
 
         coordinatesButton = StyledButtonBuilder.create()
                 .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
@@ -237,7 +245,7 @@ public class MapScreen extends ArdaMapsScreen {
 
         updateMapButtonPositions();
 
-        addDrawableChild(coordinatesButton);
+        addRenderableWidget(coordinatesButton);
     }
 
     /**
@@ -246,7 +254,7 @@ public class MapScreen extends ArdaMapsScreen {
      */
     private void configureDimensionSelectionDropDown() {
 
-        if (dimensionSelectionDropdown != null) remove(dimensionSelectionDropdown);
+        if (dimensionSelectionDropdown != null) removeWidget(dimensionSelectionDropdown);
 
         List<Dimension> dimensions = ArdaMapsClient.CONFIG != null && ArdaMapsClient.CONFIG.getDimensions() != null
                 ? ArdaMapsClient.CONFIG.getDimensions()
@@ -255,7 +263,7 @@ public class MapScreen extends ArdaMapsScreen {
         var defaultSelection = selectedDimension != null ? selectedDimension : Client.currentDimension();
 
         // Default may be null if the dimension was not configured server-side. Handle gracefully.
-        if (defaultSelection == null && !dimensions.isEmpty()) defaultSelection = dimensions.get(0);
+        if (defaultSelection == null && !dimensions.isEmpty()) defaultSelection = dimensions.getFirst();
 
         dimensionSelectionDropdown = MapDropdownBuilder.<Dimension, TextIdentifierPairItem>create()
                 .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
@@ -278,7 +286,7 @@ public class MapScreen extends ArdaMapsScreen {
 
         updateMapButtonPositions();
 
-        addDrawableChild(dimensionSelectionDropdown);
+        addRenderableWidget(dimensionSelectionDropdown);
     }
 
     /**
@@ -315,25 +323,25 @@ public class MapScreen extends ArdaMapsScreen {
         if (layerSelectionDropdown != null)
             previousSelection = mapLayers.contains(layerSelectionDropdown.getSelected()) ? layerSelectionDropdown.getSelected() : null;
 
-        if (layerSelectionDropdown != null) remove(layerSelectionDropdown);
+        if (layerSelectionDropdown != null) removeWidget(layerSelectionDropdown);
 
         layerSelectionDropdown = MapDropdownBuilder.<MapLayerDefinition, TextIdentifierPairItem>create()
                 .setSize(ModConstants.SMALL_SQUARED_BUTTON_SIZE, ModConstants.SMALL_SQUARED_BUTTON_SIZE)
                 .setOptions(mapLayers)
                 .setOptionDisplay(item ->
                         item == null ?
-                                new TextIdentifierPairItem(Text.translatable("ardamaps.client.map.screen.layer.dropdown.empty"), null) :
+                                new TextIdentifierPairItem(Component.translatable("ardamaps.client.map.screen.layer.dropdown.empty"), null) :
                                 new TextIdentifierPairItem(item.layer(), provider.getTexture(item.effectiveIcon(Client.playerPositionY())))
                 )
                 .setOnSelect(this::mapLayerSelectionChanged)
                 .setDisplayIcons(true)
                 .setDisplayLabels(false)
-                .setSelected(previousSelection != null ? previousSelection : mapLayers.get(0))
+                .setSelected(previousSelection != null ? previousSelection : mapLayers.getFirst())
                 .setDisplayArrows(false)
                 .setExpandDirection(DropdownWidget.ExpandDirection.UP_LEFT)
                 .build();
 
-        addDrawableChild(layerSelectionDropdown);
+        addRenderableWidget(layerSelectionDropdown);
 
         // Hide if only one layer available, no need to show a dropdown for a single option
         layerSelectionDropdown.visible = mapLayers.size() > 1;
@@ -349,16 +357,16 @@ public class MapScreen extends ArdaMapsScreen {
      */
     private void configureRangeSelectionWidget() {
 
-        if (rangeSelectionWidget != null) remove(rangeSelectionWidget);
+        if (rangeSelectionWidget != null) removeWidget(rangeSelectionWidget);
 
         rangeSelectionWidget = RangeSelectionWidgetBuilder.create()
                 .setSize(100, 15)
-                .setLabel(Text.translatable("ardamaps.client.map.screen.range.label"))
+                .setLabel(Component.translatable("ardamaps.client.map.screen.range.label"))
                 .setItemWidth(15)
                 .setOnSelect(this::rangeSelectionChanged)
                 .build();
 
-        addDrawableChild(rangeSelectionWidget);
+        addRenderableWidget(rangeSelectionWidget);
         refreshRangeSelection();
     }
 
@@ -375,7 +383,7 @@ public class MapScreen extends ArdaMapsScreen {
                 : new ArrayList<>();
 
         if (!ranges.isEmpty() && (selectedRange == null || !ranges.contains(selectedRange)))
-            selectedRange = ranges.get(0);
+            selectedRange = ranges.getFirst();
 
         rangeSelectionWidget.setRanges(ranges);
         rangeSelectionWidget.setSelected(selectedRange);
@@ -388,9 +396,9 @@ public class MapScreen extends ArdaMapsScreen {
      */
     private void configureMarkersDisplayDropdown() {
 
-        if (markersSelectionDropdown != null) remove(markersSelectionDropdown);
+        if (markersSelectionDropdown != null) removeWidget(markersSelectionDropdown);
 
-        var nullValue = new TextIdentifierPairItem(Text.translatable("ardamaps.client.map.screen.all.markers"), null);
+        var nullValue = new TextIdentifierPairItem(Component.translatable("ardamaps.client.map.screen.all.markers"), null);
 
         var list = MarkersManager.get().types().entrySet().stream()
                 .map(entry -> {
@@ -415,7 +423,7 @@ public class MapScreen extends ArdaMapsScreen {
                 .setDisplayAsSprite(true)
                 .setMaxVisibleOptions(6)
                 .setExpandDirection(DropdownWidget.ExpandDirection.DOWN_RIGHT)
-                .setPlaceholderText(Text.translatable("ardamaps.client.map.screen.all.markers"))
+                .setPlaceholderText(Component.translatable("ardamaps.client.map.screen.all.markers"))
                 .setPlaceholderIcon(ModConstants.ICON_ALL)
                 .build();
 
@@ -424,7 +432,7 @@ public class MapScreen extends ArdaMapsScreen {
 
         updateMapButtonPositions();
 
-        addDrawableChild(markersSelectionDropdown);
+        addRenderableWidget(markersSelectionDropdown);
     }
 
     /**
@@ -467,11 +475,11 @@ public class MapScreen extends ArdaMapsScreen {
         if (!layer.hasRanges()) return null;
 
         Double playerY = Client.playerPositionY();
-        return playerY == null ? layer.ranges().get(0) : layer.rangeForY(playerY);
+        return playerY == null ? layer.ranges().getFirst() : layer.rangeForY(playerY);
     }
 
     /**
-     * Render the map screen, main render loop
+     * Render the map screen content, main render loop
      *
      * @param context The draw context
      * @param mouseX  The mouse x position
@@ -479,12 +487,7 @@ public class MapScreen extends ArdaMapsScreen {
      * @param delta   The time since last frame
      */
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-
-        // Client should not be null here
-        assert client != null;
-
-        renderBackground(context);
+    public void extractRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         if (mapRenderer != null) {
 
@@ -507,7 +510,7 @@ public class MapScreen extends ArdaMapsScreen {
                     // Drive zoom/pan damping every render frame so the animation
                     // is truly frame-rate independent and does not jump on frame skips.
                     if (!animation.isRunning())
-                        mapCamera.update(client.getLastFrameDuration(), contentArea.topLeftX(), contentArea.topLeftY());
+                        mapCamera.update(delta, contentArea.topLeftX(), contentArea.topLeftY());
 
                     // Clear background with dark colour - will display if some areas of the map are not covered by tiles
                     context.fill(contentArea.topLeftX(),
@@ -519,16 +522,13 @@ public class MapScreen extends ArdaMapsScreen {
 
                 mapRenderer.render(context);
 
-                RenderSystem.enableBlend();
-                RenderSystem.defaultBlendFunc();
-
                 var selectedLocationType = markersSelectionDropdown.getSelected();
                 var focusedLocationPosition = locationContextPanel == null
                         ? null
                         : locationContextPanel.getDisplayedLocationPosition();
                 markerRenderer.render(
                         context,
-                        textRenderer,
+                        font,
                         mapCamera,
                         mapFrameRenderer,
                         selectedRange,
@@ -550,13 +550,11 @@ public class MapScreen extends ArdaMapsScreen {
             updateCoordinates(mouseX, mouseY);
             updateRegionUnderMouse(mouseX, mouseY);
 
-            RenderSystem.disableBlend();
-
         } else {
             renderPlaceholder(context);
         }
 
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
 
         // Render context menu if opened
         if (mapContextMenu != null)
@@ -578,18 +576,18 @@ public class MapScreen extends ArdaMapsScreen {
      *
      * @param context The draw context.
      */
-    private void renderTileLoadingDebugPanel(DrawContext context) {
+    private void renderTileLoadingDebugPanel(GuiGraphicsExtractor context) {
 
         List<String> lines = mapRenderer.getDebugLoadingLines();
         int x = 4;
         int y = 4;
-        int lineHeight = textRenderer.fontHeight + 1;
+        int lineHeight = font.lineHeight + 1;
 
-        context.drawText(textRenderer, "Currently loading " + lines.size() + " tiles", x, y, ModConstants.COLOR_WHITE, true);
+        context.text(font, "Currently loading " + lines.size() + " tiles", x, y, ModConstants.COLOR_WHITE, true);
         y += lineHeight;
 
         for (String line : lines) {
-            context.drawText(textRenderer, line, x, y, ModConstants.COLOR_WHITE, true);
+            context.text(font, line, x, y, ModConstants.COLOR_WHITE, true);
             y += lineHeight;
         }
     }
@@ -645,7 +643,7 @@ public class MapScreen extends ArdaMapsScreen {
 
         lastCoordinatesButtonX = x;
         lastCoordinatesButtonZ = z;
-        coordinatesButton.setMessage(Text.literal(String.format("X:%d, Z:%d", x, z)));
+        coordinatesButton.setMessage(Component.literal(String.format("X:%d, Z:%d", x, z)));
     }
 
     /**
@@ -707,12 +705,12 @@ public class MapScreen extends ArdaMapsScreen {
      *
      * @param context The draw context
      */
-    private void renderPlaceholder(DrawContext context) {
+    private void renderPlaceholder(GuiGraphicsExtractor context) {
 
         var centerX = width / 2;
         var centerY = height / 2;
 
-        context.drawTexture(ModConstants.ARDACRAFT_LOGO,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.ARDACRAFT_LOGO,
                 centerX - ARDACRAFT_LOGO_HALF_SIZE,
                 centerY - ARDACRAFT_LOGO_HALF_SIZE,
                 0, 0,
@@ -721,9 +719,9 @@ public class MapScreen extends ArdaMapsScreen {
                 ARDACRAFT_LOGO_SIZE,
                 ARDACRAFT_LOGO_SIZE);
 
-        context.drawCenteredTextWithShadow(
-                textRenderer,
-                Text.translatable("ardamaps.client.map.screen.no.map.selected"),
+        context.centeredText(
+                font,
+                Component.translatable("ardamaps.client.map.screen.no.map.selected"),
                 centerX,
                 centerY + ARDACRAFT_LOGO_HALF_SIZE_WITH_SPACING,
                 ModConstants.COLOR_WHITE);
@@ -734,33 +732,26 @@ public class MapScreen extends ArdaMapsScreen {
      *
      * @param context The draw context
      */
-    private void renderRegionName(DrawContext context) {
+    private void renderRegionName(GuiGraphicsExtractor context) {
 
         if (getCamera() == null) return;
 
-        var textWidth = textRenderer.getWidth(regionNameUnderMouse);
+        if (regionNameUnderMouse == null) return;
+
+        var textWidth = font.width(regionNameUnderMouse);
         var labelWidth = textWidth + 32;
-        var labelHeight = textRenderer.fontHeight + 24;
+        var labelHeight = font.lineHeight + 24;
 
         var paddedContentArea = getPaddedContentArea();
 
         var x = paddedContentArea.topLeftX() + 5;
         var y = paddedContentArea.topLeftY() + 5;
 
-        context.drawNineSlicedTexture(ModConstants.MAP_GUI_ELEMENTS,
-                x, y,
-                labelWidth, labelHeight,
-                16,
-                16,
-                16,
-                16,
-                96,
-                48,
-                144, 160);
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, ModConstants.SCROLL_BUTTON_SPRITE, x, y, labelWidth, labelHeight);
 
-        context.drawText(
-                textRenderer,
-                Text.literal(regionNameUnderMouse),
+        context.text(
+                font,
+                Component.literal(regionNameUnderMouse),
                 x + labelWidth / 2 - textWidth / 2,
                 y + 12,
                 ModConstants.COLOR_DARK_BROWN,
@@ -775,7 +766,7 @@ public class MapScreen extends ArdaMapsScreen {
      * @param widget The widget to check (can be null)
      * @return True if the mouse is over the widget, false if widget is null or mouse is not over it
      */
-    private boolean isMouseOverWidget(double mouseX, double mouseY, Element widget) {
+    private boolean isMouseOverWidget(double mouseX, double mouseY, GuiEventListener widget) {
 
         return widget != null && widget.isMouseOver(mouseX, mouseY);
     }
@@ -787,7 +778,7 @@ public class MapScreen extends ArdaMapsScreen {
     @Override
     public void tick() {
         var mapCamera = getCamera();
-        if (client != null && mapCamera != null) {
+        if (mapCamera != null) {
 
             var contentArea = getPaddedContentArea();
 
@@ -808,12 +799,11 @@ public class MapScreen extends ArdaMapsScreen {
     /**
      * Handle screen resizing, update map camera viewport and re-center coordinates button
      *
-     * @param client the Minecraft client instance
      * @param width  the new width of the screen
      * @param height the new height of the screen
      */
     @Override
-    public void resize(MinecraftClient client, int width, int height) {
+    public void resize(int width, int height) {
 
         var mapCamera = getCamera();
         if (mapCamera != null) {
@@ -821,7 +811,7 @@ public class MapScreen extends ArdaMapsScreen {
             var selection = layerSelectionDropdown != null ? layerSelectionDropdown.getSelected() : null;
             mapCamera.setViewportSize(width, height);
 
-            super.resize(client, width, height);
+            super.resize(width, height);
 
             updateMapButtonPositions();
 
@@ -831,7 +821,7 @@ public class MapScreen extends ArdaMapsScreen {
 
         } else {
 
-            super.resize(client, width, height);
+            super.resize(width, height);
         }
     }
 
@@ -904,16 +894,18 @@ public class MapScreen extends ArdaMapsScreen {
     /**
      * Handle mouse click for starting map dragging
      *
-     * @param mouseX The mouse x position
-     * @param mouseY The mouse y position
-     * @param button The mouse button
+     * @param event       the initiating mouse event
+     * @param doubleClick true if this is a double click
      * @return True if the event was handled
      */
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
 
         var mapCamera = getCamera();
-        if (mapCamera == null) return super.mouseClicked(mouseX, mouseY, button);
+        if (mapCamera == null) return super.mouseClicked(event, doubleClick);
         var mouseInMapArea = mapFrameRenderer.coordinatesInFrame(mouseX, mouseY, MAP_FRAME_PADDING);
 
         // Context menu click handling
@@ -973,7 +965,7 @@ public class MapScreen extends ArdaMapsScreen {
             return true;
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     /**
@@ -997,7 +989,7 @@ public class MapScreen extends ArdaMapsScreen {
         var focusedCameraOffsetWorldPosition = getSidePanelFocusedCameraWorldOffset(mapCamera, locationPosition, focusedZoom);
 
         locationContextPanel = new SidePanelWidget(this,
-                textRenderer,
+                font,
                 location,
                 focusedCameraOffsetWorldPosition,
                 focusedZoom);
@@ -1023,13 +1015,13 @@ public class MapScreen extends ArdaMapsScreen {
         var contextPos = mapCamera.screenToWorldCoordinates(mouseX, mouseY);
 
         // Add / Replace waypoint at clicked position
-        var addWaypointEntry = new ContextMenu.Entry(Text.translatable("ardamaps.client.map.screen.context.menu.set.waypoint"), () -> {
+        var addWaypointEntry = new ContextMenu.Entry(Component.translatable("ardamaps.client.map.screen.context.menu.set.waypoint"), () -> {
             ArdaMapsClient.CONFIG.setWaypoint(contextPos.x(), contextPos.y(), mapCamera.getDimension().getId());
             mapContextMenu = null;
         });
 
         // Teleport to clicked position if explored
-        var teleportToEntry = new ContextMenu.Entry(Text.translatable("ardamaps.client.map.screen.context.menu.teleport"), () -> {
+        var teleportToEntry = new ContextMenu.Entry(Component.translatable("ardamaps.client.map.screen.context.menu.teleport"), () -> {
 
             mapContextMenu = null;
 
@@ -1059,7 +1051,7 @@ public class MapScreen extends ArdaMapsScreen {
             // Create a deep copy - mouseOverWaypoint is dynamically updated
             var staticWaypoint = Waypoint.copy(mouseOverWaypoint);
 
-            var shareWaypointEntry = new ContextMenu.Entry(Text.translatable("ardamaps.client.map.screen.context.menu.set.waypoint.share"), () -> {
+            var shareWaypointEntry = new ContextMenu.Entry(Component.translatable("ardamaps.client.map.screen.context.menu.set.waypoint.share"), () -> {
 
                 assert Client.player() != null;
 
@@ -1073,13 +1065,13 @@ public class MapScreen extends ArdaMapsScreen {
                         staticWaypoint.dimension()
                 );
 
-                Client.mc().keyboard.setClipboard("waypoint:" + Waypoint.toJson(sharedWaypoint));
-                Client.player().sendMessage(Text.translatable("ardamaps.client.map.screen.context.menu.set.waypoint.share.message"), true);
+                Client.mc().keyboardHandler.setClipboard("waypoint:" + Waypoint.toJson(sharedWaypoint));
+                Client.player().sendSystemMessage(Component.translatable("ardamaps.client.map.screen.context.menu.set.waypoint.share.message"));
 
                 mapContextMenu = null;
             });
 
-            var removeWaypointEntry = new ContextMenu.Entry(Text.translatable("ardamaps.client.map.screen.context.menu.set.waypoint.remove"), () -> {
+            var removeWaypointEntry = new ContextMenu.Entry(Component.translatable("ardamaps.client.map.screen.context.menu.set.waypoint.remove"), () -> {
                 ArdaMapsClient.CONFIG.removeWaypoint(staticWaypoint);
                 mapContextMenu = null;
             });
@@ -1090,7 +1082,7 @@ public class MapScreen extends ArdaMapsScreen {
         } else {
 
             // Clear all the waypoints
-            var clearWaypointEntry = new ContextMenu.Entry(Text.translatable("ardamaps.client.map.screen.context.menu.set.waypoint.clear"), () -> {
+            var clearWaypointEntry = new ContextMenu.Entry(Component.translatable("ardamaps.client.map.screen.context.menu.set.waypoint.clear"), () -> {
                 ArdaMapsClient.CONFIG.clearWaypoints(mapCamera.getDimension().getId());
                 mapContextMenu = null;
             });
@@ -1114,7 +1106,7 @@ public class MapScreen extends ArdaMapsScreen {
      */
     private @Nullable Vec2d getSidePanelFocusedCameraWorldOffset(MapCamera mapCamera, Vec3d locationPosition, double zoom) {
 
-        if (locationPosition.x == 0 && locationPosition.z == 0) return null;
+        if (locationPosition.x() == 0 && locationPosition.z() == 0) return null;
 
         // Centre left part of the viewport on location
         var paddedContentArea = getPaddedContentArea();
@@ -1127,7 +1119,7 @@ public class MapScreen extends ArdaMapsScreen {
         var translationX = worldLeftCenter.x() - worldViewportCenter.x();
         var translationY = worldLeftCenter.y() - worldViewportCenter.y();
 
-        return new Vec2d(locationPosition.x - translationX, locationPosition.z - translationY);
+        return new Vec2d(locationPosition.x() - translationX, locationPosition.z() - translationY);
     }
 
     /**
@@ -1144,62 +1136,6 @@ public class MapScreen extends ArdaMapsScreen {
         if (mapCamera == null) return;
 
         animation.start(worldPos, mapCamera, targetZoom);
-    }
-
-    /**
-     * Handle mouse release for stopping map dragging
-     * Also handle single clicks on the map
-     *
-     * @param mouseX The mouse x position
-     * @param mouseY The mouse y position
-     * @param button The mouse button
-     */
-    @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-
-        // Children must get the release first: the parent dispatch is what drives widget
-        // onRelease, and returning early here would swallow it for every left-button release.
-        boolean handledByChild = super.mouseReleased(mouseX, mouseY, button);
-
-        // The parent dispatch only reaches the hovered element, so a strip drag that ends
-        // off the widget would otherwise leave it stuck tracking a press.
-        if (!handledByChild && rangeSelectionWidget != null && rangeSelectionWidget.isDragging())
-            handledByChild = rangeSelectionWidget.mouseReleased(mouseX, mouseY, button);
-
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-            dragging = false;
-
-            // Check if mouse barely moved (single click, not drag)
-            double distanceSquared = Math.pow(mouseX - clickStartX, 2) + Math.pow(mouseY - clickStartY, 2);
-
-            if (!handledByChild && distanceSquared < CLICK_THRESHOLD_SQUARED) handleMapMarkerClick();
-
-            return true;
-        }
-
-        return handledByChild;
-    }
-
-    /**
-     * Handle clicks on map markers to open location context panel
-     */
-    private void handleMapMarkerClick() {
-
-        if (Client.player() == null) return;
-
-        var anyLocationClicked = false;
-
-        var mouseOverLocation = markerRenderer.getMouseOverLocation();
-        if (mouseOverLocation != null) {
-
-            switchToLayerContaining(mouseOverLocation.getPosition().y);
-            panAndSelectLocation(mouseOverLocation, false);
-
-            anyLocationClicked = true;
-        }
-
-        if (!anyLocationClicked)
-            locationContextPanel = null;
     }
 
     /**
@@ -1223,21 +1159,6 @@ public class MapScreen extends ArdaMapsScreen {
                 rangeSelectionChanged(target);
             }
         }
-    }
-
-    /**
-     * Pans the camera to the given location, opens the side panel, and pushes the entry onto the
-     * navigation history (truncating any forward entries first, then capping at 10).
-     *
-     * @param location the location to display
-     * @param focused  if true zooms to identity at the location
-     */
-    public void panAndSelectLocation(LocationClient location, boolean focused) {
-
-        if (location == null) return;
-
-        locationHistory.push(location);
-        applySidePanel(location, focused);
     }
 
     /**
@@ -1272,7 +1193,7 @@ public class MapScreen extends ArdaMapsScreen {
                         return;
                     }
 
-                    MinecraftClient.getInstance().execute(() -> layerLoaded(generation, result));
+                    Minecraft.getInstance().execute(() -> layerLoaded(generation, result));
                 });
     }
 
@@ -1306,7 +1227,7 @@ public class MapScreen extends ArdaMapsScreen {
                 cx,
                 cy,
                 playerY,
-                textRenderer);
+                font);
     }
 
     /**
@@ -1345,6 +1266,79 @@ public class MapScreen extends ArdaMapsScreen {
     }
 
     /**
+     * Handle mouse release for stopping map dragging
+     * Also handle single clicks on the map
+     *
+     * @param event the initiating mouse event
+     * @return true if the event was consumed
+     */
+    @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
+
+        // Children must get the release first: the parent dispatch is what drives widget
+        // onRelease, and returning early here would swallow it for every left-button release.
+        boolean handledByChild = super.mouseReleased(event);
+
+        // The parent dispatch only reaches the hovered element, so a strip drag that ends
+        // off the widget would otherwise leave it stuck tracking a press.
+        if (!handledByChild && rangeSelectionWidget != null && rangeSelectionWidget.isDragging())
+            handledByChild = rangeSelectionWidget.mouseReleased(event);
+
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            dragging = false;
+
+            // Check if mouse barely moved (single click, not drag)
+            double distanceSquared = Math.pow(mouseX - clickStartX, 2) + Math.pow(mouseY - clickStartY, 2);
+
+            if (!handledByChild && distanceSquared < CLICK_THRESHOLD_SQUARED) handleMapMarkerClick();
+
+            return true;
+        }
+
+        return handledByChild;
+    }
+
+    /**
+     * Handle clicks on map markers to open location context panel
+     */
+    private void handleMapMarkerClick() {
+
+        if (Client.player() == null) return;
+
+        var anyLocationClicked = false;
+
+        var mouseOverLocation = markerRenderer.getMouseOverLocation();
+        if (mouseOverLocation != null) {
+
+            switchToLayerContaining(mouseOverLocation.getPosition().y());
+            panAndSelectLocation(mouseOverLocation, false);
+
+            anyLocationClicked = true;
+        }
+
+        if (!anyLocationClicked)
+            locationContextPanel = null;
+    }
+
+    /**
+     * Pans the camera to the given location, opens the side panel, and pushes the entry onto the
+     * navigation history (truncating any forward entries first, then capping at 10).
+     *
+     * @param location the location to display
+     * @param focused  if true zooms to identity at the location
+     */
+    public void panAndSelectLocation(LocationClient location, boolean focused) {
+
+        if (location == null) return;
+
+        locationHistory.push(location);
+        applySidePanel(location, focused);
+    }
+
+    /**
      * Cleans up renderer resources when the screen is removed.
      */
     @Override
@@ -1359,15 +1353,15 @@ public class MapScreen extends ArdaMapsScreen {
     /**
      * Handle mouse dragging for panning the map
      *
-     * @param mouseX The mouse x position
-     * @param mouseY The mouse y position
-     * @param button The mouse button
-     * @param dx     The change in x position
-     * @param dy     The change in y position
+     * @param event the initiating mouse event
+     * @param dx    The change in x position
+     * @param dy    The change in y position
      * @return True if the event was handled
      */
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+    public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+        double mouseX = event.x();
+        double mouseY = event.y();
 
         var mapCamera = getCamera();
         if (mapCamera != null && dragging && !mouseOverMapWidgets(mouseX, mouseY)) {
@@ -1385,32 +1379,33 @@ public class MapScreen extends ArdaMapsScreen {
             return true;
         }
 
-        return super.mouseDragged(mouseX, mouseY, button, dx, dy);
+        return super.mouseDragged(event, dx, dy);
     }
 
     /**
      * Handle mouse scroll for zooming
      *
-     * @param mouseX The mouse x position
-     * @param mouseY The mouse y position
-     * @param amount The scroll amount
+     * @param mouseX           The mouse x position
+     * @param mouseY           The mouse y position
+     * @param horizontalAmount The horizontal scroll amount
+     * @param verticalAmount   The vertical scroll amount
      * @return True if the event was handled
      */
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
 
         if (mouseOverMapWidgets(mouseX, mouseY)) {
 
-            if (locationContextPanel != null && locationContextPanel.mouseScrolled(mouseX, mouseY, amount))
+            if (locationContextPanel != null && locationContextPanel.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount))
                 return true;
 
-            return super.mouseScrolled(mouseX, mouseY, amount);
+            return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
         }
 
         var cam = getCamera();
         if (cam != null) {
             animation.cancel();
-            cam.setZoom(mouseX, mouseY, width, height, amount * 0.5);
+            cam.setZoom(mouseX, mouseY, width, height, verticalAmount * 0.5);
         }
 
         return true;
@@ -1424,14 +1419,15 @@ public class MapScreen extends ArdaMapsScreen {
      * </ul>
      */
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
+        int keyCode = event.key();
 
         if (keyCode == GLFW.GLFW_KEY_ESCAPE && locationContextPanel != null) {
             locationContextPanel = null;
             return true;
         }
 
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     /**
@@ -1529,5 +1525,6 @@ public class MapScreen extends ArdaMapsScreen {
      * @param highlightColor The colour used for highlighting the marker (e.g., on hover), used for rendering effects when the marker is interacted with
      */
     private record MarkerInfo(String key, String displayName, Identifier icon, int color, int highlightColor) {
+
     }
 }

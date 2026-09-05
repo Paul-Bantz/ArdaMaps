@@ -27,11 +27,11 @@ package com.duom.ardamaps.core.data.guide;
 
 import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.gui.ModConstants;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.resource.Resource;
-import net.minecraft.util.Identifier;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +49,7 @@ import java.util.Optional;
  *
  * <p>Loading is intentionally synchronous: resource-pack assets are local files and
  * are normally small, so the latency is negligible.  The texture is registered with
- * Minecraft's {@link net.minecraft.client.texture.TextureManager} on the first call
+ * Minecraft's {@link net.minecraft.client.renderer.texture.TextureManager} on the first call
  * and every subsequent call returns the cached {@link Identifier} instantly.</p>
  *
  * <p>Call {@link #clear()} when client resources reload so stale entries are evicted
@@ -66,20 +66,22 @@ public final class GuideImageCache {
      */
     private static final Map<String, Optional<Identifier>> CACHE = new HashMap<>();
 
-    private GuideImageCache() {}
+    /** Utility class with no public instances. */
+    private GuideImageCache() {
+    }
 
     /**
      * Returns the registered {@link Identifier} for the texture at {@code src},
      * loading and registering it on the first access.
      *
      * <p>Must be called from the render thread because
-     * {@link net.minecraft.client.texture.TextureManager#registerDynamicTexture} requires
+     * {@link net.minecraft.client.renderer.texture.TextureManager#register} requires
      * an active GL context.</p>
      *
      * @param src path relative to {@code assets/ardamaps/}
      *            (e.g. {@code guide/resources/icon_ardacraft_gradient_128px.png})
      * @return the registered texture identifier, or {@code null} if the resource is
-     *         missing or could not be loaded (a warning is logged in that case)
+     * missing or could not be loaded (a warning is logged in that case)
      */
     public static Identifier getTexture(String src) {
 
@@ -88,7 +90,7 @@ public final class GuideImageCache {
         }
 
         Identifier resourceId = ModConstants.modId(src);
-        Optional<Resource> resource = MinecraftClient.getInstance()
+        Optional<Resource> resource = Minecraft.getInstance()
                 .getResourceManager()
                 .getResource(resourceId);
 
@@ -100,16 +102,17 @@ public final class GuideImageCache {
             return null;
         }
 
-        try (var is = resource.get().getInputStream()) {
+        try (var is = resource.get().open()) {
 
             NativeImage img = NativeImage.read(is);
-            NativeImageBackedTexture tex = new NativeImageBackedTexture(img);
-
             // Sanitize path characters that are illegal in dynamic texture names
             String sanitised = src.replace('/', '_').replace('.', '_');
-            Identifier registered = MinecraftClient.getInstance()
+            String textureName = "ardamaps_guide_" + sanitised;
+            DynamicTexture tex = new DynamicTexture(() -> textureName, img);
+            Identifier registered = com.duom.ardamaps.gui.ModConstants.modId(textureName);
+            Minecraft.getInstance()
                     .getTextureManager()
-                    .registerDynamicTexture("ardamaps_guide_" + sanitised, tex);
+                    .register(registered, tex);
 
             CACHE.put(src, Optional.of(registered));
             return registered;

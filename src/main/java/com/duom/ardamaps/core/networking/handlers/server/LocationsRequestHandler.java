@@ -32,10 +32,8 @@ import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.location.LocationServer;
 import com.duom.ardamaps.core.networking.packets.client.LocationsResponsePacket;
 import com.duom.ardamaps.core.networking.packets.server.LocationsRequestPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,21 +58,20 @@ public class LocationsRequestHandler extends RespondablePacketHandler<LocationsR
      * Constructs a new LocationsRequestHandler, specifying the request and response channels and packet readers.
      */
     public LocationsRequestHandler() {
-        super(REQ_CHANNEL, LocationsRequestPacket::read, RESP_CHANNEL, LocationsResponsePacket::read);
+        super(REQ_CHANNEL, LocationsRequestPacket.TYPE, LocationsRequestPacket.CODEC,
+                RESP_CHANNEL, LocationsResponsePacket.TYPE, LocationsResponsePacket.CODEC);
     }
 
     /**
      * Handles the incoming LocationsRequestPacket by checking if the client's location data is outdated compared to the server's last update, and responding with a LocationsResponsePacket containing the updated location data if necessary.
      *
-     * @param server  The Minecraft server instance.
-     * @param player  The player who sent the request.
-     * @param handler The network handler for the player's connection.
-     * @param packet  The LocationsRequestPacket containing the request data, including the client's last update timestamp.
-     * @param sender  The packet sender to send the response back to the client.
+     * @param server The Minecraft server instance.
+     * @param player The player who sent the request.
+     * @param packet The LocationsRequestPacket containing the request data, including the client's last update timestamp.
      * @return A LocationsResponsePacket containing the updated location data if the client's data is outdated, or an empty response if the client's data is up-to-date.
      */
     @Override
-    public LocationsResponsePacket handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, LocationsRequestPacket packet, PacketSender sender) {
+    public LocationsResponsePacket handle(MinecraftServer server, ServerPlayer player, LocationsRequestPacket packet) {
 
         Date lastClientUpdate = packet.date();
         Date locationsLastServerUpdate = ArdaMaps.CONFIG.getLocationConfig().getLastUpdate();

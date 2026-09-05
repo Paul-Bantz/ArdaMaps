@@ -27,17 +27,16 @@ package com.duom.ardamaps.core.networking.handlers.server;
 
 import com.duom.ardamaps.core.consumers.networking.ServerPacketHandler;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.Heightmap;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.levelgen.Heightmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.OptionalDouble;
+import java.util.Set;
 
 /**
  * Handler for the PlayerTeleportPacket, responsible for teleporting the player to the specified coordinates,
@@ -55,34 +54,32 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
      * Constructs a new PlayerTeleportHandler.
      */
     public PlayerTeleportHandler() {
-        super(REQ_CHANNEL, PlayerTeleportPacket::read);
+        super(REQ_CHANNEL, PlayerTeleportPacket.TYPE, PlayerTeleportPacket.CODEC);
     }
 
     /**
      * Handles the PlayerTeleportPacket by teleporting the player to the specified coordinates.
      *
-     * @param server  The Minecraft server instance.
-     * @param player  The player to teleport.
-     * @param handler The network handler.
-     * @param packet  The PlayerTeleportPacket containing teleportation data.
-     * @param sender  The packet sender.
+     * @param server The Minecraft server instance.
+     * @param player The player to teleport.
+     * @param packet The PlayerTeleportPacket containing teleportation data.
      */
     @Override
-    protected void handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PlayerTeleportPacket packet, PacketSender sender) {
+    protected void handle(MinecraftServer server, ServerPlayer player, PlayerTeleportPacket packet) {
 
         server.execute(() -> {
 
             if (packet.worldId() != null) {
 
-                var worlds = server.getWorlds();
-                ServerWorld serverWorld = null;
+                var worlds = server.getAllLevels();
+                ServerLevel serverWorld = null;
 
                 // Search for the world with the matching registry key
                 for (var world : worlds) {
 
-                    if (world.getRegistryKey().getValue().toString().equals(packet.worldId())) {
+                    if (world.dimension().identifier().toString().equals(packet.worldId())) {
 
-                        LOGGER.info("World found: {}", world.getRegistryKey().getValue());
+                        LOGGER.info("World found: {}", world.dimension().identifier());
                         serverWorld = world;
                         break;
                     }
@@ -99,9 +96,9 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
 
                         if (safeY.isEmpty()) {
 
-                            BlockPos pos = serverWorld.getTopPosition(
-                                    Heightmap.Type.MOTION_BLOCKING_NO_LEAVES,
-                                    BlockPos.ofFloored(x, 0, z)
+                            BlockPos pos = serverWorld.getHeightmapPos(
+                                    Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                                    BlockPos.containing(x, 0, z)
                             );
                             teleportY = pos.getY() + 1;
                         } else {
@@ -110,17 +107,17 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
                             LOGGER.info("Safe position found at: {}, {}, {}", x, teleportY, z);
                         }
 
-                        player.teleport(serverWorld, x, teleportY, z, player.getYaw(), player.getPitch());
+                        player.teleportTo(serverWorld, x, teleportY, z, Set.of(), player.getYRot(), player.getXRot(), true);
                     } else {
 
-                        player.teleport(serverWorld, packet.x(), packet.y(), packet.z(), player.getYaw(), player.getPitch());
+                        player.teleportTo(serverWorld, packet.x(), packet.y(), packet.z(), Set.of(), player.getYRot(), player.getXRot(), true);
                     }
 
                     return;
                 }
             }
 
-            player.teleport(packet.x(), packet.y(), packet.z());
+            player.teleportTo(packet.x(), packet.y(), packet.z());
 
         });
     }
@@ -128,15 +125,15 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
     /**
      * Finds a safe standing Y coordinate for teleportation at the given X and Z coordinates in the specified world.
      *
-     * @param world The world to search in.
+     * @param world  The world to search in.
      * @param player The player whose standing dimensions are being placed.
-     * @param x     The snapped X coordinate to check.
-     * @param z     The snapped Z coordinate to check.
+     * @param x      The snapped X coordinate to check.
+     * @param z      The snapped Z coordinate to check.
      * @return The exact standing Y coordinate, or empty if no safe position is found.
      */
-    public static OptionalDouble findSafeY(ServerWorld world, ServerPlayerEntity player, double x, double z) {
-        int topY = world.getTopY();
-        int bottomY = world.getBottomY();
+    public static OptionalDouble findSafeY(ServerLevel world, ServerPlayer player, double x, double z) {
+        int topY = world.getMaxY();
+        int bottomY = world.getMinY();
 
         for (int y = topY - 2; y >= bottomY; y--) {
             OptionalDouble safeY = SafeTeleportScanner.standingHeightAt(world, player, x, y, z);

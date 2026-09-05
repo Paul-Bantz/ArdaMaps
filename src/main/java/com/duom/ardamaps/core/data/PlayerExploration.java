@@ -28,13 +28,13 @@ package com.duom.ardamaps.core.data;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.config.Dimension;
+import com.mojang.blaze3d.platform.NativeImage;
 import lombok.Getter;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,7 +114,7 @@ public class PlayerExploration implements Serializable {
     private transient NativeImage fogMask;
 
     /** The GPU texture for the fog-of-war, created from {@link #fogMask}. */
-    private transient NativeImageBackedTexture fogTexture;
+    private transient DynamicTexture fogTexture;
 
     /** The identifier of the fog-of-war texture in Minecraft's texture manager, used for rendering. */
     @Getter
@@ -152,6 +152,7 @@ public class PlayerExploration implements Serializable {
      * @param dimensionId The ID of the dimension (e.g. "minecraft:overworld").
      * @return A new PlayerExploration instance for the specified dimension, or null if the dimension is not found in the config.
      */
+    @SuppressWarnings("unused")
     public static @Nullable PlayerExploration create(String dimensionId) {
 
         var dimension = ArdaMapsClient.CONFIG.getDimension(dimensionId);
@@ -207,6 +208,17 @@ public class PlayerExploration implements Serializable {
     }
 
     /**
+     * Sets the backing exploration data and resets the pure grid delegate.
+     *
+     * @param explorationData Backing exploration data.
+     */
+    public void setExplorationData(byte[] explorationData) {
+
+        this.grid = ExplorationGrid.create(xMin, zMin, cellSize, nbCellsX, nbCellsY, explorationData);
+        this.explorationData = grid.getExplorationData();
+    }
+
+    /**
      * Initializes the fog-of-war texture and synchronizes it with the current exploration data.
      * Should be called on (or via) the render thread after creating a PlayerExploration instance.
      */
@@ -230,10 +242,11 @@ public class PlayerExploration implements Serializable {
 
         fogMask = new NativeImage(nbCellsX, nbCellsY, true);
 
-        fogTexture = new NativeImageBackedTexture(fogMask);
-        fogTextureId = MinecraftClient.getInstance()
+        fogTexture = new DynamicTexture(this::textureName, fogMask);
+        fogTextureId = com.duom.ardamaps.gui.ModConstants.modId(textureName());
+        Minecraft.getInstance()
                 .getTextureManager()
-                .registerDynamicTexture(textureName(), fogTexture);
+                .register(fogTextureId, fogTexture);
     }
 
     /**
@@ -255,6 +268,33 @@ public class PlayerExploration implements Serializable {
     }
 
     /**
+     * Releases GPU and native texture resources without changing grid data.
+     */
+    private void releaseTextureResources() {
+
+        if (fogTexture != null) {
+
+            if (fogTextureId != null) {
+
+                Client.mc().getTextureManager()
+                        .release(fogTextureId);
+
+                fogTextureId = null;
+            }
+
+            fogTexture.close();
+            fogTexture = null;
+        }
+
+        if (fogMask != null) {
+
+            fogMask.close();
+            fogMask = null;
+        }
+
+    }
+
+    /**
      * @return The dynamic texture name for this exploration range.
      */
     private String textureName() {
@@ -262,6 +302,19 @@ public class PlayerExploration implements Serializable {
         String name = TEXTURE_PREFIX + "_" + sanitizeIdentifierSuffix(dimensionId);
         if (rangeIndex != null) name += "_" + rangeIndex;
         return name;
+    }
+
+    /**
+     * @return The pure grid delegate, rebuilding it after JSON deserialization if needed.
+     */
+    private ExplorationGrid grid() {
+
+        if (grid == null) {
+            grid = ExplorationGrid.create(xMin, zMin, cellSize, nbCellsX, nbCellsY, explorationData);
+            explorationData = grid.getExplorationData();
+        }
+
+        return grid;
     }
 
     /**
@@ -275,7 +328,7 @@ public class PlayerExploration implements Serializable {
         for (int idx : dirtyCells) {
             int x = idx % nbCellsX;
             int y = idx / nbCellsX;
-            fogMask.setColor(x, y, grid.stateAt(x, y).getColor());
+            fogMask.setPixel(x, y, grid.stateAt(x, y).getColor());
         }
 
         dirtyCells.clear();
@@ -311,42 +364,6 @@ public class PlayerExploration implements Serializable {
     }
 
     /**
-     * Returns the exploration state of the cell at {@code (cellX, cellY)}.
-     *
-     * @param cellX Cell X index.
-     * @param cellY Cell Y index.
-     * @return The {@link ExplorationState}, or {@link ExplorationState#HIDDEN} if out of bounds.
-     */
-    public ExplorationState stateAt(int cellX, int cellY) {
-
-        return grid().stateAt(cellX, cellY);
-    }
-
-    /**
-     * Sets the backing exploration data and resets the pure grid delegate.
-     *
-     * @param explorationData Backing exploration data.
-     */
-    public void setExplorationData(byte[] explorationData) {
-
-        this.grid = ExplorationGrid.create(xMin, zMin, cellSize, nbCellsX, nbCellsY, explorationData);
-        this.explorationData = grid.getExplorationData();
-    }
-
-    /**
-     * @return The pure grid delegate, rebuilding it after JSON deserialization if needed.
-     */
-    private ExplorationGrid grid() {
-
-        if (grid == null) {
-            grid = ExplorationGrid.create(xMin, zMin, cellSize, nbCellsX, nbCellsY, explorationData);
-            explorationData = grid.getExplorationData();
-        }
-
-        return grid;
-    }
-
-    /**
      * Factory method to create a PlayerExploration instance for a ranged dimension.
      *
      * @param dimensionId The ID of the dimension.
@@ -361,6 +378,18 @@ public class PlayerExploration implements Serializable {
             return create(dimension, rangeIndex, null);
 
         return null;
+    }
+
+    /**
+     * Returns the exploration state of the cell at {@code (cellX, cellY)}.
+     *
+     * @param cellX Cell X index.
+     * @param cellY Cell Y index.
+     * @return The {@link ExplorationState}, or {@link ExplorationState#HIDDEN} if out of bounds.
+     */
+    public ExplorationState stateAt(int cellX, int cellY) {
+
+        return grid().stateAt(cellX, cellY);
     }
 
     /**
@@ -457,33 +486,6 @@ public class PlayerExploration implements Serializable {
         releaseTextureResources();
 
         if (dirtyCells != null) dirtyCells.clear();
-    }
-
-    /**
-     * Releases GPU and native texture resources without changing grid data.
-     */
-    private void releaseTextureResources() {
-
-        if (fogTexture != null) {
-
-            if (fogTextureId != null) {
-
-                Client.mc().getTextureManager()
-                        .destroyTexture(fogTextureId);
-
-                fogTextureId = null;
-            }
-
-            fogTexture.close();
-            fogTexture = null;
-        }
-
-        if (fogMask != null) {
-
-            fogMask.close();
-            fogMask = null;
-        }
-
     }
 
     /**

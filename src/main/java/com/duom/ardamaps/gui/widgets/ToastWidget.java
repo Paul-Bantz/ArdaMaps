@@ -25,12 +25,13 @@
 
 package com.duom.ardamaps.gui.widgets;
 
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
-import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -69,7 +70,7 @@ public class ToastWidget {
     private static final int TOAST_HEIGHT = PADDING * 2 + ICON_SIZE;
 
     /** Message to display. */
-    private final Text message;
+    private final Component message;
 
     /** Optional icon, rendered left of the message. */
     @Nullable
@@ -93,23 +94,9 @@ public class ToastWidget {
      * @param message the text to display
      * @param icon    optional icon identifier (nullable)
      */
-    public ToastWidget(Text message, @Nullable Identifier icon) {
+    public ToastWidget(Component message, @Nullable Identifier icon) {
 
         this(message, icon, System.currentTimeMillis());
-    }
-
-    /**
-     * Creates a new toast with an immediate start time.
-     *
-     * @param message the text to display
-     * @param icon    optional icon identifier (nullable)
-     * @param r          red component of the icon tint (0.0-1.0)
-     * @param g          green component of the icon tint (0.0-1.0)
-     * @param b          blue component of the icon tint (0.0-1).
-     */
-    public ToastWidget(Text message, @Nullable Identifier icon, float r, float g, float b) {
-
-        this(message, icon, System.currentTimeMillis(),  r, g, b);
     }
 
     /**
@@ -119,7 +106,7 @@ public class ToastWidget {
      * @param icon        optional icon identifier (nullable)
      * @param startTimeMs the toast display start time
      */
-    public ToastWidget(Text message, @Nullable Identifier icon, long startTimeMs) {
+    public ToastWidget(Component message, @Nullable Identifier icon, long startTimeMs) {
         this(message, icon, startTimeMs, 1.0f, 1.0f, 1.0f);
     }
 
@@ -129,17 +116,31 @@ public class ToastWidget {
      * @param message     the text to display
      * @param icon        optional icon identifier (nullable)
      * @param startTimeMs the toast display start time
-     * @param r          red component of the icon tint (0.0-1.0)
-     * @param g          green component of the icon tint (0.0-1.0)
-     * @param b          blue component of the icon tint (0.0-1).
+     * @param r           red component of the icon tint (0.0-1.0)
+     * @param g           green component of the icon tint (0.0-1.0)
+     * @param b           blue component of the icon tint (0.0-1).
      */
-    public ToastWidget(Text message, @Nullable Identifier icon, long startTimeMs, float r, float g, float b) {
+    public ToastWidget(Component message, @Nullable Identifier icon, long startTimeMs, float r, float g, float b) {
         this.message = message;
         this.icon = icon;
         this.startTimeMs = startTimeMs;
         this.iconR = r;
         this.iconG = g;
         this.iconB = b;
+    }
+
+    /**
+     * Creates a new toast with an immediate start time.
+     *
+     * @param message the text to display
+     * @param icon    optional icon identifier (nullable)
+     * @param r       red component of the icon tint (0.0-1.0)
+     * @param g       green component of the icon tint (0.0-1.0)
+     * @param b       blue component of the icon tint (0.0-1).
+     */
+    public ToastWidget(Component message, @Nullable Identifier icon, float r, float g, float b) {
+
+        this(message, icon, System.currentTimeMillis(), r, g, b);
     }
 
     /**
@@ -156,54 +157,43 @@ public class ToastWidget {
      *
      * @param context the draw context provided by the HUD render callback
      */
-    public void render(DrawContext context) {
+    public void render(GuiGraphicsExtractor context) {
 
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.getWindow() == null) return;
+        Minecraft mc = Minecraft.getInstance();
 
         float alpha = Math.max(0f, Math.min(1f, getAlpha()));
         if (alpha <= 0.05f) return;
 
-        var textRenderer = mc.textRenderer;
-        int screenW = mc.getWindow().getScaledWidth();
-        int screenH = mc.getWindow().getScaledHeight();
+        var textRenderer = mc.font;
+        int screenW = mc.getWindow().getGuiScaledWidth();
+        int screenH = mc.getWindow().getGuiScaledHeight();
 
-        int textWidth = textRenderer.getWidth(message);
+        int textWidth = textRenderer.width(message);
         int toastWidth = PADDING + (icon != null ? ICON_SIZE + ICON_TEXT_GAP : 0) + textWidth + PADDING;
 
         int x = screenW - toastWidth;
         int y = screenH * 2 / 3;
-
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
 
         int contentX = x + PADDING;
         int iconY = y + PADDING;
 
         if (icon != null) {
 
-            var sprite = IconSpriteAtlas.retrieveSprite(icon);
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon),
+                    contentX, iconY, ICON_SIZE, ICON_SIZE,
+                    GuiTextures.argb(iconR, iconG, iconB, alpha));
 
-            RenderSystem.setShaderColor(iconR, iconG, iconB, alpha);
-
-            if (sprite != null)
-                context.drawSprite(contentX, iconY, 0, ICON_SIZE, ICON_SIZE, IconSpriteAtlas.retrieveSprite(icon));
-            else
-                context.drawTexture(icon, contentX, iconY, 0, 0, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
-
-            RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
             contentX += ICON_SIZE + ICON_TEXT_GAP;
         }
 
-        int textY = y + (TOAST_HEIGHT - textRenderer.fontHeight) / 2;
+        int textY = y + (TOAST_HEIGHT - textRenderer.lineHeight) / 2;
 
         // Embed alpha into white so drawText respects it (colour is ARGB)
         int textAlpha = (int) (alpha * 255);
         int textColor = (textAlpha << 24) | 0x00FFFFFF;
 
-        context.drawText(textRenderer, message, contentX, textY, textColor, true);
+        context.text(textRenderer, message, contentX, textY, textColor, true);
 
-        RenderSystem.disableBlend();
     }
 
     /**
@@ -228,4 +218,3 @@ public class ToastWidget {
         }
     }
 }
-

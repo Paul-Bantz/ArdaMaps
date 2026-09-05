@@ -26,39 +26,34 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
-import com.mojang.blaze3d.systems.RenderSystem;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A styled button widget that displays text.
  * This button type is meant to be displayed on top of the GUI.
  */
-public class StyledButtonWidget extends ClickableWidget {
+public class StyledButtonWidget extends AbstractWidget {
 
     /** On select runnable */
     private final Runnable onSelect;
+
+    /** Button style */
+    private final Style style;
 
     /** Toggled state of the button, if true the button will be rendered in a toggled state */
     @Getter
     @Setter
     private boolean toggled = false;
-
-    /** Button style */
-    private final Style style;
-
-    /**
-     * Button style type
-     */
-    public enum Style {
-        DEFAULT,
-        EDGE
-    }
 
     /**
      * Creates a new Button.
@@ -76,15 +71,15 @@ public class StyledButtonWidget extends ClickableWidget {
                               int height,
                               Runnable onClick,
                               Style style,
-                              Text text) {
+                              Component text) {
 
-        super(x, y, width, height, Text.empty());
+        super(x, y, width, height, Component.empty());
 
         this.onSelect = onClick;
         this.width = width;
         this.height = height;
         this.style = style;
-        this.setMessage(text != null ? text : Text.empty());
+        this.setMessage(text != null ? text : Component.empty());
     }
 
     /**
@@ -97,7 +92,7 @@ public class StyledButtonWidget extends ClickableWidget {
      * @param delta   the time delta since the last frame, used for animations (not utilized in this implementation)
      */
     @Override
-    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void extractWidgetRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         if (!visible) return;
 
@@ -109,56 +104,46 @@ public class StyledButtonWidget extends ClickableWidget {
 
     /**
      * Renders the button as default style
+     *
      * @param context the draw context
-     * @param mouseX the mouse x position
-     * @param mouseY the mouse y position
+     * @param mouseX  the mouse x position
+     * @param mouseY  the mouse y position
      */
-    private void renderDefaultStyle(DrawContext context, int mouseX, int mouseY) {
+    private void renderDefaultStyle(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
-        var u = 16;
-        var v = 16;
         var x = getX();
         var y = getY();
 
-        if (toggled) v += 64;
-        else if (isMouseOver(mouseX, mouseY)) v += 32;
+        var sprite = toggled
+                ? ModConstants.MAP_BUTTON_PRESSED_SPRITE
+                : isMouseOver(mouseX, mouseY)
+                ? ModConstants.MAP_BUTTON_HOVERED_SPRITE
+                : ModConstants.MAP_BUTTON_SPRITE;
 
-        if (!active) {
-            RenderSystem.setShaderColor(0.85f, 0.85f, 0.85f, 1f);
-        }
-
-        context.drawNineSlicedTexture(ModConstants.MAP_GUI_ELEMENTS,
-                x, y,
-                width, height,
-                12,
-                9,
-                12,
-                9,
-                128,
-                32,
-                u, v);
+        int color = !active ? GuiTextures.argb(0.85f, 0.85f, 0.85f, 1.0f) : ModConstants.COLOR_WHITE;
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x, y, width, height, color);
 
         var text = getMessage();
 
-        if (!text.equals(Text.empty())) {
+        if (!text.equals(Component.empty())) {
 
-            var textRenderer = Client.mc().textRenderer;
-            var offsetX = width / 2 - textRenderer.getWidth(text) / 2;
-            var offsetY = height / 2 - textRenderer.fontHeight / 2;
+            var textRenderer = Client.mc().font;
+            var offsetX = width / 2 - textRenderer.width(text) / 2;
+            var offsetY = height / 2 - textRenderer.lineHeight / 2;
 
-            context.drawText(textRenderer, text, x + offsetX, y + offsetY, toggled ? ModConstants.COLOR_LIGHT_BROWN : ModConstants.COLOR_DARK_BROWN, false);
+            context.text(textRenderer, text, x + offsetX, y + offsetY, toggled ? ModConstants.COLOR_LIGHT_BROWN : ModConstants.COLOR_DARK_BROWN, false);
         }
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
     }
 
     /**
      * Renders the button as edge style
+     *
      * @param context the draw context
-     * @param mouseX the mouse x position
-     * @param mouseY the mouse y position
+     * @param mouseX  the mouse x position
+     * @param mouseY  the mouse y position
      */
-    private void renderEdgeStyle(DrawContext context, int mouseX, int mouseY) {
+    private void renderEdgeStyle(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         var x = getX();
         var y = getY();
@@ -166,31 +151,23 @@ public class StyledButtonWidget extends ClickableWidget {
         var text = getMessage();
         var mouseOver = isMouseOver(mouseX, mouseY);
 
-        if (isMouseOver(mouseX, mouseY))
-            RenderSystem.setShaderColor(1f, 1f, 1f, .5f);
-
         if (toggled || mouseOver) {
 
             var indicatorHeight = getHeight();
             var indicatorWidth = indicatorHeight * 14 / 64;
             context.fill(x, y, x + getWidth(), y + getHeight(), ModConstants.COLOR_LIGHT_BROWN);
-            context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
-                    x + getWidth() - indicatorWidth, y,
-                    indicatorWidth, indicatorHeight,
-                    32, 242,
-                    14, 64,
-                    512, 512);
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, ModConstants.EDGE_INDICATOR_SPRITE,
+                    x + getWidth() - indicatorWidth, y, indicatorWidth, indicatorHeight,
+                    mouseOver ? GuiTextures.argb(1.0f, 1.0f, 1.0f, 0.5f) : ModConstants.COLOR_WHITE);
         }
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        if (!text.equals(Component.empty())) {
 
-        if (!text.equals(Text.empty())) {
+            var textRenderer = Client.mc().font;
+            var offsetX = width / 2 - textRenderer.width(text) / 2;
+            var offsetY = height / 2 - textRenderer.lineHeight / 2;
 
-            var textRenderer = Client.mc().textRenderer;
-            var offsetX = width / 2 - textRenderer.getWidth(text) / 2;
-            var offsetY = height / 2 - textRenderer.fontHeight / 2;
-
-            context.drawText(textRenderer, text, x + offsetX, y + offsetY, ModConstants.COLOR_DARK_BROWN, false);
+            context.text(textRenderer, text, x + offsetX, y + offsetY, ModConstants.COLOR_DARK_BROWN, false);
         }
     }
 
@@ -217,14 +194,14 @@ public class StyledButtonWidget extends ClickableWidget {
     /**
      * Handles mouse click events on the button, executing the onSelect runnable and then calling the superclass's onClick method to handle any additional behaviour.
      *
-     * @param mouseX the x position of the mouse cursor at the time of the click
-     * @param mouseY the y position of the mouse cursor at the time of the click
+     * @param event the initiating mouse event
+     * @param doubleClick true if this is a double click
      */
     @Override
-    public void onClick(double mouseX, double mouseY) {
+    public void onClick(@NonNull MouseButtonEvent event, boolean doubleClick) {
 
         onSelect.run();
-        super.onClick(mouseX, mouseY);
+        super.onClick(event, doubleClick);
     }
 
     /**
@@ -233,7 +210,15 @@ public class StyledButtonWidget extends ClickableWidget {
      * @param builder the NarrationMessageBuilder to append messages to
      */
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {
-        appendDefaultNarrations(builder);
+    protected void updateWidgetNarration(@NonNull NarrationElementOutput builder) {
+        defaultButtonNarrationText(builder);
+    }
+
+    /**
+     * Button style type
+     */
+    public enum Style {
+        DEFAULT,
+        EDGE
     }
 }

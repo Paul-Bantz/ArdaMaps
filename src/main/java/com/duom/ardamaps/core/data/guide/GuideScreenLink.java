@@ -42,13 +42,17 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class GuideScreenLink {
 
-    public static final String GUIDE         = "guide";
-    public static final String GUIDE_MAP     = "guide:map";
-    public static final String GUIDE_CONFIG  = "guide:configuration";
+    public static final String GUIDE = "guide";
+
+    public static final String GUIDE_MAP = "guide:map";
+
+    public static final String GUIDE_CONFIG = "guide:configuration";
 
     private static final String GUIDE_PAGE_PREFIX = "guide:page:";
 
-    private GuideScreenLink() {}
+    /** Utility class with no public instances. */
+    private GuideScreenLink() {
+    }
 
     /**
      * Encodes a guide-page deep-link from a page and an entry.
@@ -59,23 +63,15 @@ public final class GuideScreenLink {
      * @param page  the currently selected {@link GuidePage}
      * @param entry the currently selected {@link GuideEntry}
      * @return a deep-link string of the form {@code "guide:page:<pageId>/<entryId>"},
-     *         or {@code "guide"} if either ID is absent
+     * or {@code "guide"} if either ID is absent
      */
     public static String encodePage(GuidePage page, GuideEntry entry) {
         if (page == null || entry == null) return GUIDE;
-        String pageId  = page.getId();
+        String pageId = page.getId();
         String entryId = entry.getId();
         if (pageId == null || pageId.isBlank() || entryId == null || entryId.isBlank()) return GUIDE;
         return GUIDE_PAGE_PREFIX + pageId + "/" + entryId;
     }
-
-    /**
-     * Result of a successful deep-link resolution.
-     *
-     * @param pageIndex  zero-based index of the matching page in {@link GuideBook#getPages()}
-     * @param entryIndex zero-based index of the matching entry within that page
-     */
-    public record Resolved(int pageIndex, int entryIndex) {}
 
     /**
      * Resolves a deep-link string against a loaded {@link GuideBook}.
@@ -133,6 +129,16 @@ public final class GuideScreenLink {
     /** @return {@code true} if the link should open the Configuration screen */
     public static boolean isConfigLink(@Nullable String link) {
         return GUIDE_CONFIG.equals(link);
+    }
+
+    /**
+     * Result of a successful deep-link resolution.
+     *
+     * @param pageIndex  zero-based index of the matching page in {@link GuideBook#getPages()}
+     * @param entryIndex zero-based index of the matching entry within that page
+     */
+    public record Resolved(int pageIndex, int entryIndex) {
+
     }
 }
 

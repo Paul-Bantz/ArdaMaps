@@ -117,20 +117,7 @@ public class ClientProgress implements Serializable {
 
         // Reset ArdaRegions progress
         if (!autoGenOnly && ArdaMapsClient.CONFIG.isArdaRegionsAvailable() && Client.player() != null)
-            Client.player().networkHandler.sendChatCommand("ardaregions resetprogress");
-    }
-
-    /**
-     * Disposes and clears all locally stored progress without persistence or server-side reset side effects.
-     */
-    public void clearSessionState() {
-
-        explorationState.forEach((key, exploration) -> {
-            LOGGER.warn("Disposing exploration state for dimension {} on disconnect", key);
-            exploration.dispose();
-        });
-        explorationState.clear();
-        visitedLocationIds.clear();
+            Client.player().connection.sendCommand("ardaregions resetprogress");
     }
 
     /**
@@ -171,6 +158,19 @@ public class ClientProgress implements Serializable {
     public static String explorationKey(String dimensionId, Integer rangeIndex) {
 
         return rangeIndex == null ? dimensionId : dimensionId + "#" + rangeIndex;
+    }
+
+    /**
+     * Disposes and clears all locally stored progress without persistence or server-side reset side effects.
+     */
+    public void clearSessionState() {
+
+        explorationState.forEach((key, exploration) -> {
+            LOGGER.warn("Disposing exploration state for dimension {} on disconnect", key);
+            exploration.dispose();
+        });
+        explorationState.clear();
+        visitedLocationIds.clear();
     }
 
     /**

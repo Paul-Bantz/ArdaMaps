@@ -41,19 +41,18 @@ import com.duom.ardamaps.core.data.guide.GuideScreenLink;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.location.LocationProvider;
 import com.duom.ardamaps.core.data.map.RegionLookupTexture;
+import com.duom.ardamaps.core.data.map.markers.MarkersDefinition;
 import com.duom.ardamaps.core.data.map.markers.MarkersManager;
 import com.duom.ardamaps.core.data.map.providers.HttpImageProvider;
 import com.duom.ardamaps.core.items.ModItems;
 import com.duom.ardamaps.core.networking.PacketRegistry;
-import com.duom.ardamaps.core.networking.packets.EmptyPacket;
 import com.duom.ardamaps.core.networking.packets.server.LocationsRequestPacket;
+import com.duom.ardamaps.core.networking.packets.server.MapSourcesRequestPacket;
 import com.duom.ardamaps.core.networking.packets.server.RegionsLutRequestPacket;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.hud.compass.Compass;
 import com.duom.ardamaps.gui.hud.toposcope.Toposcope;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
-import com.duom.ardamaps.gui.map.rendering.BlueMapTileShader;
-import com.duom.ardamaps.gui.map.rendering.FogOfWarShader;
 import com.duom.ardamaps.gui.screens.ConfigurationScreen;
 import com.duom.ardamaps.gui.screens.GuideScreen;
 import com.duom.ardamaps.gui.screens.MapScreen;
@@ -63,33 +62,31 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
-import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
-import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.profiler.Profiler;
+import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
+import net.fabricmc.fabric.api.resource.v1.reloader.SimpleReloadListener;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.PackType;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The client-side initializer for the Arda Maps mod, responsible for setting up client-specific features such as the toposcope and compass HUD elements, handling resource reloads, and managing player exploration tracking.
@@ -97,21 +94,67 @@ import java.util.concurrent.TimeUnit;
  */
 public class ArdaMapsClient implements ClientModInitializer {
 
-    /** Executor for asynchronous image decoding and HTTP image loads. */
-    public static final ExecutorService IMAGE_EXECUTOR =
-            newBoundedExecutor(
-                    "ardamaps-image-loader",
-                    Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
-                    64
-            );
+    /**
+     * Executor for asynchronous image processing (BlueMap/WebP tile decode). Bounded with a
+     * fixed-size queue, matching {@link #TILE_EXECUTOR}, so a fast pan/zoom that briefly outpaces
+     * the tile provider's own in-flight budget sheds excess work instead of growing an unbounded
+     * backlog that keeps decoding tiles long after they've scrolled off screen.
+     */
+    public static final ExecutorService IMAGE_EXECUTOR = new ThreadPoolExecutor(
+            Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+            Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+            0L, TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(64),
+            imageExecutorThreadFactory()
+    );
 
-    /** Executor for PMTiles archive reads, separate from HTTP/WebP image loading. */
-    public static final ExecutorService TILE_EXECUTOR =
-            newBoundedExecutor(
-                    "ardamaps-tile-loader",
-                    Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
-                    256
-            );
+    /**
+     * Creates the daemon thread factory for {@link #IMAGE_EXECUTOR}, naming threads so image
+     * decode tasks are identifiable in logs and thread dumps.
+     *
+     * @return A thread factory producing named daemon threads.
+     */
+    private static ThreadFactory imageExecutorThreadFactory() {
+
+        AtomicInteger threadId = new AtomicInteger();
+        return runnable -> {
+            Thread thread = new Thread(runnable);
+            thread.setDaemon(true);
+            thread.setName("ardamaps-image-%02d".formatted(threadId.incrementAndGet()));
+            return thread;
+        };
+    }
+
+    /**
+     * Dedicated executor for PMTiles range reads. Kept separate from {@link #IMAGE_EXECUTOR} so a
+     * slow or unresponsive PMTiles source (blocking HTTP range reads) cannot starve BlueMap/WebP
+     * image loading, which shares {@link #IMAGE_EXECUTOR}. Bounded with a fixed-size queue so a
+     * stuck source sheds new requests instead of growing an unbounded backlog.
+     */
+    public static final ExecutorService TILE_EXECUTOR = new ThreadPoolExecutor(
+            Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+            Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+            0L, TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(256),
+            tileExecutorThreadFactory()
+    );
+
+    /**
+     * Creates the daemon thread factory for {@link #TILE_EXECUTOR}, naming threads so PMTiles
+     * tasks are identifiable in logs and thread dumps (rather than the generic {@code pool-N-thread-M}).
+     *
+     * @return A thread factory producing named daemon threads.
+     */
+    private static ThreadFactory tileExecutorThreadFactory() {
+
+        AtomicInteger threadId = new AtomicInteger();
+        return runnable -> {
+            Thread thread = new Thread(runnable);
+            thread.setDaemon(true);
+            thread.setName("ardamaps-pmtiles-tile-%02d".formatted(threadId.incrementAndGet()));
+            return thread;
+        };
+    }
 
     /** How long (ms) the near-locations cache is valid before refreshing. */
     public static final long LOCATION_CACHE_MS = 100L;
@@ -130,21 +173,6 @@ public class ArdaMapsClient implements ClientModInitializer {
      * Entries are removed once their lifetime ({@link ToastWidget#TOTAL_MS}) has elapsed.
      */
     private static final Deque<ToastWidget> TOAST_QUEUE = new ArrayDeque<>();
-
-    private static ExecutorService newBoundedExecutor(String threadName, int threads, int queueSize) {
-        return new ThreadPoolExecutor(
-                threads,
-                threads,
-                0L,
-                TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(queueSize),
-                runnable -> {
-                    Thread thread = new Thread(runnable, threadName);
-                    thread.setDaemon(true);
-                    return thread;
-                }
-        );
-    }
 
     /** Client configuration manager instance, responsible for loading and saving client-specific configurations such as map layers and player progress. */
     public static ClientConfigManager CONFIG_MANAGER;
@@ -201,6 +229,8 @@ public class ArdaMapsClient implements ClientModInitializer {
         CONFIG = CONFIG_MANAGER.getConfig();
 
         KeyBinds.register();
+        IconSpriteAtlas.register();
+        suppressTileverseHttpClientCloseWarning();
 
         this.registerModItems();
         this.registerResourceListeners();
@@ -216,11 +246,28 @@ public class ArdaMapsClient implements ClientModInitializer {
         ClientLifecycleEvents.CLIENT_STOPPING.register(this::onStop);
 
         // Render queued toast notifications on the HUD
-        HudRenderCallback.EVENT.register(this::renderToast);
+        HudElementRegistry.addLast(ModConstants.modId("toast"), this::renderToast);
 
         this.registerChatProcessor();
 
         ClientCommands.register();
+    }
+
+    /**
+     * Suppresses warnings from Tileverse's HttpClient close attempts on JDK 25.
+     * <p>
+     * Tileverse 1.4.0 closes its HttpClient via reflection into jdk.internal.net.http, which the JPMS blocks.
+     * The close still succeeds, but warnings are logged and filtered here.
+     */
+    private static void suppressTileverseHttpClientCloseWarning() {
+
+        // tileverse 1.4.0 closes its HttpClient by reflecting into jdk.internal.net.http, which JPMS
+        // blocks on JDK 25. The close still succeeds; only the reflective shutdown path is skipped.
+        java.util.logging.Logger.getLogger("io.tileverse.rangereader.http.HttpRangeReader")
+                .setFilter(record -> {
+                    String message = record.getMessage();
+                    return message == null || !message.startsWith("Error shutting down HttpClient");
+                });
     }
 
     /**
@@ -237,17 +284,9 @@ public class ArdaMapsClient implements ClientModInitializer {
      */
     private void registerResourceListeners() {
 
-        ResourceManagerHelper.get(ResourceType.CLIENT_RESOURCES)
-                .registerReloadListener(new MarkersLoaderReloadListener());
-
-        ResourceManagerHelper.get(ResourceType.CLIENT_RESOURCES)
-                .registerReloadListener(new ShaderLoaderReloadListener());
-
-        ResourceManagerHelper.get(ResourceType.CLIENT_RESOURCES)
-                .registerReloadListener(new IconSpriteAtlasReloadListener());
-
-        ResourceManagerHelper.get(ResourceType.CLIENT_RESOURCES)
-                .registerReloadListener(new GuideImageCacheReloadListener());
+        ResourceLoader loader = ResourceLoader.get(PackType.CLIENT_RESOURCES);
+        loader.registerReloadListener(ModConstants.modId("markers_loader"), new MarkersLoaderReloadListener());
+        loader.registerReloadListener(ModConstants.modId("guide_image_cache"), new GuideImageCacheReloadListener());
     }
 
     /**
@@ -258,9 +297,9 @@ public class ArdaMapsClient implements ClientModInitializer {
      * @param client                   The Minecraft client instance.
      */
     @SuppressWarnings("unused")
-    private void initModInternals(ClientPlayNetworkHandler clientPlayNetworkHandler, PacketSender packetSender, MinecraftClient client) {
+    private void initModInternals(ClientPacketListener clientPlayNetworkHandler, PacketSender packetSender, Minecraft client) {
 
-        if (client.isInSingleplayer()) {
+        if (client.isLocalServer()) {
             LOGGER.info("ArdaMaps is a client/server mod - skipping initialization");
             return;
         }
@@ -280,7 +319,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      * Clears all state scoped to a single play connection.
      */
     @SuppressWarnings("unused")
-    private void onDisconnect(ClientPlayNetworkHandler handler, MinecraftClient client) {
+    private void onDisconnect(ClientPacketListener handler, Minecraft client) {
 
         LOGGER.info("Disconnected from world, clearing ArdaMaps session state");
 
@@ -300,13 +339,13 @@ public class ArdaMapsClient implements ClientModInitializer {
      *
      * @param client The Minecraft client instance.
      */
-    private void clientTick(MinecraftClient client) {
+    private void clientTick(Minecraft client) {
 
         if (client.player == null) return;
 
-        if (client.world == null) return;
+        if (client.level == null) return;
 
-        if (client.isInSingleplayer()) return;
+        if (client.isLocalServer()) return;
 
         // Poll keybindings and update toggle state first.
         KeyBinds.tick();
@@ -318,13 +357,13 @@ public class ArdaMapsClient implements ClientModInitializer {
         refreshNearLocations(client.player);
 
         // Open the map screen when M is pressed (independent of right-click).
-        if (KeyBinds.consumeMapPress() && client.currentScreen == null) {
+        if (KeyBinds.consumeMapPress() && client.screen == null) {
 
             Client.mc().setScreen(new MapScreen(null));
         }
 
         // Open a screen requested by a client command (deferred to avoid the chat-screen close race).
-        if (pendingScreen != null && client.currentScreen == null) {
+        if (pendingScreen != null && client.screen == null) {
             Screen screen = pendingScreen;
             pendingScreen = null;
             Client.mc().setScreen(screen);
@@ -344,14 +383,14 @@ public class ArdaMapsClient implements ClientModInitializer {
      * @param client The Minecraft client instance.
      */
     @SuppressWarnings("unused")
-    private void onStop(MinecraftClient client) {
+    private void onStop(Minecraft client) {
 
         ArdaMapsClient.CONFIG_MANAGER.save();
 
         // Shutdown the image executor
         IMAGE_EXECUTOR.shutdown();
         try {
-            if (!IMAGE_EXECUTOR.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+            if (!IMAGE_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
                 IMAGE_EXECUTOR.shutdownNow();
             }
         } catch (InterruptedException e) {
@@ -359,9 +398,10 @@ public class ArdaMapsClient implements ClientModInitializer {
             Thread.currentThread().interrupt();
         }
 
+        // Shutdown the PMTiles tile executor
         TILE_EXECUTOR.shutdown();
         try {
-            if (!TILE_EXECUTOR.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+            if (!TILE_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
                 TILE_EXECUTOR.shutdownNow();
             }
         } catch (InterruptedException e) {
@@ -379,7 +419,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      * @param drawContext the draw context
      * @param tickDelta   unused tick delta
      */
-    private void renderToast(DrawContext drawContext, @SuppressWarnings("unused") float tickDelta) {
+    private void renderToast(GuiGraphicsExtractor drawContext, @SuppressWarnings("unused") DeltaTracker tickDelta) {
 
         ToastWidget head = TOAST_QUEUE.peek();
 
@@ -403,18 +443,18 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         // Style guide deep-links in incoming chat and system messages
         ClientReceiveMessageEvents.MODIFY_GAME.register(
-                (message, overlay) -> ArdaMapsChatLinkProcessor.process(message));
+                (message, _) -> ArdaMapsChatLinkProcessor.process(message));
 
         // Player-sent chat cannot be modified directly; intercept, cancel,
         // and re-add the styled version to ChatHud.
-        ClientReceiveMessageEvents.ALLOW_CHAT.register((message, signedMessage, sender, params, receptionTimestamp) -> {
+        ClientReceiveMessageEvents.ALLOW_CHAT.register((message, _, _, _, _) -> {
 
-            Text processed = ArdaMapsChatLinkProcessor.process(message);
+            Component processed = ArdaMapsChatLinkProcessor.process(message);
 
             if (processed == message) return true; // nothing to restyle
 
-            MinecraftClient mc = MinecraftClient.getInstance();
-            mc.execute(() -> mc.inGameHud.getChatHud().addMessage(processed));
+            Minecraft mc = Minecraft.getInstance();
+            mc.execute(() -> mc.gui.getChat().addClientSystemMessage(processed));
 
             return false; // cancel the unstyled original
         });
@@ -453,7 +493,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      */
     public static void refreshMapSources() {
 
-        PacketRegistry.MAP_SOURCES_REQUEST.send(new EmptyPacket(), response -> {
+        PacketRegistry.MAP_SOURCES_REQUEST.send(new MapSourcesRequestPacket(), response -> {
 
             List<Dimension> dimensions = response.dimensions();
 
@@ -463,7 +503,7 @@ public class ArdaMapsClient implements ClientModInitializer {
             }
 
             // Initialize per-dimension fog-of-war textures
-            MinecraftClient.getInstance().execute(() -> {
+            Minecraft.getInstance().execute(() -> {
 
                 LOGGER.info("Received Dimension Data from server: {} dimension(s) found.", dimensions.size());
                 ArdaMapsClient.CONFIG.setWarpsAvailable(response.warpsAvailable());
@@ -517,7 +557,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      *
      * @param player the current player instance
      */
-    private void trackLocationDiscovery(@NotNull ClientPlayerEntity player) {
+    private void trackLocationDiscovery(@NotNull LocalPlayer player) {
 
         if (ArdaMapsClient.CONFIG.isMapRevealAll()) return;
         if (NEAR_LOCATIONS.isEmpty()) return;
@@ -533,9 +573,9 @@ public class ArdaMapsClient implements ClientModInitializer {
                 nearestLocation.setVisited(true);
 
                 // Don't spam toasts on client start
-                if (player.age > 20)
+                if (player.tickCount > 20)
                     showToast(new ToastWidget(
-                            Text.translatable("ardamaps.client.notification.location.visited", nearestLocation.getName()),
+                            Component.translatable("ardamaps.client.notification.location.visited", nearestLocation.getName()),
                             ModConstants.ICON_BOOK
                     ));
 
@@ -552,7 +592,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      * static active instance in sync so that UI code using the backward-compat delegates
      * always operates on the correct dimension.</p>
      */
-    private void trackExploration(@NotNull ClientPlayerEntity player) {
+    private void trackExploration(@NotNull LocalPlayer player) {
 
         var progress = CONFIG.getClientProgress();
 
@@ -560,7 +600,7 @@ public class ArdaMapsClient implements ClientModInitializer {
          * When client starts, player position might be at (0, 0) before the first world update packet is received from the server.
          * That can lead to an exploration tick at 0,0 - this tick should be discarded
          */
-        if (player.age < 100) return;
+        if (player.tickCount < 100) return;
 
         // Get the dimension ID the player is currently in.
         String dimensionId = Client.currentDimensionId();
@@ -596,7 +636,7 @@ public class ArdaMapsClient implements ClientModInitializer {
                     .filter(location -> location.getExplorationState().ordinal() < ExplorationState.REVEALED.ordinal())
                     .filter(location -> {
                         Vec3d pos = location.getPosition();
-                        return pos != null && exploration.isWorldPosExplored(pos.x, pos.z, 0);
+                        return pos != null && exploration.isWorldPosExplored(pos.x(), pos.z(), 0);
                     })
                     .forEach(location -> location.updateExplorationState(ExplorationState.REVEALED));
 
@@ -614,7 +654,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      *
      * @param player The current client player.
      */
-    private static void refreshNearLocations(@org.jetbrains.annotations.NotNull ClientPlayerEntity player) {
+    private static void refreshNearLocations(@org.jetbrains.annotations.NotNull LocalPlayer player) {
 
         String currentDimensionId = Client.currentDimensionId();
         long now = System.currentTimeMillis();
@@ -642,12 +682,12 @@ public class ArdaMapsClient implements ClientModInitializer {
      * @param client the client instance
      * @return true if the client is holding the guidebook false otherwise
      */
-    private boolean isHoldingGuidebook(MinecraftClient client) {
+    private boolean isHoldingGuidebook(Minecraft client) {
 
         if (client == null || client.player == null) return false;
 
-        return client.player.getMainHandStack().isOf(ModItems.GUIDEBOOK)
-                || client.player.getOffHandStack().isOf(ModItems.GUIDEBOOK);
+        return client.player.getMainHandItem().is(ModItems.GUIDEBOOK)
+                || client.player.getOffhandItem().is(ModItems.GUIDEBOOK);
     }
 
     /**
@@ -663,12 +703,12 @@ public class ArdaMapsClient implements ClientModInitializer {
      *
      * @param client The Minecraft client instance.
      */
-    public void handleGuidebookDisplay(MinecraftClient client) {
+    public void handleGuidebookDisplay(Minecraft client) {
 
-        long handle = client.getWindow().getHandle();
+        long handle = client.getWindow().handle();
         boolean rightDown = GLFW.glfwGetMouseButton(handle, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
 
-        if (rightDown && !rightMouseButtonWasDown && client.currentScreen == null && isHoldingGuidebook(client)) {
+        if (rightDown && !rightMouseButtonWasDown && client.screen == null && isHoldingGuidebook(client)) {
 
             String lastPage = CONFIG.getLastPage();
 
@@ -707,67 +747,18 @@ public class ArdaMapsClient implements ClientModInitializer {
     /**
      * A resource reload listener that loads markers definitions when client resources are reloaded.
      */
-    private static class MarkersLoaderReloadListener implements SimpleSynchronousResourceReloadListener {
+    private static class MarkersLoaderReloadListener extends SimpleReloadListener<MarkersDefinition> {
 
-        /** The identifier for this resource reload listener, used to distinguish it from other listeners. */
         @Override
-        public Identifier getFabricId() {
-            return ModConstants.modId("markers_loader");
+        protected MarkersDefinition prepare(SharedState state) {
+
+            return MarkersDefinition.loadMarkersDefinition(state.resourceManager());
         }
 
-        /** Loads all custom shaders when client resources are reloaded. */
         @Override
-        public void reload(ResourceManager manager) {
+        protected void apply(MarkersDefinition definition, @NonNull SharedState state) {
 
-            MarkersManager.reload();
-        }
-    }
-
-    /**
-     * A resource reload listener that loads the fog of war shader when client resources are reloaded.
-     */
-    private static class ShaderLoaderReloadListener implements SimpleSynchronousResourceReloadListener {
-
-        /** The identifier for this resource reload listener, used to distinguish it from other listeners. */
-        @Override
-        public Identifier getFabricId() {
-            return ModConstants.modId("shader_loader");
-        }
-
-        /** Loads all custom shaders when client resources are reloaded. */
-        @Override
-        public void reload(ResourceManager manager) {
-
-            FogOfWarShader.load(manager);
-            BlueMapTileShader.load(manager);
-        }
-    }
-
-    /**
-     * A resource reload listener that manages the icon sprite atlas, ensuring it is reloaded when client resources are reloaded.
-     */
-    private static class IconSpriteAtlasReloadListener implements IdentifiableResourceReloadListener {
-
-        /** The icon sprite atlas instance, which is responsible for managing the icons used in the mod's HUD and map rendering. */
-        private IconSpriteAtlas atlas;
-
-        /** Returns the identifier for this resource reload listener, which is used to distinguish it from other listeners. */
-        @Override
-        public Identifier getFabricId() {
-            return ModConstants.modId("icon_sprite_atlas");
-        }
-
-        /** Reloads the icon sprite atlas when client resources are reloaded, ensuring that any changes to the icons are reflected in the mod's HUD and map rendering. */
-        @Override
-        public CompletableFuture<Void> reload(
-                Synchronizer synchronizer, ResourceManager manager,
-                Profiler prepareProfiler, Profiler applyProfiler,
-                Executor prepareExecutor, Executor applyExecutor) {
-
-            if (atlas == null) {
-                atlas = IconSpriteAtlas.create(MinecraftClient.getInstance().getTextureManager());
-            }
-            return atlas.reload(synchronizer, manager, prepareProfiler, applyProfiler, prepareExecutor, applyExecutor);
+            MarkersManager.set(definition);
         }
     }
 
@@ -775,15 +766,17 @@ public class ArdaMapsClient implements ClientModInitializer {
      * A resource reload listener that clears the {@link GuideImageCache} when client
      * resources are reloaded, so guide images are re-read from the updated resource pack.
      */
-    private static class GuideImageCacheReloadListener implements SimpleSynchronousResourceReloadListener {
+    private static class GuideImageCacheReloadListener extends SimpleReloadListener<Void> {
 
         @Override
-        public Identifier getFabricId() {
-            return ModConstants.modId("guide_image_cache");
+        protected Void prepare(@NonNull SharedState state) {
+
+            return null;
         }
 
         @Override
-        public void reload(ResourceManager manager) {
+        protected void apply(Void value, @NonNull SharedState state) {
+
             GuideImageCache.clear();
         }
     }

@@ -99,7 +99,7 @@ class ExplorationGridTest {
     }
 
     /**
-     * Marking a ranged cell on the western edge must not wrap negative X neighbors into the previous row.
+     * Marking a ranged cell on the western edge must not wrap negative X neighbours into the previous row.
      */
     @Test
     void markCell_westernEdgeRange_doesNotWrapToPreviousRow() {

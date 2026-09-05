@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.core.networking.packets.client;
 
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,14 +36,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PlayerExplorationPacketTest {
 
     /**
-     * Negative polygon counts are rejected by the parser and surfaced as an empty packet.
+     * Verifies that negative polygon counts are rejected by the parser and surfaced as an empty packet.
      */
     @Test
     void read_negativePolygonCount_returnsEmptyPacket() {
 
-        var buf = PacketByteBufs.create();
-        buf.writeString("minecraft:overworld");
-        buf.writeString("region-1");
+        var buf = FriendlyByteBufs.create();
+        buf.writeUtf("minecraft:overworld");
+        buf.writeUtf("region-1");
         buf.writeVarInt(-1);
         buf.readerIndex(0);
 
@@ -51,14 +51,14 @@ class PlayerExplorationPacketTest {
     }
 
     /**
-     * Oversized polygon counts are rejected by the parser and surfaced as an empty packet.
+     * Verifies that oversized polygon counts are rejected by the parser and surfaced as an empty packet.
      */
     @Test
     void read_oversizedPolygonCount_returnsEmptyPacket() {
 
-        var buf = PacketByteBufs.create();
-        buf.writeString("minecraft:overworld");
-        buf.writeString("region-1");
+        var buf = FriendlyByteBufs.create();
+        buf.writeUtf("minecraft:overworld");
+        buf.writeUtf("region-1");
         buf.writeVarInt(1025);
         buf.readerIndex(0);
 

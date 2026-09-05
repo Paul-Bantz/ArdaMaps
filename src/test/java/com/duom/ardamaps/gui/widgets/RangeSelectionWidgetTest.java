@@ -26,7 +26,9 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.data.config.MapLayerRange;
-import net.minecraft.text.Text;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
+import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -53,42 +55,6 @@ class RangeSelectionWidgetTest {
         assertEquals(-1, widget.indexAt(-1, 10));
         assertEquals(-1, widget.indexAt(100, 10));
         assertEquals(-1, widget.indexAt(10, 20));
-    }
-
-    /**
-     * Verifies that tooltip labels show the covered Y interval and normalize reversed authored bounds.
-     * This protects the user-facing hover text from exposing confusing min/max ordering details.
-     */
-    @Test
-    void tooltipLabel_formatsNormalizedYRange() {
-
-        assertEquals("-500..-128", RangeSelectionWidget.tooltipLabel(new MapLayerRange(0, "0.pmtiles", -500, -128)));
-        assertEquals("-500..-128", RangeSelectionWidget.tooltipLabel(new MapLayerRange(0, "0.pmtiles", -128, -500)));
-    }
-
-    /**
-     * Verifies that the label-area gradient starts fully transparent and ends at the strip background colour.
-     * This protects the softened left edge introduced for the fixed label area.
-     */
-    @Test
-    void gradientColorAt_spansTransparentToBackground() {
-
-        assertEquals(0x00000000, RangeSelectionWidget.gradientColorAt(0, 40));
-        assertEquals(0x70000000, RangeSelectionWidget.gradientColorAt(39, 40));
-    }
-
-    /**
-     * Verifies that tooltip positioning centers above its anchor and clamps cleanly at both screen edges.
-     * This protects hover tooltips for partially clipped cells near the viewport boundaries.
-     */
-    @Test
-    void tooltipHelpers_centerClampAndSitAboveAnchor() {
-
-        assertEquals(40, RangeSelectionWidget.tooltipLeft(200, 60, 40));
-        assertEquals(4, RangeSelectionWidget.tooltipLeft(200, 5, 40));
-        assertEquals(156, RangeSelectionWidget.tooltipLeft(200, 195, 40));
-        assertEquals(56, RangeSelectionWidget.tooltipTop(80, 24));
-        assertEquals(4, RangeSelectionWidget.tooltipTop(10, 24));
     }
 
     /**
@@ -138,11 +104,47 @@ class RangeSelectionWidgetTest {
                 0,
                 100,
                 20,
-                Text.empty(),
+                Component.empty(),
                 ranges,
                 20,
                 selected::add,
                 controlDown);
+    }
+
+    /**
+     * Verifies that tooltip labels show the covered Y interval and normalize reversed authored bounds.
+     * This protects the user-facing hover text from exposing confusing min/max ordering details.
+     */
+    @Test
+    void tooltipLabel_formatsNormalizedYRange() {
+
+        assertEquals("-500..-128", RangeSelectionWidget.tooltipLabel(new MapLayerRange(0, "0.pmtiles", -500, -128)));
+        assertEquals("-500..-128", RangeSelectionWidget.tooltipLabel(new MapLayerRange(0, "0.pmtiles", -128, -500)));
+    }
+
+    /**
+     * Verifies that the label-area gradient starts fully transparent and ends at the strip background colour.
+     * This protects the softened left edge introduced for the fixed label area.
+     */
+    @Test
+    void gradientColorAt_spansTransparentToBackground() {
+
+        assertEquals(0x00000000, RangeSelectionWidget.gradientColorAt(0, 40));
+        assertEquals(0x70000000, RangeSelectionWidget.gradientColorAt(39, 40));
+    }
+
+    /**
+     * Verifies that tooltip positioning centers above its anchor and clamps cleanly at both screen edges.
+     * This protects hover tooltips for partially clipped cells near the viewport boundaries.
+     */
+    @Test
+    void tooltipHelpers_centerClampAndSitAboveAnchor() {
+
+        assertEquals(40, RangeSelectionWidget.tooltipLeft(200, 60, 40));
+        assertEquals(4, RangeSelectionWidget.tooltipLeft(200, 5, 40));
+        assertEquals(156, RangeSelectionWidget.tooltipLeft(200, 195, 40));
+        assertEquals(56, RangeSelectionWidget.tooltipTop(80, 24));
+        assertEquals(4, RangeSelectionWidget.tooltipTop(10, 24));
     }
 
     /**
@@ -202,7 +204,7 @@ class RangeSelectionWidgetTest {
     }
 
     /**
-     * Verifies that centering a middle item places its cell center at the widget center.
+     * Verifies that centering a middle item places its cell centre at the widget centre.
      * This protects the positioning math used after programmatic range changes.
      */
     @Test
@@ -217,7 +219,7 @@ class RangeSelectionWidgetTest {
 
     /**
      * Verifies that centering near either end clamps to the available scroll range instead of overscrolling.
-     * This protects the edge behavior when the selected range is near the start or end of the strip.
+     * This protects the edge behaviour when the selected range is near the start or end of the strip.
      */
     @Test
     void centerOn_edgeItems_clampsToEnds() {
@@ -241,8 +243,8 @@ class RangeSelectionWidgetTest {
         List<MapLayerRange> selected = new ArrayList<>();
         RangeSelectionWidget widget = widget(ranges(5), selected);
 
-        widget.onClick(45, 10);
-        widget.onRelease(45, 10);
+        widget.onClick(mouse(45, 10), false);
+        widget.onRelease(mouse(45, 10));
 
         assertEquals(2, widget.getSelectedIndex());
 
@@ -250,6 +252,18 @@ class RangeSelectionWidgetTest {
 
         assertEquals(2, widget.getSelected().index());
         assertEquals(List.of(widget.getSelected()), selected);
+    }
+
+    /**
+     * Creates a mouse button event at the supplied screen coordinates.
+     *
+     * @param x The screen X coordinate.
+     * @param y The screen Y coordinate.
+     * @return A mouse button event fixture.
+     */
+    @SuppressWarnings("SameParameterValue")
+    private static MouseButtonEvent mouse(double x, double y) {
+        return new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0));
     }
 
     /**
@@ -262,9 +276,9 @@ class RangeSelectionWidgetTest {
         List<MapLayerRange> selected = new ArrayList<>();
         RangeSelectionWidget widget = widget(ranges(10), selected);
 
-        widget.onClick(70, 10);
-        widget.onDrag(20, 10, -50, 0);
-        widget.onRelease(20, 10);
+        widget.onClick(mouse(70, 10), false);
+        widget.onDrag(mouse(20, 10), -50, 0);
+        widget.onRelease(mouse(20, 10));
 
         assertEquals(-50, widget.getScrollOffset());
         assertNull(widget.getSelected());
@@ -334,7 +348,7 @@ class RangeSelectionWidgetTest {
 
         widget.setSelected(ranges.get(4));
 
-        assertTrue(widget.mouseScrolled(50, 10, 1));
+        assertTrue(widget.mouseScrolled(50, 10, 0, 1));
         assertEquals(5, widget.getSelectedIndex());
         assertEquals(ranges.get(5), widget.getSelected());
         assertEquals(List.of(ranges.get(5)), selected);
@@ -352,9 +366,9 @@ class RangeSelectionWidgetTest {
         List<MapLayerRange> ranges = ranges(10);
         RangeSelectionWidget widget = widget(ranges, selected, true);
 
-        widget.setSelected(ranges.get(0));
+        widget.setSelected(ranges.getFirst());
 
-        assertTrue(widget.mouseScrolled(50, 10, -1));
+        assertTrue(widget.mouseScrolled(50, 10, 0, -1));
         assertEquals(0, widget.getSelectedIndex());
         assertTrue(selected.isEmpty());
     }
@@ -373,7 +387,7 @@ class RangeSelectionWidgetTest {
         widget.centerOn(5);
 
         assertEquals(3, widget.firstVisibleIndex());
-        assertTrue(widget.mouseScrolled(50, 10, 1));
+        assertTrue(widget.mouseScrolled(50, 10, 0, 1));
         assertEquals(4, widget.getSelectedIndex());
         assertEquals(List.of(ranges.get(4)), selected);
     }
@@ -390,7 +404,7 @@ class RangeSelectionWidgetTest {
 
         widget.centerOn(5);
 
-        assertTrue(widget.mouseScrolled(50, 10, 1));
+        assertTrue(widget.mouseScrolled(50, 10, 0, 1));
         assertEquals(-54, widget.getScrollOffset());
         assertNull(widget.getSelected());
         assertTrue(selected.isEmpty());
@@ -422,15 +436,15 @@ class RangeSelectionWidgetTest {
         RangeSelectionWidget widget = widget(ranges(10), selected);
 
         widget.centerOn(9);
-        widget.onClick(widget.stripX() + widget.viewportWidth() - 1, 10);
-        widget.onRelease(widget.stripX() + widget.viewportWidth() - 1, 10);
+        widget.onClick(mouse(widget.stripX() + widget.viewportWidth() - 1, 10), false);
+        widget.onRelease(mouse(widget.stripX() + widget.viewportWidth() - 1, 10));
 
         assertEquals(9, widget.getSelectedIndex());
-        assertEquals(9, selected.get(0).index());
+        assertEquals(9, selected.getFirst().index());
 
         widget.centerOn(4);
-        widget.onClick(widget.stripX() + widget.viewportWidth() - 1, 10);
-        widget.onRelease(widget.stripX() + widget.viewportWidth() - 1, 10);
+        widget.onClick(mouse(widget.stripX() + widget.viewportWidth() - 1, 10), false);
+        widget.onRelease(mouse(widget.stripX() + widget.viewportWidth() - 1, 10));
 
         assertNotEquals(-1, widget.getSelectedIndex());
         assertEquals(2, selected.size());
@@ -462,12 +476,12 @@ class RangeSelectionWidgetTest {
 
         widget.centerOn(9);
         assertEquals(widget.minScrollOffset(), widget.getScrollOffset());
-        assertTrue(widget.mouseScrolled(50, 10, -1));
+        assertTrue(widget.mouseScrolled(50, 10, 0, -1));
         assertEquals(widget.minScrollOffset(), widget.getScrollOffset());
 
         widget.centerOn(0);
         assertEquals(0, widget.getScrollOffset());
-        assertTrue(widget.mouseScrolled(50, 10, 1));
+        assertTrue(widget.mouseScrolled(50, 10, 0, 1));
         assertEquals(0, widget.getScrollOffset());
     }
 
@@ -480,8 +494,8 @@ class RangeSelectionWidgetTest {
 
         RangeSelectionWidget widget = widget(ranges(10), new ArrayList<>());
 
-        assertFalse(widget.mouseScrolled(100, 10, 1));
-        assertFalse(widget.mouseScrolled(50, 20, 1));
+        assertFalse(widget.mouseScrolled(100, 10, 0, 1));
+        assertFalse(widget.mouseScrolled(50, 20, 0, 1));
     }
 
     /**
@@ -507,7 +521,8 @@ class RangeSelectionWidgetTest {
          * @param onSelect    callback invoked when a range is selected
          * @param controlDown whether the control key should be reported as pressed
          */
-        TestRangeSelectionWidget(int x, int y, int width, int height, Text label, List<MapLayerRange> ranges,
+        @SuppressWarnings("SameParameterValue")
+        TestRangeSelectionWidget(int x, int y, int width, int height, Component label, List<MapLayerRange> ranges,
                                  int itemWidth, java.util.function.Consumer<MapLayerRange> onSelect,
                                  boolean controlDown) {
 

@@ -29,10 +29,11 @@ import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.config.MapLayerSource;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -56,8 +57,8 @@ class MapSourceResponsePacketTest {
         assertTrue(parsed.warpsAvailable());
         assertFalse(parsed.ardaRegionsAvailable());
         assertEquals(1, parsed.dimensions().size());
-        assertEquals(layer(null), parsed.dimensions().get(0).getMapLayers().get(0));
-        assertNull(parsed.dimensions().get(0).getMapLayers().get(0).ranges());
+        assertEquals(layer(null), parsed.dimensions().getFirst().getMapLayers().getFirst());
+        assertNull(parsed.dimensions().getFirst().getMapLayers().getFirst().ranges());
     }
 
     /**
@@ -112,18 +113,19 @@ class MapSourceResponsePacketTest {
 
         assertFalse(parsed.warpsAvailable());
         assertTrue(parsed.ardaRegionsAvailable());
-        assertEquals(ranges, parsed.dimensions().get(0).getMapLayers().get(0).ranges());
-        assertNull(parsed.dimensions().get(0).getMapLayers().get(0).path());
-        assertEquals(layer(ranges), parsed.dimensions().get(0).getMapLayers().get(0));
+        assertEquals(ranges, parsed.dimensions().getFirst().getMapLayers().getFirst().ranges());
+        assertNull(parsed.dimensions().getFirst().getMapLayers().getFirst().path());
+        assertEquals(layer(ranges), parsed.dimensions().getFirst().getMapLayers().getFirst());
     }
 
     /**
-     * Unknown layer types from a newer server should not crash the client; only the unknown layer is skipped.
+     * Verifies that unknown layer types from a newer server are skipped without crashing the client.
      */
     @Test
     void read_unknownLayerType_skipsLayer() {
 
-        var buf = PacketByteBufs.create();
+        var buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
         buf.writeBoolean(false);
         buf.writeBoolean(false);
         buf.writeInt(1);
@@ -135,39 +137,7 @@ class MapSourceResponsePacketTest {
         MapSourceResponsePacket parsed = MapSourceResponsePacket.read(buf);
 
         assertEquals(1, parsed.dimensions().size());
-        assertTrue(parsed.dimensions().get(0).getMapLayers().isEmpty());
-    }
-
-    /**
-     * Negative collection sizes must be rejected before list allocation.
-     */
-    @Test
-    void read_negativeDimensionsCount_rejectsBeforeAllocation() {
-
-        var buf = PacketByteBufs.create();
-        buf.writeBoolean(false);
-        buf.writeBoolean(false);
-        buf.writeInt(-1);
-        buf.readerIndex(0);
-
-        assertThrows(IllegalArgumentException.class, () -> MapSourceResponsePacket.read(buf));
-    }
-
-    /**
-     * Absurd collection sizes must be rejected before list allocation.
-     */
-    @Test
-    void read_oversizedLayersCount_rejectsBeforeAllocation() {
-
-        var buf = PacketByteBufs.create();
-        buf.writeBoolean(false);
-        buf.writeBoolean(false);
-        buf.writeInt(1);
-        writeDimensionHeader(buf);
-        buf.writeInt(129);
-        buf.readerIndex(0);
-
-        assertThrows(IllegalArgumentException.class, () -> MapSourceResponsePacket.read(buf));
+        assertTrue(parsed.dimensions().getFirst().getMapLayers().isEmpty());
     }
 
     /**
@@ -175,11 +145,11 @@ class MapSourceResponsePacketTest {
      *
      * @param buf The packet buffer to write to.
      */
-    private static void writeDimensionHeader(net.minecraft.network.PacketByteBuf buf) {
+    private static void writeDimensionHeader(net.minecraft.network.FriendlyByteBuf buf) {
 
         buf.writeFloat(1f);
-        buf.writeString("Test");
-        buf.writeString("test:dimension");
+        buf.writeUtf("Test");
+        buf.writeUtf("test:dimension");
         buf.writeBoolean(false);
         buf.writeInt(0);
         buf.writeInt(1000);
@@ -196,10 +166,10 @@ class MapSourceResponsePacketTest {
      * @param typeName Serialized layer type.
      */
     @SuppressWarnings("SameParameterValue")
-    private static void writeLayer(net.minecraft.network.PacketByteBuf buf, String name, String typeName) {
+    private static void writeLayer(net.minecraft.network.FriendlyByteBuf buf, String name, String typeName) {
 
-        buf.writeString(name);
-        buf.writeString(typeName);
+        buf.writeUtf(name);
+        buf.writeUtf(typeName);
         buf.writeBoolean(true);
         buf.writeInt(8);
         buf.writeDouble(7d);
@@ -211,8 +181,42 @@ class MapSourceResponsePacketTest {
         buf.writeInt(512);
         buf.writeDouble(1.25);
         buf.writeBoolean(true);
-        buf.writeString("fallback.pmtiles");
-        buf.writeString("fallback.png");
+        buf.writeUtf("fallback.pmtiles");
+        buf.writeUtf("fallback.png");
         buf.writeInt(0);
+    }
+
+    /**
+     * Verifies that negative collection sizes are rejected before list allocation.
+     */
+    @Test
+    void read_negativeDimensionsCount_rejectsBeforeAllocation() {
+
+        var buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
+        buf.writeBoolean(false);
+        buf.writeBoolean(false);
+        buf.writeInt(-1);
+        buf.readerIndex(0);
+
+        assertThrows(IllegalArgumentException.class, () -> MapSourceResponsePacket.read(buf));
+    }
+
+    /**
+     * Verifies that absurdly sized collections are rejected before list allocation.
+     */
+    @Test
+    void read_oversizedLayersCount_rejectsBeforeAllocation() {
+
+        var buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
+        buf.writeBoolean(false);
+        buf.writeBoolean(false);
+        buf.writeInt(1);
+        writeDimensionHeader(buf);
+        buf.writeInt(129);
+        buf.readerIndex(0);
+
+        assertThrows(IllegalArgumentException.class, () -> MapSourceResponsePacket.read(buf));
     }
 }

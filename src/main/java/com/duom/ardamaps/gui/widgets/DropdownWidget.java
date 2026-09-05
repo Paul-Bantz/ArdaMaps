@@ -29,14 +29,16 @@ import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
 import lombok.Getter;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,7 +53,7 @@ import java.util.function.Function;
  * @param <T> The type of items stored in the dropdown
  * @param <E> The type of display pair (must extend {@link TextIdentifierPairItem})
  */
-public class DropdownWidget<T, E extends TextIdentifierPairItem> extends ClickableWidget {
+public class DropdownWidget<T, E extends TextIdentifierPairItem> extends AbstractWidget {
 
     /** Margin around text inside the dropdown items */
     protected static final int TEXT_MARGIN = 4;
@@ -63,7 +65,7 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     protected final int maxVisibleOptions;
 
     /** Text to display when no item is selected */
-    protected final Text placeholderText;
+    protected final Component placeholderText;
 
     /** Icon to display when no item is selected */
     protected final Identifier placeholderIcon;
@@ -141,8 +143,8 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
             int y,
             int width,
             int height,
-            Text title,
-            Text nullValueText,
+            Component title,
+            Component nullValueText,
             Identifier placeholderIcon,
             List<T> options,
             Function<T, E> optionDisplay,
@@ -179,6 +181,11 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
         this.iconSize = (int) (originalHeight * .5f);
     }
 
+    /**
+     * Sets the width of this widget
+     *
+     * @param width the width to set
+     */
     @Override
     public void setWidth(int width) {
 
@@ -186,23 +193,24 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
         originalWidth = width;
     }
 
+    /**
+     * Renders the dropdown widget
+     *
+     * @param context the draw context
+     * @param mouseX  the mouse x position
+     * @param mouseY  the mouse y position
+     * @param delta   the delta elapsed since the last tick
+     */
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void extractWidgetRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
-        super.render(context, mouseX, mouseY, delta);
+        renderMainButton(context, mouseX, mouseY);
 
         renderTitle(context);
         List<T> allItems = computeItemList();
 
         if (expanded) {
-
-            MatrixStack matrices = context.getMatrices();
-            matrices.push();
-            matrices.translate(0, 0, 200);
-
             renderExpandedDropdown(context, allItems, mouseX, mouseY);
-
-            matrices.pop();
         }
     }
 
@@ -211,15 +219,16 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
      *
      * @param context The drawing context
      */
-    private void renderTitle(DrawContext context) {
+    @SuppressWarnings("ConstantValue")
+    private void renderTitle(GuiGraphicsExtractor context) {
 
-        Text title = getMessage();
+        Component title = getMessage();
 
         if (title != null) {
 
-            TextRenderer textRenderer = Client.mc().textRenderer;
-            int titleY = getY() - (textRenderer.fontHeight / 2) - 8;
-            context.drawTextWithShadow(textRenderer, title, getX(), titleY, ModConstants.COLOR_WHITE);
+            Font textRenderer = Client.mc().font;
+            int titleY = getY() - (textRenderer.lineHeight / 2) - 8;
+            context.text(textRenderer, title, getX(), titleY, ModConstants.COLOR_WHITE);
         }
     }
 
@@ -231,15 +240,12 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
      * @param mouseX  Current mouse X position
      * @param mouseY  Current mouse Y position
      */
-    protected void renderExpandedDropdown(DrawContext context, List<T> items, int mouseX, int mouseY) {
+    protected void renderExpandedDropdown(GuiGraphicsExtractor context, List<T> items, int mouseX, int mouseY) {
 
         var dropDownItems = computeDropdownItems(items);
         int visibleCount = getVisibleDropdownItemCount(dropDownItems);
 
         if (visibleCount <= 0) return;
-
-        // Dynamically adjust height based on visible items when expanded
-        this.height = originalHeight + visibleCount * originalHeight;
 
         for (int i = 0; i < visibleCount; i++) {
 
@@ -328,20 +334,15 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     }
 
     /**
-     * Gets the top Y coordinate of the dropdown list.
+     * Renders the main dropdown button
      *
-     * @param totalItems Total number of items in the dropdown
-     * @return Top Y coordinate
+     * @param context the draw context
+     * @param mouseX  the mouse x position
+     * @param mouseY  the mouse y position
      */
-    public int getDropDownTopY(int totalItems) {
-        int visibleCount = Math.min(totalItems, maxVisibleOptions);
-        return getDropdownListTopY(visibleCount);
-    }
+    protected void renderMainButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
-    @Override
-    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {
-
-        TextRenderer textRenderer = Client.mc().textRenderer;
+        Font textRenderer = Client.mc().font;
         int x = getX();
         int y = getY();
 
@@ -367,9 +368,9 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
      * @param isHovered  Whether the mouse is hovering over this item
      * @param isSelected whether this item is selected
      */
-    private void renderDropdownItem(DrawContext context, int x, int y, T item, boolean isHovered, boolean isSelected) {
+    private void renderDropdownItem(GuiGraphicsExtractor context, int x, int y, T item, boolean isHovered, boolean isSelected) {
 
-        TextRenderer textRenderer = Client.mc().textRenderer;
+        Font textRenderer = Client.mc().font;
 
         E itemPair = optionDisplay.apply(item);
 
@@ -384,9 +385,9 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
             if (icon != null) {
 
                 if (displayAsSprite)
-                    context.drawSprite(x + buttonPadding, y + (originalHeight - iconSize) / 2, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(icon));
+                    context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), x + buttonPadding, y + (originalHeight - iconSize) / 2, iconSize, iconSize);
                 else
-                    context.drawTexture(icon, x + buttonPadding, y + (originalHeight - iconSize) / 2, 0, 0, iconSize, iconSize, iconSize, iconSize);
+                    context.blit(RenderPipelines.GUI_TEXTURED, icon, x + buttonPadding, y + (originalHeight - iconSize) / 2, 0, 0, iconSize, iconSize, iconSize, iconSize);
 
                 hasIcon = true;
             }
@@ -394,14 +395,14 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
 
         if (displayLabels) {
 
-            Text display = (item == null) ? placeholderText : itemPair.text();
+            Component display = (item == null) ? placeholderText : itemPair.text();
             int textX = x + TEXT_MARGIN;
 
             if (hasIcon)
                 textX += iconSize + TEXT_MARGIN;
 
-            int textY = y + (originalHeight - textRenderer.fontHeight) / 2;
-            context.drawText(textRenderer, display, textX, textY, getLabelColor(), false);
+            int textY = y + (originalHeight - textRenderer.lineHeight) / 2;
+            context.text(textRenderer, display, textX, textY, getLabelColor(), false);
         }
     }
 
@@ -413,32 +414,33 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
      * @param x            Button X position
      * @param y            Button Y position
      */
-    private void renderExpandArrow(DrawContext context, TextRenderer textRenderer, int x, int y) {
+    private void renderExpandArrow(GuiGraphicsExtractor context, Font textRenderer, int x, int y) {
         boolean isUpDirection = expandDirection == ExpandDirection.UP_LEFT ||
                 expandDirection == ExpandDirection.UP_RIGHT;
         String arrow = expanded
                 ? (isUpDirection ? "▼" : "▲")
                 : (isUpDirection ? "▲" : "▼");
 
-        int arrowX = x + originalWidth - textRenderer.getWidth(arrow) - 4;
-        int arrowY = y + (originalHeight - textRenderer.fontHeight) / 2;
-        context.drawTextWithShadow(textRenderer, Text.literal(arrow), arrowX, arrowY, ModConstants.COLOR_WHITE);
+        int arrowX = x + originalWidth - textRenderer.width(arrow) - 4;
+        int arrowY = y + (originalHeight - textRenderer.lineHeight) / 2;
+        context.text(textRenderer, Component.literal(arrow), arrowX, arrowY, ModConstants.COLOR_WHITE);
     }
 
-    protected void drawListSlice(DrawContext context, int x, int y, boolean isHovered, boolean isSelected) {
+    /**
+     * Draws the given dropdown list item
+     *
+     * @param context    the draw context
+     * @param x          the button x coordinates
+     * @param y          the button y coordinates
+     * @param isHovered  whether the button is hovered
+     * @param isSelected whether the button is selected
+     */
+    protected void drawListSlice(GuiGraphicsExtractor context, int x, int y, boolean isHovered, boolean isSelected) {
 
-        int v = 46;
-
-        if (isHovered) v += 40;
-        else if (isSelected) v += 20;
-
-        context.drawNineSlicedTexture(WIDGETS_TEXTURE, x, y,
-                originalWidth, originalHeight,
-                20,
-                4,
-                200,
-                20,
-                0, v);
+        Identifier sprite = (isHovered || isSelected)
+                ? Identifier.withDefaultNamespace("widget/button_highlighted")
+                : Identifier.withDefaultNamespace("widget/button");
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x, y, originalWidth, originalHeight);
     }
 
     /**
@@ -452,14 +454,16 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY) {
+    public void onClick(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
         if (!expanded) {
             expand();
         } else {
             selectItemAtMousePosition(mouseX, mouseY);
             collapse();
         }
-        super.onClick(mouseX, mouseY);
+        super.onClick(event, doubleClick);
     }
 
     /**
@@ -474,9 +478,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
 
         expanded = true;
         scrollbar.resetOffset();
-
-        int visibleCount = getVisibleDropdownItemCount(dropdownItems);
-        this.height = originalHeight + visibleCount * originalHeight;
     }
 
     /**
@@ -502,27 +503,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
                 }
             }
         }
-    }
-
-    /**
-     * Overrides the default click behaviour to toggle dropdown expansion and handle item selection.
-     *
-     * @param mouseX The x-coordinate of the mouse click event
-     * @param mouseY The y-coordinate of the mouse click event
-     * @return true if the click was handled, false otherwise
-     */
-    @Override
-    protected boolean clicked(double mouseX, double mouseY) {
-        if (!this.active || !this.visible) {
-            return false;
-        }
-
-        boolean mouseOver = isMouseOver(mouseX, mouseY);
-        if (!mouseOver && expanded) {
-            collapse();
-        }
-
-        return mouseOver;
     }
 
     /**
@@ -561,7 +541,39 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
      */
     private void collapse() {
         expanded = false;
-        height = originalHeight;
+    }
+
+    /**
+     * Appends narration messages for accessibility, including the default narrations for the dropdown widget.
+     *
+     * @param builder The narration message builder to which narration messages should be appended
+     */
+    @Override
+    protected void updateWidgetNarration(@NonNull NarrationElementOutput builder) {
+        defaultButtonNarrationText(builder);
+    }
+
+    /**
+     * Overrides the default mouse scroll behaviour to allow scrolling through dropdown options when expanded.
+     *
+     * @param mouseX           The x-coordinate of the mouse cursor
+     * @param mouseY           The y-coordinate of the mouse cursor
+     * @param horizontalAmount The amount of horizontal scroll (positive for scroll up, negative for scroll down)
+     * @param verticalAmount   The amount of vertical scroll (positive for scroll up, negative for scroll down)
+     * @return true if the scroll event was handled (i.e., if the dropdown is expanded and has more items than visible), false otherwise
+     */
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (expanded) {
+            List<T> dropdownItems = computeDropdownItems(computeItemList());
+            int visibleCount = getVisibleDropdownItemCount(dropdownItems);
+
+            if (dropdownItems.size() > visibleCount) {
+                scrollbar.setMaxOffset(dropdownItems.size() - visibleCount);
+                return scrollbar.scroll(verticalAmount);
+            }
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     /**
@@ -622,38 +634,6 @@ public class DropdownWidget<T, E extends TextIdentifierPairItem> extends Clickab
     protected int getVisibleDropdownItemCount(List<T> dropdownItems) {
 
         return Math.min(dropdownItems.size(), Math.max(0, maxVisibleOptions));
-    }
-
-    /**
-     * Appends narration messages for accessibility, including the default narrations for the dropdown widget.
-     *
-     * @param builder The narration message builder to which narration messages should be appended
-     */
-    @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {
-        appendDefaultNarrations(builder);
-    }
-
-    /**
-     * Overrides the default mouse scroll behaviour to allow scrolling through dropdown options when expanded.
-     *
-     * @param mouseX The x-coordinate of the mouse cursor
-     * @param mouseY The y-coordinate of the mouse cursor
-     * @param amount The amount of scroll (positive for scroll up, negative for scroll down)
-     * @return true if the scroll event was handled (i.e., if the dropdown is expanded and has more items than visible), false otherwise
-     */
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
-        if (expanded) {
-            List<T> dropdownItems = computeDropdownItems(computeItemList());
-            int visibleCount = getVisibleDropdownItemCount(dropdownItems);
-
-            if (dropdownItems.size() > visibleCount) {
-                scrollbar.setMaxOffset(dropdownItems.size() - visibleCount);
-                return scrollbar.scroll(amount);
-            }
-        }
-        return super.mouseScrolled(mouseX, mouseY, amount);
     }
 
     /**

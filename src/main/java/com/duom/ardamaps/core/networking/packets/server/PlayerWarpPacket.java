@@ -26,8 +26,13 @@
 package com.duom.ardamaps.core.networking.packets.server;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Packet sent by the server to warp the player to a specific location
@@ -36,14 +41,18 @@ import net.minecraft.network.PacketByteBuf;
  */
 public record PlayerWarpPacket(String warpName) implements IPacket {
 
+    public static final CustomPacketPayload.Type<PlayerWarpPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_warp"));
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, PlayerWarpPacket> CODEC = IPacket.codec(PlayerWarpPacket::read);
+
     /**
-     * Reads a PlayerWarpRequest from the given PacketByteBuf.
+     * Reads a PlayerWarpPacket from the given PacketByteBuf.
      *
      * @param buf The PacketByteBuf to read from.
-     * @return A new PlayerWarpRequest instance.
+     * @return A new PlayerWarpPacket instance.
      */
-    public static PlayerWarpPacket read(PacketByteBuf buf) {
-        return new PlayerWarpPacket(buf.readString());
+    public static PlayerWarpPacket read(FriendlyByteBuf buf) {
+        return new PlayerWarpPacket(buf.readUtf());
     }
 
     /**
@@ -52,9 +61,14 @@ public record PlayerWarpPacket(String warpName) implements IPacket {
      * @return The PacketByteBuf containing the packet data.
      */
     @Override
-    public PacketByteBuf build() {
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeString(warpName);
+    public FriendlyByteBuf build() {
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
+        buf.writeUtf(warpName);
         return buf;
+    }
+
+    @Override
+    public CustomPacketPayload.@NonNull Type<PlayerWarpPacket> type() {
+        return TYPE;
     }
 }

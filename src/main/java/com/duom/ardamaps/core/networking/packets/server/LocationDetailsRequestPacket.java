@@ -26,22 +26,80 @@
 package com.duom.ardamaps.core.networking.packets.server;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 
-public record LocationDetailsRequestPacket(String locationIdentifier) implements IPacket {
+import java.util.UUID;
+
+/**
+ * A packet sent from the client to the server requesting details about a specific location.
+ *
+ * @param requestId          The unique request identifier for tracking the response.
+ * @param locationIdentifier The identifier of the location to request details for.
+ */
+public record LocationDetailsRequestPacket(UUID requestId,
+                                           String locationIdentifier) implements IRespondablePacket<LocationDetailsRequestPacket> {
+
+    public static final CustomPacketPayload.Type<LocationDetailsRequestPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_details_request"));
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, LocationDetailsRequestPacket> CODEC = IPacket.codec(LocationDetailsRequestPacket::read);
+
+    /**
+     * Constructs a LocationDetailsRequestPacket with the given location identifier.
+     *
+     * @param locationIdentifier The identifier of the location to request details for.
+     */
+    public LocationDetailsRequestPacket(String locationIdentifier) {
+        this(new UUID(0L, 0L), locationIdentifier);
+    }
+
+    /**
+     * Reads a LocationDetailsRequestPacket from the given PacketByteBuf.
+     *
+     * @param buf The PacketByteBuf to read from.
+     * @return A new LocationDetailsRequestPacket instance.
+     */
+    public static LocationDetailsRequestPacket read(FriendlyByteBuf buf) {
+
+        var requestId = buf.readUUID();
+        var location = buf.readUtf();
+
+        return new LocationDetailsRequestPacket(requestId, location);
+    }
+
+    /**
+     * Serializes this packet into a PacketByteBuf for transmission over the network.
+     *
+     * @return A new PacketByteBuf containing the serialized packet data.
+     */
     @Override
-    public PacketByteBuf build() {
+    public FriendlyByteBuf build() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeString(locationIdentifier);
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
+        buf.writeUUID(requestId);
+        buf.writeUtf(locationIdentifier);
         return buf;
     }
 
-    public static LocationDetailsRequestPacket read(PacketByteBuf buf) {
+    /**
+     * Creates a new LocationDetailsRequestPacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this request.
+     * @return A new LocationDetailsRequestPacket with the updated request identifier.
+     */
+    @Override
+    public LocationDetailsRequestPacket withRequestId(UUID requestId) {
+        return new LocationDetailsRequestPacket(requestId, locationIdentifier);
+    }
 
-        var location = buf.readString();
-
-        return new LocationDetailsRequestPacket(location);
+    @Override
+    public CustomPacketPayload.@NonNull Type<LocationDetailsRequestPacket> type() {
+        return TYPE;
     }
 }

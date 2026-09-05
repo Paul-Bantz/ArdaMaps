@@ -25,38 +25,39 @@
 
 package com.duom.ardamaps.core.data;
 
+import org.jspecify.annotations.NonNull;
+
 import java.io.Serializable;
-import java.util.Objects;
 
 /**
  * Pure 3D vector used by config, API and location DTOs.
+ *
+ * @param x X coordinate.
+ * @param y Y coordinate.
+ * @param z Z coordinate.
  */
-public final class Vec3d implements Serializable {
+public record Vec3d(double x, double y, double z) implements Serializable {
 
-    /** Zero vector. */
+    /** Zero vector constant. */
     public static final Vec3d ZERO = new Vec3d(0, 0, 0);
 
-    /** X coordinate. */
-    public final double x;
-
-    /** Y coordinate. */
-    public final double y;
-
-    /** Z coordinate. */
-    public final double z;
-
-    public Vec3d(double x, double y, double z) {
-
-        this.x = x;
-        this.y = y;
-        this.z = z;
-    }
-
+    /**
+     * Calculates the Euclidean distance to another vector.
+     *
+     * @param other The other vector.
+     * @return The distance between this vector and the other.
+     */
     public double distanceTo(Vec3d other) {
 
         return Math.sqrt(squaredDistanceTo(other));
     }
 
+    /**
+     * Calculates the squared Euclidean distance to another vector.
+     *
+     * @param other The other vector.
+     * @return The squared distance between this vector and the other.
+     */
     public double squaredDistanceTo(Vec3d other) {
 
         double dx = other.x - x;
@@ -65,24 +66,29 @@ public final class Vec3d implements Serializable {
         return dx * dx + dy * dy + dz * dz;
     }
 
+    /**
+     * Compares this vector to another object for equality based on coordinates.
+     *
+     * @param obj The object to compare to.
+     * @return True if the object is a Vec3d with equal coordinates.
+     */
     @Override
     public boolean equals(Object obj) {
 
         if (this == obj) return true;
-        if (!(obj instanceof Vec3d vec3d)) return false;
-        return Double.compare(x, vec3d.x) == 0
-                && Double.compare(y, vec3d.y) == 0
-                && Double.compare(z, vec3d.z) == 0;
+        if (!(obj instanceof Vec3d(double x1, double y1, double z1))) return false;
+        return Double.compare(x, x1) == 0
+                && Double.compare(y, y1) == 0
+                && Double.compare(z, z1) == 0;
     }
 
+    /**
+     * Returns a string representation of this vector in the format "(x, y, z)" with 3 decimal places.
+     *
+     * @return A formatted string representation of this vector.
+     */
     @Override
-    public int hashCode() {
-
-        return Objects.hash(x, y, z);
-    }
-
-    @Override
-    public String toString() {
+    public @NonNull String toString() {
 
         return String.format("(%8.3f, %8.3f, %8.3f)", x, y, z);
     }

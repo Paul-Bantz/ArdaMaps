@@ -32,9 +32,13 @@ import org.jetbrains.annotations.NotNull;
  */
 public enum ImageFileType {
 
+    /** WebP image format. */
     WEBP,
+
+    /** PNG image format. */
     PNG,
-    JPG,
+
+    /** JPEG image format. */
     JPEG;
 
     /**

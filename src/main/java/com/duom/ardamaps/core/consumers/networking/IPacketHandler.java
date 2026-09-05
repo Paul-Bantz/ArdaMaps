@@ -25,15 +25,30 @@
 
 package com.duom.ardamaps.core.consumers.networking;
 
-import net.minecraft.util.Identifier;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /**
  * Interface for handling network packets.
  * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
 public interface IPacketHandler {
+
     /**
      * Get the channel ID for this packet handler.
      */
+    @SuppressWarnings("unused")
     Identifier getChannelId();
+
+    /**
+     * @return The Fabric payload type handled by this handler.
+     */
+    CustomPacketPayload.Type<? extends IPacket> getType();
+
+    /**
+     * @return The codec registered for this payload type.
+     */
+    StreamCodec<RegistryFriendlyByteBuf, ? extends IPacket> getCodec();
 }

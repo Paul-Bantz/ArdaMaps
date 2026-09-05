@@ -26,11 +26,13 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -81,8 +83,8 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
             int y,
             int width,
             int height,
-            Text title,
-            Text nullValueText,
+            Component title,
+            Component nullValueText,
             Identifier placeholderIcon,
             List<T> options,
             Function<T, E> optionDisplay,
@@ -119,10 +121,9 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
      * @param context The DrawContext used for rendering the button.
      * @param mouseX  The current x-coordinate of the mouse cursor, used for hover detection.
      * @param mouseY  The current y-coordinate of the mouse cursor, used for hover detection.
-     * @param delta   The time delta since the last render call, which can be used for animations or other time-based effects.
      */
     @Override
-    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void renderMainButton(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         int x = getX();
         int y = getY();
@@ -145,7 +146,7 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
      * @param y       The y-coordinate where the square image button should be rendered.
      * @param hovered Whether the square image button is being hovered by the mouse cursor, which can be used to apply hover effects to the button's appearance.
      */
-    private void drawSquareImageButton(DrawContext context, int x, int y, boolean hovered) {
+    private void drawSquareImageButton(GuiGraphicsExtractor context, int x, int y, boolean hovered) {
 
         E itemPair = optionDisplay.apply(selected);
         var icon = (selected == null) ? placeholderIcon : itemPair.image();
@@ -154,20 +155,12 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
         if (icon == null) return;
 
         if (displayAsSprite)
-            context.drawSprite(x, y, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(icon));
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), x, y, iconSize, iconSize);
         else
-            context.drawTexture(icon, x, y, 0, 0, iconSize, iconSize, iconSize, iconSize);
+            context.blit(RenderPipelines.GUI_TEXTURED, icon, x, y, 0, 0, iconSize, iconSize, iconSize, iconSize);
 
-        var u = 288f;
-
-        if (hovered) u += 96;
-
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
-                x - 1, y,
-                buttonSize, buttonSize,
-                u, 224f,
-                96, 96,
-                512, 512);
+        var sprite = hovered ? ModConstants.SQUARE_BUTTON_HIGHLIGHT_SPRITE : ModConstants.SQUARE_BUTTON_SPRITE;
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x - 1, y, buttonSize, buttonSize);
     }
 
     /**
@@ -179,25 +172,15 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
      * @param y       The y-coordinate where the base button should be rendered.
      * @param hovered Whether the base button is being hovered by the mouse cursor, which can be used to apply hover effects to the button's appearance.
      */
-    private void drawBaseButton(DrawContext context, int x, int y, boolean hovered) {
+    private void drawBaseButton(GuiGraphicsExtractor context, int x, int y, boolean hovered) {
 
-        var u = 16;
-        var v = hovered ? 16 * 3 : 16;
-        var textRenderer = Client.mc().textRenderer;
+        var textRenderer = Client.mc().font;
 
         E itemPair = optionDisplay.apply(selected);
-        Text label = (selected == null) ? placeholderText : itemPair.text();
+        Component label = (selected == null) ? placeholderText : itemPair.text();
 
-        context.drawNineSlicedTexture(ModConstants.MAP_GUI_ELEMENTS,
-                x, y,
-                width, originalHeight,
-                12, // Left slice width
-                9,              // Top slice height
-                12,             // Right slice width
-                9,              // Bottom slice height
-                128,            // Centre slice width
-                32,             // Center slice height
-                u, v);
+        var sprite = hovered ? ModConstants.MAP_BUTTON_HOVERED_SPRITE : ModConstants.MAP_BUTTON_SPRITE;
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x, y, width, originalHeight);
 
         if (displayIcons) {
 
@@ -210,25 +193,25 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
             if (icon != null) {
 
                 if (displayLabels && label != null)
-                    iconX = x + (width - textRenderer.getWidth(label) - (iconSize / 2) - LABEL_MARGIN) / 2;
+                    iconX = x + (width - textRenderer.width(label) - (iconSize / 2) - LABEL_MARGIN) / 2;
 
                 if (displayAsSprite)
-                    context.drawSprite(iconX, iconY, 0, iconSize, iconSize, IconSpriteAtlas.retrieveSprite(icon));
+                    context.blitSprite(RenderPipelines.GUI_TEXTURED, IconSpriteAtlas.retrieveSprite(icon), iconX, iconY, iconSize, iconSize);
                 else
-                    context.drawTexture(icon, iconX, iconY, 0, 0, iconSize, iconSize, iconSize, iconSize);
+                    context.blit(RenderPipelines.GUI_TEXTURED, icon, iconX, iconY, 0, 0, iconSize, iconSize, iconSize, iconSize);
             }
         }
 
-        if (displayLabels) {
+        if (displayLabels && label != null) {
 
-            int textX = x + (getWidth() - textRenderer.getWidth(label)) / 2;
+            int textX = x + (getWidth() - textRenderer.width(label)) / 2;
 
             if (displayIcons)
-                textX = (x + (width - textRenderer.getWidth(label) - iconSize - LABEL_MARGIN) / 2) + iconSize + LABEL_MARGIN;
+                textX = (x + (width - textRenderer.width(label) - iconSize - LABEL_MARGIN) / 2) + iconSize + LABEL_MARGIN;
 
-            int textY = y + (originalHeight / 2 - Client.mc().textRenderer.fontHeight / 2);
+            int textY = y + (originalHeight / 2 - Client.mc().font.lineHeight / 2);
 
-            context.drawText(Client.mc().textRenderer, label, textX, textY, ModConstants.COLOR_DARK_BROWN, false);
+            context.text(Client.mc().font, label, textX, textY, ModConstants.COLOR_DARK_BROWN, false);
         }
     }
 
@@ -242,7 +225,7 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
      * @param mouseY  The current y-coordinate of the mouse cursor, used for hover detection on the dropdown options.
      */
     @Override
-    protected void renderExpandedDropdown(DrawContext context, List<T> items, int mouseX, int mouseY) {
+    protected void renderExpandedDropdown(GuiGraphicsExtractor context, List<T> items, int mouseX, int mouseY) {
 
         var dropdownItems = computeDropdownItems(items);
         var visibleCount = getVisibleDropdownItemCount(dropdownItems);
@@ -257,17 +240,11 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
             for (int idx = 0; idx < visibleCount; idx++) {
 
                 var y = getDropdownItemY(idx, visibleCount);
+                var sprite = isMouseOverItem(mouseX, mouseY, y)
+                        ? ModConstants.SQUARE_BUTTON_HIGHLIGHT_SPRITE
+                        : ModConstants.SQUARE_BUTTON_SPRITE;
 
-                var u = 288f;
-
-                if (isMouseOverItem(mouseX, mouseY, y)) u += 96;
-
-                context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
-                        getX() - 1, y,
-                        buttonSize, buttonSize,
-                        u, 224f,
-                        96, 96,
-                        512, 512);
+                context.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, getX() - 1, y, buttonSize, buttonSize);
             }
 
         } else {
@@ -275,16 +252,12 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
             var y = getDropdownListTopY(visibleCount);
 
             if (visibleCount > 0) {
-                context.drawNineSlicedTexture(ModConstants.MAP_GUI_ELEMENTS,
-                        getX(), y,
-                        width, computedHeight,
-                        16,
-                        16,
-                        16,
-                        16,
-                        64,
-                        64,
-                        16, 176);
+                GuiTextures.blitNineSliced(context, ModConstants.MAP_FRAME_TEXTURE,
+                        getX(), y, width, computedHeight,
+                        16, 16,
+                        64, 64,
+                        16, 176,
+                        ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
             }
 
             super.renderExpandedDropdown(context, items, mouseX, mouseY);
@@ -303,7 +276,7 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
      * @param isSelected Whether the current list slice represents the selected option, which can be used to apply selection effects.
      */
     @Override
-    protected void drawListSlice(DrawContext context, int x, int y, boolean isHovered, boolean isSelected) {
+    protected void drawListSlice(GuiGraphicsExtractor context, int x, int y, boolean isHovered, boolean isSelected) {
 
         if (isSquareIconButton) return;
 
@@ -319,16 +292,12 @@ public class MapDropdownWidget<T, E extends TextIdentifierPairItem> extends Drop
             if (y == listTop) topSliceHeight = 16;
             if (y == listBottom) bottomSliceHeight = 16;
 
-            context.drawNineSlicedTexture(ModConstants.MAP_GUI_ELEMENTS,
-                    x, y,
-                    width, originalHeight,
-                    16,
-                    topSliceHeight,
-                    16,
-                    bottomSliceHeight,
-                    64,
-                    64,
-                    80, 176);
+            GuiTextures.blitNineSliced(context, ModConstants.MAP_FRAME_TEXTURE,
+                    x, y, width, originalHeight,
+                    16, topSliceHeight, 16, bottomSliceHeight,
+                    64, 64,
+                    80, 176,
+                    ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
         }
     }
 

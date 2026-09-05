@@ -45,6 +45,23 @@ class WaypointTest {
         assertEquals("ardamaps:icons/custom_waypoint", waypoint.get().icon());
     }
 
+    private String jsonWithIcon(String icon) {
+
+        return """
+                {
+                  "x": 10,
+                  "z": 20,
+                  "text": "Target",
+                  "r": 1.0,
+                  "g": 0.5,
+                  "b": 0.0,
+                  "identifier": "test",
+                  "dimension": "minecraft:overworld",
+                  "icon": "%s"
+                }
+                """.formatted(icon);
+    }
+
     @Test
     void fromJson_qualifiedIconPath_isUnchanged() {
 
@@ -74,22 +91,5 @@ class WaypointTest {
 
         assertTrue(waypoint.isPresent());
         assertEquals(ModConstants.ICON_WAYPOINT.toString(), waypoint.get().icon());
-    }
-
-    private String jsonWithIcon(String icon) {
-
-        return """
-                {
-                  "x": 10,
-                  "z": 20,
-                  "text": "Target",
-                  "r": 1.0,
-                  "g": 0.5,
-                  "b": 0.0,
-                  "identifier": "test",
-                  "dimension": "minecraft:overworld",
-                  "icon": "%s"
-                }
-                """.formatted(icon);
     }
 }

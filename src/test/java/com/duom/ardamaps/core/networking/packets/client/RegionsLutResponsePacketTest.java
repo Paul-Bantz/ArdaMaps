@@ -27,11 +27,12 @@ package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.data.map.Region;
 import com.duom.ardamaps.core.data.map.RegionLookupTexture;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
+import net.minecraft.network.FriendlyByteBuf;
 import org.junit.jupiter.api.Test;
 
 import java.util.Date;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -47,8 +48,8 @@ class RegionsLutResponsePacketTest {
     void buildRead_roundTripsRegionLookupTextureAsJson() {
 
         RegionLookupTexture texture = new RegionLookupTexture(
-                new byte[] {0, 1, 2, 1},
-                new Region[] {new Region("r1", "Rohan"), new Region("r2", "Gondor")},
+                new byte[]{0, 1, 2, 1},
+                new Region[]{new Region("r1", "Rohan"), new Region("r2", "Gondor")},
                 2,
                 2,
                 "minecraft:overworld",
@@ -66,32 +67,6 @@ class RegionsLutResponsePacketTest {
     }
 
     /**
-     * Negative lengths must be rejected before byte-array allocation.
-     */
-    @Test
-    void read_negativeDataLength_rejectsBeforeAllocation() {
-
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeInt(-1);
-        buf.readerIndex(0);
-
-        assertThrows(IllegalArgumentException.class, () -> RegionsLutResponsePacket.read(buf));
-    }
-
-    /**
-     * Oversized lengths must be rejected before byte-array allocation.
-     */
-    @Test
-    void read_oversizedDataLength_rejectsBeforeAllocation() {
-
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeInt(8 * 1024 * 1024 + 1);
-        buf.readerIndex(0);
-
-        assertThrows(IllegalArgumentException.class, () -> RegionsLutResponsePacket.read(buf));
-    }
-
-    /**
      * Serializes and deserializes a packet through its binary buffer representation.
      *
      * @param packet The packet to round-trip.
@@ -102,5 +77,33 @@ class RegionsLutResponsePacketTest {
         var buf = packet.build();
         buf.readerIndex(0);
         return RegionsLutResponsePacket.read(buf);
+    }
+
+    /**
+     * Verifies that negative lengths are rejected before byte-array allocation.
+     */
+    @Test
+    void read_negativeDataLength_rejectsBeforeAllocation() {
+
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
+        buf.writeInt(-1);
+        buf.readerIndex(0);
+
+        assertThrows(IllegalArgumentException.class, () -> RegionsLutResponsePacket.read(buf));
+    }
+
+    /**
+     * Verifies that oversized lengths are rejected before byte-array allocation.
+     */
+    @Test
+    void read_oversizedDataLength_rejectsBeforeAllocation() {
+
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
+        buf.writeInt(8 * 1024 * 1024 + 1);
+        buf.readerIndex(0);
+
+        assertThrows(IllegalArgumentException.class, () -> RegionsLutResponsePacket.read(buf));
     }
 }

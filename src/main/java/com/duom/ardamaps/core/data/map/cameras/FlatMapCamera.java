@@ -141,7 +141,7 @@ public class FlatMapCamera extends MapCamera {
      * @return World coordinates as Vec2d
      */
     @Override
-    public Vec2d screenToWorldCoordinates(double screenX, double screenY, int screenW, int screenH, double zoom){
+    public Vec2d screenToWorldCoordinates(double screenX, double screenY, int screenW, int screenH, double zoom) {
 
         return new Vec2d(
                 worldX + (screenX - screenW / 2.0) / scale(zoom) * getBlocksPerPixel(),

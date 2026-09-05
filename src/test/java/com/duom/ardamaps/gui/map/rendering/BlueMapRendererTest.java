@@ -29,79 +29,75 @@ import com.duom.ardamaps.core.data.map.cameras.BlueMapCamera;
 import com.duom.ardamaps.core.data.map.providers.BlueMapTileProvider;
 import com.duom.ardamaps.core.data.map.providers.TileProvider;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * Tests BlueMap request scheduling decisions without invoking GUI rendering.
+ */
 class BlueMapRendererTest {
 
     /**
-     * Verify that BlueMap requests the zoom-step viewport one level finer than the primary zoom.
+     * Documents the Phase 4 BlueMap zoom-step direction: when settled, request one finer LOD
+     * viewport level ({@code primaryZ - 1}), not the PMTiles direction.
      */
     @Test
     void requestTilesForFrame_blueMapZoomStepTargetsPrimaryMinusOne() throws Exception {
 
-        var camera = mock(BlueMapCamera.class);
         var provider = new TestBlueMapTileProvider();
-        var renderer = renderer(camera, provider);
-        var fallback = new PmTileKey(3, 0, 0);
-        var primary = new PmTileKey(2, 1, 1);
-        var zoomStep = new PmTileKey(1, 2, 2);
+        BlueMapCamera camera = mock(BlueMapCamera.class);
+        when(camera.getVisibleTiles(3)).thenReturn(Set.of(new PmTileKey(3, 0, 0)));
+        when(camera.getRequestTiles(2, 1)).thenReturn(Set.of(new PmTileKey(2, 1, 1)));
+        when(camera.getVisibleTiles(1)).thenReturn(Set.of(new PmTileKey(1, 2, 2)));
+        when(camera.centerTileDistance(anyInt(), anyInt(), anyInt())).thenReturn(0);
 
-        when(camera.getVisibleTiles(3)).thenReturn(Set.of(fallback));
-        when(camera.getRequestTiles(2, 1)).thenReturn(Set.of(primary));
-        when(camera.getVisibleTiles(1)).thenReturn(Set.of(zoomStep));
-        when(camera.centerTileDistance(org.mockito.Mockito.anyInt(), org.mockito.Mockito.anyInt(), org.mockito.Mockito.anyInt()))
-                .thenReturn(0);
+        var renderer = rendererWithProvider(camera, provider);
 
         renderer.requestTilesForFrame(3, 2, true);
 
-        assertTrue(provider.requests.contains(new Request(zoomStep, TileProvider.ZOOM_STEP_PRIORITY_BASE)));
-        assertTrue(provider.requests.contains(new Request(fallback, TileProvider.VIEWPORT_FALLBACK_PRIORITY_BASE)));
-        assertTrue(provider.requests.contains(new Request(primary, TileProvider.PRIMARY_PREFETCH_PRIORITY_BASE)));
+        assertEquals(TileProvider.ZOOM_STEP_PRIORITY_BASE, provider.requested.get(new PmTileKey(1, 2, 2)));
     }
 
     /**
-     * Verify that oversized BlueMap zoom-step viewports are skipped.
+     * Oversized finer BlueMap LOD viewports are skipped so speculative work cannot evict visible
+     * primary tiles; the useful same-LOD ring and coarse fallback requests remain.
      */
     @Test
     void requestTilesForFrame_blueMapZoomStepSkippedWhenOverBudget() throws Exception {
 
-        var camera = mock(BlueMapCamera.class);
         var provider = new TestBlueMapTileProvider();
-        var renderer = renderer(camera, provider);
-        var fallback = new PmTileKey(3, 0, 0);
-        var primary = new PmTileKey(2, 1, 1);
-
-        when(camera.getVisibleTiles(3)).thenReturn(Set.of(fallback));
-        when(camera.getRequestTiles(2, 1)).thenReturn(Set.of(primary));
+        BlueMapCamera camera = mock(BlueMapCamera.class);
+        when(camera.getVisibleTiles(3)).thenReturn(Set.of(new PmTileKey(3, 0, 0)));
+        when(camera.getRequestTiles(2, 1)).thenReturn(Set.of(new PmTileKey(2, 1, 1)));
         when(camera.getVisibleTiles(1)).thenReturn(manyTiles());
-        when(camera.centerTileDistance(org.mockito.Mockito.anyInt(), org.mockito.Mockito.anyInt(), org.mockito.Mockito.anyInt()))
-                .thenReturn(0);
+        when(camera.centerTileDistance(anyInt(), anyInt(), anyInt())).thenReturn(0);
+
+        var renderer = rendererWithProvider(camera, provider);
 
         renderer.requestTilesForFrame(3, 2, true);
 
-        assertTrue(provider.requests.stream().noneMatch(request -> request.key().z == 1));
-        assertTrue(provider.requests.contains(new Request(fallback, TileProvider.VIEWPORT_FALLBACK_PRIORITY_BASE)));
-        assertTrue(provider.requests.contains(new Request(primary, TileProvider.PRIMARY_PREFETCH_PRIORITY_BASE)));
+        assertTrue(provider.requested.keySet().stream().noneMatch(key -> key.z == 1),
+                "Oversized BlueMap zoom-step set should not be requested");
+        assertTrue(provider.requested.containsKey(new PmTileKey(2, 1, 1)),
+                "Same-LOD prefetch ring should still be requested");
+        assertTrue(provider.requested.containsKey(new PmTileKey(3, 0, 0)),
+                "Coarse fallback viewport should still be requested");
     }
 
-    /**
-     * Create a renderer with a test provider injected by reflection.
-     *
-     * @param camera Camera under test.
-     * @param provider Provider to inject.
-     * @return Renderer configured for the test.
-     * @throws Exception If reflection fails.
-     */
-    private static BlueMapRenderer renderer(BlueMapCamera camera, TestBlueMapTileProvider provider) throws Exception {
+    private static BlueMapRenderer rendererWithProvider(BlueMapCamera camera, TestBlueMapTileProvider provider)
+            throws Exception {
 
         var renderer = new BlueMapRenderer(camera, null, null);
         Field field = BlueMapRenderer.class.getDeclaredField("provider");
@@ -119,48 +115,20 @@ class BlueMapRendererTest {
         return keys;
     }
 
-    /**
-     * Tile provider that records request priorities.
-     */
     private static final class TestBlueMapTileProvider extends BlueMapTileProvider {
 
-        /** Recorded tile requests. */
-        private final List<Request> requests = new ArrayList<>();
+        private final Map<PmTileKey, Integer> requested = new HashMap<>();
 
-        /**
-         * Create a provider with a fixed zoom range.
-         */
         private TestBlueMapTileProvider() {
-            super("", 1, 4);
+
+            super("https://example.invalid", 3, 1);
         }
 
-        /**
-         * Record the request before delegating to the base provider.
-         *
-         * @param key Tile key.
-         * @param priority Request priority.
-         */
         @Override
-        public void request(PmTileKey key, int priority) {
-            requests.add(new Request(key, priority));
-            super.request(key, priority);
+        public Optional<Identifier> request(PmTileKey key, int priority) {
+
+            requested.merge(key, priority, Math::min);
+            return Optional.empty();
         }
-
-        /**
-         * Complete load requests immediately for tests.
-         *
-         * @param key Tile key.
-         */
-        @Override
-        protected void loadTile(PmTileKey key) {
-            clearLoading(key);
-        }
-    }
-
-    /**
-     * Recorded request tuple.
-     */
-    private record Request(PmTileKey key, int priority) {
-
     }
 }

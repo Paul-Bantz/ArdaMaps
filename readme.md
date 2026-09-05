@@ -5,7 +5,7 @@
 
 # ArdaMaps
 
-![Minecraft 1.20.1](https://img.shields.io/badge/Minecraft-1.20.1-62b47a?style=flat-square)
+![Minecraft 26.1.2](https://img.shields.io/badge/Minecraft-26.1-62b47a?style=flat-square)
 ![Fabric](https://img.shields.io/badge/Fabric-loader-dbb66e?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square)](LICENSE)
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey?style=flat-square)](https://creativecommons.org/licenses/by/4.0/)
@@ -23,8 +23,8 @@ A mapping mod for Minecraft servers. Adds an interactive map, compass and toposc
 ## Requirements
 
 **Required**
-- Minecraft 1.20.1
-- Fabric Loader ≥ 0.16.10
+- Minecraft 26.1
+- Fabric Loader ≥ 0.19.3
 - Fabric API
 - HuskHomes 4.7+ - (warp integration)
 

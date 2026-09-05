@@ -40,16 +40,15 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.client.texture.TextureManager;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.renderer.texture.TextureManager;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,18 +62,19 @@ import java.util.Optional;
  */
 public class ClientCommands {
 
-    /** Class logger */
-    private static final Logger LOGGER = LoggerFactory.getLogger(ClientCommands.class);
-
     /** Tab spacing constant for formatted command output. */
     public static final String TAB_SPACING = "    ";
+
     public static final String DOUBLE_TAB_SPACING = TAB_SPACING + TAB_SPACING;
+
+    /** Class logger */
+    private static final Logger LOGGER = LoggerFactory.getLogger(ClientCommands.class);
 
     /**
      * Registers client-side commands.
      */
     public static void register() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, _) ->
                 registerCommands(dispatcher)
         );
     }
@@ -87,24 +87,24 @@ public class ClientCommands {
     private static void registerCommands(CommandDispatcher<FabricClientCommandSource> dispatcher) {
 
         dispatcher.register(
-                ClientCommandManager.literal(ArdaMaps.MOD_ID)
+                net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal(ArdaMaps.MOD_ID)
                         .executes(ClientCommands::printModInformation)
-                        .then(ClientCommandManager.literal("guide")
-                            .then(ClientCommandManager.argument("link", StringArgumentType.greedyString())
-                                .executes(ClientCommands::openGuideLink)))
-                        .then(ClientCommandManager.literal("waypoint")
-                                .then(ClientCommandManager.argument("waypointCommandArgs", StringArgumentType.greedyString())
+                        .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("guide")
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument("link", StringArgumentType.greedyString())
+                                        .executes(ClientCommands::openGuideLink)))
+                        .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("waypoint")
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument("waypointCommandArgs", StringArgumentType.greedyString())
                                         .executes(ClientCommands::addChatWaypoint)))
-                        .then(ClientCommandManager.literal("refresh")
-                                .then(ClientCommandManager.literal("locations")
+                        .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("refresh")
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("locations")
                                         .executes(ClientCommands::refreshLocations))
-                                .then(ClientCommandManager.literal("regions")
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("regions")
                                         .executes(ClientCommands::refreshRegions))
-                                .then(ClientCommandManager.literal("configuration")
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("configuration")
                                         .executes(ClientCommands::refreshMaps)))
-                        .then(ClientCommandManager.literal("debug")
+                        .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("debug")
                                 .executes(ClientCommands::debugModState)
-                                .then(ClientCommandManager.literal("exploration_state")
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("exploration_state")
                                         .executes(ClientCommands::dumpExplorationState)
                                 )
                         )
@@ -127,17 +127,69 @@ public class ClientCommands {
 
         var contextSource = context.getSource();
 
-        contextSource.sendFeedback(Text.literal("ArdaMaps - Version " + version));
-        contextSource.sendFeedback(Text.literal("Commands: "));
-        contextSource.sendFeedback(Text.literal("/" + ArdaMaps.MOD_ID).formatted(Formatting.AQUA).append(Text.literal(" - Print mod information").formatted(Formatting.GRAY)));
-        contextSource.sendFeedback(Text.literal("/" + ArdaMaps.MOD_ID + " refresh locations").formatted(Formatting.AQUA).append(Text.literal(" - Re-synchronizes the location data from the server").formatted(Formatting.GRAY)));
-        contextSource.sendFeedback(Text.literal("/" + ArdaMaps.MOD_ID + " refresh regions").formatted(Formatting.AQUA).append(Text.literal(" - Re-synchronizes the regions LUT from the server").formatted(Formatting.GRAY)));
-        contextSource.sendFeedback(Text.literal("/" + ArdaMaps.MOD_ID + " refresh configuration").formatted(Formatting.AQUA).append(Text.literal(" - Re-synchronizes the maps configuration from the server").formatted(Formatting.GRAY)));
-        contextSource.sendFeedback(Text.literal("/" + ArdaMaps.MOD_ID + " debug").formatted(Formatting.AQUA).append(Text.literal(" - Print information on the current state of the mod for debugging purposes").formatted(Formatting.GRAY)));
-        contextSource.sendFeedback(Text.literal("/" + ArdaMaps.MOD_ID + " debug exploration_state").formatted(Formatting.AQUA).append(Text.literal(" - Dump the current Exploration fog texture to disk for debugging purposes").formatted(Formatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("ArdaMaps - Version " + version));
+        contextSource.sendFeedback(Component.literal("Commands: "));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID).withStyle(ChatFormatting.AQUA).append(Component.literal(" - Print mod information").withStyle(ChatFormatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " refresh locations").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Re-synchronizes the location data from the server").withStyle(ChatFormatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " refresh regions").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Re-synchronizes the regions LUT from the server").withStyle(ChatFormatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " refresh configuration").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Re-synchronizes the maps configuration from the server").withStyle(ChatFormatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " debug").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Print information on the current state of the mod for debugging purposes").withStyle(ChatFormatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " debug exploration_state").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Dump the current Exploration fog texture to disk for debugging purposes").withStyle(ChatFormatting.GRAY)));
 
         // Give the player a guidebook if they don't have one, or switch to it if they do
         PacketRegistry.GUIDEBOOK_REQUEST_HANDLER.send(new EmptyPacket());
+
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Opens the appropriate ArdaMaps screen for the given guide deep-link.
+     *
+     * <p>Resolves the {@code link} argument using the {@link GuideScreenLink} helpers:</p>
+     * <ul>
+     *   <li>{@code guide:map} - opens the Map screen</li>
+     *   <li>{@code guide:configuration} - opens the Configuration screen</li>
+     *   <li>Any other {@code guide:…} token - opens the Guide screen, which internally
+     *       resolves the page/entry deep-link via {@link GuideScreenLink#resolve}</li>
+     * </ul>
+     *
+     * <p>The screen is opened with {@code null} as parent so that closing it returns
+     * the player straight to the game rather than back to a previous screen.</p>
+     *
+     * @param context the command context containing the {@code link} argument
+     * @return {@link Command#SINGLE_SUCCESS}
+     */
+    private static int openGuideLink(CommandContext<FabricClientCommandSource> context) {
+
+        String link = StringArgumentType.getString(context, "link");
+
+        Client.mc().setScreen(null);
+
+        // Schedule the screen to open on the next client tick, after the chat screen has closed.
+        // Calling setScreen() directly here (or inside mc.execute()) races with the chat screen's
+        // own setScreen(null) dismissal call, causing the new screen to be immediately hidden.
+        if (GuideScreenLink.isMapLink(link))
+            ArdaMapsClient.pendingScreen = new MapScreen(null);
+        else if (GuideScreenLink.isConfigLink(link))
+            ArdaMapsClient.pendingScreen = new ConfigurationScreen(null);
+        else
+            ArdaMapsClient.pendingScreen = new GuideScreen(null, link);
+
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Adds a waypoint to the client via a chatcommand
+     *
+     * @param context the command context containing the {@code waypoint} argument
+     * @return {@link Command#SINGLE_SUCCESS}
+     */
+    private static int addChatWaypoint(CommandContext<FabricClientCommandSource> context) {
+
+        String waypointCommandArgs = StringArgumentType.getString(context, "waypointCommandArgs");
+
+        Optional<Waypoint> waypoint = Waypoint.fromJson(waypointCommandArgs);
+        waypoint.ifPresent(value -> ArdaMapsClient.CONFIG.setWaypoint(value));
 
         return Command.SINGLE_SUCCESS;
     }
@@ -203,122 +255,71 @@ public class ClientCommands {
         var contextSource = context.getSource();
         var dimensions = ArdaMapsClient.CONFIG.getDimensions();
 
-        contextSource.sendFeedback(Text.literal("ArdaMaps - Mod State"));
+        contextSource.sendFeedback(Component.literal("ArdaMaps - Mod State"));
 
         // Dimension data
-        contextSource.sendFeedback(Text.literal(Integer.toString(dimensions.size())).formatted(Formatting.YELLOW).append(Text.literal(" Dimensions loaded\n{").formatted(Formatting.WHITE)));
+        contextSource.sendFeedback(Component.literal(Integer.toString(dimensions.size())).withStyle(ChatFormatting.YELLOW).append(Component.literal(" Dimensions loaded\n{").withStyle(ChatFormatting.WHITE)));
 
         for (var dimension : dimensions) {
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- Dimension ID: ")
-                    .append(Text.literal(dimension.getId()).formatted(Formatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Dimension ID: ")
+                    .append(Component.literal(dimension.getId()).withStyle(ChatFormatting.AQUA)));
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- Auto Generated: ")
-                    .append(Text.literal(Boolean.toString(dimension.isAutoGenerated())).formatted(Formatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Auto Generated: ")
+                    .append(Component.literal(Boolean.toString(dimension.isAutoGenerated())).withStyle(ChatFormatting.AQUA)));
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- min_x {").append(Text.literal(Integer.toString(dimension.getXMin())).formatted(Formatting.AQUA)).append("}")
-                    .append(", min_z {").append(Text.literal(Integer.toString(dimension.getZMin())).formatted(Formatting.AQUA)).append("}")
-                    .append(", max_x {").append(Text.literal(Integer.toString(dimension.getXMax())).formatted(Formatting.AQUA)).append("}")
-                    .append(", max_z {").append(Text.literal(Integer.toString(dimension.getZMax())).formatted(Formatting.AQUA)).append("}")
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- min_x {").append(Component.literal(Integer.toString(dimension.getXMin())).withStyle(ChatFormatting.AQUA)).append("}")
+                    .append(", min_z {").append(Component.literal(Integer.toString(dimension.getZMin())).withStyle(ChatFormatting.AQUA)).append("}")
+                    .append(", max_x {").append(Component.literal(Integer.toString(dimension.getXMax())).withStyle(ChatFormatting.AQUA)).append("}")
+                    .append(", max_z {").append(Component.literal(Integer.toString(dimension.getZMax())).withStyle(ChatFormatting.AQUA)).append("}")
             );
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- Width {").append(Text.literal(Integer.toString(dimension.getWidth())).formatted(Formatting.AQUA)).append("}")
-                    .append(", Height {").append(Text.literal(Integer.toString(dimension.getHeight())).formatted(Formatting.AQUA)).append("}"));
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Width {").append(Component.literal(Integer.toString(dimension.getWidth())).withStyle(ChatFormatting.AQUA)).append("}")
+                    .append(", Height {").append(Component.literal(Integer.toString(dimension.getHeight())).withStyle(ChatFormatting.AQUA)).append("}"));
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- Scale ").append(Text.literal(Float.toString(dimension.getScale())).formatted(Formatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Scale ").append(Component.literal(Float.toString(dimension.getScale())).withStyle(ChatFormatting.AQUA)));
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- Map Layers :"));
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Map Layers :"));
 
             for (var layer : dimension.getMapLayers()) {
 
-                contextSource.sendFeedback(Text.literal(DOUBLE_TAB_SPACING + "- Name: ")
-                        .append(Text.literal(layer.layer()).formatted(Formatting.AQUA)));
+                contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Name: ")
+                        .append(Component.literal(layer.layer()).withStyle(ChatFormatting.AQUA)));
 
-                contextSource.sendFeedback(Text.literal(DOUBLE_TAB_SPACING + "- Type: ")
-                        .append(Text.literal(layer.type().toString()).formatted(Formatting.AQUA)));
+                contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Type: ")
+                        .append(Component.literal(layer.type().toString()).withStyle(ChatFormatting.AQUA)));
 
-                contextSource.sendFeedback(Text.literal(DOUBLE_TAB_SPACING + "- Remote: ")
-                        .append(Text.literal(Boolean.toString(layer.remote())).formatted(Formatting.AQUA)));
+                contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Remote: ")
+                        .append(Component.literal(Boolean.toString(layer.remote())).withStyle(ChatFormatting.AQUA)));
             }
-            contextSource.sendFeedback(Text.literal("\n"));
+            contextSource.sendFeedback(Component.literal("\n"));
         }
-        contextSource.sendFeedback(Text.literal("}"));
+        contextSource.sendFeedback(Component.literal("}"));
 
         var progress = ArdaMapsClient.CONFIG.getClientProgress();
-        contextSource.sendFeedback(Text.literal("Exploration state for ").append(Text.literal(Integer.toString(progress.getExplorationState().size())).formatted(Formatting.YELLOW)).append(" dimensions : \n{"));
+        contextSource.sendFeedback(Component.literal("Exploration state for ").append(Component.literal(Integer.toString(progress.getExplorationState().size())).withStyle(ChatFormatting.YELLOW)).append(" dimensions : \n{"));
 
         for (var entry : progress.getExplorationState().entrySet()) {
 
             var exploration = entry.getValue();
 
-            contextSource.sendFeedback(Text.literal(TAB_SPACING + "- Dimension ID: ")
-                    .append(Text.literal(entry.getKey()).formatted(Formatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Dimension ID: ")
+                    .append(Component.literal(entry.getKey()).withStyle(ChatFormatting.AQUA)));
 
-            contextSource.sendFeedback(Text.literal(DOUBLE_TAB_SPACING + "- Auto-generated: ")
-                    .append(Text.literal(Boolean.toString(exploration.isAutoGenerated())).formatted(Formatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Auto-generated: ")
+                    .append(Component.literal(Boolean.toString(exploration.isAutoGenerated())).withStyle(ChatFormatting.AQUA)));
 
-            contextSource.sendFeedback(Text.literal(DOUBLE_TAB_SPACING + "- Cell Size: ")
-                    .append(Text.literal(Integer.toString(exploration.getCellSize())).formatted(Formatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Cell Size: ")
+                    .append(Component.literal(Integer.toString(exploration.getCellSize())).withStyle(ChatFormatting.AQUA)));
 
-            contextSource.sendFeedback(Text.literal(DOUBLE_TAB_SPACING + "- Mask size : {")
-                    .append(Text.literal(Integer.toString(exploration.getNbCellsX())).formatted(Formatting.AQUA))
-                    .append(Text.literal(","))
-                    .append(Text.literal(Integer.toString(exploration.getNbCellsY())).formatted(Formatting.AQUA))
-                    .append(Text.literal("}"))
+            contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Mask size : {")
+                    .append(Component.literal(Integer.toString(exploration.getNbCellsX())).withStyle(ChatFormatting.AQUA))
+                    .append(Component.literal(","))
+                    .append(Component.literal(Integer.toString(exploration.getNbCellsY())).withStyle(ChatFormatting.AQUA))
+                    .append(Component.literal("}"))
             );
         }
-        contextSource.sendFeedback(Text.literal("}"));
-
-        return Command.SINGLE_SUCCESS;
-    }
-
-    /**
-     * Opens the appropriate ArdaMaps screen for the given guide deep-link.
-     *
-     * <p>Resolves the {@code link} argument using the {@link GuideScreenLink} helpers:</p>
-     * <ul>
-     *   <li>{@code guide:map} - opens the Map screen</li>
-     *   <li>{@code guide:configuration} - opens the Configuration screen</li>
-     *   <li>Any other {@code guide:…} token - opens the Guide screen, which internally
-     *       resolves the page/entry deep-link via {@link GuideScreenLink#resolve}</li>
-     * </ul>
-     *
-     * <p>The screen is opened with {@code null} as parent so that closing it returns
-     * the player straight to the game rather than back to a previous screen.</p>
-     *
-     * @param context the command context containing the {@code link} argument
-     * @return {@link Command#SINGLE_SUCCESS}
-     */
-    private static int openGuideLink(CommandContext<FabricClientCommandSource> context) {
-
-        String link = StringArgumentType.getString(context, "link");
-
-        Client.mc().setScreen(null);
-
-        // Schedule the screen to open on the next client tick, after the chat screen has closed.
-        // Calling setScreen() directly here (or inside mc.execute()) races with the chat screen's
-        // own setScreen(null) dismissal call, causing the new screen to be immediately hidden.
-        if (GuideScreenLink.isMapLink(link))
-            ArdaMapsClient.pendingScreen = new MapScreen(null);
-        else if (GuideScreenLink.isConfigLink(link))
-            ArdaMapsClient.pendingScreen = new ConfigurationScreen(null);
-        else
-            ArdaMapsClient.pendingScreen = new GuideScreen(null, link);
-
-        return Command.SINGLE_SUCCESS;
-    }
-
-    /**
-     * Adds a waypoint to the client via a chatcommand
-     * @param context the command context containing the {@code waypoint} argument
-     * @return {@link Command#SINGLE_SUCCESS}
-     */
-    private static int addChatWaypoint(CommandContext<FabricClientCommandSource> context) {
-
-        String waypointCommandArgs = StringArgumentType.getString(context, "waypointCommandArgs");
-
-        Optional<Waypoint> waypoint = Waypoint.fromJson(waypointCommandArgs);
-        waypoint.ifPresent(value -> ArdaMapsClient.CONFIG.setWaypoint(value));
+        contextSource.sendFeedback(Component.literal("}"));
 
         return Command.SINGLE_SUCCESS;
     }
@@ -337,24 +338,23 @@ public class ClientCommands {
 
             TextureManager textureManager = Client.mc().getTextureManager();
             Identifier textureId = entry.getValue().getFogTextureId();
-            NativeImageBackedTexture texture = (NativeImageBackedTexture) textureManager.getTexture(textureId);
+            DynamicTexture texture = (DynamicTexture) textureManager.getTexture(textureId);
 
             try {
-                Path dir = Client.mc().runDirectory.toPath().resolve("ardamaps");
+                Path dir = Client.mc().gameDirectory.toPath().resolve("ardamaps");
                 Files.createDirectories(dir);
 
                 Path output = dir.resolve("fov_dump.png");
-                if (texture.getImage() != null) texture.getImage().writeTo(output);
-                else LOGGER.error("FoW texture image is null");
+                texture.getPixels().writeToFile(output);
 
             } catch (IOException e) {
                 LOGGER.error("Failed to dump FoW texture", e);
             }
 
-            Client.mc().getTextureManager().destroyTexture(textureId);
+            Client.mc().getTextureManager().release(textureId);
         }
 
-        context.getSource().sendFeedback(Text.literal("FoW texture dumped to disk"));
+        context.getSource().sendFeedback(Component.literal("FoW texture dumped to disk"));
 
         return Command.SINGLE_SUCCESS;
     }

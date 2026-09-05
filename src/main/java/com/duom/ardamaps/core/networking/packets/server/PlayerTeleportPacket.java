@@ -26,8 +26,13 @@
 package com.duom.ardamaps.core.networking.packets.server;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Packet sent by the server to teleport the player to a specific location, optionally in a specific world.
@@ -38,6 +43,10 @@ import net.minecraft.network.PacketByteBuf;
  * @param worldId The Identifier of the world to teleport to. If null, the current world is used.
  */
 public record PlayerTeleportPacket(double x, double y, double z, String worldId) implements IPacket {
+
+    public static final CustomPacketPayload.Type<PlayerTeleportPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_teleport"));
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, PlayerTeleportPacket> CODEC = IPacket.codec(PlayerTeleportPacket::read);
 
     /**
      * Constructs a PlayerTeleportPacket with only X and Z coordinates, setting Y to NaN.
@@ -56,12 +65,12 @@ public record PlayerTeleportPacket(double x, double y, double z, String worldId)
      * @param buf The PacketByteBuf to read from.
      * @return A new PlayerTeleportPacket instance.
      */
-    public static PlayerTeleportPacket read(PacketByteBuf buf) {
+    public static PlayerTeleportPacket read(FriendlyByteBuf buf) {
 
         final double x = buf.readDouble();
         final double y = buf.readDouble();
         final double z = buf.readDouble();
-        final String worldId = buf.readString();
+        final String worldId = buf.readUtf();
 
         return new PlayerTeleportPacket(x, y, z, worldId);
     }
@@ -72,14 +81,19 @@ public record PlayerTeleportPacket(double x, double y, double z, String worldId)
      * @return The PacketByteBuf containing the packet data.
      */
     @Override
-    public PacketByteBuf build() {
+    public FriendlyByteBuf build() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
         buf.writeDouble(x);
         buf.writeDouble(y);
         buf.writeDouble(z);
-        buf.writeString(worldId);
+        buf.writeUtf(worldId);
 
         return buf;
+    }
+
+    @Override
+    public CustomPacketPayload.@NonNull Type<PlayerTeleportPacket> type() {
+        return TYPE;
     }
 }

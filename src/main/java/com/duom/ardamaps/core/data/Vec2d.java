@@ -36,10 +36,7 @@ import org.jspecify.annotations.NonNull;
 public record Vec2d(double x, double y) {
 
     /**
-     * Constructs a new Vec2d with the specified coordinates.
-     *
-     * @param x The X coordinate.
-     * @param y The Y coordinate.
+     * Compact constructor for Vec2d with coordinate validation.
      */
     public Vec2d {
     }
@@ -51,8 +48,8 @@ public record Vec2d(double x, double y) {
      * @return The distance between the two vectors.
      */
     public double distanceTo(Vec3d vec) {
-        double d = vec.x - this.x;
-        double e = vec.z - this.y;
+        double d = vec.x() - this.x;
+        double e = vec.z() - this.y;
         return Math.sqrt(d * d + e * e);
     }
 

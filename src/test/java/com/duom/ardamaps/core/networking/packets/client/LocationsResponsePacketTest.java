@@ -26,15 +26,16 @@
 package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.data.Vec3d;
-import com.duom.ardamaps.core.data.location.BasicLocation;
 import com.duom.ardamaps.core.data.config.LocationConfig;
+import com.duom.ardamaps.core.data.location.BasicLocation;
 import com.duom.ardamaps.core.data.location.LocationClient;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
+import net.minecraft.network.FriendlyByteBuf;
 import org.junit.jupiter.api.Test;
 
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -67,7 +68,7 @@ class LocationsResponsePacketTest {
         assertNotNull(parsed.data());
         assertEquals(config.getLastUpdate(), parsed.data().getLastUpdate());
         assertEquals(1, parsed.data().getLocations().size());
-        LocationClient parsedLocation = parsed.data().getLocations().get(0);
+        LocationClient parsedLocation = parsed.data().getLocations().getFirst();
         assertEquals(location.getId(), parsedLocation.getId());
         assertEquals(locationName(location), locationName(parsedLocation));
         assertEquals(location.getWorld(), parsedLocation.getWorld());
@@ -75,32 +76,6 @@ class LocationsResponsePacketTest {
         assertEquals(location.getWarp(), parsedLocation.getWarp());
         assertEquals(location.getPathfinder(), parsedLocation.getPathfinder());
         assertEquals(location.getPosition(), parsedLocation.getPosition());
-    }
-
-    /**
-     * Negative lengths must be rejected before byte-array allocation.
-     */
-    @Test
-    void read_negativeDataLength_rejectsBeforeAllocation() {
-
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeInt(-1);
-        buf.readerIndex(0);
-
-        assertThrows(IllegalArgumentException.class, () -> LocationsResponsePacket.read(buf));
-    }
-
-    /**
-     * Oversized lengths must be rejected before byte-array allocation.
-     */
-    @Test
-    void read_oversizedDataLength_rejectsBeforeAllocation() {
-
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeInt(8 * 1024 * 1024 + 1);
-        buf.readerIndex(0);
-
-        assertThrows(IllegalArgumentException.class, () -> LocationsResponsePacket.read(buf));
     }
 
     /**
@@ -131,5 +106,33 @@ class LocationsResponsePacketTest {
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new AssertionError(e);
         }
+    }
+
+    /**
+     * Verifies that negative lengths are rejected before byte-array allocation.
+     */
+    @Test
+    void read_negativeDataLength_rejectsBeforeAllocation() {
+
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
+        buf.writeInt(-1);
+        buf.readerIndex(0);
+
+        assertThrows(IllegalArgumentException.class, () -> LocationsResponsePacket.read(buf));
+    }
+
+    /**
+     * Verifies that oversized lengths are rejected before byte-array allocation.
+     */
+    @Test
+    void read_oversizedDataLength_rejectsBeforeAllocation() {
+
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
+        buf.writeUUID(new UUID(0L, 0L));
+        buf.writeInt(8 * 1024 * 1024 + 1);
+        buf.readerIndex(0);
+
+        assertThrows(IllegalArgumentException.class, () -> LocationsResponsePacket.read(buf));
     }
 }

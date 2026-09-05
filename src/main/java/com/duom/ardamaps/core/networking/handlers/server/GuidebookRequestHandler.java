@@ -28,35 +28,34 @@ package com.duom.ardamaps.core.networking.handlers.server;
 import com.duom.ardamaps.core.consumers.networking.ServerPacketHandler;
 import com.duom.ardamaps.core.items.ModItems;
 import com.duom.ardamaps.core.networking.packets.EmptyPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 
+/**
+ * Handler for guidebook requests, responsible for giving or selecting the guidebook in a player's inventory.
+ */
 public class GuidebookRequestHandler extends ServerPacketHandler<EmptyPacket> {
 
-    /** The channel identifier for the PlayerTeleportPacket. */
+    /** The channel identifier for the guidebook request packet. */
     private static final String REQ_CHANNEL = "guidebook_request";
 
     /**
-     * Constructs a new PlayerTeleportHandler.
+     * Constructs a new GuidebookRequestHandler.
      */
     public GuidebookRequestHandler() {
-        super(REQ_CHANNEL, EmptyPacket::read);
+        super(REQ_CHANNEL, EmptyPacket.TYPE, EmptyPacket.CODEC);
     }
 
     /**
-     * Handles the PlayerTeleportPacket by teleporting the player to the specified coordinates.
+     * Handles the guidebook request by giving the player a guidebook or selecting an existing one from their inventory.
      *
-     * @param server  The Minecraft server instance.
-     * @param player  The player to teleport.
-     * @param handler The network handler.
-     * @param packet  The PlayerTeleportPacket containing teleportation data.
-     * @param sender  The packet sender.
+     * @param server The Minecraft server instance.
+     * @param player The player to give the guidebook to.
+     * @param packet The empty packet containing the request.
      */
     @Override
-    protected void handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, EmptyPacket packet, PacketSender sender) {
+    protected void handle(MinecraftServer server, ServerPlayer player, EmptyPacket packet) {
 
         server.execute(() -> giveGuidebook(player));
     }
@@ -66,22 +65,22 @@ public class GuidebookRequestHandler extends ServerPacketHandler<EmptyPacket> {
      *
      * @param player The player to give the guidebook to.
      */
-    private void giveGuidebook(ServerPlayerEntity player) {
+    private void giveGuidebook(ServerPlayer player) {
 
         // Search full inventory
-        for (int i = 0; i < player.getInventory().size(); i++) {
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
 
-            ItemStack stack = player.getInventory().getStack(i);
+            ItemStack stack = player.getInventory().getItem(i);
 
-            if (stack.isOf(ModItems.GUIDEBOOK)) {
+            if (stack.is(ModItems.GUIDEBOOK)) {
 
                 // If guidebook is in hotbar, select it
                 if (i < 9) {
 
-                    player.getInventory().selectedSlot = i;
+                    player.getInventory().setSelectedSlot(i);
 
                     // Sync held item to client
-                    player.playerScreenHandler.sendContentUpdates();
+                    player.inventoryMenu.broadcastChanges();
                 }
 
                 return;
@@ -91,25 +90,25 @@ public class GuidebookRequestHandler extends ServerPacketHandler<EmptyPacket> {
         // No guidebook found - give one
         ItemStack newBook = new ItemStack(ModItems.GUIDEBOOK);
 
-        boolean inserted = player.getInventory().insertStack(newBook);
+        boolean inserted = player.getInventory().add(newBook);
 
         if (inserted) {
 
             // Search hotbar for inserted guidebook
             for (int i = 0; i < 9; i++) {
 
-                ItemStack stack = player.getInventory().getStack(i);
+                ItemStack stack = player.getInventory().getItem(i);
 
-                if (stack.isOf(ModItems.GUIDEBOOK)) {
+                if (stack.is(ModItems.GUIDEBOOK)) {
 
-                    player.getInventory().selectedSlot = i;
+                    player.getInventory().setSelectedSlot(i);
 
                     break;
                 }
             }
 
             // Sync inventory + selected slot
-            player.playerScreenHandler.sendContentUpdates();
+            player.inventoryMenu.broadcastChanges();
         }
     }
 }

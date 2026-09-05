@@ -26,13 +26,13 @@
 package com.duom.ardamaps.core.data.guide;
 
 import com.duom.ardamaps.ArdaMaps;
-import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.gui.ModConstants;
 import com.google.gson.Gson;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.resource.Resource;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,36 +63,8 @@ public final class GuideLoader {
     /** Gson instance shared for guide deserialization. */
     private static final Gson GSON = new Gson();
 
+    /** Utility class with no public instances. */
     private GuideLoader() { /* utility class */ }
-
-    /**
-     * Submits {@code task} to {@link ArdaMaps#IO_EXECUTOR}, falling back to {@code fallback}
-     * if the executor has already been shut down (e.g. on JVM exit) instead of throwing
-     * {@link RejectedExecutionException} on the calling thread.
-     *
-     * @param task     the work to run asynchronously
-     * @param fallback the value to return if the task cannot be submitted
-     * @param <T>      the result type
-     * @return a future resolving to the task's result, or {@code fallback}
-     */
-    private static <T> CompletableFuture<T> supplyAsyncSafe(Supplier<T> task, T fallback) {
-
-        try {
-            return CompletableFuture.supplyAsync(task, ArdaMaps.IO_EXECUTOR);
-        } catch (RejectedExecutionException e) {
-            LOGGER.warn("[GuideLoader] IO executor unavailable, skipping task");
-            return CompletableFuture.completedFuture(fallback);
-        }
-    }
-
-    /**
-     * Gets the current client locale, updated dynamically to reflect language changes.
-     *
-     * @return the current client locale
-     */
-    private static String getClientLocale() {
-        return Client.mc().getLanguageManager().getLanguage();
-    }
 
     /**
      * Loads and deserializes {@code assets/ardamaps/guide/guide.json} from the active resource manager.
@@ -115,6 +87,57 @@ public final class GuideLoader {
     }
 
     /**
+     * Submits {@code task} to {@link ArdaMaps#IO_EXECUTOR}, falling back to {@code fallback}
+     * if the executor has already been shut down (e.g. on JVM exit) instead of throwing
+     * {@link RejectedExecutionException} on the calling thread.
+     *
+     * @param task     the work to run asynchronously
+     * @param fallback the value to return if the task cannot be submitted
+     * @param <T>      the result type
+     * @return a future resolving to the task's result, or {@code fallback}
+     */
+    private static <T> CompletableFuture<T> supplyAsyncSafe(Supplier<T> task, T fallback) {
+
+        try {
+            return CompletableFuture.supplyAsync(task, ArdaMaps.IO_EXECUTOR);
+        } catch (RejectedExecutionException e) {
+            LOGGER.warn("[GuideLoader] IO executor unavailable, skipping task");
+            return CompletableFuture.completedFuture(fallback);
+        }
+    }
+
+    /**
+     * Loads the pages and entries titles with the correct locale : either client locale if available or default if none found
+     *
+     * @param resourceManager the resource manager
+     * @return the titles keyed by their IDs
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> loadTitles(ResourceManager resourceManager) {
+
+        Map<String, String> titles = Map.of();
+        String filePath = "titles.json";
+
+        Optional<Resource> resource = resolveLocale(resourceManager, filePath);
+
+        if (resource.isEmpty()) {
+
+            LOGGER.warn("[GuideLoader] titles definition not found for any locale - tried client locale, language prefix, and default locale");
+            return titles;
+        }
+
+        try (Reader reader = new InputStreamReader(resource.get().open(), StandardCharsets.UTF_8)) {
+
+            titles = GSON.fromJson(reader, Map.class);
+        } catch (Exception e) {
+
+            LOGGER.error("[GuideLoader] Failed to load titles.json", e);
+        }
+
+        return titles;
+    }
+
+    /**
      * Loads a guide content based on the client locale. Falls back to default locale if not found.
      *
      * @param resourceManager the resource manager
@@ -131,7 +154,7 @@ public final class GuideLoader {
                 return new GuideBook();
             }
 
-            try (Reader reader = new InputStreamReader(resource.get().getInputStream(), StandardCharsets.UTF_8)) {
+            try (Reader reader = new InputStreamReader(resource.get().open(), StandardCharsets.UTF_8)) {
 
                 return GSON.fromJson(reader, GuideBook.class);
             }
@@ -202,7 +225,7 @@ public final class GuideLoader {
             String guidePath = "guide";
 
             try {
-                var resourceMap = resourceManager.findResources(guidePath, id -> {
+                var resourceMap = resourceManager.listResources(guidePath, id -> {
 
                     String path = id.getPath();
 
@@ -245,34 +268,12 @@ public final class GuideLoader {
     }
 
     /**
-     * Loads the pages and entries titles with the correct locale : either client locale if available or default if none found
+     * Gets the current client locale, updated dynamically to reflect language changes.
      *
-     * @param resourceManager the resource manager
-     * @return the titles keyed by their IDs
+     * @return the current client locale
      */
-    @SuppressWarnings("unchecked")
-    private static Map<String, String> loadTitles(ResourceManager resourceManager) {
-
-        Map<String, String> titles = Map.of();
-        String filePath = "titles.json";
-
-        Optional<Resource> resource = resolveLocale(resourceManager, filePath);
-
-        if (resource.isEmpty()) {
-
-            LOGGER.warn("[GuideLoader] titles definition not found for any locale - tried client locale, language prefix, and default locale");
-            return titles;
-        }
-
-        try (Reader reader = new InputStreamReader(resource.get().getInputStream(), StandardCharsets.UTF_8)) {
-
-            titles = GSON.fromJson(reader, Map.class);
-        } catch (Exception e) {
-
-            LOGGER.error("[GuideLoader] Failed to load titles.json", e);
-        }
-
-        return titles;
+    private static String getClientLocale() {
+        return Client.mc().getLanguageManager().getSelected();
     }
 
     /**
@@ -290,7 +291,7 @@ public final class GuideLoader {
             if (link == null || link.isBlank()) return "";
 
             try {
-                var resourceManager = MinecraftClient.getInstance().getResourceManager();
+                var resourceManager = Minecraft.getInstance().getResourceManager();
                 Optional<Resource> resource = resolveLocale(resourceManager, link);
 
                 if (resource.isEmpty()) {
@@ -299,7 +300,7 @@ public final class GuideLoader {
                     return "";
                 }
 
-                try (var stream = resource.get().getInputStream()) {
+                try (var stream = resource.get().open()) {
                     return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
                 }
 

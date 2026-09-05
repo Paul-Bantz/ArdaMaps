@@ -30,12 +30,9 @@ import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.map.cameras.FlatMapCamera;
 import com.duom.ardamaps.core.data.map.providers.HttpImageProvider;
-import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL13;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 
 /**
  * A map renderable that can display WEBP images as map layers.
@@ -57,7 +54,7 @@ public class WebpRenderer extends MapRenderable {
      * @param textRenderer The text renderer for displaying loading text or other information.
      * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public WebpRenderer(FlatMapCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
+    public WebpRenderer(FlatMapCamera camera, Font textRenderer, PlayerExploration exploration) {
 
         super(camera, textRenderer, exploration);
         this.mapCamera = camera;
@@ -89,10 +86,10 @@ public class WebpRenderer extends MapRenderable {
      * @param context The drawing context.
      */
     @Override
-    public void render(DrawContext context) {
+    public void render(GuiGraphicsExtractor context) {
 
         renderMap(context);
-        renderFogOfWar();
+        renderFogOfWar(context);
     }
 
     /**
@@ -104,7 +101,7 @@ public class WebpRenderer extends MapRenderable {
      *
      * @param context The drawing context.
      */
-    private void renderMap(DrawContext context) {
+    private void renderMap(GuiGraphicsExtractor context) {
 
         double scale = mapCamera.scale();
         var renderWidth = mapCamera.getWorldTextureWidth();
@@ -132,21 +129,13 @@ public class WebpRenderer extends MapRenderable {
 
         syncTextureDimensions(provider);
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-
-        RenderSystem.activeTexture(GL13.GL_TEXTURE0);
-        MinecraftClient.getInstance().getTextureManager().bindTexture(texture);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
-        RenderSystem.setShaderTexture(0, texture);
-
         // Translate for sub-pixel accuracy
-        var matrices = context.getMatrices();
-        matrices.push();
-        matrices.translate(screenX - Math.floor(screenX), screenY - Math.floor(screenY), 0);
+        var matrices = context.pose();
+        matrices.pushMatrix();
+        matrices.translate((float) (screenX - Math.floor(screenX)), (float) (screenY - Math.floor(screenY)));
 
-        context.drawTexture(
+        context.blit(
+                RenderPipelines.GUI_TEXTURED,
                 texture,
                 (int) Math.floor(screenX),
                 (int) Math.floor(screenY),
@@ -158,8 +147,7 @@ public class WebpRenderer extends MapRenderable {
                 renderHeight
         );
 
-        matrices.pop();
-        RenderSystem.disableBlend();
+        matrices.popMatrix();
     }
 
     /**

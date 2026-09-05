@@ -26,16 +26,16 @@
 package com.duom.ardamaps.core.data.map.tiles;
 
 /**
- * Represents a unique key for a map tile identified by its zoom level (z) and x, y coordinates.
+ * Represents a unique key for a PMTiles map tile identified by its zoom level (z) and x, y coordinates.
  */
 public class PmTileKey extends TileKey {
 
     /**
-     * Create a PMTiles tile key.
+     * Constructs a PmTileKey with the specified zoom level and coordinates.
      *
-     * @param z Tile zoom level.
-     * @param x Tile X coordinate.
-     * @param y Tile Y coordinate.
+     * @param z The zoom level of the tile.
+     * @param x The x coordinate of the tile.
+     * @param y The y coordinate of the tile.
      */
     public PmTileKey(int z, int x, int y) {
         super(z, x, y);
@@ -54,10 +54,10 @@ public class PmTileKey extends TileKey {
     }
 
     /**
-     * Exclusive upper bound on PMTiles tile IDs for all tiles at zoom {@code <= maxZoomInclusive}.
+     * Exclusive upper bound on TileIDs for all tiles at zoom {@code <= maxZoomInclusive}.
      *
-     * @param maxZoomInclusive The inclusive maximum zoom.
-     * @return The first tile ID belonging to the next zoom level.
+     * @param maxZoomInclusive Maximum zoom included in the prefix.
+     * @return The first TileID belonging to {@code maxZoomInclusive + 1}.
      */
     public static long tileIdUpperBound(int maxZoomInclusive) {
 

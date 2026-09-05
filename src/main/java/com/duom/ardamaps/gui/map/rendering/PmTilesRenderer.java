@@ -34,21 +34,23 @@ import com.duom.ardamaps.core.data.map.providers.PMTilesHttpTileProvider;
 import com.duom.ardamaps.core.data.map.providers.TileProvider;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
 import com.duom.ardamaps.gui.ModConstants;
-import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Pair;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.Tuple;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL13;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * A map viewer that renders map tiles from PMTiles files.
@@ -57,6 +59,9 @@ public class PmTilesRenderer extends MapRenderable {
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(PmTilesRenderer.class);
+
+    /** Approximate decoded PMTiles tile cost for common 256x256 RGBA tiles. */
+    static final long APPROX_DECODED_TILE_BYTES = 256L * 256L * 4L;
 
     /** The camera used to determine which tiles are visible and how they should be rendered based on the current view. */
     private final PmTilesMapCamera mapCamera;
@@ -77,7 +82,7 @@ public class PmTilesRenderer extends MapRenderable {
      * @param textRenderer The text renderer for displaying loading text or other information.
      * @param exploration  The fog-of-war exploration state to render for this map layer.
      */
-    public PmTilesRenderer(PmTilesMapCamera camera, TextRenderer textRenderer, PlayerExploration exploration) {
+    public PmTilesRenderer(PmTilesMapCamera camera, Font textRenderer, PlayerExploration exploration) {
 
         super(camera, textRenderer, exploration);
         this.mapCamera = camera;
@@ -112,6 +117,12 @@ public class PmTilesRenderer extends MapRenderable {
             mapCamera.setTileSize(layer.tileSize());
             mapCamera.setPreferredRenderScale(renderScale);
             mapCamera.setZoomToMatchVisualPixelsPerBlock();
+
+            // Pin the coarsest zoom outside the LRU so it can never be evicted by request churn at
+            // other zoom levels. The full-map pyramid itself is now loaded incrementally through the
+            // per-frame bounded/prioritised pipeline in renderMap(), at the lowest urgency tier,
+            // rather than being force-loaded here - that let a large coarse pyramid flood the
+            // executor queue ahead of whatever the player actually pans to first.
             tileProvider.setPinnedZoom(tileProvider.getMinZoom());
 
         } catch (IOException e) {
@@ -129,13 +140,13 @@ public class PmTilesRenderer extends MapRenderable {
      * @param context the draw context
      */
     @Override
-    public void render(DrawContext context) {
+    public void render(GuiGraphicsExtractor context) {
 
         if (tileProvider == null) {
             if (loadError != null) {
-                context.drawCenteredTextWithShadow(
+                context.centeredText(
                         textRenderer,
-                        Text.translatable("ardamaps.client.map.screen.layer_load_failed", loadError),
+                        Component.translatable("ardamaps.client.map.screen.layer_load_failed", loadError),
                         camera.getViewportWidth() / 2,
                         camera.getViewportHeight() / 2,
                         ModConstants.COLOR_WHITE);
@@ -148,37 +159,44 @@ public class PmTilesRenderer extends MapRenderable {
         /* Rendering */
 
         renderMap(context);
-        renderFogOfWar();
+        renderFogOfWar(context);
     }
 
     /**
-     * Releases tile provider resources owned by this renderer.
-     */
-    @Override
-    public void close() {
-
-        if (tileProvider != null) {
-            tileProvider.close();
-            tileProvider = null;
-        }
-    }
-
-    /**
-     * Render the PMTiles layer for the current frame.
+     * Renders the visible map tiles in two draw passes.
+     * <p>
+     * Tile loading is bounded and prioritised via {@link TileProvider#beginFrame()} /
+     * {@link TileProvider#request} / {@link TileProvider#endFrame()} across two tiers, most urgent
+     * first: primary-zoom tiles actually in the viewport (ranked by distance from the viewport
+     * centre), the one-tile ring just outside the viewport, coarse-zoom tiles in the viewport
+     * backing the immediate visual fallback, and the adjacent PMTiles zoom-step viewport at
+     * {@code primaryZ + 1} when its estimated decoded footprint fits the speculative budget.
+     * Primary-zoom requests are only registered once the camera has settled
+     * ({@link com.duom.ardamaps.core.data.map.cameras.MapCamera#isSettled()}); during a fast pan or
+     * zoom only the viewport's coarse fallback is requested.
+     * </p>
+     * <p>
+     * A classification pass resolves primary tiles and their already-loaded coarse fallbacks before
+     * anything is drawn. Fallbacks are deduplicated by the resolved {@link PmTileKey} because many
+     * primary tiles can map to the same coarser tile; drawing that ancestor repeatedly creates
+     * alpha-blend overdraw and flicker. All fallback quads are drawn before primary quads so a
+     * blurry ancestor can never repaint over a sharp tile that has already loaded.
+     * </p>
      *
-     * @param context Draw context used for rendering.
+     * @param context the draw context
      */
-    private void renderMap(DrawContext context) {
+    private void renderMap(GuiGraphicsExtractor context) {
 
         int minZoom = tileProvider.getMinZoom();
-        Set<PmTileKey> tilesToDisplay = mapCamera.getVisibleTiles();
         boolean settled = mapCamera.isSettled();
 
         tileProvider.beginFrame();
 
+        Set<PmTileKey> tilesToDisplay = mapCamera.getVisibleTiles();
         requestTilesForFrame(minZoom, settled);
 
         RenderPlan plan = classifyTiles(tilesToDisplay, minZoom, settled);
+
         tileProvider.endFrame();
 
         if (plan.primaryTiles().isEmpty() && plan.fallbackMap().isEmpty()) {
@@ -192,26 +210,30 @@ public class PmTilesRenderer extends MapRenderable {
         drawnTiles.addAll(plan.fallbackMap().keySet());
         tileProvider.protectDrawnTiles(drawnTiles);
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-
         boolean debugMode = ArdaMapsClient.CONFIG.isMapDebugDisplay();
 
-        drawTilePass(context, orderedFallbacks(plan), debugMode);
+        // Pass 1: coarse fallback base layer, drawn first so it cannot overpaint sharp primaries.
+        drawTilePass(context, plan.fallbackMap().values(), debugMode);
+
+        // Pass 2: primary tiles, drawn over the fallback base wherever they are available.
         drawTilePass(context, plan.primaryTiles(), debugMode);
     }
 
     /**
-     * Request viewport, prefetch, and adjacent-zoom tiles for the current frame.
+     * Registers tile load requests for this frame across multiple priority tiers: coarse fallback tiles,
+     * primary-zoom prefetch ring, and optionally the finer zoom-step viewport if budget permits.
+     * Only primary-zoom tiles are requested when the camera is settled; during pans/zooms only the
+     * coarse fallback is requested to avoid queuing tiles that will scroll off screen.
      *
-     * @param minZoom Minimum zoom level available from the PMTiles source.
-     * @param settled Whether the camera has settled enough to prefetch.
+     * @param minZoom The minimum zoom level to use for coarse-tile fallback.
+     * @param settled Whether the camera has been still long enough to request fine-grained primary tiles.
      */
     void requestTilesForFrame(int minZoom, boolean settled) {
 
+        // Tier 1: coarse-zoom tiles within the current viewport - the immediate visual fallback.
         for (PmTileKey key : mapCamera.getVisibleTiles(minZoom)) {
             tileProvider.request(key, TileProvider.VIEWPORT_FALLBACK_PRIORITY_BASE
-                    + mapCamera.centerTileDistance(key.x, key.y, key.z));
+                    + mapCamera.centerTileDistance(key.x, key.y, minZoom));
         }
 
         if (!settled) return;
@@ -224,7 +246,11 @@ public class PmTilesRenderer extends MapRenderable {
 
         int zoomStep = primaryZ + 1;
         if (zoomStep <= tileProvider.getMaxZoom()) {
-            for (PmTileKey key : mapCamera.getVisibleTiles(zoomStep)) {
+            Set<PmTileKey> zoomStepTiles = mapCamera.getVisibleTiles(zoomStep);
+            long estimatedBytes = (long) zoomStepTiles.size() * APPROX_DECODED_TILE_BYTES;
+            if (estimatedBytes > TileProvider.zoomStepByteCeiling()) return;
+
+            for (PmTileKey key : zoomStepTiles) {
                 tileProvider.request(key, TileProvider.ZOOM_STEP_PRIORITY_BASE
                         + mapCamera.centerTileDistance(key.x, key.y, zoomStep));
             }
@@ -232,12 +258,14 @@ public class PmTilesRenderer extends MapRenderable {
     }
 
     /**
-     * Classify visible tiles into primary draws and fallback draws.
+     * Classifies visible tiles into primary (already loaded) and fallback (coarser ancestors) tiers,
+     * deduplicating fallback tiles so a shared coarser ancestor is drawn only once. Requests primary
+     * tiles with viewport-distance-weighted priority if the camera is settled.
      *
-     * @param tilesToDisplay Tiles currently visible in the viewport.
-     * @param minZoom Minimum zoom level available from the PMTiles source.
-     * @param settled Whether the camera has settled enough to prefetch.
-     * @return Render plan with primary and fallback tiles split out.
+     * @param tilesToDisplay The set of primary-zoom tiles currently in viewport.
+     * @param minZoom The minimum zoom level available; tiles degrade to ancestors at or below this.
+     * @param settled Whether to register primary tile requests (true) or just classify fallbacks (false).
+     * @return A render plan with primary tiles and deduplicated fallback map grouped by resolved key.
      */
     RenderPlan classifyTiles(Set<PmTileKey> tilesToDisplay, int minZoom, boolean settled) {
 
@@ -247,11 +275,12 @@ public class PmTilesRenderer extends MapRenderable {
         for (PmTileKey key : tilesToDisplay) {
 
             if (settled) {
-                tileProvider.request(key, TileProvider.PRIMARY_VIEWPORT_PRIORITY_BASE
-                        + mapCamera.centerTileDistance(key.x, key.y, key.z));
+                int ring = mapCamera.centerTileDistance(key.x, key.y, key.z);
+                tileProvider.request(key, TileProvider.PRIMARY_VIEWPORT_PRIORITY_BASE + ring);
             }
 
             Optional<Identifier> tex = tileProvider.peek(key);
+
             if (tex.isPresent()) {
                 var screenPos = mapCamera.tilePositionOnViewport(key.x, key.y, key.z);
                 primaryTiles.add(new TileDraw(tex.get(), (float) screenPos.x(), (float) screenPos.y(), key));
@@ -259,11 +288,12 @@ public class PmTilesRenderer extends MapRenderable {
             }
 
             var fallbackTile = findFallbackTile(key, minZoom);
-            PmTileKey fallbackKey = fallbackTile.getLeft();
-            if (fallbackTile.getRight().isPresent() && !fallbackMap.containsKey(fallbackKey)) {
+            PmTileKey fallbackKey = fallbackTile.getA();
+
+            if (fallbackTile.getB().isPresent() && !fallbackMap.containsKey(fallbackKey)) {
                 var fallbackPos = mapCamera.tilePositionOnViewport(fallbackKey.x, fallbackKey.y, fallbackKey.z);
                 fallbackMap.put(fallbackKey, new TileDraw(
-                        fallbackTile.getRight().get(),
+                        fallbackTile.getB().get(),
                         (float) fallbackPos.x(),
                         (float) fallbackPos.y(),
                         fallbackKey));
@@ -273,56 +303,21 @@ public class PmTilesRenderer extends MapRenderable {
         return new RenderPlan(primaryTiles, fallbackMap);
     }
 
-    /**
-     * Orders the resolved fallback tiles coarsest-first (ascending {@code z}) for drawing.
-     * <p>
-     * {@link #findFallbackTile} can resolve missing primaries to several coarseness levels in the
-     * same frame (previous-primary {@code z-1} down to {@code minZoom}), and a coarser tile's
-     * footprint overlaps finer ones. Drawing coarsest-first guarantees a finer fallback always
-     * paints over the coarser tile it overlaps (blur → sharp); primaries then paint over all of them.
-     *
-     * @param plan the classified render plan for this frame
-     * @return the fallback draws sorted ascending by tile zoom
-     */
-    List<TileDraw> orderedFallbacks(RenderPlan plan) {
-
-        List<TileDraw> ordered = new ArrayList<>(plan.fallbackMap().values());
-        ordered.sort(Comparator.comparingInt(t -> t.key().z));
-        return ordered;
-    }
-
-    /**
-     * Draw a batch of tiles to the screen.
-     *
-     * @param context Draw context used for rendering.
-     * @param tiles Tiles to draw.
-     * @param debugMode Whether to overlay tile borders and labels.
-     */
-    private void drawTilePass(DrawContext context, Iterable<TileDraw> tiles, boolean debugMode) {
-
-        var textureManager = MinecraftClient.getInstance().getTextureManager();
+    private void drawTilePass(GuiGraphicsExtractor context, Iterable<TileDraw> tiles, boolean debugMode) {
 
         for (TileDraw tile : tiles) {
             int renderSize = getDisplayedTileSize(tile.key().z);
-            int roundedX = Math.round(tile.x0());
-            int roundedY = Math.round(tile.y0());
 
-            Identifier currentTexture = tile.texture();
-            RenderSystem.activeTexture(GL13.GL_TEXTURE0);
-            textureManager.bindTexture(currentTexture);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
-            RenderSystem.setShaderTexture(0, currentTexture);
+            GuiRenderStateAccess.add(context, new PmTilesTileRenderState(
+                    tile.texture(),
+                    new org.joml.Matrix3x2f(context.pose()),
+                    tile.x0(),
+                    tile.y0(),
+                    tile.x0() + renderSize,
+                    tile.y0() + renderSize,
+                    GuiRenderStateAccess.scissorArea(context)));
 
-            context.drawTexture(
-                    currentTexture,
-                    roundedX, roundedY,
-                    0, 0,
-                    renderSize, renderSize,
-                    renderSize, renderSize
-            );
-
-            if (debugMode) drawDebugLines(context, tile.key(), roundedX, roundedY, renderSize);
+            if (debugMode) drawDebugLines(context, tile.key(), Math.round(tile.x0()), Math.round(tile.y0()), renderSize);
         }
     }
 
@@ -333,7 +328,7 @@ public class PmTilesRenderer extends MapRenderable {
      * @param minZoom the minimum zoom level to stop at
      * @return the key of the fallback tile if found, or null if no fallback tile is available
      */
-    private Pair<PmTileKey, Optional<Identifier>> findFallbackTile(PmTileKey key, int minZoom) {
+    private Tuple<PmTileKey, Optional<Identifier>> findFallbackTile(PmTileKey key, int minZoom) {
 
         PmTileKey current = key;
 
@@ -345,11 +340,11 @@ public class PmTilesRenderer extends MapRenderable {
             );
 
             Optional<Identifier> tex = tileProvider.peek(current);
-            if (tex.isPresent()) return new Pair<>(current, tex);
+            if (tex.isPresent()) return new Tuple<>(current, tex);
 
         }
 
-        return new Pair<>(key, Optional.empty());
+        return new Tuple<>(key, Optional.empty());
     }
 
     /**
@@ -363,22 +358,22 @@ public class PmTilesRenderer extends MapRenderable {
     }
 
     /**
-     * Draw diagnostic borders and tile coordinates over a rendered tile.
+     * Draw tile separation lines and tile info
      *
-     * @param context Draw context used for rendering.
-     * @param key Tile key being rendered.
-     * @param screenX Screen X coordinate of the tile.
-     * @param screenY Screen Y coordinate of the tile.
-     * @param renderSize Rendered size in pixels.
+     * @param context    the draw context
+     * @param key        the tile key
+     * @param screenX    screen X position of the tile
+     * @param screenY    screen Y position of the tile
+     * @param renderSize size of the rendered tile
      */
-    private void drawDebugLines(DrawContext context, PmTileKey key, int screenX, int screenY, int renderSize) {
+    private void drawDebugLines(GuiGraphicsExtractor context, PmTileKey key, int screenX, int screenY, int renderSize) {
 
         // Draw red outline
-        context.drawBorder(screenX, screenY, renderSize, renderSize, ModConstants.COLOR_RED);
+        context.outline(screenX, screenY, renderSize, renderSize, ModConstants.COLOR_RED);
 
         // Draw tile ID text
         String tileId = String.format("Z:%d X:%d Y:%d", key.z, key.x, key.y);
-        context.drawText(
+        context.text(
                 textRenderer,
                 tileId,
                 screenX + 5,
@@ -386,6 +381,18 @@ public class PmTilesRenderer extends MapRenderable {
                 ModConstants.COLOR_WHITE,
                 true
         );
+    }
+
+    /**
+     * Releases tile provider resources owned by this renderer.
+     */
+    @Override
+    public void close() {
+
+        if (tileProvider != null) {
+            tileProvider.close();
+            tileProvider = null;
+        }
     }
 
     /**
@@ -403,14 +410,24 @@ public class PmTilesRenderer extends MapRenderable {
     }
 
     /**
-     * Classified tiles for one render pass.
+     * Rendering plan for a frame, separating already-loaded primary tiles from their fallback ancestors.
+     * Fallback tiles are deduplicated by key to avoid redundant draw calls when multiple primary tiles
+     * map to the same ancestor.
+     *
+     * @param primaryTiles List of tiles loaded at the primary zoom level, ready to draw.
+     * @param fallbackMap Deduplicated map of coarser ancestors keyed by their actual {@link PmTileKey}.
      */
     record RenderPlan(List<TileDraw> primaryTiles, Map<PmTileKey, TileDraw> fallbackMap) {
 
     }
 
     /**
-     * Resolved tile draw parameters for a PMTiles quad.
+     * Lightweight carrier for a resolved tile ready to be drawn.
+     *
+     * @param texture The loaded tile texture identifier.
+     * @param x0      Left edge of the quad in screen pixels (floating-point for sub-pixel accuracy).
+     * @param y0      Top edge of the quad in screen pixels (floating-point for sub-pixel accuracy).
+     * @param key     The tile's actual key; {@code key.z} drives quad size for coarse fallbacks.
      */
     record TileDraw(Identifier texture, float x0, float y0, PmTileKey key) {
 

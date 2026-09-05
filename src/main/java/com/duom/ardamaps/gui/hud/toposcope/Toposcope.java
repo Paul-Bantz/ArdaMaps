@@ -31,12 +31,12 @@ import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.networking.PacketRegistry;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerWarpPacket;
+import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.hud.toposcope.rendering.ToposcopeRenderer;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.event.player.*;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.TypedActionResult;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.InteractionResult;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
@@ -47,12 +47,6 @@ public class Toposcope {
 
     /** Indicates whether the toposcope overlay is currently enabled. */
     public static boolean overlayEnabled = false;
-
-    /** Tracks the previous state of the left mouse button to detect clicks. */
-    private boolean leftMouseButtonWasDown = false;
-
-    /** Tracks the previous state of the right mouse button to detect clicks. */
-    private boolean rightMouseButtonWasDown = false;
 
     /**
      * Set to true for the duration of the tick in which a left-click on a location was consumed.
@@ -67,12 +61,18 @@ public class Toposcope {
      */
     private static boolean rightClickConsumed = false;
 
+    /** Tracks the previous state of the left mouse button to detect clicks. */
+    private boolean leftMouseButtonWasDown = false;
+
+    /** Tracks the previous state of the right mouse button to detect clicks. */
+    private boolean rightMouseButtonWasDown = false;
+
     /**
      * Registers event handlers for the toposcope functionality.
      */
     public void registerRenderer() {
 
-        HudRenderCallback.EVENT.register((drawContext, v) -> ToposcopeRenderer.render(drawContext));
+        HudElementRegistry.addLast(ModConstants.modId("toposcope"), (drawContext, _) -> ToposcopeRenderer.render(drawContext));
         registerMouseHoveringCallbacks();
     }
 
@@ -83,46 +83,39 @@ public class Toposcope {
     private void registerMouseHoveringCallbacks() {
 
         // Suppress vanilla left-click: block breaking
-        AttackBlockCallback.EVENT.register((player, world, hand, pos, direction) -> {
+        AttackBlockCallback.EVENT.register((_, _, _, _, _) -> {
             if (shouldSuppressLeftClick())
-                return ActionResult.FAIL;
-            return ActionResult.PASS;
+                return InteractionResult.FAIL;
+            return InteractionResult.PASS;
         });
 
         // Suppress vanilla left-click: entity attack
-        AttackEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
+        AttackEntityCallback.EVENT.register((_, _, _, _, _) -> {
             if (shouldSuppressLeftClick())
-                return ActionResult.FAIL;
-            return ActionResult.PASS;
+                return InteractionResult.FAIL;
+            return InteractionResult.PASS;
         });
 
         // Suppress vanilla right-click: block interaction
-        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+        UseBlockCallback.EVENT.register((_, _, _, _) -> {
             if (shouldSuppressRightClick())
-                return ActionResult.FAIL;
-            return ActionResult.PASS;
+                return InteractionResult.FAIL;
+            return InteractionResult.PASS;
         });
 
         // Suppress vanilla right-click: entity interaction
-        UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
+        UseEntityCallback.EVENT.register((_, _, _, _, _) -> {
             if (shouldSuppressRightClick())
-                return ActionResult.FAIL;
-            return ActionResult.PASS;
+                return InteractionResult.FAIL;
+            return InteractionResult.PASS;
         });
 
         // Suppress vanilla right-click: item use in air
-        UseItemCallback.EVENT.register((player, world, hand) -> {
+        UseItemCallback.EVENT.register((_, _, _) -> {
             if (shouldSuppressRightClick())
-                return TypedActionResult.fail(player.getStackInHand(hand));
-            return TypedActionResult.pass(player.getStackInHand(hand));
+                return InteractionResult.FAIL;
+            return InteractionResult.PASS;
         });
-    }
-
-    /**
-     * @return true if the overlay is enabled and player is hovering a location
-     */
-    private static boolean isMouseOverLocation() {
-        return overlayEnabled && ToposcopeRenderer.getHoveredLocation() != null;
     }
 
     /**
@@ -143,12 +136,19 @@ public class Toposcope {
     }
 
     /**
+     * @return true if the overlay is enabled and player is hovering a location
+     */
+    private static boolean isMouseOverLocation() {
+        return overlayEnabled && ToposcopeRenderer.getHoveredLocation() != null;
+    }
+
+    /**
      * Toggles the overlay on or off based on the provided enabled state (driven by the V keybind).
      *
      * @param client  The Minecraft client instance.
      * @param enabled {@code true} if the toposcope should be visible.
      */
-    public void toggleOverlay(MinecraftClient client, boolean enabled) {
+    public void toggleOverlay(Minecraft client, boolean enabled) {
 
         if (client.player == null) return;
 
@@ -161,7 +161,7 @@ public class Toposcope {
      * @param client The Minecraft client instance.
      */
     @SuppressWarnings("DataFlowIssue")
-    public void handleMouseClick(MinecraftClient client) {
+    public void handleMouseClick(Minecraft client) {
 
         if (client.player == null) return;
 
@@ -169,7 +169,7 @@ public class Toposcope {
         locationClickConsumed = false;
         rightClickConsumed = false;
 
-        long handle = client.getWindow().getHandle();
+        long handle = client.getWindow().handle();
         boolean leftDown = GLFW.glfwGetMouseButton(handle, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
         boolean rightDown = GLFW.glfwGetMouseButton(handle, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
 
@@ -188,7 +188,7 @@ public class Toposcope {
                 ArdaMapsClient.CONFIG.removeWaypoint(activeWaypoint.get());
             } else {
                 var pos = location.getPosition();
-                ArdaMapsClient.CONFIG.setWaypoint(pos.x, pos.z, location.getWorld());
+                ArdaMapsClient.CONFIG.setWaypoint(pos.x(), pos.z(), location.getWorld());
             }
         }
 
@@ -203,9 +203,9 @@ public class Toposcope {
      * @param leftDown {@code true} if the left mouse button is currently pressed.
      * @return {@code true} if the click is valid for selecting a location, {@code false} otherwise.
      */
-    private boolean isValidLeftClick(MinecraftClient client, boolean leftDown) {
+    private boolean isValidLeftClick(Minecraft client, boolean leftDown) {
 
-        return client.currentScreen == null &&
+        return client.screen == null &&
                 leftDown && !leftMouseButtonWasDown &&
                 overlayEnabled &&
                 ToposcopeRenderer.getHoveredLocation() != null;
@@ -228,9 +228,9 @@ public class Toposcope {
 
             } else {
 
-                PlayerTeleportPacket packet = new PlayerTeleportPacket(hoveredLocation.getPosition().x,
-                        hoveredLocation.getPosition().y,
-                        hoveredLocation.getPosition().z,
+                PlayerTeleportPacket packet = new PlayerTeleportPacket(hoveredLocation.getPosition().x(),
+                        hoveredLocation.getPosition().y(),
+                        hoveredLocation.getPosition().z(),
                         Client.currentDimensionId());
 
                 PacketRegistry.PLAYER_TELEPORT_REQUEST.send(packet);
@@ -245,9 +245,9 @@ public class Toposcope {
      * @param rightDown {@code true} if the right mouse button is currently pressed.
      * @return {@code true} if the click is valid for placing a waypoint over a location, {@code false} otherwise.
      */
-    private boolean isValidRightClick(MinecraftClient client, boolean rightDown) {
+    private boolean isValidRightClick(Minecraft client, boolean rightDown) {
 
-        return client.currentScreen == null &&
+        return client.screen == null &&
                 rightDown && !rightMouseButtonWasDown &&
                 overlayEnabled &&
                 ToposcopeRenderer.getHoveredLocation() != null;

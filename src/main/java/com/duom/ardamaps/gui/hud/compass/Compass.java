@@ -25,8 +25,9 @@
 
 package com.duom.ardamaps.gui.hud.compass;
 
+import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.hud.compass.rendering.CompassRenderer;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 
 /**
  * HUD Compass definition
@@ -34,10 +35,12 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 public class Compass {
 
     /**
-     * Register hud render callback
+     * Registers the compass HUD element with Minecraft's HUD rendering system.
+     * Adds a render callback that draws the compass overlay at the configured opacity.
      */
     public void registerRenderer() {
 
-        HudRenderCallback.EVENT.register(CompassRenderer::render);
+        HudElementRegistry.addLast(ModConstants.modId("compass"), (context, delta) ->
+                CompassRenderer.render(context, delta.getGameTimeDeltaTicks()));
     }
 }

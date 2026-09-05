@@ -37,7 +37,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class FlatMapCameraTest {
 
     /**
-     * The overload accepting an explicit zoom is used for pre-viewport and animation math; it must not use current zoom.
+     * Verifies that the overload accepting an explicit zoom parameter uses that zoom instead of the camera's current zoom.
+     * This is essential for pre-viewport calculations and animation math.
      */
     @Test
     void screenToWorldCoordinates_atExplicitZoom_usesProvidedZoom() {

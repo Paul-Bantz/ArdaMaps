@@ -27,8 +27,8 @@ package com.duom.ardamaps.gui.widgets.builders;
 
 import com.duom.ardamaps.gui.widgets.DropdownWidget;
 import com.duom.ardamaps.gui.widgets.TextIdentifierPairItem;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -45,6 +45,9 @@ import java.util.function.Function;
 @SuppressWarnings("unused")
 public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
 
+    /** whether the dropdown widget should start in an expanded state when created */
+    protected final boolean expanded = false;
+
     /** x coordinate of the dropdown widget */
     protected int x;
 
@@ -58,7 +61,7 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
     protected int height;
 
     /** title text displayed above the dropdown widget */
-    protected Text title;
+    protected Component title;
 
     /** list of options available in the dropdown widget */
     protected List<T> options = List.of();
@@ -76,13 +79,10 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
     protected boolean allowNull = false;
 
     /** text displayed when no item is selected in the dropdown widget */
-    protected Text placeholderText = Text.literal("None");
+    protected Component placeholderText = Component.literal("None");
 
     /** icon displayed when no item is selected in the dropdown widget */
     protected Identifier placeholderIcon = null;
-
-    /** whether the dropdown widget should start in an expanded state when created */
-    protected final boolean expanded = false;
 
     /** maximum number of options visible in the dropdown widget before scrolling is enabled */
     protected int maxVisibleOptions = 8;
@@ -102,7 +102,8 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
     protected boolean displayAsSprite = false;
 
     /** Private constructor to prevent direct instantiation. Use the static create() method instead. */
-    protected DropdownBuilder() {}
+    protected DropdownBuilder() {
+    }
 
     /**
      * Creates a new instance of the builder.
@@ -222,7 +223,7 @@ public class DropdownBuilder<T, E extends TextIdentifierPairItem> {
      * @param placeholderText The placeholder text
      * @return This builder for method chaining
      */
-    public DropdownBuilder<T, E> setPlaceholderText(Text placeholderText) {
+    public DropdownBuilder<T, E> setPlaceholderText(Component placeholderText) {
         this.placeholderText = placeholderText;
         return this;
     }

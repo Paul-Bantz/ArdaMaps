@@ -25,25 +25,45 @@
 
 package com.duom.ardamaps.core.consumers.networking;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+
+import java.util.function.Function;
 
 /**
  * Interface for network packets.
  * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
-public interface IPacket {
+public interface IPacket extends CustomPacketPayload {
+
     /**
      * Convert the packet to an instance of the object.
      *
      * @param buf The packet byte buffer to read
      */
     @SuppressWarnings("unused")
-    static <T> T read(PacketByteBuf buf) {
+    static <T> T read(FriendlyByteBuf buf) {
         return null;
     }
 
     /**
-     * Build the packet.
+     * Creates a simple payload codec backed by the packet's legacy read/build methods.
+     *
+     * @param reader The packet reader.
+     * @param <T>    The packet type.
+     * @return A StreamCodec for play-phase payload registration.
      */
-    PacketByteBuf build();
+    static <T extends IPacket> StreamCodec<RegistryFriendlyByteBuf, T> codec(Function<FriendlyByteBuf, T> reader) {
+
+        return StreamCodec.of((buf, packet) -> buf.writeBytes(packet.build()), reader::apply);
+    }
+
+    /**
+     * Builds this packet into a serialized byte buffer.
+     *
+     * @return the packet data encoded in a byte buffer
+     */
+    FriendlyByteBuf build();
 }

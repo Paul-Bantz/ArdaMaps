@@ -23,33 +23,25 @@
  * THE SOFTWARE.
  */
 
-package com.duom.ardamaps.core.data.map.providers;
+package com.duom.ardamaps.core.consumers.networking;
 
-import java.net.http.HttpClient;
-import java.time.Duration;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.UUID;
 
 /**
- * Shared Java HTTP client for map image transport.
+ * Packet payload that carries a request id for request/response networking.
+ *
+ * @param <T> The concrete packet type.
  */
-final class ArdaMapsHttpClient {
+public interface IRespondablePacket<T extends IRespondablePacket<T>> extends IPacket {
 
-    /** Shared executor for the HTTP client. */
-    private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool(runnable -> {
-        Thread thread = new Thread(runnable, "ardamaps-http-client");
-        thread.setDaemon(true);
-        return thread;
-    });
+    /**
+     * @return The request id correlating a response to a request.
+     */
+    UUID requestId();
 
-    /** Shared HTTP client for map image and metadata requests. */
-    static final HttpClient CLIENT = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .executor(EXECUTOR)
-            .version(HttpClient.Version.HTTP_2)
-            .build();
-
-    /** Prevent instantiation. */
-    private ArdaMapsHttpClient() {
-    }
+    /**
+     * @param requestId The request id to attach.
+     * @return A copy of this payload with the supplied request id.
+     */
+    T withRequestId(UUID requestId);
 }

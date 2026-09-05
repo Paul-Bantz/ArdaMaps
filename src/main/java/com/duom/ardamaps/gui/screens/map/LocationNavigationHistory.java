@@ -54,7 +54,7 @@ public class LocationNavigationHistory {
             locationHistory.subList(historyIndex + 1, locationHistory.size()).clear();
 
         if (locationHistory.size() >= MAX_HISTORY_SIZE)
-            locationHistory.remove(0);
+            locationHistory.removeFirst();
 
         locationHistory.add(location);
         historyIndex = locationHistory.size() - 1;

@@ -30,10 +30,8 @@ import com.duom.ardamaps.core.consumers.networking.RespondablePacketHandler;
 import com.duom.ardamaps.core.data.map.RegionLookupTexture;
 import com.duom.ardamaps.core.networking.packets.client.RegionsLutResponsePacket;
 import com.duom.ardamaps.core.networking.packets.server.RegionsLutRequestPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,21 +55,20 @@ public class RegionsLutRequestHandler extends RespondablePacketHandler<RegionsLu
      * Constructs a new RegionsLutRequestHandler, specifying the request and response channels and packet readers.
      */
     public RegionsLutRequestHandler() {
-        super(REQ_CHANNEL, RegionsLutRequestPacket::read, RESP_CHANNEL, RegionsLutResponsePacket::read);
+        super(REQ_CHANNEL, RegionsLutRequestPacket.TYPE, RegionsLutRequestPacket.CODEC,
+                RESP_CHANNEL, RegionsLutResponsePacket.TYPE, RegionsLutResponsePacket.CODEC);
     }
 
     /**
      * Handles the incoming RegionsLutRequestPacket by checking if the client's region LUT data is outdated compared to the server's last update, and responding with a RegionsLutResponsePacket containing the updated region LUT data if necessary.
      *
-     * @param server  The Minecraft server instance.
-     * @param player  The player who sent the request.
-     * @param handler The network handler for the player's connection.
-     * @param packet  The RegionsLutRequestPacket containing the request data, including the client's last update timestamp.
-     * @param sender  The packet sender to send the response back to the client.
+     * @param server The Minecraft server instance.
+     * @param player The player who sent the request.
+     * @param packet The RegionsLutRequestPacket containing the request data, including the client's last update timestamp.
      * @return A RegionsLutResponsePacket containing the updated region LUT data if the client's data is outdated, or an empty response if the client's data is up-to-date.
      */
     @Override
-    public RegionsLutResponsePacket handle(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, RegionsLutRequestPacket packet, PacketSender sender) {
+    public RegionsLutResponsePacket handle(MinecraftServer server, ServerPlayer player, RegionsLutRequestPacket packet) {
 
         Date lastClientUpdate = packet.date();
         RegionLookupTexture serverRegionLut = ArdaMaps.CONFIG.getRegionLookupTexture();

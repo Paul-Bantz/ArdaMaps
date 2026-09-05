@@ -26,8 +26,16 @@
 package com.duom.ardamaps.core.networking.packets.server;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
+
+import java.util.UUID;
 
 /**
  * Packet sent by the server to teleport the player to a specific location in a given range, optionally in a specific world.
@@ -39,28 +47,47 @@ import net.minecraft.network.PacketByteBuf;
  * @param scanMaxBoundY Y coordinate of the maximum Y in the range to scan for a valid position.
  */
 public record PlayerRangedTeleportPacket(
+        UUID requestId,
         double x,
         double z,
         String worldId,
         double scanMinBoundY,
         double scanMaxBoundY
-) implements IPacket {
+) implements IRespondablePacket<PlayerRangedTeleportPacket> {
+
+    public static final CustomPacketPayload.Type<PlayerRangedTeleportPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("player_ranged_teleport"));
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, PlayerRangedTeleportPacket> CODEC = IPacket.codec(PlayerRangedTeleportPacket::read);
 
     /**
-     * Deserializes a PlayerRangedTeleportPacket from the given PacketByteBuf.
+     * Constructs a PlayerRangedTeleportPacket with coordinates and scan bounds.
+     *
+     * @param x             The X coordinate to teleport to.
+     * @param z             The Z coordinate to teleport to.
+     * @param worldId       The world identifier to teleport to.
+     * @param scanMinBoundY The minimum Y coordinate to scan for a valid position.
+     * @param scanMaxBoundY The maximum Y coordinate to scan for a valid position.
+     */
+    public PlayerRangedTeleportPacket(double x, double z, String worldId, double scanMinBoundY, double scanMaxBoundY) {
+        this(new UUID(0L, 0L), x, z, worldId, scanMinBoundY, scanMaxBoundY);
+    }
+
+    /**
+     * Reads a PlayerRangedTeleportPacket from the given PacketByteBuf.
      *
      * @param buf The PacketByteBuf to read from.
      * @return A new PlayerRangedTeleportPacket instance with the deserialized data.
      */
-    public static PlayerRangedTeleportPacket read(PacketByteBuf buf) {
+    public static PlayerRangedTeleportPacket read(FriendlyByteBuf buf) {
 
+        final UUID requestId = buf.readUUID();
         final double x = buf.readDouble();
         final double z = buf.readDouble();
-        final String worldId = buf.readString();
+        final String worldId = buf.readUtf();
         final double scanMinBoundY = buf.readDouble();
         final double scanMaxBoundY = buf.readDouble();
 
-        return new PlayerRangedTeleportPacket(x, z, worldId, scanMinBoundY, scanMaxBoundY);
+        return new PlayerRangedTeleportPacket(requestId, x, z, worldId, scanMinBoundY, scanMaxBoundY);
     }
 
     /**
@@ -69,16 +96,33 @@ public record PlayerRangedTeleportPacket(
      * @return A new PacketByteBuf containing the serialized packet data.
      */
     @Override
-    public PacketByteBuf build() {
+    public FriendlyByteBuf build() {
 
-        PacketByteBuf buf = PacketByteBufs.create();
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
 
+        buf.writeUUID(requestId);
         buf.writeDouble(x);
         buf.writeDouble(z);
-        buf.writeString(worldId);
+        buf.writeUtf(worldId);
         buf.writeDouble(scanMinBoundY);
         buf.writeDouble(scanMaxBoundY);
 
         return buf;
+    }
+
+    /**
+     * Creates a new PlayerRangedTeleportPacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this request.
+     * @return A new PlayerRangedTeleportPacket with the updated request identifier.
+     */
+    @Override
+    public PlayerRangedTeleportPacket withRequestId(UUID requestId) {
+        return new PlayerRangedTeleportPacket(requestId, x, z, worldId, scanMinBoundY, scanMaxBoundY);
+    }
+
+    @Override
+    public CustomPacketPayload.@NonNull Type<PlayerRangedTeleportPacket> type() {
+        return TYPE;
     }
 }

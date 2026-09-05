@@ -26,33 +26,50 @@
 package com.duom.ardamaps.core.networking.packets;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import com.duom.ardamaps.gui.ModConstants;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 
 /**
- * A packet with no data.
+ * A packet containing no data payload.
  * <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
 public record EmptyPacket() implements IPacket {
-    private static final PacketByteBuf EMPTY = PacketByteBufs.create();
+
+    public static final CustomPacketPayload.Type<EmptyPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("guidebook_request"));
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, EmptyPacket> CODEC = StreamCodec.unit(new EmptyPacket());
 
     /**
-     * Reads an EmptyPacket from the given PacketByteBuf. Since this packet has no data, the buffer is not read.
+     * Reads an EmptyPacket from the given PacketByteBuf.
+     * <p>
+     * Since this packet has no data, the buffer is not read.
      *
-     * @param buf The PacketByteBuf to read from (ignored)
-     * @return A new instance of EmptyPacket
+     * @param buf The PacketByteBuf to read from (ignored).
+     * @return A new instance of EmptyPacket.
      */
-    public static EmptyPacket read(@SuppressWarnings("unused") PacketByteBuf buf) {
+    @SuppressWarnings("unused")
+    public static EmptyPacket read(@SuppressWarnings("unused") FriendlyByteBuf buf) {
         return new EmptyPacket();
     }
 
     /**
-     * Builds an EmptyPacket into a PacketByteBuf. Since this packet has no data, an empty buffer is returned.
+     * Serializes this empty packet to a PacketByteBuf.
+     * <p>
+     * Since this packet has no data, an empty buffer is returned.
      *
-     * @return An empty PacketByteBuf
+     * @return An empty PacketByteBuf.
      */
     @Override
-    public PacketByteBuf build() {
-        return EMPTY;
+    public FriendlyByteBuf build() {
+        return net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs.empty();
+    }
+
+    @Override
+    public CustomPacketPayload.@NonNull Type<EmptyPacket> type() {
+        return TYPE;
     }
 }

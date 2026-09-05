@@ -28,27 +28,25 @@ package com.duom.ardamaps.gui.screens;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.UnitSystem;
 import com.duom.ardamaps.gui.ModConstants;
-import com.duom.ardamaps.gui.widgets.CheckboxWidget;
 import com.duom.ardamaps.gui.widgets.DropdownWidget;
 import com.duom.ardamaps.gui.widgets.StyledButtonWidget;
 import com.duom.ardamaps.gui.widgets.TextIdentifierPairItem;
-import com.duom.ardamaps.gui.widgets.builders.CheckboxBuilder;
 import com.duom.ardamaps.gui.widgets.builders.DropdownBuilder;
 import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.widget.SliderWidget;
-import net.minecraft.screen.ScreenTexts;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Pair;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.*;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Mth;
+import net.minecraft.util.Tuple;
 import net.minecraft.util.Util;
-import net.minecraft.util.math.MathHelper;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Arrays;
 import java.util.List;
@@ -80,33 +78,33 @@ public class ConfigurationScreen extends ArdaMapsScreen {
     private static final int BUTTON_WIDTH = 120;
 
     /** Confirmation dialog text for resetting exploration progress. */
-    private final Text confirmationResetExplorationDialogText = Text.translatable("ardamaps.client.map.screen.configuration.reset_exploration.confirm");
+    private final Component confirmationResetExplorationDialogText = Component.translatable("ardamaps.client.map.screen.configuration.reset_exploration.confirm");
 
     /** Confirmation dialog text for revealing all. */
-    private final Text confirmationRevealAllDialogText = Text.translatable("ardamaps.client.map.screen.configuration.reveal_all.confirm");
+    private final Component confirmationRevealAllDialogText = Component.translatable("ardamaps.client.map.screen.configuration.reveal_all.confirm");
 
     /** Title for the options section. */
-    private final Text titleOptions = Text.translatable("ardamaps.client.map.screen.options");
+    private final Component titleOptions = Component.translatable("ardamaps.client.map.screen.options");
 
-    private final Text titleMapOptions = Text.translatable("ardamaps.client.map.screen.configuration.title.map");
+    private final Component titleMapOptions = Component.translatable("ardamaps.client.map.screen.configuration.title.map");
 
-    private final Text revealAllOptionLabel = Text.translatable("ardamaps.client.map.screen.configuration.reveal_all");
+    private final Component revealAllOptionLabel = Component.translatable("ardamaps.client.map.screen.configuration.reveal_all");
 
-    private final Text resetExplorationProgressLabel = Text.translatable("ardamaps.client.map.screen.configuration.exploration");
+    private final Component resetExplorationProgressLabel = Component.translatable("ardamaps.client.map.screen.configuration.exploration");
 
-    private final Text configDirectoryLabel = Text.translatable("ardamaps.client.map.screen.configuration.directory");
+    private final Component configDirectoryLabel = Component.translatable("ardamaps.client.map.screen.configuration.directory");
 
-    private final Text unitSystemLabel = Text.translatable("ardamaps.client.map.screen.configuration.unit.system");
+    private final Component unitSystemLabel = Component.translatable("ardamaps.client.map.screen.configuration.unit.system");
 
-    private final Text titleCompassOptions = Text.translatable("ardamaps.client.map.screen.configuration.title.compass");
+    private final Component titleCompassOptions = Component.translatable("ardamaps.client.map.screen.configuration.title.compass");
 
-    private final Text compassOpacityLabel = Text.translatable("ardamaps.client.map.screen.configuration.compass.opacity");
+    private final Component compassOpacityLabel = Component.translatable("ardamaps.client.map.screen.configuration.compass.opacity");
 
-    private final Text compassPoiLabel = Text.translatable("ardamaps.client.map.screen.configuration.compass.poi.distance");
+    private final Component compassPoiLabel = Component.translatable("ardamaps.client.map.screen.configuration.compass.poi.distance");
 
-    private final Text titleToposcopeOptions = Text.translatable("ardamaps.client.map.screen.configuration.title.toposcope");
+    private final Component titleToposcopeOptions = Component.translatable("ardamaps.client.map.screen.configuration.title.toposcope");
 
-    private final Text toposcopePoiLabel = Text.translatable("ardamaps.client.map.screen.configuration.toposcope.poi.distance");
+    private final Component toposcopePoiLabel = Component.translatable("ardamaps.client.map.screen.configuration.toposcope.poi.distance");
 
     /** Margins for the left page. */
     private final Margins leftPageMargins = new Margins(10, 32, 10, 10);
@@ -121,34 +119,34 @@ public class ConfigurationScreen extends ArdaMapsScreen {
     private boolean displayResetProgressConfirmationDialog = false;
 
     /** Slider for the toposcope render distance. */
-    private SliderWidget toposcopeRenderDistanceSlider;
+    private AbstractSliderButton toposcopeRenderDistanceSlider;
 
     /** Slider for the compass render distance. */
-    private SliderWidget compassRenderDistanceSlider;
+    private AbstractSliderButton compassRenderDistanceSlider;
 
     /** Slider for the compass opacity. */
-    private SliderWidget compassOpacitySlider;
+    private AbstractSliderButton compassOpacitySlider;
 
     /** Checkbox for the reveal all option. */
-    private CheckboxWidget revealAllCheckbox;
+    private Checkbox revealAllCheckbox;
 
     /** Open Config directory button */
-    private ButtonWidget configDirectoryButton;
+    private Button configDirectoryButton;
 
     /** Button to reset exploration progress. */
-    private ButtonWidget resetExplorationButton;
+    private Button resetExplorationButton;
 
     /** Confirmation button for resetting exploration progress. */
-    private ButtonWidget confirmResetExplorationButton;
+    private Button confirmResetExplorationButton;
 
     /** Cancellation button for resetting exploration progress. */
-    private ButtonWidget cancelResetExplorationButton;
+    private Button cancelResetExplorationButton;
 
     /** Confirmation button for revealing all. */
-    private ButtonWidget confirmRevealAllButton;
+    private Button confirmRevealAllButton;
 
     /** Cancellation button for revealing all. */
-    private ButtonWidget cancelRevealAllButton;
+    private Button cancelRevealAllButton;
 
     /** Toggle button for the map options section. */
     private StyledButtonWidget mapOptionsToggleButton;
@@ -172,7 +170,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     public ConfigurationScreen(Screen parent) {
 
-        super(parent, Text.translatable("ardamaps.client.map.screen.configuration"));
+        super(parent, Component.translatable("ardamaps.client.map.screen.configuration"));
     }
 
     /**
@@ -182,8 +180,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
     protected void init() {
 
         super.init();
-
-        assert client != null;
 
         configureUnitSystemDropdown();
         configureCompassOpacitySlider();
@@ -196,9 +192,9 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         int dialogBtnWidth = Math.max(80, this.width / 8);
 
-        confirmResetExplorationButton = ButtonWidget.builder(
-                        Text.translatable("ardamaps.generic.yes"),
-                        button -> {
+        confirmResetExplorationButton = Button.builder(
+                        Component.translatable("ardamaps.generic.yes"),
+                        _ -> {
 
                             // Clear all per-dimension exploration data and re-initialise instances.
                             ArdaMapsClient.CONFIG.getClientProgress().reset(false);
@@ -209,15 +205,15 @@ public class ConfigurationScreen extends ArdaMapsScreen {
                 .size(dialogBtnWidth, BUTTON_HEIGHT)
                 .build();
 
-        cancelResetExplorationButton = ButtonWidget.builder(
-                        Text.translatable("ardamaps.generic.cancel"),
-                        button -> displayResetProgressConfirmationDialog = false)
+        cancelResetExplorationButton = Button.builder(
+                        Component.translatable("ardamaps.generic.cancel"),
+                        _ -> displayResetProgressConfirmationDialog = false)
                 .size(dialogBtnWidth, BUTTON_HEIGHT)
                 .build();
 
-        confirmRevealAllButton = ButtonWidget.builder(
-                        Text.translatable("ardamaps.generic.yes"),
-                        button -> {
+        confirmRevealAllButton = Button.builder(
+                        Component.translatable("ardamaps.generic.yes"),
+                        _ -> {
                             ArdaMapsClient.CONFIG.setMapRevealAll(true);
                             ArdaMapsClient.CONFIG_MANAGER.save();
                             displayRevealAllConfirmationDialog = false;
@@ -225,10 +221,10 @@ public class ConfigurationScreen extends ArdaMapsScreen {
                 .size(dialogBtnWidth, BUTTON_HEIGHT)
                 .build();
 
-        cancelRevealAllButton = ButtonWidget.builder(
-                        Text.translatable("ardamaps.generic.cancel"),
-                        button -> {
-                            revealAllCheckbox.setChecked(false);
+        cancelRevealAllButton = Button.builder(
+                        Component.translatable("ardamaps.generic.cancel"),
+                        _ -> {
+                            configureExplorationToggle();
                             displayRevealAllConfirmationDialog = false;
                         })
                 .size(dialogBtnWidth, BUTTON_HEIGHT)
@@ -239,7 +235,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * Get the search function that is called when searching an element on screen via the search widget.
      * This function should search for a String in a List of elements represented on screen
      *
-     * @return  the search function
+     * @return the search function
      */
     @Override
     protected @Nullable Function<String, List<?>> getSearchFunction() {
@@ -283,13 +279,11 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     private void configureUnitSystemDropdown() {
 
-        assert client != null;
-
         unitSystemDropdown = DropdownBuilder.<UnitSystem, TextIdentifierPairItem>create()
                 .setSize(BUTTON_WIDTH, BUTTON_HEIGHT)
                 .setOptions(Arrays.asList(UnitSystem.values()))
                 .setAllowNull(false)
-                .setOptionDisplay((unitSystem) -> new TextIdentifierPairItem(Text.translatable(unitSystem.getDisplayNameKey()).getString(), null))
+                .setOptionDisplay((unitSystem) -> new TextIdentifierPairItem(Component.translatable(unitSystem.getDisplayNameKey()).getString(), null))
                 .setSelected(ArdaMapsClient.CONFIG.getUnitSystem())
                 .setOnSelect((unitSystem) -> {
                     ArdaMapsClient.CONFIG.setUnitSystem(unitSystem);
@@ -305,10 +299,8 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     private void configureCompassOpacitySlider() {
 
-        assert client != null;
-
         var currentOpacity = ArdaMapsClient.CONFIG.getCompassOpacity();
-        compassOpacitySlider = new SliderWidget(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT, ScreenTexts.EMPTY, currentOpacity) {
+        compassOpacitySlider = new AbstractSliderButton(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT, CommonComponents.EMPTY, currentOpacity) {
             {
                 this.updateMessage();
             }
@@ -322,7 +314,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
             @Override
             protected void updateMessage() {
                 var value = (int) Math.round(this.value * 100);
-                this.setMessage(Text.literal(String.format("%s%%", value)));
+                this.setMessage(Component.literal(String.format("%s%%", value)));
             }
 
             @Override
@@ -338,12 +330,9 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     private void configureExplorationToggle() {
 
-        assert client != null;
-
-        revealAllCheckbox = CheckboxBuilder.create()
-                .setSize(BUTTON_WIDTH, BUTTON_HEIGHT)
-                .setChecked(ArdaMapsClient.CONFIG.isMapRevealAll())
-                .setOnChange((checked) -> {
+        revealAllCheckbox = Checkbox.builder(Component.empty(), this.font)
+                .selected(ArdaMapsClient.CONFIG.isMapRevealAll())
+                .onValueChange((_, checked) -> {
                     if (!checked) {
                         ArdaMapsClient.CONFIG.setMapRevealAll(false);
                         ArdaMapsClient.CONFIG_MANAGER.save();
@@ -352,7 +341,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
                 })
                 .build();
 
-        revealAllCheckbox.setTooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.configuration.reveal_all.tooltip")));
+        revealAllCheckbox.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.configuration.reveal_all.tooltip")));
     }
 
     /**
@@ -360,13 +349,11 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     private void configureOpenConfigurationDirectoryButton() {
 
-        assert client != null;
-
-        configDirectoryButton = ButtonWidget.builder(
-                        Text.translatable("ardamaps.client.generic.open"),
-                        button -> Util.getOperatingSystem().open(FabricLoader.getInstance().getConfigDir().resolve("arda-maps").toFile()))
+        configDirectoryButton = Button.builder(
+                        Component.translatable("ardamaps.client.generic.open"),
+                        _ -> Util.getPlatform().openFile(FabricLoader.getInstance().getConfigDir().resolve("arda-maps").toFile()))
                 .width(BUTTON_WIDTH)
-                .tooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.configuration.open_config_directory.tooltip")))
+                .tooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.configuration.open_config_directory.tooltip")))
                 .build();
     }
 
@@ -375,13 +362,11 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     private void configureResetExplorationData() {
 
-        assert client != null;
-
-        resetExplorationButton = ButtonWidget.builder(
-                        Text.translatable("ardamaps.client.map.screen.configuration.reset_exploration"),
-                        button -> displayResetProgressConfirmationDialog = true)
+        resetExplorationButton = Button.builder(
+                        Component.translatable("ardamaps.client.map.screen.configuration.reset_exploration"),
+                        _ -> displayResetProgressConfirmationDialog = true)
                 .width(BUTTON_WIDTH)
-                .tooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.configuration.reset_exploration.tooltip")))
+                .tooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.configuration.reset_exploration.tooltip")))
                 .build();
     }
 
@@ -397,15 +382,15 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         compassRenderDistanceSlider = configureGenericRenderDistanceSlider(
                 (update) -> {
-                    var slider = update.getRight();
-                    var value = (int) Math.round(minValue + update.getLeft() * (maxValue - minValue));
+                    var slider = update.getB();
+                    var value = (int) Math.round(minValue + update.getA() * (maxValue - minValue));
                     if (isMetric)
-                        slider.setMessage(Text.translatable("ardamaps.client.map.screen.configuration.poi.draw.distance.meters", value));
+                        slider.setMessage(Component.translatable("ardamaps.client.map.screen.configuration.poi.draw.distance.meters", value));
                     else
-                        slider.setMessage(Text.translatable("ardamaps.client.map.screen.configuration.poi.draw.distance.miles", value));
+                        slider.setMessage(Component.translatable("ardamaps.client.map.screen.configuration.poi.draw.distance.miles", value));
                 },
                 (update) -> {
-                    var value = (int) Math.round(minValue + update.getLeft() * (maxValue - minValue));
+                    var value = (int) Math.round(minValue + update.getA() * (maxValue - minValue));
                     ArdaMapsClient.CONFIG.setCompassDrawDistance(value);
                     ArdaMapsClient.CONFIG_MANAGER.save();
                 }, currentDrawDistance, minValue, maxValue);
@@ -423,15 +408,15 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         toposcopeRenderDistanceSlider = configureGenericRenderDistanceSlider(
                 (update) -> {
-                    var slider = update.getRight();
-                    var value = (int) Math.round(minValue + update.getLeft() * (maxValue - minValue));
+                    var slider = update.getB();
+                    var value = (int) Math.round(minValue + update.getA() * (maxValue - minValue));
                     if (isMetric)
-                        slider.setMessage(Text.translatable("ardamaps.client.map.screen.configuration.poi.draw.distance.meters", value));
+                        slider.setMessage(Component.translatable("ardamaps.client.map.screen.configuration.poi.draw.distance.meters", value));
                     else
-                        slider.setMessage(Text.translatable("ardamaps.client.map.screen.configuration.poi.draw.distance.miles", value));
+                        slider.setMessage(Component.translatable("ardamaps.client.map.screen.configuration.poi.draw.distance.miles", value));
                 },
                 (update) -> {
-                    var value = (int) Math.round(minValue + update.getLeft() * (maxValue - minValue));
+                    var value = (int) Math.round(minValue + update.getA() * (maxValue - minValue));
                     ArdaMapsClient.CONFIG.setToposcopeDrawDistance(value);
                     ArdaMapsClient.CONFIG_MANAGER.save();
                 }, currentDrawDistance, minValue, maxValue);
@@ -486,16 +471,15 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param currentDrawDistance the current draw distance value in real world units, to set the initial value of the slider
      * @return the configured slider widget
      */
-    private SliderWidget configureGenericRenderDistanceSlider(Consumer<Pair<Double, SliderWidget>> onUpdateMessage,
-                                                              Consumer<Pair<Double, SliderWidget>> onUpdateValue,
-                                                              double currentDrawDistance,
-                                                              int minValue,
-                                                              int maxValue) {
-        assert client != null;
+    private AbstractSliderButton configureGenericRenderDistanceSlider(Consumer<Tuple<Double, AbstractSliderButton>> onUpdateMessage,
+                                                                      Consumer<Tuple<Double, AbstractSliderButton>> onUpdateValue,
+                                                                      double currentDrawDistance,
+                                                                      int minValue,
+                                                                      int maxValue) {
 
-        var baseSliderValue = MathHelper.clamp((currentDrawDistance - minValue) / (maxValue - minValue), 0, 1);
+        var baseSliderValue = Mth.clamp((currentDrawDistance - minValue) / (maxValue - minValue), 0, 1);
 
-        return new SliderWidget(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT, ScreenTexts.EMPTY, baseSliderValue) {
+        return new AbstractSliderButton(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT, CommonComponents.EMPTY, baseSliderValue) {
             {
                 this.updateMessage();
             }
@@ -508,18 +492,18 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
             @Override
             protected void updateMessage() {
-                onUpdateMessage.accept(new Pair<>(this.value, this));
+                onUpdateMessage.accept(new Tuple<>(this.value, this));
             }
 
             @Override
             protected void applyValue() {
-                onUpdateValue.accept(new Pair<>(this.value, this));
+                onUpdateValue.accept(new Tuple<>(this.value, this));
             }
         };
     }
 
     /**
-     * Render the configuration screen, including the background, the configuration UI and the confirmation dialog if needed.
+     * Render the configuration screen, including the configuration UI and the confirmation dialog if needed.
      *
      * @param context the draw context
      * @param mouseX  the x position of the mouse cursor
@@ -527,13 +511,11 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param delta   the time delta since the last render call
      */
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-
-        renderBackground(context);
+    public void extractRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         renderConfigurationUi(context, mouseX, mouseY, delta);
 
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
 
         renderConfirmationDialog(context, mouseX, mouseY, delta);
     }
@@ -546,7 +528,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param mouseY  the y position of the mouse cursor
      * @param delta   the time delta since the last render call
      */
-    private void renderConfigurationUi(DrawContext context, int mouseX, int mouseY, float delta) {
+    private void renderConfigurationUi(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         var contentArea = getPaddedContentArea();
         var leftColX = contentArea.topLeftX() + leftPageMargins.left;
@@ -596,7 +578,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param mouseY    the y position of the mouse cursor
      * @param delta     the time delta since the last render call
      */
-    private void renderMapOptions(DrawContext context, int x, int y, int pageWidth, int mouseX, int mouseY, float delta) {
+    private void renderMapOptions(GuiGraphicsExtractor context, int x, int y, int pageWidth, int mouseX, int mouseY, float delta) {
 
         y = renderRow(context, x, y, pageWidth, unitSystemLabel,
                 unitSystemDropdown, mouseX, mouseY, delta) + ModConstants.ROW_SPACING;
@@ -609,6 +591,11 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         renderRow(context, x, y, pageWidth, configDirectoryLabel,
                 configDirectoryButton, mouseX, mouseY, delta);
+
+        // Draw the expanded dropdown last so its option list overlays the rows below it.
+        if (unitSystemDropdown.isExpanded()) {
+            unitSystemDropdown.extractRenderState(context, mouseX, mouseY, delta);
+        }
     }
 
     /**
@@ -622,7 +609,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param mouseY    the y position of the mouse cursor
      * @param delta     the time delta since the last render call
      */
-    private void renderToposcopeOptions(DrawContext context, int x, int y, int pageWidth, int mouseX, int mouseY, float delta) {
+    private void renderToposcopeOptions(GuiGraphicsExtractor context, int x, int y, int pageWidth, int mouseX, int mouseY, float delta) {
 
         renderRow(context, x, y, pageWidth, toposcopePoiLabel,
                 toposcopeRenderDistanceSlider, mouseX, mouseY, delta);
@@ -639,7 +626,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param mouseY    the y position of the mouse cursor
      * @param delta     the time delta since the last render call
      */
-    private void renderCompassOptions(DrawContext context, int x, int y, int pageWidth, int mouseX, int mouseY, float delta) {
+    private void renderCompassOptions(GuiGraphicsExtractor context, int x, int y, int pageWidth, int mouseX, int mouseY, float delta) {
 
         y = renderRow(context, x, y, pageWidth, compassOpacityLabel,
                 compassOpacitySlider, mouseX, mouseY, delta) + ModConstants.ROW_SPACING;
@@ -661,7 +648,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param delta   the time delta since the last render call
      * @return the y position of the bottom edge of the row, to be used for rendering subsequent rows
      */
-    private int renderRow(DrawContext context, int x, int y, int pageWidth, ClickableWidget widget, int mouseX, int mouseY, float delta) {
+    private int renderRow(GuiGraphicsExtractor context, int x, int y, int pageWidth, AbstractWidget widget, int mouseX, int mouseY, float delta) {
 
         var xPos = x + pageWidth / 2 - widget.getWidth() / 2;
         var yPos = y - widget.getHeight() / 2;
@@ -677,7 +664,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
             mousePosY = -1;
         }
 
-        widget.render(context, mousePosX, mousePosY, delta);
+        widget.extractRenderState(context, mousePosX, mousePosY, delta);
 
         return y + widget.getHeight();
     }
@@ -696,23 +683,28 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param delta   the time delta since the last render call
      * @return the y position of the bottom edge of the row, to be used for rendering subsequent rows
      */
-    private int renderRow(DrawContext context, int x, int y, int width,
-                          Text label, ClickableWidget widget, int mouseX, int mouseY, float delta) {
+    private int renderRow(GuiGraphicsExtractor context, int x, int y, int width,
+                          Component label, AbstractWidget widget, int mouseX, int mouseY, float delta) {
 
         var halfPageWidth = width / 2;
 
         widget.setWidth(Math.min(halfPageWidth, widget.getWidth()));
 
-        int lineH = textRenderer.fontHeight / 2;
+        int lineH = font.lineHeight / 2;
 
         int rightX = x + halfPageWidth;
         int labelY = y - lineH;
 
-        context.drawText(textRenderer, label, x, labelY, ModConstants.COLOR_DARK_BROWN, false);
+        context.text(font, label, x, labelY, ModConstants.COLOR_DARK_BROWN, false);
 
         // Widget - vertically centred in the row
-        int widgetYPosition = y - BUTTON_HEIGHT / 2;
-        widget.setX(rightX);
+        int widgetYPosition = y - BUTTON_HEIGHT / 2 + (BUTTON_HEIGHT - widget.getHeight()) / 2;
+        int widgetXPosition = rightX;
+        if (widget instanceof Checkbox) {
+            int controlWidth = Math.min(halfPageWidth, BUTTON_WIDTH);
+            widgetXPosition = rightX + controlWidth - widget.getWidth();
+        }
+        widget.setX(widgetXPosition);
         widget.setY(widgetYPosition);
 
         var mousePosX = mouseX;
@@ -727,9 +719,9 @@ public class ConfigurationScreen extends ArdaMapsScreen {
             mousePosY = -1;
         }
 
-        widget.render(context, mousePosX, mousePosY, delta);
+        widget.extractRenderState(context, mousePosX, mousePosY, delta);
 
-        return widgetYPosition + BUTTON_HEIGHT;
+        return y - BUTTON_HEIGHT / 2 + BUTTON_HEIGHT;
     }
 
     /**
@@ -742,19 +734,19 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param title     the title text to render
      * @return the y position of the bottom edge of the title, to be used for rendering subsequent elements in the section
      */
-    private int renderSectionTitle(DrawContext context, int x, int y, int pageWidth, Text title) {
+    private int renderSectionTitle(GuiGraphicsExtractor context, int x, int y, int pageWidth, Component title) {
 
         float scale = 1.4f;
-        int textW = textRenderer.getWidth(title);
+        int textW = font.width(title);
         int xOffset = (int) (pageWidth / 2f - (textW * scale / 2f));
 
-        context.getMatrices().push();
-        context.getMatrices().translate(x + xOffset, y, 0);
-        context.getMatrices().scale(scale, scale, 1f);
-        context.drawText(textRenderer, title, 0, 0, ModConstants.COLOR_DARK_BROWN, false);
-        context.getMatrices().pop();
+        context.pose().pushMatrix();
+        context.pose().translate(x + xOffset, y);
+        context.pose().scale(scale, scale);
+        context.text(font, title, 0, 0, ModConstants.COLOR_DARK_BROWN, false);
+        context.pose().popMatrix();
 
-        return (int) (y + textRenderer.fontHeight * scale);
+        return (int) (y + font.lineHeight * scale);
     }
 
     /**
@@ -766,12 +758,11 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * @param mouseY  the y position of the mouse cursor
      * @param delta   the time delta since the last render call
      */
-    private void renderConfirmationDialog(DrawContext context, int mouseX, int mouseY, float delta) {
+    private void renderConfirmationDialog(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         if (!isDisplayingConfirmationDialog()) return;
 
-        context.getMatrices().push();
-        context.getMatrices().translate(0, 0, 200);
+        context.pose().pushMatrix();
 
         context.fillGradient(0, 0, this.width, this.height, -1072689136, -804253680);
 
@@ -782,16 +773,8 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         var dialogY = (this.height - dialogHeight) / 2;
         var dialogPadding = (int) (dialogWidth * .1);
 
-        context.drawNineSlicedTexture(ModConstants.PAPER_TEXTURE,
-                dialogX, dialogY,
-                dialogWidth, dialogHeight,
-                64,
-                64,
-                64,
-                64,
-                256,
-                256,
-                0, 0);
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.PAPER_TEXTURE,
+                dialogX, dialogY, 0, 0, dialogWidth, dialogHeight, 256, 256, 512, 512);
 
         var text = displayResetProgressConfirmationDialog ? confirmationResetExplorationDialogText : confirmationRevealAllDialogText;
         var okButton = displayResetProgressConfirmationDialog ? confirmResetExplorationButton : confirmRevealAllButton;
@@ -800,12 +783,12 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         int x = dialogX + dialogPadding;
         int y = dialogY + dialogPadding;
 
-        List<OrderedText> multilinePrompt = textRenderer.wrapLines(text, dialogWidth - dialogPadding * 2);
-        var lineHeight = textRenderer.fontHeight;
+        List<FormattedCharSequence> multilinePrompt = font.split(text, dialogWidth - dialogPadding * 2);
+        var lineHeight = font.lineHeight;
 
-        for (OrderedText line : multilinePrompt) {
+        for (FormattedCharSequence line : multilinePrompt) {
 
-            context.drawText(textRenderer, line, x, y, ModConstants.COLOR_DARK_BROWN, false);
+            context.text(font, line, x, y, ModConstants.COLOR_DARK_BROWN, false);
             y += lineHeight;
         }
 
@@ -813,34 +796,32 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         okButton.setPosition(x, dialogY + dialogHeight - dialogPadding - BUTTON_HEIGHT);
         okButton.setWidth(buttonWidth);
-        okButton.render(context, mouseX, mouseY, delta);
+        okButton.extractRenderState(context, mouseX, mouseY, delta);
 
         cancelBtn.setPosition(x + buttonWidth + 8, dialogY + dialogHeight - dialogPadding - BUTTON_HEIGHT);
         cancelBtn.setWidth(buttonWidth);
-        cancelBtn.render(context, mouseX, mouseY, delta);
+        cancelBtn.extractRenderState(context, mouseX, mouseY, delta);
 
-        context.getMatrices().pop();
+        context.pose().popMatrix();
     }
 
     /**
      * Handle mouse clicks for the configuration screen, including clicks on the options widgets and the confirmation dialog buttons.
      * When a confirmation dialog is displayed, only the buttons in the dialog are clickable.
      *
-     * @param mouseX the x position of the mouse cursor
-     * @param mouseY the y position of the mouse cursor
-     * @param button the mouse button that was clicked
+     * @param event the initiator event
      * @return true if the click was handled by the configuration screen, false otherwise
      */
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(@NonNull MouseButtonEvent event, boolean doubleClick) {
 
         if (isDisplayingConfirmationDialog()) {
 
-            confirmResetExplorationButton.mouseClicked(mouseX, mouseY, button);
-            confirmRevealAllButton.mouseClicked(mouseX, mouseY, button);
+            confirmResetExplorationButton.mouseClicked(event, doubleClick);
+            confirmRevealAllButton.mouseClicked(event, doubleClick);
 
-            cancelResetExplorationButton.mouseClicked(mouseX, mouseY, button);
-            cancelRevealAllButton.mouseClicked(mouseX, mouseY, button);
+            cancelResetExplorationButton.mouseClicked(event, doubleClick);
+            cancelRevealAllButton.mouseClicked(event, doubleClick);
 
             return true;
         }
@@ -849,31 +830,31 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         if (mapOptionsToggleButton.isToggled()) {
 
-            consumed |= unitSystemDropdown.mouseClicked(mouseX, mouseY, button);
+            consumed |= unitSystemDropdown.mouseClicked(event, doubleClick);
 
             if (!consumed) {
 
-                consumed = revealAllCheckbox.mouseClicked(mouseX, mouseY, button);
-                consumed |= resetExplorationButton.mouseClicked(mouseX, mouseY, button);
-                consumed |= configDirectoryButton.mouseClicked(mouseX, mouseY, button);
+                consumed = revealAllCheckbox.mouseClicked(event, doubleClick);
+                consumed |= resetExplorationButton.mouseClicked(event, doubleClick);
+                consumed |= configDirectoryButton.mouseClicked(event, doubleClick);
             }
 
         } else if (compassOptionsToggleButton.isToggled()) {
 
-            consumed |= compassRenderDistanceSlider.mouseClicked(mouseX, mouseY, button);
-            consumed |= compassOpacitySlider.mouseClicked(mouseX, mouseY, button);
+            consumed |= compassRenderDistanceSlider.mouseClicked(event, doubleClick);
+            consumed |= compassOpacitySlider.mouseClicked(event, doubleClick);
 
         } else if (toposcopeOptionsToggleButton.isToggled()) {
 
-            consumed |= toposcopeRenderDistanceSlider.mouseClicked(mouseX, mouseY, button);
+            consumed |= toposcopeRenderDistanceSlider.mouseClicked(event, doubleClick);
 
         }
 
-        consumed |= mapOptionsToggleButton.mouseClicked(mouseX, mouseY, button);
-        consumed |= compassOptionsToggleButton.mouseClicked(mouseX, mouseY, button);
-        consumed |= toposcopeOptionsToggleButton.mouseClicked(mouseX, mouseY, button);
+        consumed |= mapOptionsToggleButton.mouseClicked(event, doubleClick);
+        consumed |= compassOptionsToggleButton.mouseClicked(event, doubleClick);
+        consumed |= toposcopeOptionsToggleButton.mouseClicked(event, doubleClick);
 
-        return consumed || super.mouseClicked(mouseX, mouseY, button);
+        return consumed || super.mouseClicked(event, doubleClick);
     }
 
     /**
@@ -889,15 +870,15 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      * Handle mouse drags for the configuration screen, including drags on the sliders in the options sections.
      * When a confirmation dialog is displayed, dragging is disabled for all widgets.
      *
-     * @param mouseX the x position of the mouse cursor
-     * @param mouseY the y position of the mouse cursor
-     * @param button the mouse button that is being dragged
+     * @param event  the initiating mouse event
      * @param deltaX the change in x position since the last call
      * @param deltaY the change in y position since the last call
      * @return true if the drag was handled by the configuration screen, false otherwise
      */
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
 
         if (isDisplayingConfirmationDialog()) return true;
 
@@ -906,27 +887,27 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         if (compassOptionsToggleButton.isToggled()) {
 
             if (compassRenderDistanceSlider.isMouseOver(mouseX, mouseY))
-                consumed |= compassRenderDistanceSlider.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+                consumed |= compassRenderDistanceSlider.mouseDragged(event, deltaX, deltaY);
 
             if (compassOpacitySlider.isMouseOver(mouseX, mouseY))
-                consumed |= compassOpacitySlider.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+                consumed |= compassOpacitySlider.mouseDragged(event, deltaX, deltaY);
 
         } else if (toposcopeOptionsToggleButton.isToggled()) {
 
             if (toposcopeRenderDistanceSlider.isMouseOver(mouseX, mouseY))
-                consumed |= toposcopeRenderDistanceSlider.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+                consumed |= toposcopeRenderDistanceSlider.mouseDragged(event, deltaX, deltaY);
         }
 
-        return consumed || super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        return consumed || super.mouseDragged(event, deltaX, deltaY);
     }
 
     /**
      * Save the configuration when closing the screen, to ensure that any changes made by the user are persisted.
      */
     @Override
-    public void close() {
+    public void onClose() {
         ArdaMapsClient.CONFIG_MANAGER.save();
-        super.close();
+        super.onClose();
     }
 
     /**
@@ -957,5 +938,6 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     @SuppressWarnings("SameParameterValue")
     private record Margins(int left, int right, int top, int bottom) {
+
     }
 }

@@ -26,7 +26,8 @@
 package com.duom.ardamaps.gui.screens;
 
 import com.duom.ardamaps.gui.ModConstants;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 
 /**
  * Utility class for rendering operations in ArdaMaps screens.
@@ -42,7 +43,7 @@ public class ScreenRenderingUtils {
      * @param y       Vertical position of the separator
      * @return the separator height
      */
-    public static int renderSeparator(DrawContext context, int width, int x, int y) {
+    public static int renderSeparator(GuiGraphicsExtractor context, int width, int x, int y) {
 
         return renderSeparator(context, width, x, y, true);
     }
@@ -56,60 +57,17 @@ public class ScreenRenderingUtils {
      * @param y       Vertical position of the separator
      * @return the separator height
      */
-    public static int renderSeparator(DrawContext context, int width, int x, int y, boolean displayCenterSeparator) {
+    public static int renderSeparator(GuiGraphicsExtractor context, int width, int x, int y, boolean displayCenterSeparator) {
 
         int separatorSize = 9;
-        int xOffset = x;
-        int lineWidth = (width / 2);
+
+        context.blitSprite(RenderPipelines.GUI_TEXTURED, ModConstants.PAGE_SEPARATOR_SPRITE, x, y, width, separatorSize);
 
         if (displayCenterSeparator) {
-
-            lineWidth -= separatorSize * 2;
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, ModConstants.PAGE_SEPARATOR_CENTER_SPRITE,
+                    x + width / 2 - separatorSize, y,
+                    separatorSize * 2, separatorSize);
         }
-
-        // Left end
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
-                xOffset, y,
-                separatorSize, separatorSize,
-                32, 224,
-                18, 18,
-                512, 512);
-
-        // Left line
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
-                xOffset += separatorSize, y,
-                lineWidth, separatorSize,
-                50, 224,
-                1, 18,
-                512, 512);
-
-        if (displayCenterSeparator) {
-            // Center
-            context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
-                    xOffset += lineWidth, y,
-                    separatorSize * 2, separatorSize,
-                    142, 224,
-                    36, 18,
-                    512, 512);
-        } else {
-            xOffset += lineWidth - (separatorSize * 4);
-        }
-
-        // Right line
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
-                xOffset += separatorSize * 2, y,
-                lineWidth, separatorSize,
-                50, 224,
-                1, 18,
-                512, 512);
-
-        // Right end
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
-                xOffset + lineWidth, y,
-                separatorSize, separatorSize,
-                270, 224,
-                18, 18,
-                512, 512);
 
         return separatorSize;
     }

@@ -36,9 +36,13 @@ import org.jetbrains.annotations.NotNull;
 public class DistanceUnitConverter {
 
     public static final float KM_TO_MILES = 0.621371f;
+
     public static final double METRIC_UNIT_SWITCH_THRESHOLD = 1d;
+
     public static final double IMPERIAL_UNIT_SWITCH_THRESHOLD = 0.5d;
+
     public static final double KM_TO_METERS = 1000d;
+
     public static final double MILES_TO_FEET = 5280d;
 
     /**
@@ -46,12 +50,12 @@ public class DistanceUnitConverter {
      * based on the configured unit system.
      *
      * @param dimension The dimension definition to use for the conversion.
-     * @param nbBlocks Distance in blocks.
+     * @param nbBlocks  Distance in blocks.
      * @return A string representing the distance in the selected real-world units.
      */
     public static @NotNull String asRealWorldUnits(Dimension dimension, double nbBlocks) {
 
-        if(dimension == null) return "";
+        if (dimension == null) return "";
 
         double distance = blocksToRealWorldUnits(dimension, nbBlocks);
 
@@ -73,30 +77,16 @@ public class DistanceUnitConverter {
      * Converts in-game blocks to kilometers based on Ardacraft scale.
      *
      * @param dimension The dimension definition to use for the conversion.
-     * @param blocks Distance in blocks.
+     * @param blocks    Distance in blocks.
      */
     public static double blocksToRealWorldUnits(Dimension dimension, double blocks) {
 
-        if(dimension == null) return 0d;
+        if (dimension == null) return 0d;
 
         if (ArdaMapsClient.CONFIG.getUnitSystem() == UnitSystem.IMPERIAL)
             return (blocks / dimension.getScale() / 1000.0) * KM_TO_MILES;
 
         return blocks / dimension.getScale() / 1000.0;
-    }
-
-    /**
-     * Converts a distance in kilometers to the corresponding distance in in-game blocks based on Ardacraft scale.
-     *
-     * @param dimension The dimension definition to use for the conversion.
-     * @param km Distance in kilometers.
-     * @return Distance in blocks.
-     */
-    public static float kmToBlocks(Dimension dimension, float km) {
-
-        if (dimension == null) return 0f;
-
-        return km * 1000.0f * dimension.getScale();
     }
 
     /**
@@ -110,5 +100,19 @@ public class DistanceUnitConverter {
         if (dimension == null) return 0f;
 
         return kmToBlocks(dimension, miles / KM_TO_MILES);
+    }
+
+    /**
+     * Converts a distance in kilometers to the corresponding distance in in-game blocks based on Ardacraft scale.
+     *
+     * @param dimension The dimension definition to use for the conversion.
+     * @param km        Distance in kilometers.
+     * @return Distance in blocks.
+     */
+    public static float kmToBlocks(Dimension dimension, float km) {
+
+        if (dimension == null) return 0f;
+
+        return km * 1000.0f * dimension.getScale();
     }
 }

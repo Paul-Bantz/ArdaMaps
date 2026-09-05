@@ -26,17 +26,37 @@
 package com.duom.ardamaps.core.networking.packets.server;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
+import com.duom.ardamaps.gui.ModConstants;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Date;
+import java.util.UUID;
 
 /**
  * A packet sent from the client to the server requesting location data, optionally filtered by a date.
  *
  * @param date The date to filter locations by. If null, all locations will be requested.
  */
-public record LocationsRequestPacket(Date date) implements IPacket {
+public record LocationsRequestPacket(UUID requestId, Date date) implements IRespondablePacket<LocationsRequestPacket> {
+
+    public static final CustomPacketPayload.Type<LocationsRequestPacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_data_request"));
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, LocationsRequestPacket> CODEC = IPacket.codec(LocationsRequestPacket::read);
+
+    /**
+     * Constructs a LocationsRequestPacket with the given date filter.
+     *
+     * @param date The date to filter locations by, or null to request all locations.
+     */
+    public LocationsRequestPacket(Date date) {
+        this(new UUID(0L, 0L), date);
+    }
 
     /**
      * Reads a LocationsRequestPacket from the given PacketByteBuf.
@@ -44,13 +64,14 @@ public record LocationsRequestPacket(Date date) implements IPacket {
      * @param buf The PacketByteBuf to read from.
      * @return A new LocationsRequestPacket instance.
      */
-    public static LocationsRequestPacket read(PacketByteBuf buf) {
+    public static LocationsRequestPacket read(FriendlyByteBuf buf) {
 
+        var requestId = buf.readUUID();
         var hasData = buf.readBoolean();
         Date updateDate = null;
-        if (hasData) updateDate = buf.readDate();
+        if (hasData) updateDate = new Date(buf.readLong());
 
-        return new LocationsRequestPacket(updateDate);
+        return new LocationsRequestPacket(requestId, updateDate);
     }
 
     /**
@@ -59,10 +80,27 @@ public record LocationsRequestPacket(Date date) implements IPacket {
      * @return A PacketByteBuf representing this LocationsRequestPacket.
      */
     @Override
-    public PacketByteBuf build() {
-        PacketByteBuf buf = PacketByteBufs.create();
+    public FriendlyByteBuf build() {
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
+        buf.writeUUID(requestId);
         buf.writeBoolean(date != null);
-        if (date != null) buf.writeDate(date);
+        if (date != null) buf.writeLong(date.getTime());
         return buf;
+    }
+
+    /**
+     * Creates a new LocationsRequestPacket with the specified request identifier.
+     *
+     * @param requestId The request identifier to associate with this request.
+     * @return A new LocationsRequestPacket with the updated request identifier.
+     */
+    @Override
+    public LocationsRequestPacket withRequestId(UUID requestId) {
+        return new LocationsRequestPacket(requestId, date);
+    }
+
+    @Override
+    public CustomPacketPayload.@NonNull Type<LocationsRequestPacket> type() {
+        return TYPE;
     }
 }

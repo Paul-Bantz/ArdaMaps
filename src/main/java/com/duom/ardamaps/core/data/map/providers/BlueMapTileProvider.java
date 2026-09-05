@@ -31,6 +31,12 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Tile provider that fetches map tiles from a BlueMap server.
+ * <p>
+ * Typed on {@link PmTileKey} (not the bare {@link com.duom.ardamaps.core.data.map.tiles.TileKey})
+ * because {@code TileKey.equals}/{@code PmTileKey.equals} compare {@code getClass()}: every key the
+ * BlueMap renderer actually passes in is a {@code PmTileKey}, and a bare {@code TileKey} would
+ * silently miss every cache lookup against it.
+ * </p>
  */
 public class BlueMapTileProvider extends TileProvider<PmTileKey> {
 
@@ -46,7 +52,7 @@ public class BlueMapTileProvider extends TileProvider<PmTileKey> {
     /**
      * Constructs a BlueMapTileProvider with the specified root path.
      *
-     * @param path The root path for BlueMap tiles.
+     * @param path   The root path for BlueMap tiles.
      * @param minLod The minimum level of detail (LOD) to load.
      * @param maxLod The maximum level of detail (LOD) to load.
      */
@@ -74,7 +80,7 @@ public class BlueMapTileProvider extends TileProvider<PmTileKey> {
 
         ArdaMapsClient.getHttpImageProvider().loadImage(
                 getUrlForKey(key),
-                image -> registerTexture("bluemap_", image == null ? null : image.getLeft(), key),
+                image -> registerTexture("bluemap_", image == null ? null : image.getA(), key),
                 () -> markTransportFailure(key),
                 maxAgeSeconds -> markMissing(key, maxAgeSeconds * 1000L)
         );

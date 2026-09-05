@@ -26,28 +26,39 @@
 package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.consumers.networking.IPacket;
+import com.duom.ardamaps.core.consumers.networking.IRespondablePacket;
 import com.duom.ardamaps.core.data.config.ConfigManager;
 import com.duom.ardamaps.core.data.config.LocationConfig;
 import com.duom.ardamaps.core.data.location.LocationClient;
+import com.duom.ardamaps.gui.ModConstants;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.network.PacketByteBuf;
+import net.fabricmc.fabric.api.networking.v1.FriendlyByteBufs;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
  * A packet representing a response containing location data in JSON format.
  */
-public record LocationsResponsePacket(LocationConfig<LocationClient> data) implements IPacket {
+public record LocationsResponsePacket(UUID requestId,
+                                      LocationConfig<LocationClient> data) implements IRespondablePacket<LocationsResponsePacket> {
+
+    public static final CustomPacketPayload.Type<LocationsResponsePacket> TYPE = new CustomPacketPayload.Type<>(ModConstants.modId("location_data_response"));
+
+    public static final LocationsResponsePacket EMPTY = new LocationsResponsePacket(null);
 
     /** Class logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(LocationsResponsePacket.class);
@@ -56,19 +67,29 @@ public record LocationsResponsePacket(LocationConfig<LocationClient> data) imple
     private static final int MAX_COMPRESSED_DATA_LENGTH = 8 * 1024 * 1024;
 
     /** Location config type token preserving the LocationClient generic parameter. */
-    private static final Type LOCATION_CONFIG_TYPE = new TypeToken<LocationConfig<LocationClient>>() {
+    private static final java.lang.reflect.Type LOCATION_CONFIG_TYPE = new TypeToken<LocationConfig<LocationClient>>() {
     }.getType();
 
-    public static final LocationsResponsePacket EMPTY = new LocationsResponsePacket(null);
+    public static final StreamCodec<RegistryFriendlyByteBuf, LocationsResponsePacket> CODEC = IPacket.codec(LocationsResponsePacket::read);
 
     /**
-     * Reads a MapSourceResponsePacket - ie a timestamped list of location data within the world.
+     * Constructs a LocationsResponsePacket with the given location data.
      *
-     * @param buf The PacketByteBuf to read from
-     * @return The MapSourceResponsePacket read from the buffer
+     * @param data The location configuration data to include in the response, or null for an empty response.
      */
-    public static LocationsResponsePacket read(PacketByteBuf buf) {
+    public LocationsResponsePacket(LocationConfig<LocationClient> data) {
+        this(new UUID(0L, 0L), data);
+    }
 
+    /**
+     * Reads a LocationsResponsePacket containing timestamped location data.
+     *
+     * @param buf The PacketByteBuf to read from.
+     * @return The LocationsResponsePacket read from the buffer.
+     */
+    public static LocationsResponsePacket read(FriendlyByteBuf buf) {
+
+        var requestId = buf.readUUID();
         var dataLength = buf.readInt();
 
         if (dataLength != 0) {
@@ -84,7 +105,7 @@ public record LocationsResponsePacket(LocationConfig<LocationClient> data) imple
                 try (GZIPInputStream gzip = new GZIPInputStream(outputStream)) {
                     var json = new String(gzip.readAllBytes(), StandardCharsets.UTF_8);
                     LocationConfig<LocationClient> locationsConfig = ConfigManager.gson().fromJson(json, LOCATION_CONFIG_TYPE);
-                    return new LocationsResponsePacket(locationsConfig);
+                    return new LocationsResponsePacket(requestId, locationsConfig);
                 }
 
             } catch (IOException | JsonSyntaxException e) {
@@ -93,18 +114,45 @@ public record LocationsResponsePacket(LocationConfig<LocationClient> data) imple
             }
         }
 
-        return LocationsResponsePacket.EMPTY;
+        return new LocationsResponsePacket(requestId, null);
     }
 
     /**
-     * Builds a serialized and compressed PacketByteBuf representing the location data.
+     * Validates the compressed payload size before allocating the target byte array.
+     * <p>
+     * Ensures the data length is non-negative, does not exceed the maximum, and fits within remaining buffer bytes.
      *
-     * @return The PacketByteBuf representing this packet
+     * @param dataLength    The declared compressed payload length in bytes.
+     * @param readableBytes The remaining readable bytes in the packet buffer.
+     * @throws IllegalArgumentException If length is negative, exceeds maximum, or exceeds readable bytes.
+     */
+    private static void validateDataLength(int dataLength, int readableBytes) {
+
+        if (dataLength < 0) {
+            throw new IllegalArgumentException("Location response data length cannot be negative: " + dataLength);
+        }
+
+        if (dataLength > MAX_COMPRESSED_DATA_LENGTH) {
+            throw new IllegalArgumentException("Location response data length exceeds maximum of "
+                    + MAX_COMPRESSED_DATA_LENGTH + " bytes: " + dataLength);
+        }
+
+        if (dataLength > readableBytes) {
+            throw new IllegalArgumentException("Location response data length " + dataLength
+                    + " exceeds readable packet bytes " + readableBytes);
+        }
+    }
+
+    /**
+     * Serializes this packet into a compressed PacketByteBuf for transmission over the network.
+     *
+     * @return The PacketByteBuf representing this packet.
      */
     @Override
-    public PacketByteBuf build() {
-        PacketByteBuf buf = PacketByteBufs.create();
+    public FriendlyByteBuf build() {
+        FriendlyByteBuf buf = FriendlyByteBufs.create();
 
+        buf.writeUUID(requestId);
         var hasData = data != null && data.getLastUpdate() != null;
 
         if (hasData) {
@@ -136,25 +184,18 @@ public record LocationsResponsePacket(LocationConfig<LocationClient> data) imple
     }
 
     /**
-     * Validates the compressed payload size before allocating the target byte array.
+     * Creates a new LocationsResponsePacket with the specified request identifier.
      *
-     * @param dataLength    Declared compressed payload length.
-     * @param readableBytes Remaining readable bytes in the packet buffer.
+     * @param requestId The request identifier to associate with this response.
+     * @return A new LocationsResponsePacket with the updated request identifier.
      */
-    private static void validateDataLength(int dataLength, int readableBytes) {
+    @Override
+    public LocationsResponsePacket withRequestId(UUID requestId) {
+        return new LocationsResponsePacket(requestId, data);
+    }
 
-        if (dataLength < 0) {
-            throw new IllegalArgumentException("Location response data length cannot be negative: " + dataLength);
-        }
-
-        if (dataLength > MAX_COMPRESSED_DATA_LENGTH) {
-            throw new IllegalArgumentException("Location response data length exceeds maximum of "
-                    + MAX_COMPRESSED_DATA_LENGTH + " bytes: " + dataLength);
-        }
-
-        if (dataLength > readableBytes) {
-            throw new IllegalArgumentException("Location response data length " + dataLength
-                    + " exceeds readable packet bytes " + readableBytes);
-        }
+    @Override
+    public CustomPacketPayload.@NonNull Type<LocationsResponsePacket> type() {
+        return TYPE;
     }
 }

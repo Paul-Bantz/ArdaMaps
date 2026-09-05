@@ -28,21 +28,21 @@ package com.duom.ardamaps.core.data.map.providers;
 import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
+import com.mojang.blaze3d.platform.NativeImage;
 import io.tileverse.pmtiles.PMTilesDirectory;
 import io.tileverse.pmtiles.PMTilesEntry;
 import io.tileverse.pmtiles.PMTilesHeader;
 import io.tileverse.pmtiles.PMTilesReader;
 import io.tileverse.rangereader.RangeReader;
-import net.minecraft.client.texture.NativeImage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Optional;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Supplier;
@@ -58,9 +58,6 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
 
     /** PMTiles reader for accessing tile data */
     protected volatile PMTilesReader reader;
-
-    /** Whether this provider has been closed. */
-    protected volatile boolean closed;
 
     /** Human-readable archive path/URI for diagnostics. */
     protected volatile String archivePath = "unknown PMTiles archive";
@@ -82,8 +79,11 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
     @Override
     public void loadTile(PmTileKey key) {
 
+        // Snapshot the reader once: `close()` may null the field concurrently, and re-reading it
+        // inside the lambda would be a check-then-use race against that assignment.
         PMTilesReader activeReader = reader;
-        if (closed || activeReader == null) {
+
+        if (activeReader == null) {
             clearLoading(key);
             return;
         }
@@ -97,15 +97,15 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
                 try {
                     optionalTile = activeReader.getTile(key.toTileId());
                 } catch (IOException e) {
-                    LOGGER.error("Failed to read tile {} from PMTiles source", key, e);
+                    LOGGER.warn("Failed to read tile {} from PMTiles source", key, e);
                     markTransportFailure(key);
                     return null;
                 } catch (RuntimeException e) {
-                    LOGGER.error("Unexpected error reading tile {} from PMTiles source", key, e);
+                    LOGGER.warn("Unexpected error reading tile {} from PMTiles source", key, e);
+                    markTransportFailure(key);
                     return null;
                 }
 
-                if (closed) return null;
                 if (optionalTile.isEmpty()) {
                     markMissing(key);
                     return null;
@@ -117,9 +117,12 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
                 buffer.get(bytes);
 
                 try {
+
                     return NativeImage.read(new ByteArrayInputStream(bytes));
+
                 } catch (IOException | RuntimeException e) {
                     logDecodeFailure(key, e);
+
                     return null;
                 }
 
@@ -130,36 +133,19 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
                     return;
                 }
 
-                if (closed) {
-                    clearLoading(key);
-                    return;
-                }
-
                 registerTexture("pmtiles_", image, key);
             });
         } catch (RejectedExecutionException e) {
-            LOGGER.warn("Tile executor rejected PMTiles tile {}", key, e);
+            LOGGER.warn("PMTiles tile executor rejected tile {}, retrying next frame", key);
             clearLoading(key);
         }
     }
 
-    /**
-     * Submit a PMTiles decode task to the shared tile executor.
-     *
-     * @param supplier Tile decode supplier.
-     * @return Future that completes with the decoded image.
-     */
     CompletableFuture<NativeImage> submitTileLoad(Supplier<NativeImage> supplier) {
 
         return CompletableFuture.supplyAsync(supplier, ArdaMapsClient.TILE_EXECUTOR);
     }
 
-    /**
-     * Record a tile decode failure and emit the appropriate diagnostic level.
-     *
-     * @param key Tile key that failed to decode.
-     * @param e Failure cause.
-     */
     private void logDecodeFailure(PmTileKey key, Exception e) {
 
         int failures = decodeFailureCounts.getOrDefault(key, 0) + 1;
@@ -171,11 +157,6 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
         markDecodeFailure(key);
     }
 
-    /**
-     * Record a human-readable archive path or URI for diagnostics.
-     *
-     * @param archivePath Archive path or URI.
-     */
     protected void setArchivePath(String archivePath) {
 
         this.archivePath = archivePath == null || archivePath.isBlank() ? "unknown PMTiles archive" : archivePath;
@@ -195,12 +176,11 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
     /**
      * Configures the TileProvider with the given PMTilesReader.
      *
-     * @param rangeReader     The PMTilesReader to use for tile retrieval.
-     * @param bootstrapRemote Whether to start remote coarse-pyramid bootstrap after configuration.
+     * @param rangeReader      The PMTilesReader to use for tile retrieval.
+     * @param bootstrapRemote  Whether to start remote coarse-pyramid bootstrap after configuration.
      */
     public void configureReader(RangeReader rangeReader, boolean bootstrapRemote) throws IOException {
 
-        this.closed = false;
         this.reader = new PMTilesReader(rangeReader);
 
         var header = reader.getHeader();
@@ -212,13 +192,6 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
         }
     }
 
-    /**
-     * Schedule the remote coarse-pyramid bootstrap on the I/O executor.
-     *
-     * @param rangeReader Source reader used for the initial range reads.
-     * @param activeReader Open PMTiles reader.
-     * @param header Archive header.
-     */
     private void scheduleRemoteBootstrap(RangeReader rangeReader, PMTilesReader activeReader, PMTilesHeader header) {
 
         CompletableFuture.runAsync(() -> runRemoteBootstrap(rangeReader, activeReader, header), ArdaMaps.IO_EXECUTOR)
@@ -228,13 +201,6 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
                 });
     }
 
-    /**
-     * Preload the coarse PMTiles pyramid when the archive layout supports it.
-     *
-     * @param rangeReader Source reader used for the prewarm reads.
-     * @param activeReader Open PMTiles reader.
-     * @param header Archive header.
-     */
     void runRemoteBootstrap(RangeReader rangeReader, PMTilesReader activeReader, PMTilesHeader header) {
 
         if (!header.clustered()) {
@@ -271,13 +237,6 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
         enqueueBootstrapTiles(coarsePyramidKeys());
     }
 
-    /**
-     * Resolve the contiguous tile-data span needed for coarse-pyramid bootstrap.
-     *
-     * @param activeReader Open PMTiles reader.
-     * @param header Archive header.
-     * @return Contiguous extent to prewarm, or null when nothing was found.
-     */
     private Extent resolveCoarseExtent(PMTilesReader activeReader, PMTilesHeader header) {
 
         long upperBound = PmTileKey.tileIdUpperBound(bootstrapMaxZoom());
@@ -288,15 +247,6 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
         return accumulator.toExtent();
     }
 
-    /**
-     * Walk a directory tree and accumulate coarse-pyramid tile-data ranges.
-     *
-     * @param directory PMTiles directory to inspect.
-     * @param activeReader Open PMTiles reader.
-     * @param header Archive header.
-     * @param upperBound Exclusive tile-id upper bound.
-     * @param accumulator Range accumulator.
-     */
     private void collectCoarseEntries(PMTilesDirectory directory,
                                       PMTilesReader activeReader,
                                       PMTilesHeader header,
@@ -314,11 +264,6 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
         }
     }
 
-    /**
-     * Build the coarse bootstrap key list from the configured minimum zoom upward.
-     *
-     * @return Coarse PMTiles keys to enqueue.
-     */
     private List<PmTileKey> coarsePyramidKeys() {
 
         int maxZoom = bootstrapMaxZoom();
@@ -336,34 +281,17 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
         return keys;
     }
 
-    /**
-     * Return the zoom ceiling used for bootstrap reads.
-     *
-     * @return Maximum zoom to prewarm.
-     */
     private int bootstrapMaxZoom() {
 
         return Math.min(maxZoom, minZoom + COARSE_PYRAMID_EXTRA_ZOOMS);
     }
 
-    /**
-     * Validate a range length before casting to int.
-     *
-     * @param length Range length in bytes.
-     * @return Length as an int.
-     */
     private static int checkedLength(long length) {
 
         if (length > Integer.MAX_VALUE) throw new IllegalArgumentException("Range too large: " + length);
         return (int) length;
     }
 
-    /**
-     * Detect the PMTiles "416 Range Not Satisfiable" case across wrapped exceptions.
-     *
-     * @param throwable Exception chain to inspect.
-     * @return True when a 416 error is present.
-     */
     private static boolean isRangeNotSatisfiable(Throwable throwable) {
 
         Throwable current = throwable;
@@ -380,63 +308,44 @@ public abstract class PMTilesProvider extends TileProvider<PmTileKey> {
     @Override
     public void close() {
 
-        closed = true;
         super.close();
 
-        PMTilesReader activeReader = reader;
-        reader = null;
-        if (activeReader != null) {
+        if (reader != null) {
             try {
-                activeReader.close();
+
+                reader.close();
+
             } catch (IOException e) {
+
                 LOGGER.warn("Failed to close PMTiles reader", e);
+
+            } finally {
+                reader = null;
             }
         }
     }
 
-    /**
-     * Contiguous byte range in the PMTiles source.
-     */
     private record Extent(long offset, long length) {
 
     }
 
-    /**
-     * Accumulates the minimum contiguous byte range needed for coarse bootstrap prewarming.
-     */
     private static final class ExtentAccumulator {
 
         private final long tileDataOffset;
         private long minOffset = Long.MAX_VALUE;
         private long maxEnd = Long.MIN_VALUE;
 
-        /**
-         * Create a new accumulator with the archive tile-data offset.
-         *
-         * @param tileDataOffset Archive tile-data offset.
-         */
         private ExtentAccumulator(long tileDataOffset) {
 
             this.tileDataOffset = tileDataOffset;
         }
 
-        /**
-         * Include one tile-data range in the accumulated extent.
-         *
-         * @param absoluteOffset Absolute byte offset.
-         * @param length Range length in bytes.
-         */
         private void accept(long absoluteOffset, int length) {
 
             minOffset = Math.min(minOffset, absoluteOffset);
             maxEnd = Math.max(maxEnd, absoluteOffset + length);
         }
 
-        /**
-         * Convert the accumulated span into a contiguous extent.
-         *
-         * @return Collapsed extent, or null when nothing was accumulated.
-         */
         private Extent toExtent() {
 
             if (minOffset == Long.MAX_VALUE) return null;

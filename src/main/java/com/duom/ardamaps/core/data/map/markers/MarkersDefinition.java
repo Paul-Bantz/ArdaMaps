@@ -34,10 +34,9 @@ import com.duom.ardamaps.gui.ModConstants;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.SerializedName;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.resource.Resource;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,12 +76,13 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
     private static final Identifier MARKERS_JSON = ModConstants.modId("markers.json");
 
     /**
-     * Loads the markers definition from the `markers.json` resource file.
+     * Loads the markers definition from the `markers.json` resource file using the supplied resource manager.
      *
+     * @param manager the resource manager for the reload in progress
      * @return the loaded {@link MarkersDefinition}
      * @throws RuntimeException if the resource is missing or cannot be parsed
      */
-    public static @NotNull MarkersDefinition loadMarkersDefinition() {
+    public static @NotNull MarkersDefinition loadMarkersDefinition(ResourceManager manager) {
 
         MarkersDefinition markersDefinition = createDefault();
         Gson gson = new GsonBuilder()
@@ -91,14 +91,12 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
                 .registerTypeAdapter(MarkersDefinition.class, new MarkersDefinitionTypeAdapter())
                 .create();
 
-        ResourceManager manager = MinecraftClient.getInstance().getResourceManager();
-
         Optional<Resource> resource = manager.getResource(MARKERS_JSON);
 
         if (resource.isEmpty()) throw new RuntimeException("Missing resource: " + MARKERS_JSON);
 
         try (InputStreamReader reader = new InputStreamReader(
-                resource.get().getInputStream(),
+                resource.get().open(),
                 StandardCharsets.UTF_8
         )) {
 
@@ -145,7 +143,7 @@ public record MarkersDefinition(@SerializedName("marker_background") Identifier 
 
             MarkerType markerType = getMarkerType(location.getTypes().isEmpty() ?
                     null :
-                    location.getTypes().get(0).toUpperCase());
+                    location.getTypes().getFirst().toUpperCase());
 
             location.setIcon(ModConstants.id(markerType.icon()));
             location.setColor(markerType.color());

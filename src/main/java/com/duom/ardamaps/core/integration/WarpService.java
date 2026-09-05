@@ -26,7 +26,7 @@
 package com.duom.ardamaps.core.integration;
 
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 
 /**
  * First-party bridge for optional warp integrations.
@@ -41,5 +41,5 @@ public interface WarpService {
      * @param warpName  the configured warp name
      * @param onFailure fallback action for missing or invalid warp targets
      */
-    void warpTo(MinecraftServer server, ServerPlayerEntity player, String warpName, Runnable onFailure);
+    void warpTo(MinecraftServer server, ServerPlayer player, String warpName, Runnable onFailure);
 }

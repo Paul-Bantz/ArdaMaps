@@ -40,12 +40,8 @@ import java.net.URI;
  */
 public class PMTilesHttpTileProvider extends PMTilesProvider {
 
-    /**
-     * Prevent direct instantiation.
-     */
-    private PMTilesHttpTileProvider() {
-        /* Instantiated via init */
-    }
+    /** Private constructor to prevent direct instantiation */
+    private PMTilesHttpTileProvider() {/* Instantiated via init */}
 
     /**
      * Create a PMTilesHttpTileProvider from the specified PMTiles HTTP URI.
@@ -60,6 +56,7 @@ public class PMTilesHttpTileProvider extends PMTilesProvider {
 
         HttpRangeReader rangeReader = HttpRangeReader.builder()
                 .uri(URI.create(uri))
+                .httpClient(DelegatingHttpClient.create())
                 .build();
 
         RangeReader diskCached = DiskCachingRangeReader.builder(rangeReader)

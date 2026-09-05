@@ -26,64 +26,61 @@
 package com.duom.ardamaps.core.data.map.providers;
 
 import java.net.http.HttpResponse;
-import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
 /**
  * HTTP fetch result with the cache metadata needed by the tile pipeline.
  *
- * @param bytes         response body bytes.
+ * @param bytes         Response body bytes.
  * @param status        HTTP status code.
  * @param lastModified  Last-Modified header value, if present.
- * @param maxAgeSeconds clamped Cache-Control max-age.
+ * @param maxAgeSeconds Clamped Cache-Control max-age.
  */
 record FetchResult(byte[] bytes, int status, String lastModified, long maxAgeSeconds) {
 
-    /** Default cache lifetime for successful tile responses. */
     static final long DEFAULT_TILE_MAX_AGE_SECONDS = 86_400L;
-    /** Default cache lifetime for absent tile responses. */
     static final long DEFAULT_ABSENT_MAX_AGE_SECONDS = 14_400L;
-    /** Lower bound for parsed cache lifetimes. */
     static final long MIN_MAX_AGE_SECONDS = 300L;
-    /** Upper bound for parsed cache lifetimes. */
     static final long MAX_MAX_AGE_SECONDS = 604_800L;
 
     /**
-     * Return whether the response represents an absent tile.
+     * Checks if this fetch result represents an absent tile (no content, not found, or empty).
      *
-     * @return true for 204/404/empty-body responses.
+     * @return {@code true} if the tile is absent (status 204/404 or zero-length response).
      */
     boolean isAbsent() {
         return status == 204 || status == 404 || bytes.length == 0;
     }
 
     /**
-     * Return whether the response indicates a not-modified cache hit.
+     * Checks if this fetch result represents a 304 Not Modified response.
      *
-     * @return true when the status code is 304.
+     * @return {@code true} if the status code is 304.
      */
     boolean isNotModified() {
         return status == 304;
     }
 
     /**
-     * Build a fetch result from an HTTP client response.
+     * Constructs a FetchResult from an HttpResponse, extracting cache metadata and clamping TTLs.
      *
-     * @param response HTTP response to adapt.
-     * @return Adapted fetch result.
+     * @param response The HTTP response containing status, headers, and body.
+     * @return A FetchResult with parsed cache control, last-modified, and clamped max-age.
      */
     static FetchResult fromResponse(HttpResponse<byte[]> response) {
 
         int status = response.statusCode();
         byte[] body = response.body() == null ? new byte[0] : response.body();
-        String contentLength = response.headers().firstValue("content-length").orElse(null);
-        boolean emptyContentLength = false;
-        if (contentLength != null) {
-            try {
-                emptyContentLength = Long.parseLong(contentLength) == 0L;
-            } catch (NumberFormatException ignored) {
-            }
-        }
+        Optional<String> contentLength = response.headers().firstValue("content-length");
+        boolean emptyContentLength = contentLength
+                .map(value -> {
+                    try {
+                        return Long.parseLong(value) == 0L;
+                    } catch (NumberFormatException ignored) {
+                        return false;
+                    }
+                })
+                .orElse(false);
 
         if (status == 204 || emptyContentLength) body = new byte[0];
 
@@ -99,46 +96,11 @@ record FetchResult(byte[] bytes, int status, String lastModified, long maxAgeSec
     }
 
     /**
-     * Build a fetch result from a lower-level connection response.
+     * Parses the max-age directive from a Cache-Control header.
      *
-     * @param status HTTP status code.
-     * @param body Response body bytes.
-     * @param headers Response headers.
-     * @return Adapted fetch result.
-     */
-    static FetchResult fromConnection(int status, byte[] body, Map<String, List<String>> headers) {
-
-        byte[] bytes = body == null ? new byte[0] : body;
-        String contentLength = firstHeader(headers, "content-length");
-        boolean emptyContentLength = false;
-        if (contentLength != null) {
-            try {
-                emptyContentLength = Long.parseLong(contentLength) == 0L;
-            } catch (NumberFormatException ignored) {
-            }
-        }
-
-        if (status == 204 || emptyContentLength) bytes = new byte[0];
-
-        long defaultMaxAge = status == 204
-                || status == 404
-                || bytes.length == 0
-                ? DEFAULT_ABSENT_MAX_AGE_SECONDS
-                : DEFAULT_TILE_MAX_AGE_SECONDS;
-
-        return new FetchResult(
-                bytes,
-                status,
-                firstHeader(headers, "last-modified"),
-                parseMaxAge(firstHeader(headers, "cache-control"), defaultMaxAge));
-    }
-
-    /**
-     * Parse and clamp a Cache-Control max-age value.
-     *
-     * @param cacheControl Cache-Control header value.
-     * @param defaultSeconds Fallback lifetime when no max-age is present.
-     * @return Parsed and clamped lifetime in seconds.
+     * @param cacheControl The Cache-Control header value, or null/blank to use the default.
+     * @param defaultSeconds The default max-age to use if the header is absent or unparseable.
+     * @return The parsed max-age clamped to {@link #MIN_MAX_AGE_SECONDS} and {@link #MAX_MAX_AGE_SECONDS}.
      */
     static long parseMaxAge(String cacheControl, long defaultSeconds) {
 
@@ -159,34 +121,13 @@ record FetchResult(byte[] bytes, int status, String lastModified, long maxAgeSec
     }
 
     /**
-     * Clamp a cache lifetime to the supported range.
+     * Clamps a max-age value to the safe retry window.
      *
-     * @param seconds Cache lifetime in seconds.
-     * @return Clamped lifetime.
+     * @param seconds The seconds value to clamp.
+     * @return The clamped value between {@link #MIN_MAX_AGE_SECONDS} and {@link #MAX_MAX_AGE_SECONDS}.
      */
     private static long clampMaxAge(long seconds) {
 
-        return Math.max(MIN_MAX_AGE_SECONDS, Math.min(MAX_MAX_AGE_SECONDS, seconds));
-    }
-
-    /**
-     * Read the first matching header value from a case-insensitive header map.
-     *
-     * @param headers Header map.
-     * @param name Header name to look up.
-     * @return First matching value, or null.
-     */
-    private static String firstHeader(Map<String, List<String>> headers, String name) {
-
-        if (headers == null) return null;
-
-        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
-            if (entry.getKey() == null || !entry.getKey().equalsIgnoreCase(name)) continue;
-            List<String> values = entry.getValue();
-            if (values == null || values.isEmpty()) return null;
-            return values.get(0);
-        }
-
-        return null;
+        return Math.clamp(seconds, MIN_MAX_AGE_SECONDS, MAX_MAX_AGE_SECONDS);
     }
 }

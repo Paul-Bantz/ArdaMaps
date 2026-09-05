@@ -31,129 +31,81 @@ import com.duom.ardamaps.core.data.config.MapLayerSource;
 import com.duom.ardamaps.core.data.map.cameras.PmTilesMapCamera;
 import com.duom.ardamaps.core.data.map.providers.TileProvider;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
-import net.minecraft.util.Identifier;
+import com.duom.ardamaps.gui.ModConstants;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * Tests PMTiles renderer classification before draw submission. Rendering itself is client-bound,
+ * but the correctness bugs were in how primary and fallback draw work was selected and ordered.
+ */
 class PmTilesRendererTest {
 
     /**
-     * Verify that shared fallbacks are deduplicated.
+     * Verifies many primary tiles resolving to one loaded coarse ancestor produce only one fallback
+     * draw entry.
      */
     @Test
-    void classifyTiles_deduplicatesSharedFallback() throws Exception {
+    void classifyTiles_deduplicatesSharedFallbackTile() throws Exception {
 
-        var camera = mockCamera();
-        var provider = new TestTileProvider();
-        var fallback = new PmTileKey(1, 0, 0);
-        provider.publish(fallback, Identifier.of("ardamaps", "fallback"));
-        var renderer = renderer(camera, provider);
+        var renderer = rendererWithProvider(providerWithTexture(new PmTileKey(2, 0, 0), ModConstants.modId("test/fallback")));
 
-        var plan = renderer.classifyTiles(Set.of(
-                new PmTileKey(3, 0, 0),
-                new PmTileKey(3, 1, 0),
-                new PmTileKey(3, 0, 1),
-                new PmTileKey(3, 1, 1)
-        ), 1, false);
+        var tiles = new LinkedHashSet<PmTileKey>();
+        tiles.add(new PmTileKey(4, 0, 0));
+        tiles.add(new PmTileKey(4, 1, 0));
+        tiles.add(new PmTileKey(4, 0, 1));
+        tiles.add(new PmTileKey(4, 1, 1));
 
-        assertTrue(plan.primaryTiles().isEmpty());
-        assertEquals(List.of(fallback), List.copyOf(plan.fallbackMap().keySet()));
+        PmTilesRenderer.RenderPlan plan = renderer.classifyTiles(tiles, 2, true);
+
+        assertEquals(0, plan.primaryTiles().size());
+        assertEquals(1, plan.fallbackMap().size(), "Shared coarse PMTiles ancestor should be drawn once");
+        assertEquals(new PmTileKey(2, 0, 0), plan.fallbackMap().keySet().iterator().next());
     }
 
     /**
-     * Verify that fallback tiles stay separate from primaries.
+     * Verifies fallback draw work is separated ahead of primary draw work and remains deterministic
+     * across repeated classifications.
      */
     @Test
-    void classifyTiles_keepsFallbacksSeparateFromPrimaries() throws Exception {
+    void classifyTiles_separatesFallbacksBeforePrimariesDeterministically() throws Exception {
 
-        var camera = mockCamera();
+        PmTileKey fallbackKey = new PmTileKey(2, 0, 0);
+        PmTileKey primaryKey = new PmTileKey(4, 3, 3);
         var provider = new TestTileProvider();
-        var fallback = new PmTileKey(1, 0, 0);
-        var primary = new PmTileKey(3, 2, 2);
-        provider.publish(fallback, Identifier.of("ardamaps", "fallback"));
-        provider.publish(primary, Identifier.of("ardamaps", "primary"));
-        var renderer = renderer(camera, provider);
+        provider.put(fallbackKey, ModConstants.modId("test/fallback"));
+        provider.put(primaryKey, ModConstants.modId("test/primary"));
 
-        var plan = renderer.classifyTiles(Set.of(new PmTileKey(3, 0, 0), primary), 1, false);
+        var renderer = rendererWithProvider(provider);
+        var tiles = new LinkedHashSet<>(List.of(
+                new PmTileKey(4, 0, 0),
+                primaryKey,
+                new PmTileKey(4, 1, 1)
+        ));
 
-        assertEquals(List.of(fallback), List.copyOf(plan.fallbackMap().keySet()));
-        assertEquals(List.of(primary), plan.primaryTiles().stream().map(PmTilesRenderer.TileDraw::key).toList());
+        List<PmTileKey> first = plannedDrawOrder(renderer.classifyTiles(tiles, 2, true));
+        List<PmTileKey> second = plannedDrawOrder(renderer.classifyTiles(tiles, 2, true));
+
+        assertEquals(List.of(fallbackKey, primaryKey), first);
+        assertEquals(first, second, "PMTiles draw ordering should not depend on hash iteration side effects");
     }
 
     /**
-     * Verify that fallback drawing happens coarsest-first.
+     * Verifies a bad PMTiles archive path records a layer-specific load error instead of leaving
+     * the renderer in an indistinguishable loading state forever.
      */
     @Test
-    void orderedFallbacks_drawsCoarsestFirst() throws Exception {
+    void configure_badArchivePath_setsLoadError() throws Exception {
 
-        var camera = mockCamera();
-        var provider = new TestTileProvider();
-        var renderer = renderer(camera, provider);
-
-        // Insert fallbacks in a deliberately wrong (finer-before-coarser) order.
-        var fine = new PmTileKey(3, 4, 4);
-        var mid = new PmTileKey(2, 2, 2);
-        var coarse = new PmTileKey(1, 1, 1);
-        var fallbackMap = new java.util.LinkedHashMap<PmTileKey, PmTilesRenderer.TileDraw>();
-        fallbackMap.put(fine, new PmTilesRenderer.TileDraw(Identifier.of("ardamaps", "fine"), 0, 0, fine));
-        fallbackMap.put(coarse, new PmTilesRenderer.TileDraw(Identifier.of("ardamaps", "coarse"), 0, 0, coarse));
-        fallbackMap.put(mid, new PmTilesRenderer.TileDraw(Identifier.of("ardamaps", "mid"), 0, 0, mid));
-
-        var ordered = renderer.orderedFallbacks(new PmTilesRenderer.RenderPlan(List.of(), fallbackMap));
-
-        // Ascending z => coarsest (lowest z) painted first, so finer fallbacks overpaint it.
-        assertEquals(List.of(coarse, mid, fine), ordered.stream().map(PmTilesRenderer.TileDraw::key).toList());
-    }
-
-    /**
-     * Verify that frame requests include prefetch rings and adjacent zoom levels.
-     */
-    @Test
-    void requestTilesForFrame_requestsPrefetchRingAndFinerZoomStepWithoutDrawingRing() throws Exception {
-
-        var camera = mockCamera();
-        var provider = new TestTileProvider();
-        var renderer = renderer(camera, provider);
-        var fallback = new PmTileKey(1, 0, 0);
-        var primary = new PmTileKey(3, 1, 1);
-        var ring = new PmTileKey(3, 2, 1);
-        var zoomStep = new PmTileKey(4, 2, 2);
-
-        when(camera.getTileSourceClampedZoom()).thenReturn(3);
-        when(camera.getVisibleTiles(1)).thenReturn(Set.of(fallback));
-        when(camera.getRequestTiles(3, 1)).thenReturn(Set.of(primary, ring));
-        when(camera.getVisibleTiles(4)).thenReturn(Set.of(zoomStep));
-        when(camera.centerTileDistance(org.mockito.Mockito.anyInt(), org.mockito.Mockito.anyInt(), org.mockito.Mockito.anyInt()))
-                .thenReturn(0);
-
-        provider.publish(primary, Identifier.of("ardamaps", "primary"));
-        provider.publish(ring, Identifier.of("ardamaps", "ring"));
-
-        renderer.requestTilesForFrame(1, true);
-        var plan = renderer.classifyTiles(Set.of(primary), 1, true);
-
-        assertTrue(provider.requests.contains(new Request(fallback, TileProvider.VIEWPORT_FALLBACK_PRIORITY_BASE)));
-        assertTrue(provider.requests.contains(new Request(ring, TileProvider.PRIMARY_PREFETCH_PRIORITY_BASE)));
-        assertTrue(provider.requests.contains(new Request(zoomStep, TileProvider.ZOOM_STEP_PRIORITY_BASE)));
-        assertEquals(List.of(primary), plan.primaryTiles().stream().map(PmTilesRenderer.TileDraw::key).toList());
-    }
-
-    /**
-     * Verify that a bad archive path records a load error.
-     */
-    @Test
-    void configure_badArchivePathSetsLoadError() throws Exception {
-
-        var camera = mockCamera();
+        PmTilesMapCamera camera = mock(PmTilesMapCamera.class);
         var renderer = new PmTilesRenderer(camera, null, null);
         var layer = new MapLayerDefinition(
                 "Broken Layer",
@@ -168,26 +120,120 @@ class PmTilesRendererTest {
                 14,
                 256,
                 1.0,
-                "/definitely/not/a/real/archive.pmtiles",
+                "/tmp/ardamaps-missing-test-archive.pmtiles",
                 "",
                 null);
 
+        assertNull(loadError(renderer));
+
         renderer.configure(layer, 1.0);
 
-        Field field = PmTilesRenderer.class.getDeclaredField("loadError");
-        field.setAccessible(true);
-        assertEquals("Broken Layer", field.get(renderer));
+        assertEquals("Broken Layer", loadError(renderer));
     }
 
     /**
-     * Create a renderer with a test provider injected by reflection.
-     *
-     * @param camera Camera under test.
-     * @param provider Provider to inject.
-     * @return Renderer configured for the test.
-     * @throws Exception If reflection fails.
+     * Documents the Phase 4 PMTiles zoom-step direction: when settled, request one finer viewport
+     * level ({@code primaryZ + 1}), not the BlueMap direction.
      */
-    private static PmTilesRenderer renderer(PmTilesMapCamera camera, TestTileProvider provider) throws Exception {
+    @Test
+    void requestTilesForFrame_pmtilesZoomStepTargetsPrimaryPlusOne() throws Exception {
+
+        var provider = new TestTileProvider();
+        provider.setMaxZoom();
+        PmTilesMapCamera camera = mock(PmTilesMapCamera.class);
+        when(camera.getVisibleTiles(2)).thenReturn(Set.of(new PmTileKey(2, 0, 0)));
+        when(camera.getTileSourceClampedZoom()).thenReturn(5);
+        when(camera.getRequestTiles(5, 1)).thenReturn(Set.of(new PmTileKey(5, 3, 3)));
+        when(camera.getVisibleTiles(6)).thenReturn(Set.of(new PmTileKey(6, 7, 7)));
+        when(camera.centerTileDistance(anyInt(), anyInt(), anyInt())).thenReturn(0);
+
+        var renderer = rendererWithProvider(camera, provider);
+
+        renderer.requestTilesForFrame(2, true);
+
+        assertEquals(TileProvider.ZOOM_STEP_PRIORITY_BASE, provider.requested.get(new PmTileKey(6, 7, 7)));
+    }
+
+    /**
+     * Oversized PMTiles zoom-step viewports are skipped so speculative finer tiles cannot evict
+     * visible primary tiles.
+     */
+    @Test
+    void requestTilesForFrame_pmtilesZoomStepSkippedWhenOverBudget() throws Exception {
+
+        var provider = new TestTileProvider();
+        provider.setMaxZoom();
+        PmTilesMapCamera camera = mock(PmTilesMapCamera.class);
+        when(camera.getVisibleTiles(2)).thenReturn(Set.of(new PmTileKey(2, 0, 0)));
+        when(camera.getTileSourceClampedZoom()).thenReturn(5);
+        when(camera.getRequestTiles(5, 1)).thenReturn(Set.of(new PmTileKey(5, 3, 3)));
+        when(camera.getVisibleTiles(6)).thenReturn(manyTiles());
+        when(camera.centerTileDistance(anyInt(), anyInt(), anyInt())).thenReturn(0);
+
+        var renderer = rendererWithProvider(camera, provider);
+
+        renderer.requestTilesForFrame(2, true);
+
+        assertTrue(provider.requested.keySet().stream().noneMatch(key -> key.z == 6),
+                "Oversized PMTiles zoom-step set should not be requested");
+        assertTrue(provider.requested.containsKey(new PmTileKey(5, 3, 3)),
+                "Same-zoom prefetch ring should still be requested");
+        assertTrue(provider.requested.containsKey(new PmTileKey(2, 0, 0)),
+                "Coarse fallback viewport should still be requested");
+    }
+
+    /**
+     * Ring tiles are low-priority request candidates but are not part of the draw classification
+     * unless they are in the viewport-visible set.
+     */
+    @Test
+    void requestTilesForFrame_prefetchRingIsRequestedButNotDrawn() throws Exception {
+
+        PmTileKey visible = new PmTileKey(5, 3, 3);
+        PmTileKey ring = new PmTileKey(5, 4, 3);
+        var provider = new TestTileProvider();
+        PmTilesMapCamera camera = mock(PmTilesMapCamera.class);
+        when(camera.getVisibleTiles(2)).thenReturn(Set.of(new PmTileKey(2, 0, 0)));
+        when(camera.getTileSourceClampedZoom()).thenReturn(5);
+        when(camera.getRequestTiles(5, 1)).thenReturn(new LinkedHashSet<>(List.of(visible, ring)));
+        when(camera.getVisibleTiles(6)).thenReturn(Set.of());
+        when(camera.centerTileDistance(anyInt(), anyInt(), anyInt())).thenReturn(0);
+        when(camera.tilePositionOnViewport(anyInt(), anyInt(), anyInt())).thenAnswer(invocation ->
+                new Vec2d(invocation.getArgument(0, Integer.class) * 256.0,
+                        invocation.getArgument(1, Integer.class) * 256.0));
+
+        var renderer = rendererWithProvider(camera, provider);
+
+        renderer.requestTilesForFrame(2, true);
+        PmTilesRenderer.RenderPlan plan = renderer.classifyTiles(Set.of(visible), 2, true);
+
+        assertEquals(TileProvider.PRIMARY_PREFETCH_PRIORITY_BASE, provider.requested.get(ring));
+        assertTrue(plan.primaryTiles().stream().noneMatch(tile -> tile.key().equals(ring)));
+        assertFalse(plan.fallbackMap().containsKey(ring));
+    }
+
+    private static List<PmTileKey> plannedDrawOrder(PmTilesRenderer.RenderPlan plan) {
+
+        List<PmTileKey> order = new ArrayList<>();
+        plan.fallbackMap().values().forEach(tile -> order.add(tile.key()));
+        plan.primaryTiles().forEach(tile -> order.add(tile.key()));
+        return order;
+    }
+
+    private static String loadError(PmTilesRenderer renderer) throws Exception {
+
+        Field field = PmTilesRenderer.class.getDeclaredField("loadError");
+        field.setAccessible(true);
+        return (String) field.get(renderer);
+    }
+
+    private static PmTilesRenderer rendererWithProvider(TestTileProvider provider) throws Exception {
+
+        PmTilesMapCamera camera = mock(PmTilesMapCamera.class);
+        when(camera.centerTileDistance(anyInt(), anyInt(), anyInt())).thenReturn(0);
+        when(camera.tilePositionOnViewport(anyInt(), anyInt(), anyInt())).thenAnswer(invocation ->
+                new Vec2d(invocation.getArgument(0, Integer.class) * 256.0,
+                        invocation.getArgument(1, Integer.class) * 256.0));
 
         var renderer = new PmTilesRenderer(camera, null, null);
         Field field = PmTilesRenderer.class.getDeclaredField("tileProvider");
@@ -196,72 +242,55 @@ class PmTilesRendererTest {
         return renderer;
     }
 
-    /**
-     * Build a camera mock that returns deterministic screen positions.
-     *
-     * @return Mock camera.
-     */
-    private static PmTilesMapCamera mockCamera() {
+    private static PmTilesRenderer rendererWithProvider(PmTilesMapCamera camera, TestTileProvider provider) throws Exception {
 
-        var camera = mock(PmTilesMapCamera.class);
-        when(camera.tilePositionOnViewport(org.mockito.Mockito.anyInt(), org.mockito.Mockito.anyInt(), org.mockito.Mockito.anyInt()))
-                .thenAnswer(invocation -> new Vec2d(invocation.getArgument(1, Integer.class) * 10.0, invocation.getArgument(2, Integer.class) * 10.0));
-        return camera;
+        var renderer = new PmTilesRenderer(camera, null, null);
+        Field field = PmTilesRenderer.class.getDeclaredField("tileProvider");
+        field.setAccessible(true);
+        field.set(renderer, provider);
+        return renderer;
     }
 
-    /**
-     * Tile provider that records requests and allows direct cache publication.
-     */
+    private static TestTileProvider providerWithTexture(PmTileKey key, Identifier texture) {
+
+        var provider = new TestTileProvider();
+        provider.put(key, texture);
+        return provider;
+    }
+
+    private static Set<PmTileKey> manyTiles() {
+
+        Set<PmTileKey> keys = new LinkedHashSet<>();
+        for (int i = 0; i < 200; i++) {
+            keys.add(new PmTileKey(6, i, 0));
+        }
+        return keys;
+    }
+
     private static final class TestTileProvider extends TileProvider<PmTileKey> {
 
-        /** Recorded tile requests. */
-        private final List<Request> requests = new ArrayList<>();
+        private final Map<PmTileKey, Integer> requested = new HashMap<>();
 
-        /**
-         * Create a provider with a fixed zoom range.
-         */
-        private TestTileProvider() {
-            this.minZoom = 1;
-            this.maxZoom = 4;
+        private void setMaxZoom() {
+
+            this.maxZoom = 6;
         }
 
-        /**
-         * Publish a texture for a tile key.
-         *
-         * @param key Tile key.
-         * @param texture Texture identifier.
-         */
-        private void publish(PmTileKey key, Identifier texture) {
+        private void put(PmTileKey key, Identifier texture) {
+
             cacheTexture(key, texture);
         }
 
-        /**
-         * Record the request before delegating to the base provider.
-         *
-         * @param key Tile key.
-         * @param priority Request priority.
-         */
         @Override
-        public void request(PmTileKey key, int priority) {
-            requests.add(new Request(key, priority));
-            super.request(key, priority);
+        public Optional<Identifier> request(PmTileKey key, int priority) {
+
+            requested.merge(key, priority, Math::min);
+            return Optional.empty();
         }
 
-        /**
-         * Complete load requests immediately for tests.
-         *
-         * @param key Tile key.
-         */
         @Override
         protected void loadTile(PmTileKey key) {
             clearLoading(key);
         }
-    }
-
-    /**
-     * Recorded request tuple.
-     */
-    private record Request(PmTileKey key, int priority) {
-
     }
 }

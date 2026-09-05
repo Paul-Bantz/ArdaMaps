@@ -31,18 +31,17 @@ import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.networking.packets.client.PlayerTeleportResponsePacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerRangedTeleportPacket;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.OptionalDouble;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
 
@@ -65,7 +64,8 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
      * Constructs a new PlayerRangedTeleportHandler and registers it for the specified channel.
      */
     public PlayerRangedTeleportHandler() {
-        super(REQ_CHANNEL, PlayerRangedTeleportPacket::read, RESP_CHANNEL, PlayerTeleportResponsePacket::read);
+        super(REQ_CHANNEL, PlayerRangedTeleportPacket.TYPE, PlayerRangedTeleportPacket.CODEC,
+                RESP_CHANNEL, PlayerTeleportResponsePacket.TYPE, PlayerTeleportResponsePacket.CODEC);
     }
 
     /**
@@ -74,24 +74,21 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
      * Resolves the destination world and dimension configuration, scans for a valid teleport position within the
      * specified Y range, and either teleports the player or sends an error message.
      *
-     * @param server  The Minecraft server instance.
-     * @param player  The player to teleport.
-     * @param handler The network handler for this player connection.
-     * @param packet  The PlayerRangedTeleportPacket containing the target coordinates and Y scan range.
-     * @param sender  The packet sender for responses.
+     * @param server    The Minecraft server instance.
+     * @param player    The player to teleport.
+     * @param packet    The PlayerRangedTeleportPacket containing the target coordinates and Y scan range.
      * @param responder Callback that sends the teleport response and must be called exactly once inside the server task.
      * @return Null because the response is sent asynchronously from the server thread.
      */
     @Override
-    protected PlayerTeleportResponsePacket handle(MinecraftServer server, ServerPlayerEntity player,
-                                                  ServerPlayNetworkHandler handler, PlayerRangedTeleportPacket packet,
-                                                  PacketSender sender,
+    protected PlayerTeleportResponsePacket handle(MinecraftServer server, ServerPlayer player,
+                                                  PlayerRangedTeleportPacket packet,
                                                   Consumer<PlayerTeleportResponsePacket> responder) {
 
         server.execute(() -> {
 
             // Resolve the destination world
-            ServerWorld serverWorld = resolveWorld(server, packet.worldId());
+            ServerLevel serverWorld = resolveWorld(server, packet.worldId());
 
             if (serverWorld == null) {
                 LOGGER.warn("Unable to resolve ranged teleport world: {}", packet.worldId());
@@ -101,7 +98,7 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
 
             // Get the dimension configuration and calculate effective scan bounds
             Dimension dimension = resolveDimension(packet.worldId());
-            VerticalBounds overallBounds = effectiveOverallBounds(dimension, serverWorld.getBottomY(), serverWorld.getTopY());
+            VerticalBounds overallBounds = effectiveOverallBounds(dimension, serverWorld.getMinY(), serverWorld.getMaxY());
             double x = SafeTeleportScanner.blockCenter(packet.x());
             double z = SafeTeleportScanner.blockCenter(packet.z());
 
@@ -111,14 +108,14 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
 
             if (candidateY.isPresent()) {
                 double y = candidateY.getAsDouble();
-                player.teleport(serverWorld, x, y, z, player.getYaw(), player.getPitch());
+                player.teleportTo(serverWorld, x, y, z, Set.of(), player.getYRot(), player.getXRot(), true);
                 responder.accept(new PlayerTeleportResponsePacket(true, x, y, z));
                 return;
             }
 
             // Send error message if no safe position found
-            player.sendMessage(Text.literal(String.format("Invalid teleport position at %s %s", (int)packet.x(), (int)packet.z()))
-                    .formatted(Formatting.RED), false);
+            player.sendSystemMessage(Component.literal(String.format("Invalid teleport position at %s %s", (int) packet.x(), (int) packet.z()))
+                    .withStyle(ChatFormatting.RED), false);
             responder.accept(PlayerTeleportResponsePacket.failed());
         });
 
@@ -132,12 +129,12 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
      * @param worldId The world identifier string (e.g., "minecraft:overworld").
      * @return The matching ServerWorld, or null if not found or worldId is null.
      */
-    private static ServerWorld resolveWorld(MinecraftServer server, String worldId) {
+    private static ServerLevel resolveWorld(MinecraftServer server, String worldId) {
 
         if (worldId == null) return null;
 
-        for (ServerWorld world : server.getWorlds()) {
-            if (world.getRegistryKey().getValue().toString().equals(worldId)) return world;
+        for (ServerLevel world : server.getAllLevels()) {
+            if (world.dimension().identifier().toString().equals(worldId)) return world;
         }
 
         return null;
@@ -244,7 +241,7 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
      *
      * @param minY     Lower inclusive candidate Y coordinate.
      * @param maxY     Upper inclusive candidate Y coordinate.
-     * @param resolver  Resolver returning the exact standing Y for valid candidate positions.
+     * @param resolver Resolver returning the exact standing Y for valid candidate positions.
      * @return The first valid standing Y value encountered, or empty if none found or the interval is invalid (minY > maxY).
      */
     static OptionalDouble scanUpward(int minY, int maxY, IntFunction<OptionalDouble> resolver) {
@@ -264,7 +261,7 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
      *
      * @param minY     Lower inclusive candidate Y coordinate.
      * @param maxY     Upper inclusive candidate Y coordinate.
-     * @param resolver  Resolver returning the exact standing Y for valid candidate positions.
+     * @param resolver Resolver returning the exact standing Y for valid candidate positions.
      * @return The first valid standing Y value encountered, or empty if none found or the interval is invalid (minY > maxY).
      */
     static OptionalDouble scanDownward(int minY, int maxY, IntFunction<OptionalDouble> resolver) {

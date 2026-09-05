@@ -50,8 +50,11 @@ public class GuideEntry {
     @SerializedName("link")
     private String link;
 
-    /** No-arg constructor required by Gson. */
-    public GuideEntry() {}
+    /**
+     * No-arg constructor required by Gson deserialization.
+     */
+    public GuideEntry() {
+    }
 
 }
 

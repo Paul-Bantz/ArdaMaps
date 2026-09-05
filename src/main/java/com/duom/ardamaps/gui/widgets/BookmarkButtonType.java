@@ -25,7 +25,7 @@
 
 package com.duom.ardamaps.gui.widgets;
 
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 /**
  * Enum representing different types of bookmark buttons in the GUI.
@@ -33,19 +33,37 @@ import net.minecraft.text.Text;
  */
 public enum BookmarkButtonType {
 
+    /** Close button bookmark type. */
     BOOKMARK_CLOSE("ardamaps.client.map.screen.generic.close"),
+
+    /** Configuration button bookmark type. */
     BOOKMARK_CONFIGURATION("ardamaps.client.map.screen.configuration"),
+
+    /** Guide button bookmark type. */
     BOOKMARK_GUIDE("ardamaps.client.map.screen.guide"),
+
+    /** Map button bookmark type. */
     BOOKMARK_MAP("ardamaps.client.map.screen.map");
 
+    /** Translation key for this bookmark button type. */
     private final String translationKey;
 
-    BookmarkButtonType(String translationKey){
+    /**
+     * Creates a new BookmarkButtonType with the specified translation key.
+     *
+     * @param translationKey the translation key for this bookmark button type
+     */
+    BookmarkButtonType(String translationKey) {
         this.translationKey = translationKey;
     }
 
-    public Text getTranslation(){
+    /**
+     * Gets the translatable component for this bookmark button type.
+     *
+     * @return The translated component for this button type
+     */
+    public Component getTranslation() {
 
-        return Text.translatable(translationKey);
+        return Component.translatable(translationKey);
     }
 }

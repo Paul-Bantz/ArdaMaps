@@ -38,24 +38,28 @@ import com.duom.ardamaps.core.networking.PacketRegistry;
 import com.duom.ardamaps.core.networking.packets.server.LocationDetailsRequestPacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
 import com.duom.ardamaps.core.networking.packets.server.PlayerWarpPacket;
+import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.screens.MapScreen;
 import com.duom.ardamaps.gui.screens.ScreenRenderingUtils;
 import com.duom.ardamaps.gui.screens.rendering.TextContentBlockRenderer;
 import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
-import com.mojang.blaze3d.systems.RenderSystem;
 import lombok.Getter;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.ScreenRect;
-import net.minecraft.client.gui.navigation.GuiNavigation;
-import net.minecraft.client.gui.navigation.GuiNavigationPath;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.ComponentPath;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.navigation.FocusNavigationEvent;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.Style;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
@@ -66,7 +70,7 @@ import java.util.List;
  * It includes a fade-in effect, scrollable description, and action buttons for setting waypoints
  * and teleporting to the location.
  */
-public class SidePanelWidget implements Element {
+public class SidePanelWidget implements GuiEventListener {
 
     /** Layout constants */
     private static final int ELEMENT_SPACING = 2;
@@ -93,7 +97,7 @@ public class SidePanelWidget implements Element {
     private final LocationClient displayedLocation;
 
     /** Text renderer for drawing text */
-    private final TextRenderer textRenderer;
+    private final Font textRenderer;
 
     /** Renderer for the HTML content blocks */
     private final TextContentBlockRenderer textContentBlockRenderer;
@@ -162,7 +166,7 @@ public class SidePanelWidget implements Element {
      * @param cameraFocusWorldPosition The camera focus offset in world coordinates
      * @param cameraFocusZoom          the camera focus zoom
      */
-    public SidePanelWidget(Screen parent, TextRenderer textRenderer, LocationClient displayedLocation, Vec2d cameraFocusWorldPosition, double cameraFocusZoom) {
+    public SidePanelWidget(Screen parent, Font textRenderer, LocationClient displayedLocation, Vec2d cameraFocusWorldPosition, double cameraFocusZoom) {
 
         this.parent = parent;
         this.textRenderer = textRenderer;
@@ -184,19 +188,19 @@ public class SidePanelWidget implements Element {
         /* Buttons */
 
         setWaypointButton = StyledButtonBuilder.create()
-                .setText(Text.translatable("ardamaps.client.generic.set.waypoint"))
-                .setOnClick(() -> ArdaMapsClient.CONFIG.setWaypoint(displayedLocation.getPosition().x, displayedLocation.getPosition().z, displayedLocation.getWorld()))
+                .setText(Component.translatable("ardamaps.client.generic.set.waypoint"))
+                .setOnClick(() -> ArdaMapsClient.CONFIG.setWaypoint(displayedLocation.getPosition().x(), displayedLocation.getPosition().z(), displayedLocation.getWorld()))
                 .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
                 .build();
 
         teleportButton = StyledButtonBuilder.create()
-                .setText(Text.translatable("ardamaps.client.generic.teleport"))
+                .setText(Component.translatable("ardamaps.client.generic.teleport"))
                 .setOnClick(this::requestTeleport)
                 .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
                 .build();
 
         exploreInDepthButton = StyledButtonBuilder.create()
-                .setText(Text.translatable("ardamaps.client.map.screen.side.panel.explore_in_depth"))
+                .setText(Component.translatable("ardamaps.client.map.screen.side.panel.explore_in_depth"))
                 .setOnClick(this::exploreInDepth)
                 .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
                 .build();
@@ -204,9 +208,9 @@ public class SidePanelWidget implements Element {
         assert exploreInDepthButton != null;
 
         if (displayedLocation.isVisited()) {
-            exploreInDepthButton.setTooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.side.panel.explore_in_depth.tooltip")));
+            exploreInDepthButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.side.panel.explore_in_depth.tooltip")));
         } else {
-            exploreInDepthButton.setTooltip(Tooltip.of(Text.translatable("ardamaps.client.map.screen.side.panel.explore_in_depth.not_visited.tooltip")));
+            exploreInDepthButton.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.side.panel.explore_in_depth.not_visited.tooltip")));
             exploreInDepthButton.active = false;
         }
     }
@@ -244,8 +248,8 @@ public class SidePanelWidget implements Element {
         } else {
 
             PacketRegistry.PLAYER_TELEPORT_REQUEST.send(new PlayerTeleportPacket(
-                    displayedLocation.getPosition().x,
-                    displayedLocation.getPosition().z,
+                    displayedLocation.getPosition().x(),
+                    displayedLocation.getPosition().z(),
                     displayedLocation.getWorld()));
         }
     }
@@ -281,9 +285,9 @@ public class SidePanelWidget implements Element {
      */
     private void initPlaceholderLocation(String placeholderDescriptionKey, String placeholderTitleKey) {
 
-        var placeholderText = Text.translatable(placeholderDescriptionKey).getString();
+        var placeholderText = Component.translatable(placeholderDescriptionKey).getString();
 
-        locationDetails = new LocationDetails(Text.translatable(placeholderTitleKey).getString());
+        locationDetails = new LocationDetails(Component.translatable(placeholderTitleKey).getString());
         descriptionBlocks = HtmlConverter.parseBlocks(placeholderText);
     }
 
@@ -341,7 +345,7 @@ public class SidePanelWidget implements Element {
      * @param mouseX  Current mouse X position
      * @param mouseY  Current mouse Y position
      */
-    public void render(DrawContext context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         if (locationDetails == null) return;
 
@@ -354,22 +358,15 @@ public class SidePanelWidget implements Element {
      *
      * @param context The drawing context
      */
-    private void renderBackground(DrawContext context) {
+    private void renderBackground(GuiGraphicsExtractor context) {
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        context.drawNineSlicedTexture(ModConstants.PAPER_TEXTURE,
-                screenX1, screenY1,
-                screenX2 - screenX1, screenY2 - screenY1,
-                64,
-                64,
-                64,
-                64,
-                256,
-                256,
-                0, 0);
+        GuiTextures.blitNineSliced(context, ModConstants.PAPER_TEXTURE,
+                screenX1, screenY1, screenX2 - screenX1, screenY2 - screenY1,
+                64, 64,
+                256, 256,
+                0, 0,
+                ModConstants.LEGACY_TEXTURE_SPACE, ModConstants.LEGACY_TEXTURE_SPACE);
 
-        RenderSystem.disableBlend();
     }
 
     /**
@@ -379,7 +376,7 @@ public class SidePanelWidget implements Element {
      * @param mouseX  Current mouse X position
      * @param mouseY  Current mouse Y position
      */
-    private void renderGuiElements(DrawContext context, int mouseX, int mouseY) {
+    private void renderGuiElements(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         var centerX = (screenX1 + screenX2) / 2;
         var y = screenY1 + ELEMENT_SPACING + PADDING;
@@ -415,22 +412,22 @@ public class SidePanelWidget implements Element {
      * @param mouseY  Current mouse Y position
      * @return The height of the rendered title
      */
-    private int renderTitle(DrawContext context, int centerX, int y, int mouseX, int mouseY) {
+    private int renderTitle(GuiGraphicsExtractor context, int centerX, int y, int mouseX, int mouseY) {
 
-        this.titleWidth = (int) (textRenderer.getWidth(locationDetails.name()) * ModConstants.H1_TEXT_SCALE);
-        this.titleHeight = (int) (textRenderer.fontHeight * ModConstants.H1_TEXT_SCALE);
+        this.titleWidth = (int) (textRenderer.width(locationDetails.name()) * ModConstants.H1_TEXT_SCALE);
+        this.titleHeight = (int) (textRenderer.lineHeight * ModConstants.H1_TEXT_SCALE);
         this.titleX = centerX - (titleWidth / 2);
         this.titleY = y;
 
-        context.getMatrices().push();
-        context.getMatrices().translate(titleX, titleY, 0);
-        context.getMatrices().scale(ModConstants.H1_TEXT_SCALE, ModConstants.H1_TEXT_SCALE, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(titleX, titleY);
+        context.pose().scale(ModConstants.H1_TEXT_SCALE, ModConstants.H1_TEXT_SCALE);
 
         int color = mouseOverTitle(mouseX, mouseY) ?
                 ModConstants.COLOR_BLUE_HIGHLIGHT :
                 ModConstants.COLOR_BLUE;
 
-        context.drawText(
+        context.text(
                 textRenderer,
                 locationDetails.name(),
                 0,
@@ -439,9 +436,9 @@ public class SidePanelWidget implements Element {
                 false
         );
 
-        context.getMatrices().pop();
+        context.pose().popMatrix();
 
-        return (int) (textRenderer.fontHeight * ModConstants.H1_TEXT_SCALE);
+        return (int) (textRenderer.lineHeight * ModConstants.H1_TEXT_SCALE);
     }
 
     /**
@@ -458,12 +455,12 @@ public class SidePanelWidget implements Element {
      * @param visibleHeight   The visible height for rendering
      * @return The total height occupied by the description area (= visibleHeight)
      */
-    private int renderDescription(DrawContext context, double mouseX, double mouseY,
+    private int renderDescription(GuiGraphicsExtractor context, double mouseX, double mouseY,
                                   int usableWidth, int centerX, int y,
                                   int halfUsableWidth, int visibleHeight) {
 
         // Detect rising-edge left-click this frame
-        long handle = Client.mc().getWindow().getHandle();
+        long handle = Client.mc().getWindow().handle();
         boolean leftDown = GLFW.glfwGetMouseButton(handle, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
         boolean clicked = leftDown && !leftMouseButtonWasDown;
         leftMouseButtonWasDown = leftDown;
@@ -491,11 +488,11 @@ public class SidePanelWidget implements Element {
         // Handle hover tooltip and click events
         Style hoveredStyle = result.hoveredStyle;
         if (hoveredStyle != null) {
-            if (hoveredStyle.getHoverEvent() != null)
-                context.drawHoverEvent(textRenderer, hoveredStyle, (int) mouseX, (int) mouseY);
+            if (hoveredStyle.getHoverEvent() instanceof HoverEvent.ShowText(Component value)) {
+                context.setTooltipForNextFrame(textRenderer, value, (int) mouseX, (int) mouseY);
+            }
 
-            if (clicked && hoveredStyle.getClickEvent() != null
-                    && hoveredStyle.getClickEvent().getAction() == ClickEvent.Action.OPEN_URL) {
+            if (clicked && hoveredStyle.getClickEvent() instanceof ClickEvent.OpenUrl) {
                 handleLinkClick(hoveredStyle.getClickEvent());
             }
         }
@@ -513,10 +510,10 @@ public class SidePanelWidget implements Element {
      * @param mouseY  Current mouse Y position
      * @return The height of the rendered button
      */
-    private int renderExploreInDepth(DrawContext context, int centerX, int y, int mouseX, int mouseY) {
+    private int renderExploreInDepth(GuiGraphicsExtractor context, int centerX, int y, int mouseX, int mouseY) {
 
         exploreInDepthButton.setPosition(centerX - ModConstants.BUTTON_WIDTH / 2, y);
-        exploreInDepthButton.render(context, mouseX, mouseY, 0);
+        exploreInDepthButton.extractRenderState(context, mouseX, mouseY, 0);
 
         return ModConstants.BUTTON_HEIGHT;
     }
@@ -531,14 +528,14 @@ public class SidePanelWidget implements Element {
      * @param mouseX      The current mouse X position
      * @param mouseY      The current mouse Y position
      */
-    private void renderButtons(DrawContext context, int usableWidth, int x, int y, int mouseX, int mouseY) {
+    private void renderButtons(GuiGraphicsExtractor context, int usableWidth, int x, int y, int mouseX, int mouseY) {
 
         // Check that the teleport and set waypoint doesn't lead to world origin
         if (displayedLocation.getPosition() != null) {
 
-            if (displayedLocation.getPosition().x == 0
-                    && displayedLocation.getPosition().y == 0
-                    && displayedLocation.getPosition().z == 0)
+            if (displayedLocation.getPosition().x() == 0
+                    && displayedLocation.getPosition().y() == 0
+                    && displayedLocation.getPosition().z() == 0)
 
                 return;
         }
@@ -550,19 +547,19 @@ public class SidePanelWidget implements Element {
             setWaypointButton.setX(x + PADDING + (usableWidth - ModConstants.BUTTON_WIDTH) / 2);
             setWaypointButton.setY(y);
             setWaypointButton.setWidth(ModConstants.BUTTON_WIDTH);
-            setWaypointButton.render(context, mouseX, mouseY, 0f);
+            setWaypointButton.extractRenderState(context, mouseX, mouseY, 0f);
 
         } else {
 
             setWaypointButton.setX(x + PADDING);
             setWaypointButton.setY(y);
             setWaypointButton.setWidth(buttonWidth);
-            setWaypointButton.render(context, mouseX, mouseY, 0f);
+            setWaypointButton.extractRenderState(context, mouseX, mouseY, 0f);
 
             teleportButton.setX(x + PADDING + buttonWidth + ELEMENT_SPACING);
             teleportButton.setY(y);
             teleportButton.setWidth(buttonWidth);
-            teleportButton.render(context, mouseX, mouseY, 0f);
+            teleportButton.extractRenderState(context, mouseX, mouseY, 0f);
         }
     }
 
@@ -587,9 +584,9 @@ public class SidePanelWidget implements Element {
      */
     private void handleLinkClick(ClickEvent clickEvent) {
 
-        if (parent != null && parent instanceof MapScreen) {
+        if (parent instanceof MapScreen && clickEvent instanceof ClickEvent.OpenUrl(java.net.URI uri)) {
 
-            ((MapScreen) parent).panAndSelectLocation(ArdaMapsClient.CONFIG.getLocation(clickEvent.getValue()), false);
+            ((MapScreen) parent).panAndSelectLocation(ArdaMapsClient.CONFIG.getLocation(uri.toString()), false);
         }
     }
 
@@ -611,6 +608,7 @@ public class SidePanelWidget implements Element {
      * @return True if the event was handled by the side panel, false otherwise
      */
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        MouseButtonEvent event = new MouseButtonEvent(mouseX, mouseY, new net.minecraft.client.input.MouseButtonInfo(button, 0));
 
         if (mouseOverTitle((int) mouseX, (int) mouseY)) {
 
@@ -618,53 +616,50 @@ public class SidePanelWidget implements Element {
             return true;
         }
 
-        return (exploreInDepthButton.mouseClicked(mouseX, mouseY, button))
-                || (teleportButton.mouseClicked(mouseX, mouseY, button))
-                || (setWaypointButton.mouseClicked(mouseX, mouseY, button));
+        return (exploreInDepthButton.mouseClicked(event, false))
+                || (teleportButton.mouseClicked(event, false))
+                || (setWaypointButton.mouseClicked(event, false));
     }
 
     /**
      * Handles mouse release events for the side panel. Unimplemented as button release effects are not required.
      *
-     * @param mouseX The mouse X position
-     * @param mouseY The mouse Y position
-     * @param button The mouse button that was released
+     * @param event the initiating mouse event
      * @return False as the event is not handled
      */
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(@NonNull MouseButtonEvent event) {
         return false;
     }
 
     /**
      * Handles mouse drag events for the side panel. Unimplemented as dragging is not required.
      *
-     * @param mouseX The mouse X position
-     * @param mouseY The mouse Y position
-     * @param button The mouse button that is being dragged
+     * @param event  the initiating mouse event
      * @param deltaX The change in X position since the last event
      * @param deltaY The change in Y position since the last event
      * @return False as the event is not handled
      */
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public boolean mouseDragged(@NonNull MouseButtonEvent event, double deltaX, double deltaY) {
         return false;
     }
 
     /**
      * Handle mouse scroll for zooming
      *
-     * @param mouseX The mouse x position
-     * @param mouseY The mouse y position
-     * @param amount The scroll amount
+     * @param mouseX           The mouse x position
+     * @param mouseY           The mouse y position
+     * @param horizontalAmount The horizontal scroll amount
+     * @param verticalAmount   The vertical scroll amount
      * @return True if the event was handled
      */
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
 
         if (!isMouseOver(mouseX, mouseY)) return false;
 
-        return scrollbar.scroll(amount);
+        return scrollbar.scroll(verticalAmount);
     }
 
     /**
@@ -683,38 +678,22 @@ public class SidePanelWidget implements Element {
     /**
      * Handles key press events for the side panel. Unimplemented as keyboard interaction is not required.
      *
-     * @param keyCode   The code of the key that was pressed
-     * @param scanCode  The scan code of the key that was pressed
-     * @param modifiers Any modifier keys that were held during the key press
+     * @param event the initiating key event
      * @return False as the event is not handled
      */
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(@NonNull KeyEvent event) {
         return false;
     }
 
     /**
      * Handles key release events for the side panel. Unimplemented as keyboard interaction is not required.
      *
-     * @param keyCode   The code of the key that was released
-     * @param scanCode  The scan code of the key that was released
-     * @param modifiers Any modifier keys that were held during the key release
+     * @param event the initiating key event
      * @return False as the event is not handled
      */
     @Override
-    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
-        return false;
-    }
-
-    /**
-     * Handles character typing events for the side panel. Unimplemented as keyboard interaction is not required.
-     *
-     * @param chr       The character that was typed
-     * @param modifiers Any modifier keys that were held during typing
-     * @return False as the event is not handled
-     */
-    @Override
-    public boolean charTyped(char chr, int modifiers) {
+    public boolean keyReleased(@NonNull KeyEvent event) {
         return false;
     }
 
@@ -725,7 +704,7 @@ public class SidePanelWidget implements Element {
      * @return Null as navigation paths are not implemented
      */
     @Override
-    public @Nullable GuiNavigationPath getNavigationPath(GuiNavigation navigation) {
+    public @Nullable ComponentPath nextFocusPath(@NonNull FocusNavigationEvent navigation) {
         return null;
     }
 
@@ -749,7 +728,7 @@ public class SidePanelWidget implements Element {
      * @return Null as the side panel does not support navigation paths
      */
     @Override
-    public @Nullable GuiNavigationPath getFocusedPath() {
+    public @Nullable ComponentPath getCurrentFocusPath() {
         return null;
     }
 
@@ -757,8 +736,8 @@ public class SidePanelWidget implements Element {
      * @return Null as the side panel does not support navigation focus
      */
     @Override
-    public ScreenRect getNavigationFocus() {
-        return null;
+    public @NonNull ScreenRectangle getRectangle() {
+        return new ScreenRectangle(0, 0, 0, 0);
     }
 
     /**

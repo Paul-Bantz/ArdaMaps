@@ -25,68 +25,146 @@
 
 package com.duom.ardamaps.core.data.map.providers;
 
-import com.duom.ardamaps.ArdaMapsClient;
-import net.minecraft.client.texture.NativeImage;
+import com.duom.ardamaps.core.data.ImageFileType;
+import com.duom.ardamaps.gui.ModConstants;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.RemovalCause;
+import com.github.benmanes.caffeine.cache.RemovalListener;
+import com.mojang.blaze3d.platform.NativeImage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
+import java.lang.reflect.Field;
+import java.net.Authenticator;
+import java.net.CookieHandler;
+import java.net.ProxySelector;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for HTTP image color packing helpers.
+ * Tests for HTTP image colour packing helpers.
  */
 class HttpImageProviderTest {
 
-    /** Temporary directory used for disk-cache assertions. */
     @TempDir
     private Path tempDir;
 
     /**
-     * Verifies that Scrimage ARGB pixels are converted to the ABGR packing expected by NativeImage.
+     * Verifies PNG signature detection does not depend on the URL extension.
      */
     @Test
-    void argbToAbgr_swapsRedAndBlueChannels() {
+    void detectImageFileType_pngMagicBytes_winOverExtension() {
 
-        assertEquals(0xFF332211, HttpImageProvider.argbToAbgr(0xFF112233));
+        byte[] bytes = new byte[]{(byte) 0x89, 'P', 'N', 'G', 0, 0, 0, 0};
+
+        assertEquals(ImageFileType.PNG, HttpImageProvider.detectImageFileType(bytes, URI.create("https://example.test/map.jpg")));
     }
 
     /**
-     * Verify that executor rejection still completes the load path without throwing.
+     * Verifies JPEG signature detection for extension-less or query-string URLs.
      */
     @Test
-    void loadImage_executorRejectionInvokesCompletionCallback() throws Exception {
+    void detectImageFileType_jpegMagicBytes_doNotDefaultToPng() {
 
-        assertInstanceOf(ThreadPoolExecutor.class, ArdaMapsClient.IMAGE_EXECUTOR);
-        ThreadPoolExecutor executor = (ThreadPoolExecutor) ArdaMapsClient.IMAGE_EXECUTOR;
-        var provider = new HttpImageProvider(tempDir, (uri, lastModified) ->
-                CompletableFuture.completedFuture(FetchResult.fromConnection(200, new byte[]{1}, Map.of())));
-        var blockers = saturate(executor);
-        var ioFailure = new AtomicBoolean(false);
+        byte[] bytes = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0, 0, 0};
 
-        try {
-            assertDoesNotThrow(() -> provider.loadImage(
-                    "https://example.com/tile.png",
-                    image -> fail("Rejected decode should retry on a later request"),
-                    () -> ioFailure.set(true)
-            ));
-
-            assertFalse(ioFailure.get());
-        } finally {
-            blockers.releaseAll();
-            provider.close();
-        }
+        assertEquals(ImageFileType.JPEG, HttpImageProvider.detectImageFileType(bytes, URI.create("https://example.test/icon?id=1")));
     }
 
     /**
-     * Verify Cache-Control max-age parsing and clamping.
+     * Verifies WebP RIFF container detection.
+     */
+    @Test
+    void detectImageFileType_webpMagicBytes() {
+
+        byte[] bytes = new byte[]{'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P'};
+
+        assertEquals(ImageFileType.WEBP, HttpImageProvider.detectImageFileType(bytes, URI.create("https://example.test/layer.png")));
+    }
+
+    /**
+     * Verifies inconclusive bytes still use the existing extension fallback.
+     */
+    @Test
+    void detectImageFileType_inconclusiveBytes_useExtensionFallback() {
+
+        byte[] bytes = new byte[]{0, 1, 2};
+
+        assertEquals(ImageFileType.JPEG, HttpImageProvider.detectImageFileType(bytes, URI.create("https://example.test/layer.jpeg")));
+    }
+
+    /**
+     * Verifies a saturated image executor does not strand the URL in the loading set. The second
+     * call must attempt submission again, which can only happen if the first rejection cleared it.
+     */
+    @Test
+    void loadImage_executorRejection_clearsLoadingWithoutThrowing() {
+
+        var client = new FakeHttpClient();
+        client.enqueue(200, new byte[]{1}, Map.of("cache-control", "max-age=300"));
+        client.enqueue(200, new byte[]{1}, Map.of("cache-control", "max-age=300"));
+        var provider = new RejectingHttpImageProvider(tempDir, client);
+        String url = "https://example.test/tile.png";
+
+        assertDoesNotThrow(() -> provider.loadImage(url));
+        assertDoesNotThrow(() -> provider.loadImage(url));
+
+        assertEquals(2, provider.submitAttempts, "Rejected URL should be retriable on the next request");
+    }
+
+    /**
+     * Verifies preloaded icons are not loaded again when the map screen is re-initialized.
+     */
+    @Test
+    void loadImage_cachedTexture_skipsReload() throws Exception {
+
+        var client = new FakeHttpClient();
+        var provider = new CapturingHttpImageProvider(tempDir, client);
+        String url = "https://example.test/icon.png";
+
+        cacheTexture(provider, url);
+        provider.loadImage(url);
+
+        assertEquals(0, client.requests.get(), "Cached textures should not trigger another fetch");
+        assertTrue(provider.decodedBytes.isEmpty(), "Cached textures should not be decoded again");
+    }
+
+    /**
+     * Verifies replacing a Caffeine cache entry does not release a deterministic texture identifier
+     * that the replacement may still use.
+     */
+    @Test
+    void textureRemovalListener_replacedEntry_doesNotDestroyTexture() throws Exception {
+
+        var provider = new CountingDestroyHttpImageProvider(tempDir, new FakeHttpClient());
+        var listener = textureRemovalListener(provider);
+        var data = textureData();
+
+        listener.onRemoval("https://example.test/icon.png", data, RemovalCause.REPLACED);
+        listener.onRemoval("https://example.test/icon.png", data, RemovalCause.EXPLICIT);
+
+        assertEquals(1, provider.destroyedTextures.get(), "Only non-replacement removals should destroy textures");
+    }
+
+    /**
+     * Verifies cache-control max-age parsing, defaults, and defensive clamping.
      */
     @Test
     void cacheControl_maxAgeParsingAndClamp() {
@@ -98,7 +176,7 @@ class HttpImageProviderTest {
     }
 
     /**
-     * Verify that disk-cache keys remain collision-resistant across a large tile set.
+     * Verifies widened disk keys avoid collisions over a large synthetic tile URL set.
      */
     @Test
     void diskCacheKey_noCollisionsAcrossLargeTileSet() {
@@ -114,15 +192,15 @@ class HttpImageProviderTest {
     }
 
     /**
-     * Verify that a fresh disk entry is reused without a second network fetch.
+     * Verifies a fresh disk entry is served without a second network request.
      */
     @Test
     void loadImage_freshDiskEntry_skipsNetwork() throws Exception {
 
         byte[] bytes = new byte[]{1, 2, 3};
-        var fetcher = new FakeFetcher();
-        fetcher.enqueue(200, bytes, Map.of("cache-control", "max-age=86400", "last-modified", "Fri, 14 Aug 2026 10:00:00 GMT"));
-        var provider = new CapturingHttpImageProvider(tempDir, fetcher);
+        var client = new FakeHttpClient();
+        client.enqueue(200, bytes, Map.of("cache-control", "max-age=86400", "last-modified", "Fri, 14 Aug 2026 10:00:00 GMT"));
+        var provider = new CapturingHttpImageProvider(tempDir, client);
         provider.setClock(() -> 1_000L);
         String url = "https://example.test/tile.png";
 
@@ -130,21 +208,21 @@ class HttpImageProviderTest {
         provider.setClock(() -> 2_000L);
         awaitLoad(provider, url);
 
-        assertEquals(1, fetcher.requests.get());
+        assertEquals(1, client.requests.get(), "Fresh disk entry should not hit the network");
         assertArrayEquals(bytes, provider.decodedBytes.getFirst());
         assertArrayEquals(bytes, provider.decodedBytes.getLast());
     }
 
     /**
-     * Verify that an expired disk entry triggers a refetch.
+     * Verifies expired disk entries are refetched and rewritten.
      */
     @Test
     void loadImage_expiredDiskEntry_refetches() throws Exception {
 
-        var fetcher = new FakeFetcher();
-        fetcher.enqueue(200, new byte[]{1}, Map.of("cache-control", "max-age=300"));
-        fetcher.enqueue(200, new byte[]{2}, Map.of("cache-control", "max-age=300"));
-        var provider = new CapturingHttpImageProvider(tempDir, fetcher);
+        var client = new FakeHttpClient();
+        client.enqueue(200, new byte[]{1}, Map.of("cache-control", "max-age=300"));
+        client.enqueue(200, new byte[]{2}, Map.of("cache-control", "max-age=300"));
+        var provider = new CapturingHttpImageProvider(tempDir, client);
         String url = "https://example.test/tile.png";
 
         provider.setClock(() -> 1_000L);
@@ -152,20 +230,20 @@ class HttpImageProviderTest {
         provider.setClock(() -> 1_000L + 301_000L);
         awaitLoad(provider, url);
 
-        assertEquals(2, fetcher.requests.get());
+        assertEquals(2, client.requests.get());
         assertArrayEquals(new byte[]{2}, provider.decodedBytes.getLast());
     }
 
     /**
-     * Verify that absent responses are cached using the negative-cache TTL.
+     * Verifies a 204 response takes the absent path and persists the negative cache for later calls.
      */
     @SuppressWarnings("resource")
     @Test
     void loadImage_absentResponse_usesNegativeCacheTtl() throws Exception {
 
-        var fetcher = new FakeFetcher();
-        fetcher.enqueue(204, new byte[0], Map.of("cache-control", "max-age=14400"));
-        var provider = new CapturingHttpImageProvider(tempDir, fetcher);
+        var client = new FakeHttpClient();
+        client.enqueue(204, new byte[0], Map.of("cache-control", "max-age=14400"));
+        var provider = new CapturingHttpImageProvider(tempDir, client);
         String url = "https://example.test/missing.png";
 
         long firstTtl = awaitAbsent(provider, url);
@@ -173,42 +251,24 @@ class HttpImageProviderTest {
 
         assertEquals(14_400L, firstTtl);
         assertEquals(14_400L, secondTtl);
-        assertEquals(1, fetcher.requests.get());
-        assertTrue(Files.list(tempDir).anyMatch(path -> path.getFileName().toString().endsWith(".1")));
+        assertEquals(1, client.requests.get(), "Fresh negative cache entry should suppress network");
+        assertTrue(Files.list(tempDir).anyMatch(path -> path.getFileName().toString().endsWith(".1")),
+                "Absent metadata should be persisted");
     }
 
     /**
-     * Verify that empty response bodies are persisted as absent results.
-     */
-    @Test
-    void loadImage_emptyBodyResponse_persistsAsAbsent() throws Exception {
-
-        var fetcher = new FakeFetcher();
-        fetcher.enqueue(200, new byte[0], Map.of("cache-control", "max-age=14400"));
-        var provider = new CapturingHttpImageProvider(tempDir, fetcher);
-        String url = "https://example.test/empty.png";
-
-        assertEquals(14_400L, awaitAbsent(provider, url));
-
-        var secondProvider = new CapturingHttpImageProvider(tempDir, fetcher);
-        assertEquals(14_400L, awaitAbsent(secondProvider, url));
-
-        assertEquals(1, fetcher.requests.get());
-        assertTrue(secondProvider.decodedBytes.isEmpty());
-    }
-
-    /**
-     * Verify that a 304 response reuses the cached bytes.
+     * Verifies an expired cached entry sends If-Modified-Since and a 304 refreshes metadata while
+     * serving the cached bytes.
      */
     @Test
     void loadImage_expiredEntryWith304_usesCachedBytes() throws Exception {
 
-        var fetcher = new FakeFetcher();
-        fetcher.enqueue(200, new byte[]{9}, Map.of(
+        var client = new FakeHttpClient();
+        client.enqueue(200, new byte[]{9}, Map.of(
                 "cache-control", "max-age=300",
                 "last-modified", "Fri, 14 Aug 2026 10:00:00 GMT"));
-        fetcher.enqueue(304, new byte[0], Map.of("cache-control", "max-age=300"));
-        var provider = new CapturingHttpImageProvider(tempDir, fetcher);
+        client.enqueue(304, new byte[0], Map.of("cache-control", "max-age=300"));
+        var provider = new CapturingHttpImageProvider(tempDir, client);
         String url = "https://example.test/tile.png";
 
         provider.setClock(() -> 1_000L);
@@ -216,38 +276,80 @@ class HttpImageProviderTest {
         provider.setClock(() -> 1_000L + 301_000L);
         awaitLoad(provider, url);
 
-        assertEquals(2, fetcher.requests.get());
-        assertEquals("Fri, 14 Aug 2026 10:00:00 GMT", fetcher.lastModifiedHeaders.get(fetcher.lastModifiedHeaders.size() - 1));
+        assertEquals(2, client.requests.get());
+        assertEquals("Fri, 14 Aug 2026 10:00:00 GMT",
+                client.lastRequest.headers().firstValue("If-Modified-Since").orElse(null));
         assertArrayEquals(new byte[]{9}, provider.decodedBytes.getLast());
     }
 
-    /**
-     * Wait for a successful image load to complete.
-     *
-     * @param provider Provider under test.
-     * @param url Image URL.
-     * @throws Exception If the latch times out.
-     */
+    private static final class RejectingHttpImageProvider extends HttpImageProvider {
+
+        private int submitAttempts;
+
+        private RejectingHttpImageProvider(Path diskCacheDirectory, FakeHttpClient client) {
+
+            super(diskCacheDirectory, new DelegatingHttpClient(client));
+        }
+
+        @Override
+        CompletableFuture<NativeImage> submitImageLoad(Supplier<NativeImage> supplier) {
+            submitAttempts++;
+            throw new RejectedExecutionException("full");
+        }
+    }
+
+    private static final class CountingDestroyHttpImageProvider extends HttpImageProvider {
+
+        private final AtomicInteger destroyedTextures = new AtomicInteger();
+
+        private CountingDestroyHttpImageProvider(Path diskCacheDirectory, FakeHttpClient client) {
+
+            super(diskCacheDirectory, new DelegatingHttpClient(client));
+        }
+
+        @Override
+        void destroyTexture(TextureData data) {
+            destroyedTextures.incrementAndGet();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void cacheTexture(HttpImageProvider provider, String url) throws Exception {
+
+        Field texturesField = HttpImageProvider.class.getDeclaredField("textures");
+        texturesField.setAccessible(true);
+        Cache<String, HttpImageProvider.TextureData> textures =
+                (Cache<String, HttpImageProvider.TextureData>) texturesField.get(provider);
+
+        textures.put(url, textureData());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static RemovalListener<String, HttpImageProvider.TextureData> textureRemovalListener(HttpImageProvider provider)
+            throws Exception {
+
+        Field listenerField = HttpImageProvider.class.getDeclaredField("textureRemovalListener");
+        listenerField.setAccessible(true);
+        return (RemovalListener<String, HttpImageProvider.TextureData>) listenerField.get(provider);
+    }
+
+    private static HttpImageProvider.TextureData textureData() {
+
+        return new HttpImageProvider.TextureData(ModConstants.modId("test/cached"), 1, 1);
+    }
+
     private static void awaitLoad(CapturingHttpImageProvider provider, String url) throws Exception {
 
         CountDownLatch latch = new CountDownLatch(1);
-        provider.loadImage(url, ignored -> latch.countDown(), () -> fail("Unexpected IO failure"));
+        provider.loadImage(url, _ -> latch.countDown(), () -> fail("Unexpected IO failure"));
         assertTrue(latch.await(2, TimeUnit.SECONDS), "Image load did not complete");
     }
 
-    /**
-     * Wait for an absent image load to complete and return the reported TTL.
-     *
-     * @param provider Provider under test.
-     * @param url Image URL.
-     * @return Reported negative-cache TTL.
-     * @throws Exception If the latch times out.
-     */
     private static long awaitAbsent(CapturingHttpImageProvider provider, String url) throws Exception {
 
         CountDownLatch latch = new CountDownLatch(1);
         long[] ttl = new long[1];
-        provider.loadImage(url, ignored -> latch.countDown(), () -> fail("Unexpected IO failure"), maxAge -> {
+        provider.loadImage(url, _ -> latch.countDown(), () -> fail("Unexpected IO failure"), maxAge -> {
             ttl[0] = maxAge;
             latch.countDown();
         });
@@ -255,73 +357,26 @@ class HttpImageProviderTest {
         return ttl[0];
     }
 
-    /**
-     * Saturate the given executor so rejected submissions can be exercised.
-     *
-     * @param executor Executor to saturate.
-     * @return Handle for releasing the blocked tasks.
-     * @throws InterruptedException If waiting for task start is interrupted.
-     */
-    private static Blockers saturate(ThreadPoolExecutor executor) throws InterruptedException {
-
-        int tasks = executor.getCorePoolSize() + executor.getQueue().remainingCapacity();
-        CountDownLatch release = new CountDownLatch(1);
-        CountDownLatch started = new CountDownLatch(executor.getCorePoolSize());
-        List<Future<?>> futures = new ArrayList<>();
-
-        for (int i = 0; i < tasks; i++) {
-            futures.add(executor.submit(() -> {
-                started.countDown();
-                try {
-                    release.await();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }));
-        }
-
-        assertTrue(started.await(5, TimeUnit.SECONDS));
-        assertEquals(0, executor.getQueue().remainingCapacity());
-        return new Blockers(release, futures);
-    }
-
-    /**
-     * Handles release and cancellation of the saturated executor tasks.
-     */
-    private record Blockers(CountDownLatch release, List<Future<?>> futures) {
-
-        private void releaseAll() {
-            release.countDown();
-            futures.forEach(future -> future.cancel(true));
-        }
-    }
-
-    /**
-     * Test provider that records decoded bytes instead of creating textures.
-     */
     private static final class CapturingHttpImageProvider extends HttpImageProvider {
 
-        /** Bytes passed to the decoder in call order. */
         private final ArrayDeque<byte[]> decodedBytes = new ArrayDeque<>();
 
-        /**
-         * Create a capturing provider for tests.
-         *
-         * @param diskCacheDirectory Disk cache directory.
-         * @param fetcher Response source.
-         */
-        private CapturingHttpImageProvider(Path diskCacheDirectory, FakeFetcher fetcher) {
+        private CapturingHttpImageProvider(Path diskCacheDirectory, FakeHttpClient client) {
 
-            super(diskCacheDirectory, fetcher);
+            super(diskCacheDirectory, new DelegatingHttpClient(client));
         }
 
-        /**
-         * Record the raw bytes and skip actual decoding.
-         *
-         * @param rawImageData Encoded image bytes.
-         * @param uri Source URI.
-         * @return Always null to avoid creating textures in the test.
-         */
+        @Override
+        CompletableFuture<NativeImage> submitImageLoad(Supplier<NativeImage> supplier) {
+
+            try {
+                supplier.get();
+            } catch (RuntimeException ignored) {
+                // Tests use arbitrary bytes and only need to observe cache transport behaviour.
+            }
+            return CompletableFuture.completedFuture(null);
+        }
+
         @Override
         NativeImage decodeImage(byte[] rawImageData, URI uri) {
 
@@ -330,45 +385,93 @@ class HttpImageProviderTest {
         }
     }
 
-    /**
-     * Deterministic fetcher used to feed scripted responses into the provider.
-     */
-    private static final class FakeFetcher implements HttpImageProvider.Fetcher {
+    private static final class FakeHttpClient extends HttpClient {
 
-        /** Scripted responses returned in order. */
-        private final ArrayDeque<FetchResult> responses = new ArrayDeque<>();
-        /** Count of fetch invocations. */
+        private final ArrayDeque<HttpResponse<byte[]>> responses = new ArrayDeque<>();
         private final AtomicInteger requests = new AtomicInteger();
-        /** Last-Modified values passed to each request. */
-        private final List<String> lastModifiedHeaders = new ArrayList<>();
+        private HttpRequest lastRequest;
 
-        /**
-         * Queue a synthetic fetch response.
-         *
-         * @param status HTTP status code.
-         * @param body Response body bytes.
-         * @param headers Response headers.
-         */
         private void enqueue(int status, byte[] body, Map<String, String> headers) {
 
-            Map<String, List<String>> values = new HashMap<>();
-            headers.forEach((key, value) -> values.put(key, List.of(value)));
-            responses.add(FetchResult.fromConnection(status, body, values));
+            responses.add(new FakeResponse(status, body, headers));
         }
 
-        /**
-         * Return the next scripted response.
-         *
-         * @param uri Requested URI.
-         * @param lastModified Last-Modified value from the caller.
-         * @return Completed future for the next scripted response.
-         */
         @Override
-        public CompletableFuture<FetchResult> fetch(URI uri, String lastModified) {
+        public <T> CompletableFuture<HttpResponse<T>> sendAsync(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler) {
 
             requests.incrementAndGet();
-            lastModifiedHeaders.add(lastModified);
-            return CompletableFuture.completedFuture(responses.removeFirst());
+            lastRequest = request;
+            @SuppressWarnings("unchecked")
+            HttpResponse<T> response = (HttpResponse<T>) responses.removeFirst();
+            return CompletableFuture.completedFuture(response);
         }
+
+        @Override
+        public Optional<CookieHandler> cookieHandler() { return Optional.empty(); }
+
+        @Override
+        public Optional<Duration> connectTimeout() { return Optional.empty(); }
+
+        @Override
+        public Redirect followRedirects() { return Redirect.NEVER; }
+
+        @Override
+        public Optional<ProxySelector> proxy() { return Optional.empty(); }
+
+        @Override
+        public SSLContext sslContext() { return null; }
+
+        @Override
+        public SSLParameters sslParameters() { return null; }
+
+        @Override
+        public Optional<Authenticator> authenticator() { return Optional.empty(); }
+
+        @Override
+        public HttpClient.Version version() { return HttpClient.Version.HTTP_2; }
+
+        @Override
+        public Optional<java.util.concurrent.Executor> executor() { return Optional.empty(); }
+
+        @Override
+        public <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public <T> CompletableFuture<HttpResponse<T>> sendAsync(HttpRequest request,
+                                                                HttpResponse.BodyHandler<T> responseBodyHandler,
+                                                                HttpResponse.PushPromiseHandler<T> pushPromiseHandler) {
+            return sendAsync(request, responseBodyHandler);
+        }
+
+    }
+
+    private record FakeResponse(int statusCode, byte[] body, Map<String, String> headerMap) implements HttpResponse<byte[]> {
+
+        @Override
+        public HttpRequest request() { return null; }
+
+        @Override
+        public Optional<HttpResponse<byte[]>> previousResponse() { return Optional.empty(); }
+
+        @Override
+        public HttpHeaders headers() {
+            Map<String, java.util.List<String>> values = new HashMap<>();
+            headerMap.forEach((key, value) -> values.put(key, java.util.List.of(value)));
+            return HttpHeaders.of(values, (_, _) -> true);
+        }
+
+        @Override
+        public byte[] body() { return body; }
+
+        @Override
+        public Optional<javax.net.ssl.SSLSession> sslSession() { return Optional.empty(); }
+
+        @Override
+        public URI uri() { return URI.create("https://example.test"); }
+
+        @Override
+        public HttpClient.Version version() { return HttpClient.Version.HTTP_2; }
     }
 }

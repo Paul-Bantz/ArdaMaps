@@ -30,31 +30,25 @@ import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.map.tiles.PmTileKey;
-import lombok.Getter;
 import lombok.Setter;
 import org.jspecify.annotations.NonNull;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-/**
- * Base camera for tile-backed map layers. It adds tile zoom bounds, tile selection helpers,
- * and exploration-aware tile filtering on top of the generic map camera math.
- */
 public abstract class TilesMapCamera extends MapCamera {
 
-    /** Tile size in pixels. */
-    @Getter
+    /** Tile size in pixels */
     @Setter
     protected int tileSize;
 
-    /** Maximum zoom level allowed by the tile source. */
+    /** Maximum zoom level allowed by the pmtiles file */
     protected int maxTileZoom;
 
-    /** Minimum zoom level allowed by the tile source. */
+    /** Minimum zoom level allowed by the pmtiles file */
     protected int minTileZoom;
 
-    /** Current exploration state for the tileset. */
+    /** Current exploration state for the tileset */
     private PlayerExploration playerExploration;
 
     /**
@@ -137,24 +131,6 @@ public abstract class TilesMapCamera extends MapCamera {
     public abstract int getTileSourceClampedZoom();
 
     /**
-     * Returns a stable integer distance from the viewport center to the tile center.
-     * Lower distances are higher priority.
-     *
-     * @param tileX tile X coordinate
-     * @param tileY tile Y coordinate
-     * @param tileZoom tile zoom level
-     * @return rounded screen-space distance from viewport center
-     */
-    public int centerTileDistance(int tileX, int tileY, int tileZoom) {
-
-        Vec2d screen = tilePositionOnViewport(tileX, tileY, tileZoom);
-        double halfTile = displayedTileSize(tileZoom) / 2.0;
-        double dx = screen.x() + halfTile - viewportWidth / 2.0;
-        double dy = screen.y() + halfTile - viewportHeight / 2.0;
-        return (int) Math.round(Math.hypot(dx, dy));
-    }
-
-    /**
      * Set tile zoom bounds. This is the allowed zoom range for the tile source.
      *
      * @param minZoom Minimum zoom level
@@ -198,6 +174,24 @@ public abstract class TilesMapCamera extends MapCamera {
     }
 
     /**
+     * Chebyshev distance, in tiles, between the given tile and the tile currently under the camera
+     * centre at the same zoom level. Used to prioritize tile loading centre-out.
+     *
+     * @param tileX    Tile X coordinate.
+     * @param tileY    Tile Y coordinate.
+     * @param tileZoom Zoom level the tile belongs to.
+     * @return The Chebyshev distance in tile units from the viewport-centre tile.
+     */
+    public int centerTileDistance(int tileX, int tileY, int tileZoom) {
+
+        int blocksPerTile = numberOfBlocksPerTile(tileZoom);
+        int centerTileX = (int) Math.floor(getWorldX() / blocksPerTile);
+        int centerTileY = (int) Math.floor(getWorldZ() / blocksPerTile);
+
+        return Math.max(Math.abs(tileX - centerTileX), Math.abs(tileY - centerTileY));
+    }
+
+    /**
      * Check whether a tile is at least partially explored. If current exploration is null, return true.
      *
      * @param exploration   the exploration state to check against
@@ -210,6 +204,7 @@ public abstract class TilesMapCamera extends MapCamera {
 
     /**
      * Sets the dimension for this camera. References the player exploration if dimension is valid.
+     *
      * @param dimension The DimensionDefinition to set for this camera
      */
     @Override

@@ -56,4 +56,6 @@ public record ApiLocation(String id,
                           List<String> regions,
                           boolean canon,
                           String description,
-                          String externalUrl) {}
+                          String externalUrl) {
+
+}

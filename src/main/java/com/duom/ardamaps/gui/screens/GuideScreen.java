@@ -35,17 +35,21 @@ import com.duom.ardamaps.gui.screens.rendering.TextContentBlockRenderer;
 import com.duom.ardamaps.gui.widgets.ScrollbarWidget;
 import com.duom.ardamaps.gui.widgets.StyledButtonWidget;
 import com.duom.ardamaps.gui.widgets.builders.StyledButtonBuilder;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.ChatScreen;
-import net.minecraft.client.gui.screen.ConfirmLinkScreen;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.option.KeybindsScreen;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.options.controls.KeyBindsScreen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.util.Util;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -89,13 +93,6 @@ public class GuideScreen extends ArdaMapsScreen {
     private static final int BUTTON_SCROLL_SPEED = 1;
 
     /**
-     * Screen layout view state – controls what the left column renders.
-     * {@code PAGE_LIST} shows the page-selection buttons; {@code ENTRY_VIEW}
-     * shows the entries of the selected page plus a back button.
-     */
-    private enum ViewState { PAGE_LIST, ENTRY_VIEW }
-
-    /**
      * Inner margin values applied to the left page column.
      * These control the space between the column's logical boundary and its content.
      */
@@ -109,16 +106,16 @@ public class GuideScreen extends ArdaMapsScreen {
     private static final Margins RIGHT_MARGINS = new Margins(32, 10, 10, 10);
 
     /** Translated label used as the section title of the left column. */
-    private final Text titleGuide = Text.translatable("ardamaps.client.map.screen.guide");
+    private final Component titleGuide = Component.translatable("ardamaps.client.map.screen.guide");
 
     /** Translated label used as the title of the right column when no page is selected (landing page). */
-    private final Text titleAbout = Text.translatable("ardamaps.client.map.screen.guide.about");
+    private final Component titleAbout = Component.translatable("ardamaps.client.map.screen.guide.about");
 
     /** Translated placeholder shown while the guide book or an entry is loading. */
-    private final Text textLoading = Text.translatable("ardamaps.client.map.screen.guide.loading");
+    private final Component textLoading = Component.translatable("ardamaps.client.map.screen.guide.loading");
 
     /** Translated placeholder shown in the entry sub-column when a page has no entries. */
-    private final Text textSelectTopic = Text.translatable("ardamaps.client.map.screen.guide.select_topic");
+    private final Component textSelectTopic = Component.translatable("ardamaps.client.map.screen.guide.select_topic");
 
     /**
      * One toggle button per {@link com.duom.ardamaps.core.data.guide.GuidePage},
@@ -157,6 +154,14 @@ public class GuideScreen extends ArdaMapsScreen {
      */
     private final ScrollbarWidget contentScrollbar =
             new ScrollbarWidget(SCROLLBAR_WIDTH, 12, ModConstants.COLOR_BLUE, ModConstants.COLOR_BLUE_HIGHLIGHT, SCROLL_SPEED);
+
+    /**
+     * Deep-link string from {@code ClientConfig#lastPage} supplied at construction time.
+     * Used in {@link #init()} to restore the last-visited page+entry once the book has
+     * finished loading. {@code null} or {@code "guide"} means open the landing page.
+     */
+    @Nullable
+    private final String initialLink;
 
     /**
      * The fully loaded guide book, or {@code null} while the initial async load is in
@@ -269,14 +274,6 @@ public class GuideScreen extends ArdaMapsScreen {
     private Style lastHoveredContentStyle;
 
     /**
-     * Deep-link string from {@code ClientConfig#lastPage} supplied at construction time.
-     * Used in {@link #init()} to restore the last-visited page+entry once the book has
-     * finished loading. {@code null} or {@code "guide"} means open the landing page.
-     */
-    @Nullable
-    private final String initialLink;
-
-    /**
      * Creates a new Guide Screen that attempts to restore the given deep-link.
      *
      * @param parent      the screen to return to when this screen is closed
@@ -284,7 +281,7 @@ public class GuideScreen extends ArdaMapsScreen {
      *                    or {@code null} to open the landing page
      */
     public GuideScreen(Screen parent, @Nullable String initialLink) {
-        super(parent, Text.translatable("ardamaps.client.map.screen.guide"));
+        super(parent, Component.translatable("ardamaps.client.map.screen.guide"));
         this.initialLink = initialLink;
     }
 
@@ -304,7 +301,7 @@ public class GuideScreen extends ArdaMapsScreen {
     protected void init() {
         super.init();
 
-        textContentBlockRenderer = new TextContentBlockRenderer(textRenderer, ModConstants.COLOR_DARK_BROWN);
+        textContentBlockRenderer = new TextContentBlockRenderer(font, ModConstants.COLOR_DARK_BROWN);
         loadingBook = true;
         loadingLanding = true;
         landingContent = null;
@@ -312,8 +309,8 @@ public class GuideScreen extends ArdaMapsScreen {
         // Load guide.html in parallel with the book – shown on right page in PAGE_LIST state
         GuideLoader.loadHtml("guide.html").thenAccept(html -> {
             List<ContentBlock> parsed = html.isBlank() ? null : HtmlConverter.parseBlocks(html);
-            assert client != null;
-            client.execute(() -> {
+
+            minecraft.execute(() -> {
                 landingContent = parsed;
                 loadingLanding = false;
             });
@@ -325,8 +322,7 @@ public class GuideScreen extends ArdaMapsScreen {
 
             GuideSearchIndex.preloadIfNeeded(book);
 
-            assert client != null;
-            client.execute(() -> {
+            minecraft.execute(() -> {
 
                 rebuildPageButtons();
 
@@ -358,7 +354,7 @@ public class GuideScreen extends ArdaMapsScreen {
      * Get the search function that is called when searching an element on screen via the search widget.
      * This function should search for a String in a List of elements represented on screen
      *
-     * @return  the search function
+     * @return the search function
      */
     @Override
     protected @Nullable Function<String, List<?>> getSearchFunction() {
@@ -435,7 +431,7 @@ public class GuideScreen extends ArdaMapsScreen {
         if (guideBook != null && pageIndex >= 0 && pageIndex < guideBook.getPages().size()) {
             var entries = guideBook.getPages().get(pageIndex).getEntries();
             if (!entries.isEmpty()) {
-                selectEntry(entries.get(0), 0);
+                selectEntry(entries.getFirst(), 0);
             }
         }
     }
@@ -472,11 +468,10 @@ public class GuideScreen extends ArdaMapsScreen {
 
         GuideLoader.loadHtml(entry.getLink()).thenAccept(html -> {
             List<ContentBlock> parsed = html.isBlank()
-                    ? List.of(new ContentBlock.TextBlock(Text.literal("(no content)")))
+                    ? List.of(new ContentBlock.TextBlock(Component.literal("(no content)")))
                     : HtmlConverter.parseBlocks(html);
 
-            assert client != null;
-            client.execute(() -> {
+            minecraft.execute(() -> {
                 currentContent = parsed;
                 loadingEntry = false;
             });
@@ -502,7 +497,7 @@ public class GuideScreen extends ArdaMapsScreen {
         leftScrollbar.resetOffset();
 
         backButton = StyledButtonBuilder.create()
-                .setText(Text.translatable("ardamaps.client.map.screen.guide.back"))
+                .setText(Component.translatable("ardamaps.client.map.screen.guide.back"))
                 .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
                 .setOnClick(() -> {
                     viewState = ViewState.PAGE_LIST;
@@ -526,7 +521,7 @@ public class GuideScreen extends ArdaMapsScreen {
             final int idx = i;
             var page = pages.get(i);
             var button = StyledButtonBuilder.create()
-                    .setText(Text.literal(page.getTitle()))
+                    .setText(Component.literal(page.getTitle()))
                     .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
                     .setOnClick(() -> selectPage(idx))
                     .build();
@@ -570,7 +565,7 @@ public class GuideScreen extends ArdaMapsScreen {
             final var entry = entries.get(i);
 
             var btn = StyledButtonBuilder.create()
-                    .setText(Text.literal(entry.getTitle()))
+                    .setText(Component.literal(entry.getTitle()))
                     .setSize(ModConstants.BUTTON_WIDTH, ModConstants.BUTTON_HEIGHT)
                     .setOnClick(() -> selectEntry(entry, ei))
                     .setStyle(StyledButtonWidget.Style.EDGE)
@@ -605,14 +600,13 @@ public class GuideScreen extends ArdaMapsScreen {
     /**
      * {@inheritDoc}
      *
-     * <p>Renders the tiled paper background, then the guide UI (three columns), then
+     * <p>Renders the guide UI (three columns), then
      * the standard Minecraft overlay elements (tooltips, etc.).</p>
      */
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context);
+    public void extractRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         renderGuideUi(context, mouseX, mouseY, delta);
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
 
     /**
@@ -625,7 +619,7 @@ public class GuideScreen extends ArdaMapsScreen {
      * @param mouseY  current mouse Y in screen coordinates
      * @param delta   partial tick used for animations
      */
-    private void renderGuideUi(DrawContext context, int mouseX, int mouseY, float delta) {
+    private void renderGuideUi(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         var contentArea = getPaddedContentArea();
 
         int leftColX = contentArea.topLeftX() + LEFT_MARGINS.left();
@@ -648,6 +642,7 @@ public class GuideScreen extends ArdaMapsScreen {
 
     /**
      * Calculates the page width available for rendering
+     *
      * @param contentArea the content area provided by the screen
      * @return the available page width
      */
@@ -660,125 +655,13 @@ public class GuideScreen extends ArdaMapsScreen {
      * Renders the left column. Delegates to {@link #renderPageListLeftColumn} or
      * {@link #renderEntryViewLeftColumn} depending on {@link #viewState}.
      */
-    private void renderLeftColumn(DrawContext context, int colX, int topY, int bottomY,
+    private void renderLeftColumn(GuiGraphicsExtractor context, int colX, int topY, int bottomY,
                                   int pageWidth, int mouseX, int mouseY, float delta) {
         if (viewState == ViewState.ENTRY_VIEW) {
             renderEntryViewLeftColumn(context, colX, topY, bottomY, pageWidth, mouseX, mouseY, delta);
         } else {
             renderPageListLeftColumn(context, colX, topY, bottomY, pageWidth, mouseX, mouseY, delta);
         }
-    }
-
-    /**
-     * Left-column rendering for {@link ViewState#PAGE_LIST}: guide title, separator,
-     * and a scrollable list of page toggle buttons.
-     */
-    private void renderPageListLeftColumn(DrawContext context, int colX, int topY, int bottomY,
-                                          int pageWidth, int mouseX, int mouseY, float delta) {
-        int y = topY;
-        y = renderSectionTitle(context, colX, y, pageWidth, titleGuide) + ModConstants.ROW_SPACING;
-        y += ScreenRenderingUtils.renderSeparator(context, pageWidth, colX, y) + ModConstants.ROW_SPACING;
-
-        leftListTopY = y;
-        leftBottomY = bottomY;
-
-        if (loadingBook) {
-            context.drawText(textRenderer, textLoading, colX, y, ModConstants.COLOR_DARK_BROWN, false);
-            return;
-        }
-
-        int visibleHeight = bottomY - y;
-        if (visibleHeight <= 0 || pageButtons.isEmpty()) return;
-
-        int stride = ModConstants.BUTTON_HEIGHT + ModConstants.ROW_SPACING;
-        int visibleItems = Math.max(1, (visibleHeight + ModConstants.ROW_SPACING) / stride);
-        int maxScroll = Math.max(0, pageButtons.size() - visibleItems);
-        leftScrollbar.setMaxOffset(maxScroll);
-
-        context.enableScissor(colX, y, colX + pageWidth, bottomY);
-
-        int drawY = y - leftScrollbar.getScrollOffset() * stride;
-        for (StyledButtonWidget btn : pageButtons) {
-            btn.setX(colX + pageWidth / 2 - btn.getWidth() / 2);
-            btn.setY(drawY);
-            if (drawY + ModConstants.BUTTON_HEIGHT > y && drawY < bottomY) {
-                btn.render(context, mouseX, mouseY, delta);
-            }
-            drawY += stride;
-        }
-
-        context.disableScissor();
-
-        if (maxScroll > 0) {
-            leftScrollbar.render(context,
-                    colX + pageWidth - SCROLLBAR_WIDTH, y,
-                    stride * visibleItems, visibleItems, pageButtons.size());
-        }
-    }
-
-    /**
-     * Left-column rendering for {@link ViewState#ENTRY_VIEW}: the selected page's name,
-     * a separator, a scrollable list of entry buttons, and a back button pinned at the
-     * very bottom of the column (always visible, outside the scissor region).
-     */
-    private void renderEntryViewLeftColumn(DrawContext context, int colX, int topY, int bottomY,
-                                           int pageWidth, int mouseX, int mouseY, float delta) {
-        int y = topY;
-
-        String pageTitle = (guideBook != null && currentPageIndex >= 0
-                && currentPageIndex < guideBook.getPages().size())
-                ? guideBook.getPages().get(currentPageIndex).getTitle()
-                : "";
-        y = renderSectionTitle(context, colX, y, pageWidth, Text.literal(pageTitle)) + ModConstants.ROW_SPACING;
-        y += ScreenRenderingUtils.renderSeparator(context, pageWidth, colX, y) + ModConstants.ROW_SPACING;
-
-        // Reserve space for the back button at the bottom
-        int backButtonStride = ModConstants.BUTTON_HEIGHT + ModConstants.ROW_SPACING;
-        int listBottomY = bottomY - backButtonStride;
-
-        leftListTopY = y;
-        leftBottomY = listBottomY;
-
-        if (entryButtons.isEmpty()) {
-            context.drawText(textRenderer, textSelectTopic, colX, y, ModConstants.COLOR_DARK_BROWN, false);
-        } else {
-            int visibleHeight = listBottomY - y;
-            if (visibleHeight > 0) {
-                int stride = ModConstants.BUTTON_HEIGHT;
-                int visibleItems = Math.max(1, visibleHeight / stride);
-                int maxScroll = Math.max(0, entryButtons.size() - visibleItems);
-                entryScrollbar.setMaxOffset(maxScroll);
-
-                context.enableScissor(colX, y, colX + pageWidth, listBottomY);
-
-                int drawY = y - entryScrollbar.getScrollOffset() * stride;
-                for (StyledButtonWidget btn : entryButtons) {
-                    btn.setWidth(pageWidth);
-                    btn.setHeight(ModConstants.BUTTON_HEIGHT);
-                    btn.setX(colX);
-                    btn.setY(drawY);
-                    if (drawY + ModConstants.BUTTON_HEIGHT > y && drawY < listBottomY) {
-                        btn.render(context, mouseX, mouseY, delta);
-                    }
-                    drawY += stride;
-                }
-
-                context.disableScissor();
-
-                if (maxScroll > 0) {
-                    entryScrollbar.render(context,
-                            colX + pageWidth - SCROLLBAR_WIDTH, y,
-                            stride * visibleItems, visibleItems, entryButtons.size());
-                }
-            }
-        }
-
-        // Back button – always visible, pinned at the bottom of the column
-        backButton.setWidth(ModConstants.BUTTON_WIDTH);
-        backButton.setHeight(ModConstants.BUTTON_HEIGHT);
-        backButton.setX(colX + pageWidth / 2 - backButton.getWidth() / 2);
-        backButton.setY(bottomY - ModConstants.BUTTON_HEIGHT);
-        backButton.render(context, mouseX, mouseY, delta);
     }
 
     /**
@@ -801,7 +684,7 @@ public class GuideScreen extends ArdaMapsScreen {
      * @param delta     partial tick (unused; kept for signature consistency with the caller)
      */
     @SuppressWarnings("unused")
-    private void renderRightColumn(DrawContext context, int colX, int topY, int bottomY,
+    private void renderRightColumn(GuiGraphicsExtractor context, int colX, int topY, int bottomY,
                                    int pageWidth, int mouseX, int mouseY, float delta) {
         int y = topY;
 
@@ -818,7 +701,7 @@ public class GuideScreen extends ArdaMapsScreen {
 
         // ENTRY_VIEW
         if (loadingBook || currentPageIndex < 0) {
-            context.drawText(textRenderer, textLoading, colX, topY, ModConstants.COLOR_DARK_BROWN, false);
+            context.text(font, textLoading, colX, topY, ModConstants.COLOR_DARK_BROWN, false);
             return;
         }
 
@@ -831,7 +714,7 @@ public class GuideScreen extends ArdaMapsScreen {
             }
         }
 
-        y = renderSectionTitle(context, colX, y, pageWidth, Text.literal(entryTitle)) + ModConstants.ROW_SPACING;
+        y = renderSectionTitle(context, colX, y, pageWidth, Component.literal(entryTitle)) + ModConstants.ROW_SPACING;
         y += ScreenRenderingUtils.renderSeparator(context, pageWidth, colX, y) + ModConstants.ROW_SPACING;
 
         rightSubTopY = y;
@@ -842,9 +725,120 @@ public class GuideScreen extends ArdaMapsScreen {
     }
 
     /**
+     * Left-column rendering for {@link ViewState#ENTRY_VIEW}: the selected page's name,
+     * a separator, a scrollable list of entry buttons, and a back button pinned at the
+     * very bottom of the column (always visible, outside the scissor region).
+     */
+    private void renderEntryViewLeftColumn(GuiGraphicsExtractor context, int colX, int topY, int bottomY,
+                                           int pageWidth, int mouseX, int mouseY, float delta) {
+        int y = topY;
+
+        String pageTitle = (guideBook != null && currentPageIndex >= 0
+                && currentPageIndex < guideBook.getPages().size())
+                ? guideBook.getPages().get(currentPageIndex).getTitle()
+                : "";
+        y = renderSectionTitle(context, colX, y, pageWidth, Component.literal(pageTitle)) + ModConstants.ROW_SPACING;
+        y += ScreenRenderingUtils.renderSeparator(context, pageWidth, colX, y) + ModConstants.ROW_SPACING;
+
+        // Reserve space for the back button at the bottom
+        int backButtonStride = ModConstants.BUTTON_HEIGHT + ModConstants.ROW_SPACING;
+        int listBottomY = bottomY - backButtonStride;
+
+        leftListTopY = y;
+        leftBottomY = listBottomY;
+
+        if (entryButtons.isEmpty()) {
+            context.text(font, textSelectTopic, colX, y, ModConstants.COLOR_DARK_BROWN, false);
+        } else {
+            int visibleHeight = listBottomY - y;
+            if (visibleHeight > 0) {
+                int stride = ModConstants.BUTTON_HEIGHT;
+                int visibleItems = Math.max(1, visibleHeight / stride);
+                int maxScroll = Math.max(0, entryButtons.size() - visibleItems);
+                entryScrollbar.setMaxOffset(maxScroll);
+
+                context.enableScissor(colX, y, colX + pageWidth, listBottomY);
+
+                int drawY = y - entryScrollbar.getScrollOffset() * stride;
+                for (StyledButtonWidget btn : entryButtons) {
+                    btn.setWidth(pageWidth);
+                    btn.setHeight(ModConstants.BUTTON_HEIGHT);
+                    btn.setX(colX);
+                    btn.setY(drawY);
+                    if (drawY + ModConstants.BUTTON_HEIGHT > y && drawY < listBottomY) {
+                        btn.extractRenderState(context, mouseX, mouseY, delta);
+                    }
+                    drawY += stride;
+                }
+
+                context.disableScissor();
+
+                if (maxScroll > 0) {
+                    entryScrollbar.render(context,
+                            colX + pageWidth - SCROLLBAR_WIDTH, y,
+                            stride * visibleItems, visibleItems, entryButtons.size());
+                }
+            }
+        }
+
+        // Back button – always visible, pinned at the bottom of the column
+        backButton.setWidth(ModConstants.BUTTON_WIDTH);
+        backButton.setHeight(ModConstants.BUTTON_HEIGHT);
+        backButton.setX(colX + pageWidth / 2 - backButton.getWidth() / 2);
+        backButton.setY(bottomY - ModConstants.BUTTON_HEIGHT);
+        backButton.extractRenderState(context, mouseX, mouseY, delta);
+    }
+
+    /**
+     * Left-column rendering for {@link ViewState#PAGE_LIST}: guide title, separator,
+     * and a scrollable list of page toggle buttons.
+     */
+    private void renderPageListLeftColumn(GuiGraphicsExtractor context, int colX, int topY, int bottomY,
+                                          int pageWidth, int mouseX, int mouseY, float delta) {
+        int y = topY;
+        y = renderSectionTitle(context, colX, y, pageWidth, titleGuide) + ModConstants.ROW_SPACING;
+        y += ScreenRenderingUtils.renderSeparator(context, pageWidth, colX, y) + ModConstants.ROW_SPACING;
+
+        leftListTopY = y;
+        leftBottomY = bottomY;
+
+        if (loadingBook) {
+            context.text(font, textLoading, colX, y, ModConstants.COLOR_DARK_BROWN, false);
+            return;
+        }
+
+        int visibleHeight = bottomY - y;
+        if (visibleHeight <= 0 || pageButtons.isEmpty()) return;
+
+        int stride = ModConstants.BUTTON_HEIGHT + ModConstants.ROW_SPACING;
+        int visibleItems = Math.max(1, (visibleHeight + ModConstants.ROW_SPACING) / stride);
+        int maxScroll = Math.max(0, pageButtons.size() - visibleItems);
+        leftScrollbar.setMaxOffset(maxScroll);
+
+        context.enableScissor(colX, y, colX + pageWidth, bottomY);
+
+        int drawY = y - leftScrollbar.getScrollOffset() * stride;
+        for (StyledButtonWidget btn : pageButtons) {
+            btn.setX(colX + pageWidth / 2 - btn.getWidth() / 2);
+            btn.setY(drawY);
+            if (drawY + ModConstants.BUTTON_HEIGHT > y && drawY < bottomY) {
+                btn.extractRenderState(context, mouseX, mouseY, delta);
+            }
+            drawY += stride;
+        }
+
+        context.disableScissor();
+
+        if (maxScroll > 0) {
+            leftScrollbar.render(context,
+                    colX + pageWidth - SCROLLBAR_WIDTH, y,
+                    stride * visibleItems, visibleItems, pageButtons.size());
+        }
+    }
+
+    /**
      * Draws {@code title} centred horizontally within {@code pageWidth}, scaled to
      * 1.4× the base font size.
-     *
      *
      * @param context   the draw context for the current frame
      * @param x         left edge X of the column this title belongs to
@@ -854,20 +848,19 @@ public class GuideScreen extends ArdaMapsScreen {
      * @return the screen-space Y coordinate immediately below the rendered title,
      * suitable for use as the starting Y of the next element
      */
-    private int renderSectionTitle(DrawContext context, int x, int y, int pageWidth, Text title) {
+    private int renderSectionTitle(GuiGraphicsExtractor context, int x, int y, int pageWidth, Component title) {
         float scale = 1.4f;
-        int textW = textRenderer.getWidth(title);
+        int textW = font.width(title);
         int xOffset = (int) (pageWidth / 2f - (textW * scale / 2f));
 
-        context.getMatrices().push();
-        context.getMatrices().translate(x + xOffset, y, 0);
-        context.getMatrices().scale(scale, scale, 1f);
-        context.drawText(textRenderer, title, 0, 0, ModConstants.COLOR_DARK_BROWN, false);
-        context.getMatrices().pop();
+        context.pose().pushMatrix();
+        context.pose().translate(x + xOffset, y);
+        context.pose().scale(scale, scale);
+        context.text(font, title, 0, 0, ModConstants.COLOR_DARK_BROWN, false);
+        context.pose().popMatrix();
 
-        return (int) (y + textRenderer.fontHeight * scale);
+        return (int) (y + font.lineHeight * scale);
     }
-
 
     /**
      * Renders the content sub-column with the given {@code content} blocks,
@@ -886,13 +879,13 @@ public class GuideScreen extends ArdaMapsScreen {
      * @param loading  {@code true} while the content is still being fetched/parsed
      * @param content  the parsed content blocks to render, or {@code null}
      */
-    private void renderContentSubColumn(DrawContext context, int x, int y,
+    private void renderContentSubColumn(GuiGraphicsExtractor context, int x, int y,
                                         int subWidth, int bottomY,
                                         int mouseX, int mouseY,
                                         boolean loading, @Nullable List<ContentBlock> content) {
         if (loading || content == null) {
             lastHoveredContentStyle = null;
-            context.drawText(textRenderer, textLoading, x, y, ModConstants.COLOR_DARK_BROWN, false);
+            context.text(font, textLoading, x, y, ModConstants.COLOR_DARK_BROWN, false);
             return;
         }
 
@@ -912,7 +905,7 @@ public class GuideScreen extends ArdaMapsScreen {
         );
 
         int totalHeight = result.totalHeight;
-        int maxScroll   = Math.max(0, totalHeight - viewportHeight);
+        int maxScroll = Math.max(0, totalHeight - viewportHeight);
         contentScrollbar.setMaxOffset(maxScroll);
 
         if (maxScroll > 0) {
@@ -924,11 +917,11 @@ public class GuideScreen extends ArdaMapsScreen {
         context.disableScissor();
 
         lastHoveredContentStyle = result.hoveredStyle;
-        if (lastHoveredContentStyle != null && lastHoveredContentStyle.getHoverEvent() != null) {
-            context.drawHoverEvent(textRenderer, lastHoveredContentStyle, mouseX, mouseY);
+        if (lastHoveredContentStyle != null
+                && lastHoveredContentStyle.getHoverEvent() instanceof HoverEvent.ShowText(Component value)) {
+            context.setTooltipForNextFrame(font, value, mouseX, mouseY);
         }
     }
-
 
     /**
      * Handles mouse button press events.
@@ -942,13 +935,15 @@ public class GuideScreen extends ArdaMapsScreen {
      *   <li>The default Minecraft screen handler for any remaining widgets.</li>
      * </ol>
      *
-     * @param mouseX screen-space X of the cursor
-     * @param mouseY screen-space Y of the cursor
-     * @param button the mouse button index (0 = left, 1 = right, 2 = middle)
+     * @param event       the initiating mouse event
+     * @param doubleClick true if this is a double click
      * @return {@code true} if the event was consumed, {@code false} otherwise
      */
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         var area = getPaddedContentArea();
         int midX = area.topLeftX() + area.guiWidth() / 2;
 
@@ -959,26 +954,26 @@ public class GuideScreen extends ArdaMapsScreen {
                 && mouseY < rightSubBottomY
                 && lastHoveredContentStyle != null) {
 
-            if (hasShiftDown()
+            if ((event.modifiers() & (GLFW.GLFW_MOD_SHIFT)) != 0
                     && ModConstants.RUN_FONT_CHATCOMMAND.equals(lastHoveredContentStyle.getFont())
                     && lastHoveredContentStyle.getInsertion() != null) {
-                MinecraftClient.getInstance().setScreen(new ChatScreen(lastHoveredContentStyle.getInsertion()));
+                Minecraft.getInstance().setScreen(new ChatScreen(lastHoveredContentStyle.getInsertion(), false));
                 return true;
             }
 
             if (ModConstants.RUN_FONT_KEYBIND.equals(lastHoveredContentStyle.getFont())) {
-                MinecraftClient mc = MinecraftClient.getInstance();
-                mc.setScreen(new KeybindsScreen(this, mc.options));
+                Minecraft mc = Minecraft.getInstance();
+                mc.setScreen(new KeyBindsScreen(this, mc.options));
                 return true;
             }
 
             ClickEvent clickEvent = lastHoveredContentStyle.getClickEvent();
-            if (clickEvent != null && clickEvent.getAction() == ClickEvent.Action.OPEN_URL) {
-                String url = clickEvent.getValue();
+            if (clickEvent instanceof ClickEvent.OpenUrl(java.net.URI uri)) {
+                String url = uri.toString();
                 if (!url.isBlank()) {
-                    MinecraftClient mc = MinecraftClient.getInstance();
+                    Minecraft mc = Minecraft.getInstance();
                     mc.setScreen(new ConfirmLinkScreen(confirmed -> {
-                        if (confirmed) Util.getOperatingSystem().open(url);
+                        if (confirmed) Util.getPlatform().openUri(url);
                         mc.setScreen(this);
                     }, url, false));
                     return true;
@@ -992,22 +987,22 @@ public class GuideScreen extends ArdaMapsScreen {
                 // Entry buttons (only in scissored viewport)
                 if (mouseY >= leftListTopY && mouseY < leftBottomY) {
                     for (StyledButtonWidget btn : entryButtons) {
-                        if (btn.mouseClicked(mouseX, mouseY, button)) return true;
+                        if (btn.mouseClicked(event, doubleClick)) return true;
                     }
                 }
                 // Back button (always visible below the list)
-                if (backButton != null && backButton.mouseClicked(mouseX, mouseY, button)) return true;
+                if (backButton != null && backButton.mouseClicked(event, doubleClick)) return true;
             } else {
                 // Page buttons
                 if (mouseY >= leftListTopY && mouseY < leftBottomY) {
                     for (StyledButtonWidget btn : pageButtons) {
-                        if (btn.mouseClicked(mouseX, mouseY, button)) return true;
+                        if (btn.mouseClicked(event, doubleClick)) return true;
                     }
                 }
             }
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     /**
@@ -1022,29 +1017,30 @@ public class GuideScreen extends ArdaMapsScreen {
      *       always {@link #contentScrollbar}.</li>
      * </ul>
      *
-     * @param mouseX screen-space X of the cursor
-     * @param mouseY screen-space Y of the cursor
-     * @param amount scroll amount (positive = up / away from user)
+     * @param mouseX           screen-space X of the cursor
+     * @param mouseY           screen-space Y of the cursor
+     * @param horizontalAmount the horizontal scroll amount (positive = up / away from user)
+     * @param verticalAmount   the vertical scroll amount
      * @return {@code true} if the event was consumed, {@code false} otherwise
      */
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         var area = getPaddedContentArea();
         int midX = area.topLeftX() + area.guiWidth() / 2;
 
         if (mouseX < midX) {
             if (mouseY >= leftListTopY && mouseY < leftBottomY) {
                 return viewState == ViewState.ENTRY_VIEW
-                        ? entryScrollbar.scroll(amount)
-                        : leftScrollbar.scroll(amount);
+                        ? entryScrollbar.scroll(verticalAmount)
+                        : leftScrollbar.scroll(verticalAmount);
             }
         } else {
             if (mouseY >= rightSubTopY && mouseY < rightSubBottomY) {
-                return contentScrollbar.scroll(amount);
+                return contentScrollbar.scroll(verticalAmount);
             }
         }
 
-        return super.mouseScrolled(mouseX, mouseY, amount);
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     /**
@@ -1069,6 +1065,13 @@ public class GuideScreen extends ArdaMapsScreen {
     }
 
     /**
+     * Screen layout view state – controls what the left column renders.
+     * {@code PAGE_LIST} shows the page-selection buttons; {@code ENTRY_VIEW}
+     * shows the entries of the selected page plus a back button.
+     */
+    private enum ViewState {PAGE_LIST, ENTRY_VIEW}
+
+    /**
      * Immutable record holding the four inner margin values (in pixels) for a column.
      *
      * @param left   space between the column's left boundary and its content
@@ -1078,5 +1081,6 @@ public class GuideScreen extends ArdaMapsScreen {
      */
     @SuppressWarnings("SameParameterValue")
     private record Margins(int left, int right, int top, int bottom) {
+
     }
 }

@@ -44,11 +44,11 @@ import java.util.Optional;
  */
 public final class CronScheduleHelper {
 
-    /** Class logger */
-    private static final Logger LOGGER = LoggerFactory.getLogger(CronScheduleHelper.class);
-    
     /** Default CRON schedule: every 4 days at 03:00 AM. */
     public static final String DEFAULT_CRON = "0 3 */4 * *";
+
+    /** Class logger */
+    private static final Logger LOGGER = LoggerFactory.getLogger(CronScheduleHelper.class);
 
     /**
      * Initialize the parser as a UNIX/POSIX cron parser
@@ -58,7 +58,8 @@ public final class CronScheduleHelper {
     );
 
     /** Private constructor to prevent instantiation of this utility class. */
-    private CronScheduleHelper() {}
+    private CronScheduleHelper() {
+    }
 
     /**
      * Parses the given CRON expression as a Unix/Posix 5-field expression.
@@ -76,7 +77,7 @@ public final class CronScheduleHelper {
         if (expression == null || expression.isBlank()) {
             LOGGER.warn(
                     "[ArdaMaps] refresh_cron is missing or blank in server.json. " +
-                    "Falling back to default schedule: '{}'", DEFAULT_CRON);
+                            "Falling back to default schedule: '{}'", DEFAULT_CRON);
             return parseDefault();
         }
 
@@ -87,10 +88,17 @@ public final class CronScheduleHelper {
         } catch (IllegalArgumentException e) {
             LOGGER.warn(
                     "[ArdaMaps] refresh_cron '{}' is invalid ({}). " +
-                    "Falling back to default schedule: '{}'",
+                            "Falling back to default schedule: '{}'",
                     expression, e.getMessage(), DEFAULT_CRON);
             return parseDefault();
         }
+    }
+
+    /**
+     * @return the parsed default CRON schedule (every 4 days at 03:00 AM).
+     */
+    private static Cron parseDefault() {
+        return PARSER.parse(DEFAULT_CRON);
     }
 
     /**
@@ -114,13 +122,6 @@ public final class CronScheduleHelper {
      */
     public static Optional<ZonedDateTime> lastExecution(Cron cron, ZonedDateTime from) {
         return ExecutionTime.forCron(cron).lastExecution(from);
-    }
-
-    /**
-     * @return the parsed default CRON schedule (every 4 days at 03:00 AM).
-     */
-    private static Cron parseDefault() {
-        return PARSER.parse(DEFAULT_CRON);
     }
 }
 

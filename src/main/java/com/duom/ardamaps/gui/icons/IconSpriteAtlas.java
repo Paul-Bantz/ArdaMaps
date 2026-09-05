@@ -26,59 +26,42 @@
 package com.duom.ardamaps.gui.icons;
 
 import com.duom.ardamaps.gui.ModConstants;
-import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
-import net.minecraft.client.texture.Sprite;
-import net.minecraft.client.texture.SpriteAtlasHolder;
-import net.minecraft.client.texture.TextureManager;
-import net.minecraft.util.Identifier;
+import net.fabricmc.fabric.api.client.rendering.v1.AtlasRegistry;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.resources.model.sprite.AtlasManager;
+import net.minecraft.client.resources.model.sprite.SpriteId;
+import net.minecraft.resources.Identifier;
 
 /**
- * Holds the sprite atlas for map icons.
- * Atlas ID: ardamaps:map_icons
- * Sprite IDs follow the pattern: ardamaps:icons/<name>
+ * Facade for retrieving sprites from the map icon atlas.
  */
-public class IconSpriteAtlas extends SpriteAtlasHolder implements IdentifiableResourceReloadListener {
+public class IconSpriteAtlas {
 
-    /** Runtime GPU texture storage location. Never read from disk. */
+    /** Runtime GPU texture storage location; never read from disk. */
     public static final Identifier ATLAS_ID = ModConstants.modId("textures/atlas/map_icons.png");
 
-    /** Singleton instance of the atlas. Initialized at runtime. */
-    private static IconSpriteAtlas INSTANCE;
+    /** Atlas definition identifier. */
+    private static final Identifier ATLAS_DEFINITION = ModConstants.modId("map_icons");
 
-    /** Private constructor to enforce singleton pattern. */
-    public IconSpriteAtlas(TextureManager textureManager) {
-        super(textureManager, ATLAS_ID, ModConstants.modId("map_icons"));
+    /** Private constructor to prevent instantiation. */
+    private IconSpriteAtlas() {
     }
 
     /**
-     * Factory method to create or retrieve the singleton instance of the IconSpriteAtlas.
+     * Registers the map icon atlas with the Minecraft resource system.
+     */
+    public static void register() {
+        AtlasRegistry.register(new AtlasManager.AtlasConfig(ATLAS_ID, ATLAS_DEFINITION, false));
+    }
+
+    /**
+     * Retrieves a sprite from the map icon atlas.
      *
-     * @param textureManager the TextureManager to use for loading the atlas.
-     * @return the singleton instance of IconSpriteAtlas.
+     * @param id the sprite identifier
+     * @return The texture atlas sprite associated with the given identifier
      */
-    public static IconSpriteAtlas create(TextureManager textureManager) {
-        if (INSTANCE == null) {
-            INSTANCE = new IconSpriteAtlas(textureManager);
-        }
-        return INSTANCE;
-    }
-
-    /**
-     * Get a sprite by its full identifier (e.g. {@code ardamaps:icons/icon_landmark}).
-     *
-     * @param id the identifier of the sprite to retrieve.
-     * @return the sprite from the atlas.
-     */
-    public static Sprite retrieveSprite(Identifier id) {
-        if (INSTANCE == null) throw new IllegalStateException("IconSpriteAtlas not initialized");
-        return INSTANCE.getSprite(id);
-    }
-
-    /**
-     * @return the unique identifier for this resource reload listener, used for logging and debugging.
-     */
-    @Override
-    public Identifier getFabricId() {
-        return ModConstants.modId("icon_sprite_atlas");
+    public static TextureAtlasSprite retrieveSprite(Identifier id) {
+        return Minecraft.getInstance().getAtlasManager().get(new SpriteId(ATLAS_ID, id));
     }
 }

@@ -25,9 +25,9 @@
 
 package com.duom.ardamaps.core.data.json;
 
+import com.duom.ardamaps.core.data.Vec3d;
 import com.duom.ardamaps.core.data.config.ConfigManager;
 import com.duom.ardamaps.core.data.config.Dimension;
-import com.duom.ardamaps.core.data.Vec3d;
 import com.google.gson.JsonParseException;
 import org.junit.jupiter.api.Test;
 
@@ -39,12 +39,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class TypeAdapterHardeningTest {
 
+    /**
+     * Verifies that invalid base64 data throws a JSON parse exception.
+     */
     @Test
     void byteArray_invalidBase64_throwsJsonParseException() {
 
         assertThrows(JsonParseException.class, () -> ConfigManager.gson().fromJson("\"not base64\"", byte[].class));
     }
 
+    /**
+     * Verifies that valid base64 data can be serialized and deserialized without loss.
+     */
     @Test
     void byteArray_validBase64_roundTrips() {
 
@@ -54,6 +60,9 @@ class TypeAdapterHardeningTest {
         assertArrayEquals(bytes, ConfigManager.gson().fromJson(json, byte[].class));
     }
 
+    /**
+     * Verifies that deserializing a Dimension with a missing required field throws a parse exception.
+     */
     @Test
     void dimension_missingRequiredField_throwsJsonParseException() {
 
@@ -71,6 +80,9 @@ class TypeAdapterHardeningTest {
         assertThrows(JsonParseException.class, () -> ConfigManager.gson().fromJson(json, Dimension.class));
     }
 
+    /**
+     * Verifies that deserializing a Vec3d with a missing required field throws a parse exception.
+     */
     @Test
     void vec3d_missingRequiredField_throwsJsonParseException() {
 

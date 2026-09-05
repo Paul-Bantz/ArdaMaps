@@ -27,8 +27,8 @@ package com.duom.ardamaps.gui.screens.rendering;
 
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.gui.ModConstants;
-import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 
 /**
  * Renderer for the frame around the map.
@@ -90,14 +90,9 @@ public class MapFrameRenderer {
      *
      * @param context The draw context
      */
-    public void render(DrawContext context, BackgroundRenderer.GuiLayout layout) {
+    public void render(GuiGraphicsExtractor context, BackgroundRenderer.GuiLayout layout) {
 
         updateIfDirty(layout);
-
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
 
         drawMapFrameTopEdge(context, topLeft, topRight);
         drawMapFrameBottomEdge(context, bottomLeft, bottomRight);
@@ -106,7 +101,6 @@ public class MapFrameRenderer {
 
         drawMapCorners(context, topLeft, topRight, bottomRight, bottomLeft);
 
-        RenderSystem.disableBlend();
     }
 
     /**
@@ -147,7 +141,7 @@ public class MapFrameRenderer {
      * @param topLeft  the screen coordinates of the top-left corner of the frame
      * @param topRight the screen coordinates of the top-right corner of the frame
      */
-    private void drawMapFrameTopEdge(DrawContext context, Vec2d topLeft, Vec2d topRight) {
+    private void drawMapFrameTopEdge(GuiGraphicsExtractor context, Vec2d topLeft, Vec2d topRight) {
 
         int x = (int) topLeft.x() + scaledCornerSize - PIXEL_OVERLAP;
         int endX = (int) (topRight.x() - scaledCornerSize + PIXEL_OVERLAP);
@@ -161,7 +155,7 @@ public class MapFrameRenderer {
             int segW = scaledFrameBarLongEdge;
             if (x + segW > endX) segW = endX - x;
 
-            context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                     x, y,
                     edgeU, edgeV,
                     segW, scaledFrameBarShortEdge,
@@ -179,7 +173,7 @@ public class MapFrameRenderer {
      * @param bottomLeft  the screen coordinates of the bottom-left corner of the frame
      * @param bottomRight the screen coordinates of the bottom-right corner of the frame
      */
-    private void drawMapFrameBottomEdge(DrawContext context, Vec2d bottomLeft, Vec2d bottomRight) {
+    private void drawMapFrameBottomEdge(GuiGraphicsExtractor context, Vec2d bottomLeft, Vec2d bottomRight) {
 
         int x = (int) bottomLeft.x() + scaledCornerSize - PIXEL_OVERLAP;
         int endX = (int) (bottomRight.x() - scaledCornerSize + PIXEL_OVERLAP);
@@ -193,7 +187,7 @@ public class MapFrameRenderer {
             int segW = scaledFrameBarLongEdge;
             if (x + segW > endX) segW = endX - x;
 
-            context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                     x, y,
                     edgeU, edgeV,
                     segW, scaledFrameBarShortEdge,
@@ -211,7 +205,7 @@ public class MapFrameRenderer {
      * @param topLeft    the screen coordinates of the top-left corner of the frame
      * @param bottomLeft the screen coordinates of the bottom-left corner of the frame
      */
-    private void drawMapFrameLeftEdge(DrawContext context, Vec2d topLeft, Vec2d bottomLeft) {
+    private void drawMapFrameLeftEdge(GuiGraphicsExtractor context, Vec2d topLeft, Vec2d bottomLeft) {
 
         int x = (int) topLeft.x();
         int y = (int) topLeft.y() + scaledCornerSize - PIXEL_OVERLAP;
@@ -225,7 +219,7 @@ public class MapFrameRenderer {
             int segH = scaledFrameBarLongEdge;
             if (y + segH > endY) segH = endY - y;
 
-            context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                     x, y,
                     edgeU, edgeV,
                     scaledFrameBarShortEdge, segH,
@@ -243,7 +237,7 @@ public class MapFrameRenderer {
      * @param topRight    the screen coordinates of the top-right corner of the frame
      * @param bottomRight the screen coordinates of the bottom-right corner of the frame
      */
-    private void drawMapFrameRightEdge(DrawContext context, Vec2d topRight, Vec2d bottomRight) {
+    private void drawMapFrameRightEdge(GuiGraphicsExtractor context, Vec2d topRight, Vec2d bottomRight) {
 
         int x = (int) topRight.x() - scaledCornerSize;
         int y = (int) topRight.y() + scaledCornerSize - PIXEL_OVERLAP;
@@ -257,7 +251,7 @@ public class MapFrameRenderer {
             int segmentHeight = scaledFrameBarLongEdge;
             if (y + segmentHeight > endY) segmentHeight = endY - y;
 
-            context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+            context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                     x, y,
                     edgeU, edgeV,
                     scaledFrameBarShortEdge, segmentHeight,
@@ -276,29 +270,29 @@ public class MapFrameRenderer {
      * @param bottomRight the screen coordinates of the bottom-right corner of the frame
      * @param bottomLeft  the screen coordinates of the bottom-left corner of the frame
      */
-    private void drawMapCorners(DrawContext context, Vec2d topLeft, Vec2d topRight, Vec2d bottomRight, Vec2d bottomLeft) {
+    private void drawMapCorners(GuiGraphicsExtractor context, Vec2d topLeft, Vec2d topRight, Vec2d bottomRight, Vec2d bottomLeft) {
 
         var cornerUv = scaledFrameTextureSize - scaledCornerSize;
 
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                 (int) (topLeft.x()), (int) (topLeft.y()),
                 0, 0,
                 scaledCornerSize, scaledCornerSize,
                 scaledFrameTextureSize, scaledFrameTextureSize);
 
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                 (int) (topRight.x() - scaledCornerSize), (int) (topRight.y()),
                 cornerUv, 0,
                 scaledCornerSize, scaledCornerSize,
                 scaledFrameTextureSize, scaledFrameTextureSize);
 
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                 (int) (bottomRight.x() - scaledCornerSize), (int) (bottomRight.y() - scaledCornerSize),
                 cornerUv, cornerUv,
                 scaledCornerSize, scaledCornerSize,
                 scaledFrameTextureSize, scaledFrameTextureSize);
 
-        context.drawTexture(ModConstants.MAP_GUI_ELEMENTS,
+        context.blit(RenderPipelines.GUI_TEXTURED, ModConstants.MAP_FRAME_TEXTURE,
                 (int) (bottomLeft.x()), (int) (bottomLeft.y() - scaledCornerSize),
                 0, cornerUv,
                 scaledCornerSize, scaledCornerSize,

@@ -26,11 +26,6 @@
 package com.duom.ardamaps.core.consumers.networking;
 
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
 
 /**
  * Interface for handling packets sent from the client to the server.
@@ -39,21 +34,18 @@ import net.minecraft.server.network.ServerPlayerEntity;
  *            <br/><b>Credits to AjCool</b> for the original code - <a href="https://github.com/ArdaCraft/ArdaPaths">...</a>
  */
 public interface IServerPacketHandler<T extends IPacket> extends IPacketHandler {
+
     /**
      * Send a packet to the server.
      *
      * @param packet The packet to send
      */
     default void send(final T packet) {
-        ClientPlayNetworking.send(getChannelId(), packet.build());
+        ClientPlayNetworking.send(packet);
     }
 
     /**
      * Handle an incoming packet on the server.
      */
-    void handle(MinecraftServer server,
-                ServerPlayerEntity player,
-                ServerPlayNetworkHandler handler,
-                PacketByteBuf buf,
-                PacketSender sender);
+    void receive(T packet, net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.Context context);
 }

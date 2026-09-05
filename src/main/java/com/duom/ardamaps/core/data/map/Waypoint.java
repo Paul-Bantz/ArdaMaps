@@ -114,7 +114,7 @@ public record Waypoint(int x, int z,
                 waypoint = new Waypoint(
                         deserialized.x,
                         deserialized.z,
-                        deserialized.text !=  null ? deserialized.text : "",
+                        deserialized.text != null ? deserialized.text : "",
                         deserialized.r,
                         deserialized.g,
                         deserialized.b,
@@ -142,7 +142,7 @@ public record Waypoint(int x, int z,
      */
     public static String toJson(@NonNull Waypoint waypoint) {
 
-        Gson gson = new GsonBuilder() .addSerializationExclusionStrategy(new ExclusionStrategy() {
+        Gson gson = new GsonBuilder().addSerializationExclusionStrategy(new ExclusionStrategy() {
 
             @Override
             public boolean shouldSkipField(FieldAttributes field) {
@@ -152,7 +152,9 @@ public record Waypoint(int x, int z,
             }
 
             @Override
-            public boolean shouldSkipClass(Class<?> clazz) { return false; }
+            public boolean shouldSkipClass(Class<?> clazz) {
+                return false;
+            }
         }).create();
         return gson.toJson(waypoint);
     }
