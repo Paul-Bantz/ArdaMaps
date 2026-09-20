@@ -109,8 +109,6 @@ public class ClientProgress implements Serializable {
                 location.setVisited(false);
                 location.setExplorationState(ExplorationState.HIDDEN);
             });
-
-            ArdaMapsClient.CONFIG_MANAGER.saveProgress();
         }
 
         initialize();

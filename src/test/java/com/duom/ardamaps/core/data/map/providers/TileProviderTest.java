@@ -200,34 +200,26 @@ class TileProviderTest {
     }
 
     /**
-     * Verify that an old drawn texture returns to the LRU when it is no longer drawn.
+     * Verify that a no-longer-drawn texture returns to the LRU while the newly drawn one is held out.
      */
     @Test
     void protectDrawnTiles_releasesOldDrawnTextureBackToLru() {
 
-        String previousBudget = System.getProperty("ardamaps.textureCacheBudgetBytes");
-        System.setProperty("ardamaps.textureCacheBudgetBytes", "500");
-        try {
-            var provider = new TestTileProvider(true);
-            var oldDrawn = new TileKey(3, 1, 1);
-            var currentDrawn = new TileKey(3, 2, 2);
-            provider.publish(oldDrawn, Identifier.of("ardamaps", "old"), 10, 10);
-            provider.publish(currentDrawn, Identifier.of("ardamaps", "current"), 10, 10);
+        var provider = new TestTileProvider(true);
+        var oldDrawn = new TileKey(3, 1, 1);
+        var currentDrawn = new TileKey(3, 2, 2);
+        provider.publish(oldDrawn, Identifier.of("ardamaps", "old"), 10, 10);
+        provider.publish(currentDrawn, Identifier.of("ardamaps", "current"), 10, 10);
 
-            provider.protectDrawnTiles(Set.of(oldDrawn));
-            provider.protectDrawnTiles(Set.of(currentDrawn));
+        provider.protectDrawnTiles(Set.of(oldDrawn));
+        provider.protectDrawnTiles(Set.of(currentDrawn));
 
-            for (int i = 0; i < TileProvider.MAX_CACHE_SIZE; i++) {
-                provider.publish(new TileKey(3, i + 100, 0), Identifier.of("ardamaps", "churn_" + i), 10, 10);
-            }
-            provider.textures.cleanUp();
+        assertTrue(provider.textures.asMap().containsKey(oldDrawn));
+        assertEquals(Identifier.of("ardamaps", "old"), provider.peek(oldDrawn).orElseThrow());
+        assertTrue(provider.destroyedTextures.isEmpty());
 
-            assertTrue(provider.peek(oldDrawn).isEmpty());
-            assertEquals(Identifier.of("ardamaps", "current"), provider.peek(currentDrawn).orElseThrow());
-        } finally {
-            if (previousBudget == null) System.clearProperty("ardamaps.textureCacheBudgetBytes");
-            else System.setProperty("ardamaps.textureCacheBudgetBytes", previousBudget);
-        }
+        assertFalse(provider.textures.asMap().containsKey(currentDrawn));
+        assertEquals(Identifier.of("ardamaps", "current"), provider.peek(currentDrawn).orElseThrow());
     }
 
     /**

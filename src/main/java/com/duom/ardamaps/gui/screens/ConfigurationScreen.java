@@ -27,6 +27,7 @@ package com.duom.ardamaps.gui.screens;
 
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.UnitSystem;
+import com.duom.ardamaps.core.data.config.client.ProgressWipe;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.widgets.CheckboxWidget;
 import com.duom.ardamaps.gui.widgets.DropdownWidget;
@@ -200,9 +201,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
                         Text.translatable("ardamaps.generic.yes"),
                         button -> {
 
-                            // Clear all per-dimension exploration data and re-initialise instances.
-                            ArdaMapsClient.CONFIG.getClientProgress().reset(false);
-                            ArdaMapsClient.CONFIG_MANAGER.saveProgress();
+                            ArdaMapsClient.CONFIG_MANAGER.wipeClientProgress(ProgressWipe.FULL_RESET);
 
                             displayResetProgressConfirmationDialog = false;
                         })
