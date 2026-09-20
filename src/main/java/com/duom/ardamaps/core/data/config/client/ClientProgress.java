@@ -123,8 +123,6 @@ public class ClientProgress implements Serializable {
                     location.setExplorationState(ExplorationState.HIDDEN);
                 });
             }
-
-            ArdaMapsClient.CONFIG_MANAGER.saveProgress();
         }
 
         initialize();

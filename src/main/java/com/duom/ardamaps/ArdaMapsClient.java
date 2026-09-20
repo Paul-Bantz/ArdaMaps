@@ -36,6 +36,7 @@ import com.duom.ardamaps.core.data.config.ClientConfigManager;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.LocationConfig;
 import com.duom.ardamaps.core.data.config.client.ClientConfig;
+import com.duom.ardamaps.core.data.config.client.ProgressWipe;
 import com.duom.ardamaps.core.data.guide.ArdaMapsChatLinkProcessor;
 import com.duom.ardamaps.core.data.guide.GuideImageCache;
 import com.duom.ardamaps.core.data.guide.GuideScreenLink;
@@ -305,6 +306,8 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         LOGGER.info("Joined world, initializing mod internals");
 
+        ArdaMapsClient.CONFIG_MANAGER.reloadClientProgress();
+
         // initializeTextures() calls registerDynamicTexture which requires the render/GL thread.
         client.execute(() -> ArdaMapsClient.CONFIG.getClientProgress().initializeTextures());
 
@@ -335,6 +338,8 @@ public class ArdaMapsClient implements ClientModInitializer {
         PacketRegistry.clearPendingResponses();
         // The disconnect event may run on Netty's IO thread; callees defer GL teardown.
         PlayerIcon.clear();
+
+        if (CONFIG_MANAGER != null) CONFIG_MANAGER.saveProgressNow();
 
         if (CONFIG != null) CONFIG.clearSessionState();
     }
@@ -389,6 +394,7 @@ public class ArdaMapsClient implements ClientModInitializer {
     private void onStop(Minecraft client) {
 
         ArdaMapsClient.CONFIG_MANAGER.save();
+        ArdaMapsClient.CONFIG_MANAGER.saveProgressNow();
 
         // Shutdown the image executor
         IMAGE_EXECUTOR.shutdown();
@@ -516,10 +522,7 @@ public class ArdaMapsClient implements ClientModInitializer {
                 // Invalidate cached dimension to ensure it is re-resolved with the updated dimension data on next access.
                 Client.invalidateCachedDimension();
 
-                var progress = ArdaMapsClient.CONFIG.getClientProgress();
-                if (progress.migrateRangedExploration(dimensions)) {
-                    ArdaMapsClient.CONFIG_MANAGER.backupClientProgress(".backup");
-                }
+                ArdaMapsClient.CONFIG_MANAGER.wipeClientProgress(ProgressWipe.RANGED_MIGRATION, dimensions);
 
                 ArdaMapsClient.CONFIG.getClientProgress().reset(true);
                 ArdaMapsClient.CONFIG_MANAGER.saveProgress();

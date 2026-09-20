@@ -27,106 +27,279 @@ package com.duom.ardamaps.core.data.config;
 
 import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.ArdaMapsClient;
-import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.core.data.ExplorationState;
+import com.duom.ardamaps.core.data.config.client.ProgressWipe;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.renderer.texture.TextureManager;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedConstruction;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for client configuration progress handling.
+ * Tests for client exploration progress persistence and wipe handling.
  */
 class ClientConfigManagerTest {
 
-    /** Temporary configuration directory. */
+    /** Temporary configuration directory for each test. */
     @TempDir
     private Path tempDir;
 
+    /** Mocked image construction used to isolate texture-backed exploration setup from native resources. */
+    private MockedConstruction<NativeImage> mockedNativeImage;
+
+    /** Mocked texture construction used to isolate dynamic texture registration from the Minecraft runtime. */
+    private MockedConstruction<DynamicTexture> mockedDynamicTexture;
+
+    /** Mocked static accessor for {@link Minecraft} so tests can provide a fake texture manager. */
+    private MockedStatic<Minecraft> mockedMinecraftClient;
+
     /**
-     * Waits for async configuration saves before JUnit deletes the temporary directory.
+     * Installs the minimal mocked Minecraft client environment required for exploration texture creation.
+     */
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    @BeforeEach
+    void setUp() {
+
+        mockedNativeImage = Mockito.mockConstruction(NativeImage.class);
+        mockedDynamicTexture = Mockito.mockConstruction(DynamicTexture.class);
+
+        Minecraft mockClient = Mockito.mock(Minecraft.class);
+        TextureManager mockTextureManager = Mockito.mock(TextureManager.class);
+        Mockito.when(mockClient.getTextureManager()).thenReturn(mockTextureManager);
+        mockedMinecraftClient = Mockito.mockStatic(Minecraft.class);
+        mockedMinecraftClient.when(Minecraft::getInstance).thenReturn(mockClient);
+    }
+
+    /**
+     * Releases mocked native-resource wrappers and restores the shared test config state.
      *
      * @throws Exception If the IO executor does not drain.
      */
     @AfterEach
-    void waitForConfigSaves() throws Exception {
+    void tearDown() throws Exception {
 
         drainIoExecutor();
+        mockedNativeImage.close();
+        mockedDynamicTexture.close();
+        mockedMinecraftClient.close();
         ArdaMapsClient.CONFIG = null;
+        ArdaMapsClient.CONFIG_MANAGER = null;
     }
 
     /**
-     * Verifies that reset progress removes offline progress from memory and disk.
-     *
-     * @throws Exception If test file setup or async reset fails.
+     * Verifies that saved progress can be restored after session-only state is cleared.
      */
     @Test
-    void resetProgress_whenOffline_clearsStateAndDeletesProgressFile() throws Exception {
+    void reloadClientProgress_restoresSavedProgressAfterSessionClear() {
 
-        Files.createDirectories(configDir());
-        Files.writeString(progressPath(), """
-                {
-                  "visitedLocationIds": [
-                    "spawn"
-                  ]
-                }
-                """);
+        ClientConfigManager manager = createManager();
+        seedProgress(manager);
 
-        try (var client = Mockito.mockStatic(Client.class)) {
-            client.when(Client::world).thenReturn(null);
+        manager.saveProgressNow();
+        manager.getConfig().getClientProgress().clearSessionState();
 
-            ClientConfigManager manager = manager();
-            ArdaMapsClient.CONFIG = manager.getConfig();
-            manager.getConfig().getClientProgress().getExplorationState("minecraft:overworld", true);
+        assertTrue(manager.getConfig().getClientProgress().getExplorationState().isEmpty());
+        assertTrue(manager.reloadClientProgress());
 
-            manager.resetProgress();
-            drainIoExecutor();
+        var reloadedProgress = manager.getConfig().getClientProgress();
+        assertTrue(reloadedProgress.getExplorationState().containsKey("test:dimension"));
+        assertTrue(reloadedProgress.getVisitedLocationIds().contains("visited-location"));
+        assertEquals(ExplorationState.REVEALED, reloadedProgress.getExplorationState("test:dimension", false).stateAt(0, 0));
+    }
 
-            assertFalse(Files.exists(progressPath()));
-            assertTrue(manager.getConfig().getClientProgress().getExplorationState().isEmpty());
-            assertTrue(manager.getConfig().getClientProgress().getVisitedLocationIds().isEmpty());
+    /**
+     * Verifies that a full reset writes a timestamped backup before saving empty progress.
+     *
+     * @throws Exception when test file operations fail.
+     */
+    @Test
+    void wipeClientProgress_fullResetBacksUpPreviousProgressAndSavesEmptyFile() throws Exception {
+
+        ClientConfigManager manager = createManager();
+        seedProgress(manager);
+        manager.saveProgressNow();
+
+        manager.getConfig().setDimensions(List.of());
+        manager.wipeClientProgress(ProgressWipe.FULL_RESET);
+        manager.saveProgressNow();
+
+        List<Path> backups = progressBackups();
+        assertEquals(1, backups.size());
+        assertTrue(Files.readString(backups.get(0)).contains("test:dimension"));
+        assertFalse(Files.readString(progressFile()).contains("test:dimension"));
+    }
+
+    /**
+     * Verifies that only the three most recent backup files are retained.
+     *
+     * @throws Exception when test file operations fail.
+     */
+    @Test
+    void wipeClientProgress_retainsOnlyThreeNewestBackups() throws Exception {
+
+        ClientConfigManager manager = createManager();
+        seedProgress(manager);
+        manager.saveProgressNow();
+        manager.getConfig().setDimensions(List.of());
+
+        for (int idx = 0; idx < 4; idx++) {
+            manager.wipeClientProgress(ProgressWipe.FULL_RESET);
+            manager.saveProgressNow();
+
+            Path newest = progressBackups().stream()
+                    .max(Comparator.comparing(path -> path.getFileName().toString()))
+                    .orElseThrow();
+            Files.setLastModifiedTime(newest, FileTime.fromMillis(idx + 1L));
+        }
+
+        List<Path> backups = progressBackups();
+        assertEquals(3, backups.size());
+        assertEquals(List.of(2L, 3L, 4L), backups.stream()
+                .map(path -> {
+                    try {
+                        return Files.getLastModifiedTime(path).toMillis();
+                    } catch (IOException e) {
+                        throw new AssertionError(e);
+                    }
+                })
+                .sorted()
+                .toList());
+    }
+
+    /**
+     * Verifies that corrupt progress is backed up and replaced without failing manager construction.
+     *
+     * @throws Exception when test file operations fail.
+     */
+    @Test
+    void constructor_corruptProgressBacksUpAndInstallsEmptyProgress() throws Exception {
+
+        Files.createDirectories(tempDir);
+        Files.writeString(progressFile(), "{not-valid-json");
+
+        ClientConfigManager manager = createManager();
+        manager.saveProgressNow();
+
+        assertTrue(manager.getConfig().getClientProgress().getExplorationState().isEmpty());
+        assertEquals(1, progressBackups().size());
+        assertTrue(Files.readString(progressBackups().get(0)).contains("{not-valid-json"));
+    }
+
+    /**
+     * Verifies that a ranged migration with no stale flat entry does not create a backup.
+     *
+     * @throws Exception when test file operations fail.
+     */
+    @Test
+    void wipeClientProgress_rangedMigrationNoOpCreatesNoBackup() throws Exception {
+
+        ClientConfigManager manager = createManager();
+        manager.getConfig().setDimensions(List.of(rangedDimension()));
+        manager.getConfig().getClientProgress().getExplorationState("test:dimension", 0, true);
+        manager.saveProgressNow();
+
+        manager.wipeClientProgress(ProgressWipe.RANGED_MIGRATION, List.of(rangedDimension()));
+        manager.saveProgressNow();
+
+        assertTrue(progressBackups().isEmpty());
+    }
+
+    /**
+     * Creates a client config manager rooted in the test temporary directory.
+     *
+     * @return A manager whose config is installed into {@link ArdaMapsClient}.
+     */
+    private ClientConfigManager createManager() {
+
+        ClientConfigManager manager = new ClientConfigManager(
+                tempDir.resolve("config.json").toString(),
+                tempDir.resolve("locations.json").toString(),
+                tempDir.resolve("regions.json").toString(),
+                progressFile().toString());
+        ArdaMapsClient.CONFIG_MANAGER = manager;
+        ArdaMapsClient.CONFIG = manager.getConfig();
+        return manager;
+    }
+
+    /**
+     * Adds one revealed cell and one visited location to the manager progress.
+     *
+     * @param manager The manager to seed.
+     */
+    private void seedProgress(ClientConfigManager manager) {
+
+        manager.getConfig().setDimensions(List.of(flatDimension()));
+        var progress = manager.getConfig().getClientProgress();
+        var exploration = progress.getExplorationState("test:dimension", true);
+        exploration.markCell(0, 0, ExplorationState.REVEALED);
+        progress.getVisitedLocationIds().add("visited-location");
+    }
+
+    /**
+     * Returns the path to the test progress file.
+     *
+     * @return Test progress file path.
+     */
+    private Path progressFile() {
+
+        return tempDir.resolve("progress.json");
+    }
+
+    /**
+     * Lists progress backup files in deterministic filename order.
+     *
+     * @return Progress backup files.
+     * @throws IOException when listing fails.
+     */
+    private List<Path> progressBackups() throws IOException {
+
+        try (var paths = Files.list(tempDir)) {
+            return paths
+                    .filter(path -> path.getFileName().toString().startsWith("progress.json.backup-"))
+                    .sorted()
+                    .toList();
         }
     }
 
     /**
-     * Creates a client config manager rooted in the temporary directory.
+     * Builds a small non-ranged dimension definition for progress creation.
      *
-     * @return A client config manager.
+     * @return A dimension definition.
      */
-    private ClientConfigManager manager() {
+    private static Dimension flatDimension() {
 
-        return new ClientConfigManager(
-                configDir().resolve("client.json").toString(),
-                configDir().resolve("client-locations.json").toString(),
-                configDir().resolve("region-texture-lookup.json").toString(),
-                progressPath().toString());
+        return new Dimension("Test", "test:dimension", 1f, 0, 15, 0, 15, false);
     }
 
     /**
-     * Gets the test client progress path.
+     * Builds a small ranged dimension definition for migration tests.
      *
-     * @return The test client progress path.
+     * @return A ranged dimension definition.
      */
-    private Path progressPath() {
+    private static Dimension rangedDimension() {
 
-        return configDir().resolve("progress.json");
-    }
-
-    /**
-     * Gets the test ArdaMaps config directory.
-     *
-     * @return The test ArdaMaps config directory.
-     */
-    private Path configDir() {
-
-        return tempDir.resolve("arda-maps");
+        Dimension dimension = flatDimension();
+        dimension.getMapLayers().add(new MapLayerDefinition("Ranged", MapLayerSource.PMTILES, true, 8, null, 1.0,
+                1, 3, 1, 14, 256, 1.0, "fallback.pmtiles", "fallback.png",
+                List.of(new MapLayerRange(0, "low.pmtiles", -64, 0))));
+        return dimension;
     }
 
     /**

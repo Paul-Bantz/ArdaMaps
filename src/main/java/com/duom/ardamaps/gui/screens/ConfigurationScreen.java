@@ -30,6 +30,7 @@ import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.CacheStorage;
 import com.duom.ardamaps.core.data.UnitSystem;
+import com.duom.ardamaps.core.data.config.client.ProgressWipe;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.RenderingUtils;
 import com.duom.ardamaps.gui.widgets.DropdownWidget;
@@ -203,7 +204,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         confirmResetExplorationButton = Button.builder(
                         Component.translatable("ardamaps.generic.yes"),
                         _ -> {
-                            ArdaMapsClient.CONFIG_MANAGER.resetProgress();
+                            ArdaMapsClient.CONFIG_MANAGER.wipeClientProgress(ProgressWipe.FULL_RESET);
                             displayResetProgressConfirmationDialog = false;
                         })
                 .size(dialogBtnWidth, Button.DEFAULT_HEIGHT)
