@@ -80,6 +80,9 @@ public class SidePanelWidget implements GuiEventListener {
     /** Padding from the edges of the panel to the content */
     private static final int PADDING = 24;
 
+    /** Padding from the panel's outer box to its content, including the sprite's shadow band. */
+    private static final int CONTENT_INSET = PADDING + ModConstants.POPUP_SHADOW_INSET;
+
     /** Width of the scrollbar area (including margin) */
     private static final int SCROLLBAR_WIDTH = 4;
 
@@ -361,7 +364,7 @@ public class SidePanelWidget implements GuiEventListener {
 
         renderBackground(context);
         renderGuiElements(context, mouseX, mouseY);
-        PopupCloseButton.render(context, screenX1, screenY1, width, mouseX, mouseY);
+        PopupCloseButton.render(context, screenX1, screenY1, width, PopupCloseButton.shadowedInset(), mouseX, mouseY);
     }
 
     /**
@@ -386,17 +389,17 @@ public class SidePanelWidget implements GuiEventListener {
     private void renderGuiElements(GuiGraphicsExtractor context, int mouseX, int mouseY) {
 
         var centerX = (screenX1 + screenX2) / 2;
-        var y = screenY1 + ELEMENT_SPACING + PADDING;
-        var usableWidth = screenX2 - screenX1 - 2 * PADDING;
+        var y = screenY1 + ELEMENT_SPACING + CONTENT_INSET;
+        var usableWidth = screenX2 - screenX1 - 2 * CONTENT_INSET;
         var halfUsableWidth = usableWidth / 2;
         boolean hasProjectInfo = Pathfinders.isAvailable()
                 && displayedLocation.getPathfinder() != null
                 && !displayedLocation.getPathfinder().isEmpty();
 
         y += renderTitle(context, centerX, y, mouseX, mouseY) + ELEMENT_SPACING * 3;
-        y += RenderingUtils.renderSeparator(context, usableWidth, screenX1 + PADDING, y) + ELEMENT_SPACING * 3;
+        y += RenderingUtils.renderSeparator(context, usableWidth, screenX1 + CONTENT_INSET, y) + ELEMENT_SPACING * 3;
 
-        var bottomButtonsSpacing = Button.DEFAULT_HEIGHT + Button.DEFAULT_SPACING + PADDING;
+        var bottomButtonsSpacing = Button.DEFAULT_HEIGHT + Button.DEFAULT_SPACING + CONTENT_INSET;
         if (hasProjectInfo) bottomButtonsSpacing += Button.DEFAULT_HEIGHT + Button.DEFAULT_SPACING;
 
         var remainingVisibleHeight = screenY2 - y - bottomButtonsSpacing;
@@ -404,10 +407,10 @@ public class SidePanelWidget implements GuiEventListener {
         y += renderDescription(context, mouseX, mouseY, usableWidth, centerX, y, halfUsableWidth, remainingVisibleHeight) + Button.DEFAULT_SPACING;
 
         if (hasProjectInfo)
-            y += renderExploreInDepth(context, screenX1 + PADDING, usableWidth, y, mouseX, mouseY)
+            y += renderExploreInDepth(context, screenX1 + CONTENT_INSET, usableWidth, y, mouseX, mouseY)
                     + Button.DEFAULT_SPACING;
 
-        renderButtons(context, screenX1 + PADDING, usableWidth, y, mouseX, mouseY);
+        renderButtons(context, screenX1 + CONTENT_INSET, usableWidth, y, mouseX, mouseY);
     }
 
     /**
@@ -610,7 +613,8 @@ public class SidePanelWidget implements GuiEventListener {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         MouseButtonEvent event = new MouseButtonEvent(mouseX, mouseY, new net.minecraft.client.input.MouseButtonInfo(button, 0));
 
-        if (button == 0 && PopupCloseButton.isMouseOver(screenX1, screenY1, width, mouseX, mouseY)) {
+        if (button == 0 && PopupCloseButton.isMouseOver(
+                screenX1, screenY1, width, PopupCloseButton.shadowedInset(), mouseX, mouseY)) {
 
             onClose.run();
             return true;
@@ -677,8 +681,9 @@ public class SidePanelWidget implements GuiEventListener {
      */
     public boolean isMouseOver(double mouseX, double mouseY) {
 
-        return mouseX >= screenX1 && mouseX <= screenX2 &&
-                mouseY >= screenY1 && mouseY <= screenY2;
+        int inset = ModConstants.POPUP_SHADOW_INSET;
+        return mouseX >= screenX1 + inset && mouseX <= screenX2 - inset &&
+                mouseY >= screenY1 + inset && mouseY <= screenY2 - inset;
     }
 
     /**

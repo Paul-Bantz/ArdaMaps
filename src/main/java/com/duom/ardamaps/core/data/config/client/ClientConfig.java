@@ -76,6 +76,12 @@ public class ClientConfig extends Configuration<LocationClient> {
     @SerializedName("show_region_borders")
     private boolean showRegionBorders = true;
 
+    /** Whether client movement tracking records the travelled path - defaults to true */
+    @Setter
+    @Getter
+    @SerializedName("track_movement")
+    private boolean trackMovement = true;
+
     /** Compass opacity - defaults to 1.0 (fully opaque) */
     @Setter
     @Getter

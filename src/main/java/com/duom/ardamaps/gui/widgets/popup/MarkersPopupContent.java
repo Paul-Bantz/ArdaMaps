@@ -174,15 +174,15 @@ public class MarkersPopupContent implements BookLabelPopupContent {
         this.titleHeight = (int) (lineHeight * ModConstants.H1_TEXT_SCALE);
         this.checkboxSize = checkboxSize;
         this.itemHeight = Math.max(MIN_ITEM_HEIGHT, checkboxSize + 2);
-        this.verticalPadding = Math.max(0, ModConstants.POPUP_CORNER - (itemHeight - lineHeight) / 2);
+        this.verticalPadding = Math.max(0, ModConstants.POPUP_CONTENT_INSET - (itemHeight - lineHeight) / 2);
         this.leftRows = (markerFilter.available().size() + 1) / 2;
         this.columnWidth = widestEntryWidth(textWidth);
 
         int columns = markerFilter.available().size() > leftRows ? 2 : 1;
         this.columnsWidth = columnWidth * columns
                 + (columns > 1 ? COLUMN_GAP : 0);
-        int titleAreaWidth = this.titleWidth + PopupCloseButton.SIZE + ModConstants.POPUP_CORNER;
-        int desiredWidth = ModConstants.POPUP_CORNER * 2
+        int titleAreaWidth = this.titleWidth + PopupCloseButton.SIZE + ModConstants.POPUP_CONTENT_INSET;
+        int desiredWidth = ModConstants.POPUP_CONTENT_INSET * 2
                 + Math.max(columnsWidth, titleAreaWidth);
         int rowsHeight = Math.max(1, leftRows) * itemHeight;
         int desiredHeight = verticalPadding * 2
@@ -275,7 +275,7 @@ public class MarkersPopupContent implements BookLabelPopupContent {
 
         PopupSurface.drawBackground(context, x, y, width, height);
         renderTitle(context);
-        PopupCloseButton.render(context, x, y, width, mouseX, mouseY);
+        PopupCloseButton.render(context, x, y, width, PopupCloseButton.shadowedInset(), mouseX, mouseY);
         renderSeparator(context);
         renderEntries(context, mouseX, mouseY);
         renderButtons(context, mouseX, mouseY);
@@ -306,8 +306,8 @@ public class MarkersPopupContent implements BookLabelPopupContent {
     private void renderSeparator(GuiGraphicsExtractor context) {
 
         RenderingUtils.renderSeparator(context,
-                width - ModConstants.POPUP_CORNER * 2,
-                x + ModConstants.POPUP_CORNER,
+                width - ModConstants.POPUP_CONTENT_INSET * 2,
+                x + ModConstants.POPUP_CONTENT_INSET,
                 separatorY());
     }
 
@@ -396,9 +396,9 @@ public class MarkersPopupContent implements BookLabelPopupContent {
      */
     private void positionButtons() {
 
-        int innerWidth = width - ModConstants.POPUP_CORNER * 2;
+        int innerWidth = width - ModConstants.POPUP_CONTENT_INSET * 2;
         int buttonWidth = (innerWidth - SECTION_GAP) / 2;
-        int buttonX = x + ModConstants.POPUP_CORNER;
+        int buttonX = x + ModConstants.POPUP_CONTENT_INSET;
         int buttonY = y + height - verticalPadding - Button.DEFAULT_HEIGHT;
 
         allButton.setX(buttonX);
@@ -470,7 +470,12 @@ public class MarkersPopupContent implements BookLabelPopupContent {
      */
     private boolean isMouseOverEntry(double mouseX, double mouseY, int index) {
 
-        return mouseX >= rowX(index)
+        int inset = ModConstants.POPUP_SHADOW_INSET;
+        return mouseX >= x + inset
+                && mouseX < x + width - inset
+                && mouseY >= y + inset
+                && mouseY < y + height - inset
+                && mouseX >= rowX(index)
                 && mouseX < rowX(index) + columnWidth
                 && mouseY >= rowY(index)
                 && mouseY < rowY(index) + itemHeight;
@@ -489,7 +494,7 @@ public class MarkersPopupContent implements BookLabelPopupContent {
 
         positionButtons();
         MouseButtonEvent event = new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(button, 0));
-        if (button == 0 && PopupCloseButton.isMouseOver(x, y, width, mouseX, mouseY)) {
+        if (button == 0 && PopupCloseButton.isMouseOver(x, y, width, PopupCloseButton.shadowedInset(), mouseX, mouseY)) {
 
             if (onClose != null) onClose.run();
             return true;
@@ -546,7 +551,11 @@ public class MarkersPopupContent implements BookLabelPopupContent {
     @Override
     public boolean isMouseOver(double mouseX, double mouseY) {
 
-        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+        int inset = ModConstants.POPUP_SHADOW_INSET;
+        return mouseX >= x + inset
+                && mouseX < x + width - inset
+                && mouseY >= y + inset
+                && mouseY < y + height - inset;
     }
 
     /**

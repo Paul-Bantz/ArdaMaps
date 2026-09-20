@@ -55,14 +55,17 @@ public class ModConstants {
     /** Sprite identifier for the paper background, nine-sliced via its mcmeta sidecar. */
     public static final Identifier PAPER_SPRITE = modId("widgets/paper");
 
-    /** Sprite identifier for the highlighted paper background used on hovered popup rows. */
-    public static final Identifier PAPER_HIGHLIGHT_SPRITE = modId("widgets/paper_highlight");
-
     /** Sprite identifier for inline guide key-cap backgrounds. */
     public static final Identifier KEYCAP_SPRITE = modId("widgets/keycap");
 
     /** Inset in pixels between a popup's edge and its content. */
     public static final int POPUP_CORNER = 16;
+
+    /** Width of the cast-shadow band baked into the paper sprite, in GUI pixels. */
+    public static final int POPUP_SHADOW_INSET = 12;
+
+    /** Inset from a shadowed popup's outer box to its usable content. */
+    public static final int POPUP_CONTENT_INSET = POPUP_CORNER + POPUP_SHADOW_INSET;
 
     /** Sprite identifier for the nine-sliced map frame. */
     public static final Identifier MAP_FRAME_SPRITE = modId("widgets/map_frame");
@@ -108,6 +111,9 @@ public class ModConstants {
 
     /** Raw-PNG path for the ornamented page separator. */
     public static final Identifier SEPARATOR_TEXTURE = modId("textures/gui/separator.png");
+
+    /** Raw-PNG path for the vertical cast-shadow slice. */
+    public static final Identifier SHADOW_HSLICE_TEXTURE = modId("textures/gui/sprites/widgets/shadow_hslice.png");
 
     /** Nominal drawn height of ornamented page separators. */
     public static final int SEPARATOR_HEIGHT = 20;
@@ -210,6 +216,9 @@ public class ModConstants {
 
     /** ARGB colour constant for light brown. */
     public static final int COLOR_LIGHT_BROWN = 0XFFE6D6BB;
+
+    /** Colour of the recorded travel path drawn on the map. */
+    public static final int COLOR_TRAIL_YELLOW = 0xFFF5C518;
 
     /** ARGB colour constant for text inside command inline tags. */
     public static final int TEXT_COLOR_COMMAND = 0xFF603E05;

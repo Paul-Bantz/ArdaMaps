@@ -263,66 +263,10 @@ public final class RegionBorderRenderer {
             double nx = ring[next * 2];
             double nz = ring[next * 2 + 1];
 
-            joins[index] = joinOffset(px, pz, cx, cz, nx, nz, halfWidthWorld);
+            joins[index] = StrokeGeometry.joinOffset(px, pz, cx, cz, nx, nz, halfWidthWorld);
         }
 
         return joins;
-    }
-
-    /**
-     * Computes a miter join offset with a bevel fallback for sharp turns.
-     *
-     * @param px             The previous vertex X.
-     * @param pz             The previous vertex Z.
-     * @param cx             The current vertex X.
-     * @param cz             The current vertex Z.
-     * @param nx             The next vertex X.
-     * @param nz             The next vertex Z.
-     * @param halfWidthWorld The stroke half-width in world units.
-     * @return The join offset.
-     */
-    @SuppressWarnings("SuspiciousNameCombination")
-    private static Vec2d joinOffset(double px, double pz, double cx, double cz, double nx, double nz, double halfWidthWorld) {
-
-        double prevDx = cx - px;
-        double prevDz = cz - pz;
-        double nextDx = nx - cx;
-        double nextDz = nz - cz;
-        double prevLength = Math.hypot(prevDx, prevDz);
-        double nextLength = Math.hypot(nextDx, nextDz);
-
-        if (prevLength == 0.0 || nextLength == 0.0)
-            return new Vec2d(0.0, halfWidthWorld);
-
-        prevDx /= prevLength;
-        prevDz /= prevLength;
-        nextDx /= nextLength;
-        nextDz /= nextLength;
-
-        double tangentX = prevDx + nextDx;
-        double tangentZ = prevDz + nextDz;
-        double tangentLength = Math.hypot(tangentX, tangentZ);
-        double nextNormalX = -nextDz;
-        double nextNormalZ = nextDx;
-
-        if (tangentLength == 0.0)
-            return new Vec2d(nextNormalX * halfWidthWorld, nextNormalZ * halfWidthWorld);
-
-        tangentX /= tangentLength;
-        tangentZ /= tangentLength;
-        double miterX = -tangentZ;
-        double miterZ = tangentX;
-        double denominator = miterX * nextNormalX + miterZ * nextNormalZ;
-
-        if (Math.abs(denominator) < 0.1)
-            return new Vec2d(nextNormalX * halfWidthWorld, nextNormalZ * halfWidthWorld);
-
-        double miterLength = halfWidthWorld / denominator;
-        double miterLimit = halfWidthWorld * 4.0;
-        if (Math.abs(miterLength) > miterLimit)
-            return new Vec2d(nextNormalX * halfWidthWorld, nextNormalZ * halfWidthWorld);
-
-        return new Vec2d(miterX * miterLength, miterZ * miterLength);
     }
 
     /**

@@ -25,7 +25,7 @@ void main() {
             float dist = length(vec2(x, y));
 
             if (dist <= blurRadius) {
-                float maskAlpha = texture(Sampler1, texCoord0 + offset).a;
+                float maskAlpha = texture(Sampler1, texCoord0 + offset).r;
                 float weight = exp(-dist * dist / (2.0 * sigma * sigma));
 
                 weightedAlpha += maskAlpha * weight;

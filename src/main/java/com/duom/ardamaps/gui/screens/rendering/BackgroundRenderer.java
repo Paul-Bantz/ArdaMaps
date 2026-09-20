@@ -155,6 +155,16 @@ public class BackgroundRenderer {
     }
 
     /**
+     * Gets the outer book texture area, including page borders.
+     *
+     * @return The outer book texture area.
+     */
+    public GuiLayout getBookArea() {
+
+        return new GuiLayout(guiTopLeftX, guiTopLeftY, pageWidth * 2, pageHeight);
+    }
+
+    /**
      * Simple record class representing the usable content area of the GUI, excluding borders. Coordinates are in screen pixels.
      *
      * @param topLeftX  X coordinate of the top-left corner of the content area (inside the border)

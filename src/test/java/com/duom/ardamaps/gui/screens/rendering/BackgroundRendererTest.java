@@ -112,6 +112,23 @@ class BackgroundRendererTest {
     }
 
     /**
+     * Verifies the outer book area includes the full two-page texture, not just padded content.
+     */
+    @Test
+    void getBookArea_returnsFullBookTextureBounds() {
+
+        BackgroundRenderer renderer = new BackgroundRenderer();
+        renderer.invalidate(800, 600);
+
+        BackgroundRenderer.GuiLayout bookArea = renderer.getBookArea();
+
+        assertEquals(25, bookArea.topLeftX());
+        assertEquals(100, bookArea.topLeftY());
+        assertEquals(750, bookArea.guiWidth());
+        assertEquals(400, bookArea.guiHeight());
+    }
+
+    /**
      * Cache validation
      * The early-exit guard prevents redundant layout recalculations every frame.
      * This test verifies that the cached fields are stable (same values) on a second call,

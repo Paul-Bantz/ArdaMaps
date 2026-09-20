@@ -93,6 +93,9 @@ public class ConfigurationScreen extends ArdaMapsScreen {
     /** Reveal all option label value. */
     private final Component revealAllOptionLabel = Component.translatable("ardamaps.client.map.screen.configuration.reveal_all");
 
+    /** Movement tracking option label value. */
+    private final Component movementTrackingOptionLabel = Component.translatable("ardamaps.client.map.screen.configuration.track_movement");
+
     /** Reset exploration progress label value. */
     private final Component resetExplorationProgressLabel = Component.translatable("ardamaps.client.map.screen.configuration.exploration");
 
@@ -144,6 +147,9 @@ public class ConfigurationScreen extends ArdaMapsScreen {
     /** Checkbox for the reveal all option. */
     private Checkbox revealAllCheckbox;
 
+    /** Checkbox for the movement tracking option. */
+    private Checkbox movementTrackingCheckbox;
+
     /** Open Config directory button */
     private Button configDirectoryButton;
 
@@ -192,6 +198,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         configureUnitSystemDropdown();
         configureCompassOpacitySlider();
         configureExplorationToggle();
+        configureMovementTrackingCheckbox();
         configureOpenConfigurationDirectoryButton();
         configureClearCacheButton();
         configureResetExplorationData();
@@ -347,6 +354,22 @@ public class ConfigurationScreen extends ArdaMapsScreen {
                 .build();
 
         revealAllCheckbox.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.configuration.reveal_all.tooltip")));
+    }
+
+    /**
+     * Configure the toggle button for the movement tracking option.
+     */
+    private void configureMovementTrackingCheckbox() {
+
+        movementTrackingCheckbox = Checkbox.builder(Component.empty(), this.font)
+                .selected(ArdaMapsClient.CONFIG.isTrackMovement())
+                .onValueChange((_, checked) -> {
+                    ArdaMapsClient.CONFIG.setTrackMovement(checked);
+                    ArdaMapsClient.CONFIG_MANAGER.save();
+                })
+                .build();
+
+        movementTrackingCheckbox.setTooltip(Tooltip.create(Component.translatable("ardamaps.client.map.screen.configuration.track_movement.tooltip")));
     }
 
     /**
@@ -602,6 +625,9 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         y = renderRow(context, x, y, pageWidth, revealAllOptionLabel,
                 revealAllCheckbox, mouseX, mouseY, delta) + Button.DEFAULT_SPACING;
 
+        y = renderRow(context, x, y, pageWidth, movementTrackingOptionLabel,
+                movementTrackingCheckbox, mouseX, mouseY, delta) + Button.DEFAULT_SPACING;
+
         y = renderRow(context, x, y, pageWidth, resetExplorationProgressLabel,
                 resetExplorationButton, mouseX, mouseY, delta) + Button.DEFAULT_SPACING;
 
@@ -731,18 +757,20 @@ public class ConfigurationScreen extends ArdaMapsScreen {
 
         var dialogX = confirmationDialogX();
         var dialogY = confirmationDialogY();
-        var dialogPadding = (int) (dialogWidth * .1);
+        var dialogPadding = (int) ((dialogWidth - ModConstants.POPUP_SHADOW_INSET * 2) * .1)
+                + ModConstants.POPUP_SHADOW_INSET;
 
         context.blitSprite(RenderPipelines.GUI_TEXTURED, ModConstants.PAPER_SPRITE,
                 dialogX, dialogY, dialogWidth, dialogHeight);
-        PopupCloseButton.render(context, dialogX, dialogY, dialogWidth, mouseX, mouseY);
+        PopupCloseButton.render(context, dialogX, dialogY, dialogWidth, PopupCloseButton.shadowedInset(), mouseX, mouseY);
 
         var text = displayResetProgressConfirmationDialog ? confirmationResetExplorationDialogText : confirmationRevealAllDialogText;
         var okButton = displayResetProgressConfirmationDialog ? confirmResetExplorationButton : confirmRevealAllButton;
         var cancelBtn = displayResetProgressConfirmationDialog ? cancelResetExplorationButton : cancelRevealAllButton;
 
         int x = dialogX + dialogPadding;
-        int y = dialogY + Math.max(dialogPadding, PopupCloseButton.SIZE + Button.DEFAULT_SPACING);
+        int y = dialogY + Math.max(dialogPadding,
+                PopupCloseButton.shadowedInset() + PopupCloseButton.SIZE + Button.DEFAULT_SPACING);
 
         List<FormattedCharSequence> multilinePrompt = font.split(text, dialogWidth - dialogPadding * 2);
         var lineHeight = font.lineHeight;
@@ -773,7 +801,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     private int confirmationDialogWidth() {
 
-        return this.width / 3;
+        return this.width / 3 + ModConstants.POPUP_SHADOW_INSET * 2;
     }
 
     /**
@@ -783,7 +811,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
      */
     private int confirmationDialogHeight() {
 
-        return this.height / 3;
+        return this.height / 3 + ModConstants.POPUP_SHADOW_INSET * 2;
     }
 
     /**
@@ -822,6 +850,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
                     confirmationDialogX(),
                     confirmationDialogY(),
                     confirmationDialogWidth(),
+                    PopupCloseButton.shadowedInset(),
                     event.x(),
                     event.y())) {
                 cancelConfirmationDialog();
@@ -842,6 +871,7 @@ public class ConfigurationScreen extends ArdaMapsScreen {
         if (!consumed) {
 
             consumed = revealAllCheckbox.mouseClicked(event, doubleClick);
+            consumed |= movementTrackingCheckbox.mouseClicked(event, doubleClick);
             consumed |= resetExplorationButton.mouseClicked(event, doubleClick);
             consumed |= configDirectoryButton.mouseClicked(event, doubleClick);
             consumed |= clearCacheButton.mouseClicked(event, doubleClick);

@@ -302,6 +302,18 @@ public abstract class ArdaMapsScreen extends Screen {
     }
 
     /**
+     * Returns the outer book texture area, including page borders.
+     *
+     * @return The outer book texture area.
+     */
+    protected BackgroundRenderer.GuiLayout getBookArea() {
+
+        invalidateCachedLayouts();
+
+        return guiBackgroundRenderer.getBookArea();
+    }
+
+    /**
      * Returns the content area of the screen, which is calculated based on the background renderer.
      * This method ensures that the cached layouts are invalidated and recalculated if necessary before returning the content area.
      *

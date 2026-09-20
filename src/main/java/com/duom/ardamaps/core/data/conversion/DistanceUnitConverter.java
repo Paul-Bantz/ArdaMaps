@@ -66,7 +66,33 @@ public class DistanceUnitConverter {
 
         if (dimension == null) return Component.empty();
 
-        double distance = blocksToRealWorldUnits(dimension, nbBlocks);
+        return format(blocksToRealWorldUnits(dimension, nbBlocks));
+    }
+
+    /**
+     * Converts real-world metres to a localized component in the configured unit system.
+     *
+     * @param metres Distance in real-world metres.
+     * @return A component representing the distance in the selected real-world units.
+     */
+    public static @NotNull Component asRealWorldDistance(double metres) {
+
+        UnitSystem unitSystem = ArdaMapsClient.CONFIG.getUnitSystem();
+        double distance = unitSystem == UnitSystem.IMPERIAL
+                ? metres / KM_TO_METERS * KM_TO_MILES
+                : metres / KM_TO_METERS;
+
+        return format(distance);
+    }
+
+    /**
+     * Formats a distance already expressed in the configured primary unit.
+     *
+     * @param distance Distance in kilometers or miles according to the configured unit system.
+     * @return A localized distance component.
+     */
+    private static @NotNull Component format(double distance) {
+
         UnitSystem unitSystem = ArdaMapsClient.CONFIG.getUnitSystem();
         String formattedDistance;
         String unitKey;

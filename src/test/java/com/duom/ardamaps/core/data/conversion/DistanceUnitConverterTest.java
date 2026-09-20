@@ -140,6 +140,26 @@ class DistanceUnitConverterTest {
     }
 
     /**
+     * Verifies stored real-world metres are formatted without applying a dimension scale.
+     */
+    @Test
+    void asRealWorldDistance_metricMetres_returnsKilometers() {
+        setUnitSystem(UnitSystem.METRIC);
+
+        assertDistance("2", "unit.system.metric.unit", DistanceUnitConverter.asRealWorldDistance(2000));
+    }
+
+    /**
+     * Verifies stored real-world metres are converted to imperial units directly.
+     */
+    @Test
+    void asRealWorldDistance_imperialMetres_returnsFeet() {
+        setUnitSystem(UnitSystem.IMPERIAL);
+
+        assertDistance("1640.4", "unit.system.imperial.subunit", DistanceUnitConverter.asRealWorldDistance(500));
+    }
+
+    /**
      * Asserts the formatted distance component shape.
      *
      * @param expectedNumber The expected numeric prefix.

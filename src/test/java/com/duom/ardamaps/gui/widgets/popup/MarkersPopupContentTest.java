@@ -25,6 +25,7 @@
 
 package com.duom.ardamaps.gui.widgets.popup;
 
+import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.screens.map.MarkerTypeFilter;
 import com.duom.ardamaps.gui.screens.rendering.BackgroundRenderer;
 import net.minecraft.resources.Identifier;
@@ -52,10 +53,10 @@ class MarkersPopupContentTest {
 
         MarkersPopupContent content = content(new TestMarkerTypeFilter());
 
-        assertEquals(246, content.getWidth());
-        assertEquals(130, content.getHeight());
-        assertEquals(97, content.getX());
-        assertEquals(115, content.getY());
+        assertEquals(282, content.getWidth());
+        assertEquals(154, content.getHeight());
+        assertEquals(79, content.getX());
+        assertEquals(103, content.getY());
     }
 
     /**
@@ -66,8 +67,14 @@ class MarkersPopupContentTest {
 
         MarkersPopupContent content = content(new TestMarkerTypeFilter());
 
-        assertTrue(content.mouseClicked(content.getX(), content.getY(), 0));
-        assertTrue(content.mouseClicked(content.getX() + content.getWidth() - 1, content.getY() + content.getHeight() - 1, 0));
+        int inset = ModConstants.POPUP_SHADOW_INSET;
+
+        assertTrue(content.mouseClicked(content.getX() + inset, content.getY() + inset, 0));
+        assertTrue(content.mouseClicked(
+                content.getX() + content.getWidth() - inset - 1,
+                content.getY() + content.getHeight() - inset - 1,
+                0));
+        assertFalse(content.mouseClicked(content.getX(), content.getY(), 0));
         assertFalse(content.mouseClicked(content.getX() + content.getWidth(), content.getY() + content.getHeight(), 0));
         assertFalse(content.mouseClicked(content.getX() - 1, content.getY(), 0));
     }
@@ -104,10 +111,11 @@ class MarkersPopupContentTest {
         MarkersPopupContent content = content(new TestMarkerTypeFilter());
         AtomicInteger closeCount = new AtomicInteger();
         content.setOnClose(closeCount::incrementAndGet);
+        int inset = PopupCloseButton.shadowedInset();
 
         assertTrue(content.mouseClicked(
-                PopupCloseButton.x(content.getX(), content.getWidth()),
-                PopupCloseButton.y(content.getY()),
+                PopupCloseButton.x(content.getX(), content.getWidth(), inset),
+                PopupCloseButton.y(content.getY(), inset),
                 0));
 
         assertEquals(1, closeCount.get());
@@ -122,10 +130,11 @@ class MarkersPopupContentTest {
         MarkersPopupContent content = content(new TestMarkerTypeFilter());
         AtomicInteger closeCount = new AtomicInteger();
         content.setOnClose(closeCount::incrementAndGet);
+        int inset = PopupCloseButton.shadowedInset();
 
         assertTrue(content.mouseClicked(
-                PopupCloseButton.x(content.getX(), content.getWidth()) - 1,
-                PopupCloseButton.y(content.getY()),
+                PopupCloseButton.x(content.getX(), content.getWidth(), inset) - 1,
+                PopupCloseButton.y(content.getY(), inset),
                 0));
 
         assertEquals(0, closeCount.get());
@@ -151,6 +160,19 @@ class MarkersPopupContentTest {
     }
 
     /**
+     * Verifies that popup width includes content inset on both sides of its widest column block.
+     */
+    @Test
+    void constructor_columnBlockWidth_includesShadowedContentInsets() {
+
+        MarkersPopupContent content = content(new TestMarkerTypeFilter());
+        int widestColumnBlock = 20 + 5 + 12 + 6 + 36;
+        int columnsWidth = widestColumnBlock * 2 + 16;
+
+        assertTrue(content.getWidth() >= columnsWidth + ModConstants.POPUP_CONTENT_INSET * 2);
+    }
+
+    /**
      * Verifies that a fresh popup marks the all button toggled when every marker type is enabled.
      */
     @Test
@@ -170,7 +192,7 @@ class MarkersPopupContentTest {
 
         MarkersPopupContent content = content(new TestMarkerTypeFilter());
 
-        assertTrue(content.mouseClicked(230, 230, 0));
+        assertTrue(content.mouseClicked(230, 218, 0));
 
         assertFalse(content.isAllToggled());
         assertTrue(content.isNoneToggled());

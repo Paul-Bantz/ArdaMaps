@@ -29,9 +29,8 @@ import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.config.client.ProgressWipe;
-import com.mojang.blaze3d.platform.NativeImage;
+import com.duom.ardamaps.gui.map.rendering.FogMaskTexture;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,6 +44,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -61,11 +61,8 @@ class ClientConfigManagerTest {
     @TempDir
     private Path tempDir;
 
-    /** Mocked image construction used to isolate texture-backed exploration setup from native resources. */
-    private MockedConstruction<NativeImage> mockedNativeImage;
-
-    /** Mocked texture construction used to isolate dynamic texture registration from the Minecraft runtime. */
-    private MockedConstruction<DynamicTexture> mockedDynamicTexture;
+    /** Mocked fog-mask construction used to isolate texture registration from the Minecraft runtime. */
+    private MockedConstruction<FogMaskTexture> mockedFogMaskTexture;
 
     /** Mocked static accessor for {@link Minecraft} so tests can provide a fake texture manager. */
     private MockedStatic<Minecraft> mockedMinecraftClient;
@@ -77,8 +74,7 @@ class ClientConfigManagerTest {
     @BeforeEach
     void setUp() {
 
-        mockedNativeImage = Mockito.mockConstruction(NativeImage.class);
-        mockedDynamicTexture = Mockito.mockConstruction(DynamicTexture.class);
+        mockedFogMaskTexture = Mockito.mockConstruction(FogMaskTexture.class);
 
         Minecraft mockClient = Mockito.mock(Minecraft.class);
         TextureManager mockTextureManager = Mockito.mock(TextureManager.class);
@@ -96,8 +92,7 @@ class ClientConfigManagerTest {
     void tearDown() throws Exception {
 
         drainIoExecutor();
-        mockedNativeImage.close();
-        mockedDynamicTexture.close();
+        mockedFogMaskTexture.close();
         mockedMinecraftClient.close();
         ArdaMapsClient.CONFIG = null;
         ArdaMapsClient.CONFIG_MANAGER = null;
@@ -142,7 +137,7 @@ class ClientConfigManagerTest {
 
         List<Path> backups = progressBackups();
         assertEquals(1, backups.size());
-        assertTrue(Files.readString(backups.get(0)).contains("test:dimension"));
+        assertTrue(Files.readString(backups.getFirst()).contains("test:dimension"));
         assertFalse(Files.readString(progressFile()).contains("test:dimension"));
     }
 
@@ -199,7 +194,38 @@ class ClientConfigManagerTest {
 
         assertTrue(manager.getConfig().getClientProgress().getExplorationState().isEmpty());
         assertEquals(1, progressBackups().size());
-        assertTrue(Files.readString(progressBackups().get(0)).contains("{not-valid-json"));
+        assertTrue(Files.readString(progressBackups().getFirst()).contains("{not-valid-json"));
+    }
+
+    /**
+     * Verifies legacy plain-base64 exploration arrays reload and are rewritten in compressed form.
+     *
+     * @throws Exception when test file operations fail.
+     */
+    @Test
+    void reloadClientProgress_legacyExplorationDataRewritesCompressed() throws Exception {
+
+        byte[] legacyData = new byte[largeFlatCellCount()];
+        legacyData[0] = ExplorationState.REVEALED.getValue();
+        Files.writeString(progressFile(), legacyProgressJson(legacyData));
+        long legacySize = Files.size(progressFile());
+
+        ClientConfigManager manager = createManager();
+        manager.getConfig().setDimensions(List.of(largeFlatDimension()));
+
+        assertTrue(manager.reloadClientProgress());
+        assertEquals(ExplorationState.REVEALED, manager.getConfig().getClientProgress()
+                .getExplorationState("test:large", false)
+                .stateAt(0, 0));
+
+        manager.saveProgressNow();
+
+        assertTrue(Files.size(progressFile()) < legacySize);
+        manager.getConfig().getClientProgress().clearSessionState();
+        assertTrue(manager.reloadClientProgress());
+        assertEquals(ExplorationState.REVEALED, manager.getConfig().getClientProgress()
+                .getExplorationState("test:large", false)
+                .stateAt(0, 0));
     }
 
     /**
@@ -286,6 +312,54 @@ class ClientConfigManagerTest {
     private static Dimension flatDimension() {
 
         return new Dimension("Test", "test:dimension", 1f, 0, 15, 0, 15, false);
+    }
+
+    /**
+     * Builds a larger flat dimension that makes legacy base64 materially larger than compressed data.
+     *
+     * @return A larger dimension definition.
+     */
+    private static Dimension largeFlatDimension() {
+
+        return new Dimension("Large Test", "test:large", 1f, 0, 10_000, 0, 10_000, false);
+    }
+
+    /**
+     * Returns the exploration cell count for {@link #largeFlatDimension()}.
+     *
+     * @return The large flat dimension's cell count.
+     */
+    private static int largeFlatCellCount() {
+
+        return 79 * 79;
+    }
+
+    /**
+     * Builds a legacy progress JSON document with plain-base64 exploration data.
+     *
+     * @param explorationData Legacy raw exploration data.
+     * @return A legacy progress JSON document.
+     */
+    private static String legacyProgressJson(byte[] explorationData) {
+
+        return """
+                {
+                  "explorationState": {
+                    "test:large": {
+                      "dimensionId": "test:large",
+                      "rangeIndex": null,
+                      "nbCellsX": 79,
+                      "nbCellsY": 79,
+                      "xMin": 0,
+                      "zMin": 0,
+                      "autoGenerated": false,
+                      "cellSize": 128,
+                      "explorationData": "%s"
+                    }
+                  },
+                  "visitedLocationIds": []
+                }
+                """.formatted(Base64.getEncoder().encodeToString(explorationData));
     }
 
     /**

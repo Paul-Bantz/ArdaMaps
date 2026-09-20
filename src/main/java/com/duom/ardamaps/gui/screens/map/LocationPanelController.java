@@ -29,6 +29,7 @@ import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.Vec3d;
 import com.duom.ardamaps.core.data.location.LocationClient;
 import com.duom.ardamaps.core.data.map.cameras.MapCamera;
+import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.screens.rendering.BackgroundRenderer;
 import com.duom.ardamaps.gui.widgets.SidePanelWidget;
 import net.fabricmc.api.EnvType;
@@ -181,9 +182,10 @@ public class LocationPanelController {
         int panelHeight = contentArea.guiHeight() - 16;
         int xPos = contentArea.topLeftX() + contentArea.guiWidth() - panelWidth - 8;
         int yPos = contentArea.topLeftY() + 8;
+        int inset = ModConstants.POPUP_SHADOW_INSET;
 
-        panel.setSize(panelWidth, panelHeight);
-        panel.setPosition(xPos, yPos);
+        panel.setSize(panelWidth + inset * 2, panelHeight + inset * 2);
+        panel.setPosition(xPos - inset, yPos - inset);
     }
 
     /**

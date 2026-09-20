@@ -30,6 +30,10 @@ import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.config.Dimension;
+import com.duom.ardamaps.core.data.json.TrailDataTypeAdapter;
+import com.duom.ardamaps.core.data.trail.MovementStats;
+import com.duom.ardamaps.core.data.trail.PlayerTrail;
+import com.google.gson.annotations.JsonAdapter;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,10 +57,17 @@ public class ClientProgress implements Serializable {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientProgress.class);
 
     @Serial
-    private static final long serialVersionUID = 2L;
+    private static final long serialVersionUID = 3L;
 
     /** Map of exploration key to per-dimension or per-range exploration state. */
     private final Map<String, PlayerExploration> explorationState = new ConcurrentHashMap<>();
+
+    /** Recorded movement trails keyed by dimension id. */
+    @JsonAdapter(TrailDataTypeAdapter.class)
+    private final Map<String, PlayerTrail> trails = new ConcurrentHashMap<>();
+
+    /** Lifetime walked, swam and flown distances in real-world metres. */
+    private MovementStats movementStats = new MovementStats();
 
     /** IDs of locations the player has visited */
     private final Set<String> visitedLocationIds = new HashSet<>();
@@ -70,6 +81,8 @@ public class ClientProgress implements Serializable {
 
         ClientProgress snapshot = new ClientProgress();
         snapshot.explorationState.putAll(explorationState);
+        snapshot.trails.putAll(trails);
+        snapshot.movementStats = movementStats.copy();
         snapshot.visitedLocationIds.addAll(visitedLocationIds);
         return snapshot;
     }
@@ -115,6 +128,9 @@ public class ClientProgress implements Serializable {
         }
 
         if (!autoGenOnly) {
+
+            trails.clear();
+            movementStats.reset();
 
             var locations = ArdaMapsClient.CONFIG.getLocations();
             if (locations != null) {
@@ -184,7 +200,17 @@ public class ClientProgress implements Serializable {
             exploration.dispose();
         });
         explorationState.clear();
+        trails.clear();
         visitedLocationIds.clear();
+    }
+
+    /**
+     * Clears lifetime movement counters and all recorded trail geometry.
+     */
+    public void resetMovementTracking() {
+
+        movementStats.reset();
+        trails.clear();
     }
 
     /**
@@ -237,5 +263,19 @@ public class ClientProgress implements Serializable {
 
         String key = explorationKey(dimensionId, rangeIndex);
         return createDefault ? explorationState.computeIfAbsent(key, ignored -> PlayerExploration.createWithoutTexture(dimensionId, rangeIndex)) : explorationState.get(key);
+    }
+
+    /**
+     * Retrieves the movement trail for a specific dimension.
+     *
+     * @param dimensionId   The ID of the dimension to retrieve the movement trail for.
+     * @param createDefault Whether to create an empty trail when missing.
+     * @return The PlayerTrail instance for the specified dimension, or null if not found.
+     */
+    public PlayerTrail trail(String dimensionId, boolean createDefault) {
+
+        if (dimensionId == null) return null;
+
+        return createDefault ? trails.computeIfAbsent(dimensionId, ignored -> new PlayerTrail()) : trails.get(dimensionId);
     }
 }

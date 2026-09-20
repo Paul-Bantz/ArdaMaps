@@ -36,13 +36,13 @@ import org.jetbrains.annotations.NotNull;
 public enum ExplorationState {
 
     /** Fully hidden state with transparent colour (alpha = 0). */
-    HIDDEN(0, 0x00000000),
+    HIDDEN(0, 0x00000000, 0x00),
 
     /** Partially visible state with semi-transparent colour (alpha = 0.5). */
-    VISIBLE(1, 0x33000000),
+    VISIBLE(1, 0x33000000, 0x33),
 
     /** Fully revealed state with opaque colour (alpha = 1.0). */
-    REVEALED(2, 0xFF000000);
+    REVEALED(2, 0xFF000000, 0xFF);
 
     /** the byte value of this state */
     private final byte value;
@@ -50,15 +50,20 @@ public enum ExplorationState {
     /** The colour associated with this state in ARGB format */
     private final int color;
 
+    /** The single-channel fog-mask value for this state. */
+    private final byte maskValue;
+
     /**
      * Constructs an ExplorationState with the specified byte value and colour.
      *
      * @param value the byte value representing the exploration state
-     * @param color the colour associated with this state in ARGB format
+     * @param color     the colour associated with this state in ARGB format
+     * @param maskValue the RED8 fog-mask value
      */
-    ExplorationState(int value, int color) {
+    ExplorationState(int value, int color, int maskValue) {
         this.value = (byte) value;
         this.color = color;
+        this.maskValue = (byte) maskValue;
     }
 
     /**

@@ -28,8 +28,11 @@ package com.duom.ardamaps.core.commands;
 import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.guide.GuideScreenLink;
 import com.duom.ardamaps.core.data.map.Waypoint;
+import com.duom.ardamaps.core.data.trail.MovementStats;
+import com.duom.ardamaps.core.data.trail.TrailCodec;
 import com.duom.ardamaps.core.networking.PacketRegistry;
 import com.duom.ardamaps.core.networking.packets.EmptyPacket;
 import com.duom.ardamaps.gui.screens.ConfigurationScreen;
@@ -39,21 +42,20 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.blaze3d.platform.NativeImage;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -107,6 +109,9 @@ public class ClientCommands {
                                 .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("exploration_state")
                                         .executes(ClientCommands::dumpExplorationState)
                                 )
+                                .then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("trail")
+                                        .executes(ClientCommands::debugTrail)
+                                )
                         )
         );
     }
@@ -135,6 +140,7 @@ public class ClientCommands {
         contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " refresh configuration").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Re-synchronizes the maps configuration from the server").withStyle(ChatFormatting.GRAY)));
         contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " debug").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Print information on the current state of the mod for debugging purposes").withStyle(ChatFormatting.GRAY)));
         contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " debug exploration_state").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Dump the current Exploration fog texture to disk for debugging purposes").withStyle(ChatFormatting.GRAY)));
+        contextSource.sendFeedback(Component.literal("/" + ArdaMaps.MOD_ID + " debug trail").withStyle(ChatFormatting.AQUA).append(Component.literal(" - Print movement trail storage and distance counters").withStyle(ChatFormatting.GRAY)));
 
         // Give the player a guidebook if they don't have one, or switch to it if they do
         PacketRegistry.GUIDEBOOK_REQUEST_HANDLER.send(new EmptyPacket());
@@ -328,6 +334,49 @@ public class ClientCommands {
     }
 
     /**
+     * Command execution method to print movement trail diagnostics.
+     *
+     * @param context The command context.
+     * @return Command result status.
+     */
+    private static int debugTrail(CommandContext<FabricClientCommandSource> context) {
+
+        var progress = ArdaMapsClient.CONFIG.getClientProgress();
+        var contextSource = context.getSource();
+
+        contextSource.sendFeedback(Component.literal("Movement trails for ")
+                .append(Component.literal(Integer.toString(progress.getTrails().size())).withStyle(ChatFormatting.YELLOW))
+                .append(Component.literal(" dimension(s):\n{")));
+
+        for (var entry : progress.getTrails().entrySet()) {
+            var trail = entry.getValue();
+            int encodedSize = TrailCodec.encode(Map.of(entry.getKey(), trail)).length;
+
+            contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Dimension ID: ")
+                    .append(Component.literal(entry.getKey()).withStyle(ChatFormatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Segments: ")
+                    .append(Component.literal(Integer.toString(trail.segments().size())).withStyle(ChatFormatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Points: ")
+                    .append(Component.literal(Integer.toString(trail.pointCount())).withStyle(ChatFormatting.AQUA)));
+            contextSource.sendFeedback(Component.literal(DOUBLE_TAB_SPACING + "- Encoded Size: ")
+                    .append(Component.literal(encodedSize + " bytes").withStyle(ChatFormatting.AQUA)));
+        }
+        contextSource.sendFeedback(Component.literal("}"));
+
+        MovementStats stats = progress.getMovementStats();
+        contextSource.sendFeedback(Component.literal("Movement distance totals (metres):\n{"));
+        contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Walk: ")
+                .append(Component.literal(String.format("%.2f", stats.getWalkedMetres())).withStyle(ChatFormatting.AQUA)));
+        contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Swim: ")
+                .append(Component.literal(String.format("%.2f", stats.getSwamMetres())).withStyle(ChatFormatting.AQUA)));
+        contextSource.sendFeedback(Component.literal(TAB_SPACING + "- Fly: ")
+                .append(Component.literal(String.format("%.2f", stats.getFlownMetres())).withStyle(ChatFormatting.AQUA)));
+        contextSource.sendFeedback(Component.literal("}"));
+
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
      * Command execution method to dump the current Fog of War texture to disk for debugging purposes.
      *
      * @param context The command context.
@@ -341,26 +390,26 @@ public class ClientCommands {
 
         for (var entry : progress.getExplorationState().entrySet()) {
 
-            TextureManager textureManager = Client.mc().getTextureManager();
-            Identifier textureId = entry.getValue().getFogTextureId();
-            if (textureId == null) {
+            var exploration = entry.getValue();
+            if (exploration.getFogTextureId() == null) {
                 contextSource.sendFeedback(Component.literal("Skipping FoW dump for ")
                         .append(Component.literal(entry.getKey()).withStyle(ChatFormatting.YELLOW))
                         .append(Component.literal(": texture is not initialized.")));
                 continue;
             }
 
-            var registeredTexture = textureManager.getTexture(textureId);
-            if (!(registeredTexture instanceof DynamicTexture texture)) {
-                contextSource.sendFeedback(Component.literal("Skipping FoW dump for ")
-                        .append(Component.literal(entry.getKey()).withStyle(ChatFormatting.YELLOW))
-                        .append(Component.literal(": registered texture is not dynamic.")));
-                continue;
-            }
+            try (NativeImage pixels = new NativeImage(NativeImage.Format.RGBA, exploration.getNbCellsX(), exploration.getNbCellsY(), false)) {
+                for (int y = 0; y < exploration.getNbCellsY(); y++) {
+                    for (int x = 0; x < exploration.getNbCellsX(); x++) {
+                        ExplorationState state = exploration.stateAt(x, y);
+                        int mask = state.getMaskValue() & 0xFF;
+                        int color = state == ExplorationState.HIDDEN
+                                ? 0x00000000
+                                : 0xFF000000 | mask << 16 | mask << 8 | mask;
+                        pixels.setPixel(x, y, color);
+                    }
+                }
 
-            var pixels = texture.getPixels();
-
-            try {
                 Path dir = Client.mc().gameDirectory.toPath().resolve("ardamaps");
                 Files.createDirectories(dir);
 

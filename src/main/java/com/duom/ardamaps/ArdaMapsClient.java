@@ -37,6 +37,8 @@ import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.LocationConfig;
 import com.duom.ardamaps.core.data.config.client.ClientConfig;
 import com.duom.ardamaps.core.data.config.client.ProgressWipe;
+import com.duom.ardamaps.core.data.trail.MovementMode;
+import com.duom.ardamaps.core.data.trail.PlayerTrail;
 import com.duom.ardamaps.core.data.guide.ArdaMapsChatLinkProcessor;
 import com.duom.ardamaps.core.data.guide.GuideImageCache;
 import com.duom.ardamaps.core.data.guide.GuideScreenLink;
@@ -128,6 +130,18 @@ public class ArdaMapsClient implements ClientModInitializer {
     /** Minimum squared distance to discover a location */
     public static final double LOCATION_NEAR_DISTANCE = 625d;
 
+    /** Number of ticks between movement-geometry samples. */
+    private static final int SAMPLE_INTERVAL_TICKS = 20;
+
+    /** Number of ticks a movement mode must hold before becoming active. */
+    private static final int MODE_HYSTERESIS_TICKS = 10;
+
+    /** Minimum horizontal movement before recording a geometry sample. */
+    private static final double IDLE_EPSILON_BLOCKS = 0.05d;
+
+    /** Minimum delay between trail-driven progress saves. */
+    private static final long TRAIL_SAVE_INTERVAL_MS = 30_000L;
+
     /** Logger instance for the mod. */
     private static final Logger LOGGER = LoggerFactory.getLogger(ArdaMapsClient.class);
 
@@ -166,6 +180,9 @@ public class ArdaMapsClient implements ClientModInitializer {
     /** HTTP image provider instance */
     private static HttpImageProvider HTTP_IMAGE_PROVIDER;
 
+    /** Active client initializer instance used by static UI entry points. */
+    private static ArdaMapsClient INSTANCE;
+
     /** Timestamp of the last {@link #NEAR_LOCATIONS} refresh. */
     private static long lastNearLocationsUpdate = 0L;
 
@@ -180,6 +197,48 @@ public class ArdaMapsClient implements ClientModInitializer {
 
     /** Tracks the previous state of the right mouse button to detect clicks. */
     private boolean rightMouseButtonWasDown = false;
+
+    /** Dimension ID for the active movement-tracking segment. */
+    private String trailDimensionId = null;
+
+    /** Previous per-tick player X coordinate for distance accumulation. */
+    private double previousTrailX;
+
+    /** Previous per-tick player Z coordinate for distance accumulation. */
+    private double previousTrailZ;
+
+    /** Tick count for the previous per-tick trail position. */
+    private int previousTrailTick;
+
+    /** Whether the previous per-tick trail position is initialized. */
+    private boolean hasPreviousTrailPosition;
+
+    /** Last sampled player X coordinate for geometry recording. */
+    private double lastTrailSampleX;
+
+    /** Last sampled player Z coordinate for geometry recording. */
+    private double lastTrailSampleZ;
+
+    /** Whether the last sampled trail position is initialized. */
+    private boolean hasLastTrailSample;
+
+    /** Tick count when geometry was last sampled. */
+    private int lastTrailSampleTick = -SAMPLE_INTERVAL_TICKS;
+
+    /** Current debounced movement mode. */
+    private MovementMode activeMovementMode = MovementMode.WALK;
+
+    /** Candidate movement mode waiting to pass hysteresis. */
+    private MovementMode candidateMovementMode = MovementMode.WALK;
+
+    /** Number of consecutive ticks the candidate movement mode has held. */
+    private int candidateMovementTicks;
+
+    /** Whether trail geometry changed since the last trail-driven save. */
+    private boolean trailDirty;
+
+    /** Timestamp of the last trail-driven progress save. */
+    private long lastTrailSaveMs;
 
     /**
      * Creates the daemon thread factory for {@link #IMAGE_EXECUTOR}, naming threads so image
@@ -224,6 +283,7 @@ public class ArdaMapsClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
 
+        INSTANCE = this;
         HTTP_IMAGE_PROVIDER = new HttpImageProvider();
         CONFIG_MANAGER = new ClientConfigManager(
                 "./config/arda-maps/config.json",
@@ -256,6 +316,21 @@ public class ArdaMapsClient implements ClientModInitializer {
         this.registerChatProcessor();
 
         ClientCommands.register();
+    }
+
+    /**
+     * Clears persisted movement progress and client-only sampler state.
+     */
+    public static void resetMovementTracking() {
+
+        if (CONFIG == null || CONFIG.getClientProgress() == null) return;
+
+        CONFIG.getClientProgress().resetMovementTracking();
+        if (INSTANCE != null) {
+            INSTANCE.resetTrailRuntimeState();
+            INSTANCE.trailDirty = false;
+        }
+        if (CONFIG_MANAGER != null) CONFIG_MANAGER.saveProgress();
     }
 
     /**
@@ -339,6 +414,8 @@ public class ArdaMapsClient implements ClientModInitializer {
         // The disconnect event may run on Netty's IO thread; callees defer GL teardown.
         PlayerIcon.clear();
 
+        breakActiveTrail();
+
         if (CONFIG_MANAGER != null) CONFIG_MANAGER.saveProgressNow();
 
         if (CONFIG != null) CONFIG.clearSessionState();
@@ -360,6 +437,8 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         trackLocationDiscovery(client.player);
         trackExploration(client.player);
+        trackMovement(client.player);
+        saveTrailProgressIfNeeded();
 
         // Refresh the shared near-locations cache once per tick budget.
         refreshNearLocations(client.player);
@@ -393,6 +472,7 @@ public class ArdaMapsClient implements ClientModInitializer {
     @SuppressWarnings("unused")
     private void onStop(Minecraft client) {
 
+        breakActiveTrail();
         ArdaMapsClient.CONFIG_MANAGER.save();
         ArdaMapsClient.CONFIG_MANAGER.saveProgressNow();
 
@@ -742,6 +822,178 @@ public class ArdaMapsClient implements ClientModInitializer {
 
             ArdaMapsClient.CONFIG_MANAGER.saveProgress();
         }
+    }
+
+    /**
+     * Tracks player movement trails and lifetime distance counters.
+     *
+     * @param player The player whose movement data is being recorded.
+     */
+    private void trackMovement(@NotNull LocalPlayer player) {
+
+        if (!CONFIG.isTrackMovement()) {
+            breakActiveTrail();
+            resetTrailRuntimeState();
+            return;
+        }
+
+        if (player.tickCount < 100) return;
+
+        String dimensionId = Client.currentDimensionId();
+        Dimension dimension = Client.currentDimension();
+        if (dimensionId == null || dimension == null) return;
+
+        var progress = CONFIG.getClientProgress();
+        PlayerTrail trail = progress.trail(dimensionId, true);
+        if (trail == null) return;
+
+        if (!Objects.equals(trailDimensionId, dimensionId)) {
+            breakActiveTrail();
+            resetTrailRuntimeState();
+            trailDimensionId = dimensionId;
+        }
+
+        MovementMode mode = debouncedMovementMode(player);
+        double x = player.getX();
+        double z = player.getZ();
+
+        if (hasPreviousTrailPosition) {
+            double dx = x - previousTrailX;
+            double dz = z - previousTrailZ;
+            double blocks = Math.sqrt(dx * dx + dz * dz);
+            int elapsedTicks = Math.max(1, player.tickCount - previousTrailTick);
+            if (PlayerTrail.isPositionJump(blocks, elapsedTicks)) {
+                trail.breakForJump((int) Math.floor(previousTrailX), (int) Math.floor(previousTrailZ), mode);
+                hasLastTrailSample = false;
+                lastTrailSampleTick = player.tickCount - SAMPLE_INTERVAL_TICKS;
+                trailDirty = true;
+            } else {
+                progress.getMovementStats().add(mode, blocks / dimension.getScale());
+            }
+        }
+
+        previousTrailX = x;
+        previousTrailZ = z;
+        previousTrailTick = player.tickCount;
+        hasPreviousTrailPosition = true;
+
+        if (player.tickCount - lastTrailSampleTick < SAMPLE_INTERVAL_TICKS) return;
+        if (hasLastTrailSample && squaredDistance(x, z, lastTrailSampleX, lastTrailSampleZ) < IDLE_EPSILON_BLOCKS * IDLE_EPSILON_BLOCKS) {
+            return;
+        }
+
+        int previousPointCount = trail.pointCount();
+        trail.record((int) Math.floor(x), (int) Math.floor(z), mode);
+        if (trail.pointCount() != previousPointCount) trailDirty = true;
+
+        lastTrailSampleX = x;
+        lastTrailSampleZ = z;
+        hasLastTrailSample = true;
+        lastTrailSampleTick = player.tickCount;
+    }
+
+    /**
+     * Resolves the debounced movement mode for the current player state.
+     *
+     * @param player The player being tracked.
+     * @return Debounced movement mode.
+     */
+    private MovementMode debouncedMovementMode(@NotNull LocalPlayer player) {
+
+        MovementMode resolved = resolveMovementMode(player);
+        if (resolved == activeMovementMode) {
+            candidateMovementMode = resolved;
+            candidateMovementTicks = 0;
+            return activeMovementMode;
+        }
+
+        if (resolved != candidateMovementMode) {
+            candidateMovementMode = resolved;
+            candidateMovementTicks = 1;
+        } else {
+            candidateMovementTicks++;
+        }
+
+        if (candidateMovementTicks >= MODE_HYSTERESIS_TICKS) {
+            activeMovementMode = candidateMovementMode;
+            candidateMovementTicks = 0;
+        }
+
+        return activeMovementMode;
+    }
+
+    /**
+     * Resolves the instantaneous movement mode from Minecraft player state.
+     *
+     * @param player The player being tracked.
+     * @return Instantaneous movement mode.
+     */
+    private static MovementMode resolveMovementMode(@NotNull LocalPlayer player) {
+
+        if (player.getAbilities().flying || player.isFallFlying() || player.isSpectator()) return MovementMode.FLY;
+        if (player.isInWater() || player.isUnderWater()) return MovementMode.SWIM;
+        return MovementMode.WALK;
+    }
+
+    /**
+     * Saves progress when trail geometry changed and the debounce interval has elapsed.
+     */
+    private void saveTrailProgressIfNeeded() {
+
+        if (!trailDirty || CONFIG_MANAGER == null) return;
+
+        long now = System.currentTimeMillis();
+        if (now - lastTrailSaveMs < TRAIL_SAVE_INTERVAL_MS) return;
+
+        CONFIG_MANAGER.saveProgress();
+        trailDirty = false;
+        lastTrailSaveMs = now;
+    }
+
+    /**
+     * Commits the pending endpoint on the active trail, if any.
+     */
+    private void breakActiveTrail() {
+
+        if (CONFIG == null || CONFIG.getClientProgress() == null || trailDimensionId == null) return;
+
+        PlayerTrail trail = CONFIG.getClientProgress().trail(trailDimensionId, false);
+        if (trail == null) return;
+
+        int previousPointCount = trail.pointCount();
+        trail.breakSegment();
+        if (trail.pointCount() != previousPointCount) trailDirty = true;
+    }
+
+    /**
+     * Clears client-only movement tracking state.
+     */
+    private void resetTrailRuntimeState() {
+
+        trailDimensionId = null;
+        hasPreviousTrailPosition = false;
+        previousTrailTick = 0;
+        hasLastTrailSample = false;
+        lastTrailSampleTick = -SAMPLE_INTERVAL_TICKS;
+        activeMovementMode = MovementMode.WALK;
+        candidateMovementMode = MovementMode.WALK;
+        candidateMovementTicks = 0;
+    }
+
+    /**
+     * Returns the squared distance between two XZ points.
+     *
+     * @param ax First X coordinate.
+     * @param az First Z coordinate.
+     * @param bx Second X coordinate.
+     * @param bz Second Z coordinate.
+     * @return Squared XZ distance.
+     */
+    private static double squaredDistance(double ax, double az, double bx, double bz) {
+
+        double dx = bx - ax;
+        double dz = bz - az;
+        return dx * dx + dz * dz;
     }
 
     /**

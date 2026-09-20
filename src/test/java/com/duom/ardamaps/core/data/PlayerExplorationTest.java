@@ -26,9 +26,9 @@
 package com.duom.ardamaps.core.data;
 
 import com.duom.ardamaps.core.data.config.Dimension;
-import com.mojang.blaze3d.platform.NativeImage;
+import com.duom.ardamaps.gui.map.rendering.FogMaskTexture;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.AfterEach;
@@ -61,14 +61,14 @@ class PlayerExplorationTest {
     private static final Dimension OFFSET_DIM =
             new Dimension("Offset", "test:offset", 1f, -1000, 1001, -500, 501, false);
 
-    /** Mocked image construction used to isolate fog-texture allocation from native resources. */
-    private MockedConstruction<NativeImage> mockedNativeImage;
-
-    /** Mocked backed-texture construction used to avoid touching the real render thread. */
-    private MockedConstruction<DynamicTexture> mockedNativeImageBackedTexture;
+    /** Mocked fog-mask construction used to avoid touching the real render thread. */
+    private MockedConstruction<FogMaskTexture> mockedFogMaskTexture;
 
     /** Mocked static accessor for {@link Minecraft} so tests can supply a fake texture manager. */
     private MockedStatic<Minecraft> mockedMinecraftClient;
+
+    /** Mocked render-thread accessor so release callbacks run inline. */
+    private MockedStatic<RenderSystem> mockedRenderSystem;
 
     /** Mocked texture manager used to verify dynamic texture registration. */
     private TextureManager mockTextureManager;
@@ -80,14 +80,16 @@ class PlayerExplorationTest {
     @BeforeEach
     void setUp() {
 
-        mockedNativeImage = Mockito.mockConstruction(NativeImage.class);
-        mockedNativeImageBackedTexture = Mockito.mockConstruction(DynamicTexture.class);
+        mockedFogMaskTexture = Mockito.mockConstruction(FogMaskTexture.class);
 
         Minecraft mockClient = Mockito.mock(Minecraft.class);
         mockTextureManager = Mockito.mock(TextureManager.class);
         Mockito.when(mockClient.getTextureManager()).thenReturn(mockTextureManager);
         mockedMinecraftClient = Mockito.mockStatic(Minecraft.class);
         mockedMinecraftClient.when(Minecraft::getInstance).thenReturn(mockClient);
+
+        mockedRenderSystem = Mockito.mockStatic(RenderSystem.class);
+        mockedRenderSystem.when(RenderSystem::isOnRenderThread).thenReturn(true);
 
     }
 
@@ -96,9 +98,9 @@ class PlayerExplorationTest {
      */
     @AfterEach
     public void afterEach() {
-        mockedNativeImage.close();
-        mockedNativeImageBackedTexture.close();
+        mockedFogMaskTexture.close();
         mockedMinecraftClient.close();
+        mockedRenderSystem.close();
     }
 
     /**
@@ -125,7 +127,45 @@ class PlayerExplorationTest {
 
         Mockito.verify(mockTextureManager).register(
                 Mockito.eq(Identifier.fromNamespaceAndPath("ardamaps", "fog_of_war_texture_test_small_6")),
-                Mockito.any(DynamicTexture.class));
+                Mockito.any(FogMaskTexture.class));
+    }
+
+    /**
+     * Re-initializing a texture must release the previous registered texture and build exactly one replacement.
+     * This covers the map-layer reload path that reuses an already initialized exploration instance.
+     */
+    @Test
+    void initializeTexture_calledTwice_releasesAndRebuildsOnce() {
+
+        PlayerExploration exploration = PlayerExploration.create(SMALL_DIM, null);
+        FogMaskTexture originalMask = mockedFogMaskTexture.constructed().getFirst();
+        Identifier textureId = Identifier.fromNamespaceAndPath("ardamaps", "fog_of_war_texture_test_small");
+
+        exploration.initializeTexture();
+
+        assertEquals(2, mockedFogMaskTexture.constructed().size());
+        Mockito.verify(mockTextureManager).release(textureId);
+        Mockito.verify(originalMask).close();
+        Mockito.verify(mockTextureManager, Mockito.times(2))
+                .register(Mockito.eq(textureId), Mockito.any(FogMaskTexture.class));
+    }
+
+    /**
+     * Resynchronizing after replacing backing data must clear texels that were previously revealed.
+     */
+    @Test
+    void syncTextureFromData_clearsPreviouslyRevealedTexels() {
+
+        PlayerExploration exploration = PlayerExploration.create(SMALL_DIM, new byte[] {ExplorationState.REVEALED.getValue()});
+        FogMaskTexture mask = mockedFogMaskTexture.constructed().getFirst();
+        Mockito.clearInvocations(mask);
+
+        exploration.setExplorationData(new byte[] {HIDDEN.getValue()});
+        exploration.syncTextureFromData();
+
+        Mockito.verify(mask).fill(HIDDEN.getMaskValue());
+        Mockito.verify(mask, Mockito.never()).setPixel(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyByte());
+        Mockito.verify(mask).upload();
     }
 
     /**

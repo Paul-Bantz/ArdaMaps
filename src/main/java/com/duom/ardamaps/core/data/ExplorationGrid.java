@@ -45,7 +45,7 @@ public class ExplorationGrid implements Serializable {
     private static final int MIN_CELL_SIZE = 128;
 
     /** Maximum number of cells allowed along any single axis. */
-    private static final int MAX_CELLS_PER_AXIS = 420;
+    static final int MAX_CELLS_PER_AXIS = 420;
 
     @Serial
     private static final long serialVersionUID = 1L;

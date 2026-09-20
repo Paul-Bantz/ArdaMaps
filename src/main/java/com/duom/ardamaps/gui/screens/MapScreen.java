@@ -89,6 +89,9 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
     /** Renderer for vector region borders. */
     private final RegionBorderRenderer regionBorderRenderer = new RegionBorderRenderer();
 
+    /** Renderer for the recorded travel path. */
+    private final TrailRenderer trailRenderer = new TrailRenderer();
+
     /** Renderer for on-map region labels. */
     private final RegionLabelRenderer regionLabelRenderer = new RegionLabelRenderer();
 
@@ -102,6 +105,9 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
             layerSession::getCamera,
             this::getPaddedContentArea,
             () -> height);
+
+    /** Movement-tracking sheet button and popup controller. */
+    private final TravelsPanelController travelsPanel = new TravelsPanelController(this::getBookArea);
 
     /** Bottom-left control bar (buttons and selection state). */
     private final MapControlBar controlBar = new MapControlBar(this);
@@ -171,6 +177,7 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
         int generationBeforeWidgets = layerSession.generation();
 
         controlBar.rebuild();
+        travelsPanel.layout();
 
         var camera = layerSession.getCamera();
         if (camera != null) camera.setViewportSize(width, height);
@@ -447,6 +454,7 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
                 layerSession.getRenderable().render(context);
 
                 regionBorderRenderer.render(context, mapCamera, layerSession.getExploration());
+                if (isTrailVisible()) trailRenderer.render(context, mapCamera);
                 regionLabelRenderer.render(context, font, mapCamera, layerSession.getExploration());
 
                 markerRenderer.render(
@@ -494,6 +502,7 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
         locationPanel.render(context, mouseX, mouseY);
 
         controlBar.renderOverlays(context, mouseX, mouseY, delta);
+        travelsPanel.render(context, mouseX, mouseY, delta);
     }
 
     /** {@inheritDoc} */
@@ -543,6 +552,7 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
 
         controlBar.layout();
         locationPanel.layout();
+        travelsPanel.layout();
     }
 
     /**
@@ -581,6 +591,8 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
             }
         }
 
+        if (travelsPanel.mouseClicked(mouseX, mouseY, button)) return true;
+
         if (locationPanel.isMouseOver(mouseX, mouseY)) {
 
             return locationPanel.mouseClicked(mouseX, mouseY, button);
@@ -597,7 +609,10 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
             return locationPanel.navigateForward(this::panCameraToMapCoordinates);
         }
 
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && mouseInMapArea && !overBookLabel) {
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT
+                && mouseInMapArea
+                && !overBookLabel
+                && !travelsPanel.isMouseOver(mouseX, mouseY)) {
 
             int modifiers = event.modifiers();
             var pos = mapCamera.screenToWorldCoordinates(mouseX, mouseY);
@@ -630,7 +645,10 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
             clickStartY = mouseY;
         }
 
-        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && mouseInMapArea && !overBookLabel) {
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT
+                && mouseInMapArea
+                && !overBookLabel
+                && !travelsPanel.isMouseOver(mouseX, mouseY)) {
 
             var pos = mapCamera.screenToWorldCoordinates(mouseX, mouseY);
             boolean outsideExplored = isOutsideExploredArea(pos.x(), pos.y());
@@ -744,7 +762,11 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
         double mouseY = event.y();
 
         var mapCamera = layerSession.getCamera();
-        if (mapCamera == null || !dragging || controlBar.isMouseOver(mouseX, mouseY) || locationPanel.isMouseOver(mouseX, mouseY))
+        if (mapCamera == null
+                || !dragging
+                || controlBar.isMouseOver(mouseX, mouseY)
+                || locationPanel.isMouseOver(mouseX, mouseY)
+                || travelsPanel.isMouseOver(mouseX, mouseY))
             return super.screenMouseDragged(event, dx, dy);
 
         mapCamera.resetZoomAnchor();
@@ -773,7 +795,9 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
 
         if (controlBar.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) return true;
 
-        if (controlBar.isMouseOver(mouseX, mouseY) || locationPanel.isMouseOver(mouseX, mouseY)) {
+        if (controlBar.isMouseOver(mouseX, mouseY)
+                || locationPanel.isMouseOver(mouseX, mouseY)
+                || travelsPanel.isMouseOver(mouseX, mouseY)) {
 
             if (locationPanel.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) return true;
 
@@ -801,6 +825,12 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
 
         if (controlBar.keyPressed(event)) return true;
 
+        if (event.key() == GLFW.GLFW_KEY_ESCAPE && travelsPanel.isOpen()) {
+
+            travelsPanel.close();
+            return true;
+        }
+
         if (event.key() == GLFW.GLFW_KEY_ESCAPE && locationPanel.isOpen()) {
 
             locationPanel.close();
@@ -815,6 +845,16 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
     public int getContentPadding() {
 
         return MAP_FRAME_PADDING;
+    }
+
+    /**
+     * Checks whether the travelled-path polyline should be drawn on the map.
+     *
+     * @return True when trail rendering should be visible.
+     */
+    public boolean isTrailVisible() {
+
+        return travelsPanel.isOpen();
     }
 
     /** {@inheritDoc} */

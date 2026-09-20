@@ -28,12 +28,13 @@ package com.duom.ardamaps.core.data;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.data.config.Dimension;
-import com.mojang.blaze3d.platform.NativeImage;
+import com.duom.ardamaps.core.data.json.ExplorationDataTypeAdapter;
+import com.duom.ardamaps.gui.map.rendering.FogMaskTexture;
+import com.google.gson.annotations.JsonAdapter;
 import lombok.Getter;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -96,9 +97,8 @@ public class PlayerExploration implements Serializable {
     @Getter
     private final int cellSize;
 
-    /**
-     * The backing byte array that stores the exploration state for each cell.
-     */
+    /** The backing byte array that stores the exploration state for each cell. */
+    @JsonAdapter(ExplorationDataTypeAdapter.class)
     private byte[] explorationData;
 
     /** Pure grid delegate rebuilt from persisted fields after deserialization. */
@@ -111,14 +111,8 @@ public class PlayerExploration implements Serializable {
     @Getter
     private transient long revision;
 
-    /**
-     * The in-memory (CPU-side) fog-of-war mask image, where each pixel corresponds to a cell.
-     * This is updated on the go and used by {@link #fogTexture} to upload changes to the GPU.
-     */
-    private transient NativeImage fogMask;
-
-    /** The GPU texture for the fog-of-war, created from {@link #fogMask}. */
-    private transient DynamicTexture fogTexture;
+    /** The CPU and GPU fog-of-war mask texture. */
+    private transient FogMaskTexture fogMask;
 
     /** The identifier of the fog-of-war texture in Minecraft's texture manager, used for rendering. */
     @Getter
@@ -241,20 +235,17 @@ public class PlayerExploration implements Serializable {
 
     /**
      * Initializes the fog-of-war texture. All pixels begin as {@link ExplorationState#HIDDEN}.
-     * No fill needed - NativeImage is zero-initialized, and HIDDEN colour is 0x00000000
      * Should be called on (or via) the render thread.
      */
     private void initialize() {
 
         releaseTextureResources();
 
-        fogMask = new NativeImage(nbCellsX, nbCellsY, true);
-
-        fogTexture = new DynamicTexture(this::textureName, fogMask);
+        fogMask = new FogMaskTexture(this::textureName, nbCellsX, nbCellsY);
         fogTextureId = com.duom.ardamaps.gui.ModConstants.modId(textureName());
         Minecraft.getInstance()
                 .getTextureManager()
-                .register(fogTextureId, fogTexture);
+                .register(fogTextureId, fogMask);
     }
 
     /**
@@ -267,6 +258,8 @@ public class PlayerExploration implements Serializable {
     public void syncTextureFromData() {
 
         var grid = grid();
+        if (fogMask != null) fogMask.fill(ExplorationState.HIDDEN.getMaskValue());
+
         for (int i = 0; i < explorationData.length; i++) {
             if (ExplorationState.fromValue(grid.getExplorationData()[i]) != ExplorationState.HIDDEN) {
                 dirtyCells.add(i);
@@ -280,15 +273,13 @@ public class PlayerExploration implements Serializable {
      */
     private void releaseTextureResources() {
 
-        DynamicTexture releasedTexture = fogTexture;
         Identifier releasedTextureId = fogTextureId;
-        NativeImage releasedMask = fogMask;
+        FogMaskTexture releasedMask = fogMask;
 
-        fogTexture = null;
         fogTextureId = null;
         fogMask = null;
 
-        if (releasedTexture == null && releasedTextureId == null && releasedMask == null) return;
+        if (releasedTextureId == null && releasedMask == null) return;
 
         Client.onRenderThread(() -> {
 
@@ -297,7 +288,7 @@ public class PlayerExploration implements Serializable {
                         .release(releasedTextureId);
             }
 
-            if (releasedTexture != null) releasedTexture.close();
+            // TextureManager.release closes registered textures; explicit close also covers masks that never registered.
             if (releasedMask != null) releasedMask.close();
         });
 
@@ -331,17 +322,20 @@ public class PlayerExploration implements Serializable {
      * No-op if there are no dirty cells or if the texture has not been initialized.
      */
     public void flushTexture() {
-        if (dirtyCells == null || dirtyCells.isEmpty() || fogMask == null) return;
+        if (fogMask == null) return;
 
-        var grid = grid();
-        for (int idx : dirtyCells) {
-            int x = idx % nbCellsX;
-            int y = idx / nbCellsX;
-            fogMask.setPixel(x, y, grid.stateAt(x, y).getColor());
+        if (dirtyCells != null && !dirtyCells.isEmpty()) {
+            var grid = grid();
+            for (int idx : dirtyCells) {
+                int x = idx % nbCellsX;
+                int y = idx / nbCellsX;
+                fogMask.setPixel(x, y, grid.stateAt(x, y).getMaskValue());
+            }
+
+            dirtyCells.clear();
         }
 
-        dirtyCells.clear();
-        fogTexture.upload();
+        fogMask.upload();
     }
 
     /**
