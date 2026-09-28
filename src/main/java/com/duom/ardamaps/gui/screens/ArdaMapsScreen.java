@@ -86,6 +86,9 @@ public abstract class ArdaMapsScreen extends Screen {
     /** The exit button widget, which closes the current screen and returns to the parent screen when clicked. */
     private BookmarkButtonWidget exitButton;
 
+    /** True while a SearchWidget opened by this screen currently covers it. */
+    protected boolean coveredBySearchOverlay;
+
     /**
      * Constructs a new ArdaMapsScreen with the specified parent screen and title.
      *
@@ -105,6 +108,7 @@ public abstract class ArdaMapsScreen extends Screen {
     @Override
     protected void init() {
 
+        coveredBySearchOverlay = false;
         super.init();
 
         invalidateCachedLayouts();
@@ -347,6 +351,7 @@ public abstract class ArdaMapsScreen extends Screen {
             searchWidget.setResultTooltipFunction(getSearchResultTooltipFunction());
             searchWidget.setOnSearchResultSelected(getOnSearcheResultSelectedFunction());
 
+            coveredBySearchOverlay = true;
             Client.mc().setScreen(searchWidget);
 
             return true;

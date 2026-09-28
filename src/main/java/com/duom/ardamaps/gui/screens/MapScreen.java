@@ -1350,6 +1350,11 @@ public class MapScreen extends ArdaMapsScreen {
     @Override
     public void removed() {
 
+        if (coveredBySearchOverlay) {
+            super.removed();
+            return;
+        }
+
         removed = true;
         layerLoadGeneration++;
         closeMapRenderer();
@@ -1456,10 +1461,11 @@ public class MapScreen extends ArdaMapsScreen {
 
         return (String input) -> {
 
-            var mapCamera = getCamera();
-            if (mapCamera == null) return null;
-
             var results = new ArrayList<>();
+
+            var mapCamera = getCamera();
+            if (mapCamera == null) return results;
+
             var selectedLocationType = markersSelectionDropdown.getSelected();
 
             var locations = ArdaMapsClient.CONFIG.getLocations(
