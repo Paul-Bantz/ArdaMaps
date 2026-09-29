@@ -87,11 +87,13 @@ public class PlayerRangedTeleportHandler extends RespondablePacketHandler<Player
 
         server.execute(() -> {
 
+            String teleportWorldId = ArdaMaps.CONFIG.resolveTeleportWorld(packet.worldId(), packet.x(), packet.z());
+
             // Resolve the destination world
-            ServerLevel serverWorld = resolveWorld(server, packet.worldId());
+            ServerLevel serverWorld = resolveWorld(server, teleportWorldId);
 
             if (serverWorld == null) {
-                LOGGER.warn("Unable to resolve ranged teleport world: {}", packet.worldId());
+                LOGGER.warn("Unable to resolve ranged teleport world: {}", teleportWorldId);
                 responder.accept(PlayerTeleportResponsePacket.failed());
                 return;
             }

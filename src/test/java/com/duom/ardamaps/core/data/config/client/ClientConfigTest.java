@@ -26,8 +26,11 @@
 package com.duom.ardamaps.core.data.config.client;
 
 import com.duom.ardamaps.core.data.config.Dimension;
+import com.duom.ardamaps.core.data.config.DimensionRemap;
 import com.google.gson.Gson;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -126,6 +129,36 @@ class ClientConfigTest {
 
         assertNull(config.getLastMapLayer(overworld));
         assertNull(config.getLastMapLayer(blankId));
+    }
+
+    /**
+     * Exact dimension ID matches take precedence over remap fallback.
+     */
+    @Test
+    void getDimension_exactMatchWinsOverRemapFallback() {
+
+        ClientConfig config = new ClientConfig();
+        Dimension exact = dimension("Exact", "multiworld:freebuild");
+        Dimension owner = new Dimension("Overworld", "minecraft:overworld", 1f, 0, 100, 0, 100, false, false,
+                List.of(new DimensionRemap("multiworld:freebuild")));
+        config.setDimensions(List.of(owner, exact));
+
+        assertEquals(exact, config.getDimension("multiworld:freebuild"));
+    }
+
+    /**
+     * Remapped world IDs resolve to their owning dimension when no exact dimension exists.
+     */
+    @Test
+    void getDimension_remappedWorld_returnsOwnerDimension() {
+
+        ClientConfig config = new ClientConfig();
+        Dimension owner = new Dimension("Overworld", "minecraft:overworld", 1f, 0, 100, 0, 100, false, false,
+                List.of(new DimensionRemap("multiworld:freebuild")));
+        config.setDimensions(List.of(owner));
+
+        assertEquals(owner, config.getDimension("multiworld:freebuild"));
+        assertNull(config.getDimension("unknown:world"));
     }
 
     /**

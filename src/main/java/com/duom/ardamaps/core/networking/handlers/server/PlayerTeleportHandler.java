@@ -25,6 +25,7 @@
 
 package com.duom.ardamaps.core.networking.handlers.server;
 
+import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.core.consumers.networking.ServerPacketHandler;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
 import net.minecraft.core.BlockPos;
@@ -69,7 +70,9 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
 
         server.execute(() -> {
 
-            if (packet.worldId() != null) {
+            String worldId = ArdaMaps.CONFIG.resolveTeleportWorld(packet.worldId(), packet.x(), packet.z());
+
+            if (worldId != null) {
 
                 var worlds = server.getAllLevels();
                 ServerLevel serverWorld = null;
@@ -77,7 +80,7 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
                 // Search for the world with the matching registry key
                 for (var world : worlds) {
 
-                    if (world.dimension().identifier().toString().equals(packet.worldId())) {
+                    if (world.dimension().identifier().toString().equals(worldId)) {
 
                         LOGGER.info("World found: {}", world.dimension().identifier());
                         serverWorld = world;

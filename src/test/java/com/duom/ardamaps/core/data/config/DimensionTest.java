@@ -27,6 +27,8 @@ package com.duom.ardamaps.core.data.config;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -84,5 +86,19 @@ class DimensionTest {
         assertEquals(first, second);
         assertEquals(first.hashCode(), second.hashCode());
         assertNotEquals(first, other);
+    }
+
+    /**
+     * Regional remap lookup returns the first remap containing the requested coordinate.
+     */
+    @Test
+    void findRemapAt_insideRegion_returnsMatchingRemap() {
+
+        DimensionRemap freebuild = new DimensionRemap("multiworld:freebuild", 10, 20, 30, 40);
+        Dimension dimension = new Dimension("Test", "minecraft:overworld", 1f, 0, 100, 0, 100, false, false,
+                List.of(freebuild));
+
+        assertEquals(freebuild, dimension.findRemapAt(20, 30));
+        assertNull(dimension.findRemapAt(9, 30));
     }
 }

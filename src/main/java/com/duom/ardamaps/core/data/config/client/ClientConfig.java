@@ -139,17 +139,24 @@ public class ClientConfig extends Configuration<LocationClient> {
     }
 
     /**
-     * Returns the dimension definition for the given dimension ID, or a default definition if not found.
+     * Returns the dimension definition for the given dimension ID, or a remap owner if configured.
      *
      * @param dimensionId The dimension ID to look up (e.g. "minecraft:overworld").
-     * @return The Dimension for the given dimension ID, or a default definition if not found.
+     * @return The Dimension for the given dimension ID or remap owner, or null if not found.
      */
     public @Nullable Dimension getDimension(String dimensionId) {
 
         if (dimensions == null || dimensions.isEmpty())
             return null;
 
-        return dimensions.stream().filter(dimension -> dimension.getId().equals(dimensionId)).findFirst().orElse(null);
+        var exactMatch = dimensions.stream()
+                .filter(dimension -> dimension.getId().equals(dimensionId))
+                .findFirst();
+
+        return exactMatch.orElseGet(() -> dimensions.stream()
+                .filter(dimension -> dimension.getRemappedWorlds().contains(dimensionId))
+                .findFirst()
+                .orElse(null));
     }
 
     /**

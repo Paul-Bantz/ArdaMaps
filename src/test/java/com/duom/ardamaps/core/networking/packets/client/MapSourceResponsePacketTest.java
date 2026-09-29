@@ -26,6 +26,7 @@
 package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.data.config.Dimension;
+import com.duom.ardamaps.core.data.config.DimensionRemap;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.config.MapLayerSource;
@@ -119,6 +120,21 @@ class MapSourceResponsePacketTest {
     }
 
     /**
+     * Remaps are transferred to the client with their regional bounds.
+     */
+    @Test
+    void buildRead_roundTripsRemaps() {
+
+        Dimension dimension = new Dimension("Test", "test:dimension", 1f, 0, 1000, 0, 1000, false, false,
+                List.of(new DimensionRemap("multiworld:freebuild", 10, 20, 30, 40)));
+
+        MapSourceResponsePacket parsed = roundTrip(new MapSourceResponsePacket(false, false, List.of(dimension)));
+
+        assertEquals(List.of("multiworld:freebuild"), parsed.dimensions().getFirst().getRemappedWorlds());
+        assertEquals(dimension.getRemaps(), parsed.dimensions().getFirst().getRemaps());
+    }
+
+    /**
      * Verifies that unknown layer types from a newer server are skipped without crashing the client.
      */
     @Test
@@ -156,6 +172,7 @@ class MapSourceResponsePacketTest {
         buf.writeInt(0);
         buf.writeInt(1000);
         buf.writeBoolean(false);
+        buf.writeInt(0);
     }
 
     /**

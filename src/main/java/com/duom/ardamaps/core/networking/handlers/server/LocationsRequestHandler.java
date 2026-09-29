@@ -80,7 +80,7 @@ public class LocationsRequestHandler extends RespondablePacketHandler<LocationsR
         if (locationsLastServerUpdate == null || lastClientUpdate == null || lastClientUpdate.before(locationsLastServerUpdate)) {
 
             List<LocationClient> clientLocations = ArdaMaps.CONFIG.getLocationConfig().getLocations().stream()
-                    .map(LocationServer::toLocationClient)
+                    .map(location -> LocationServer.toLocationClient(location, ArdaMaps.CONFIG.resolveDimensionId(location.getWorld())))
                     .toList();
 
             // Format a stripped location configuration for the client

@@ -35,7 +35,11 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Configuration manager for loading and saving server settings.
@@ -146,17 +150,25 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
      */
     public void validateDimensionConfiguration(Iterable<ServerWorldDefinition> worlds) {
 
+        List<ServerWorldDefinition> worldDefinitions = new ArrayList<>();
+        worlds.forEach(worldDefinitions::add);
+
         validateRangeConfiguration();
+        validateRemapConfiguration(worldDefinitions);
 
         if (!this.config.isAutoGenerateMissingDimensions()) return;
+
+        Set<String> remappedWorlds = remappedWorldIds();
 
         /*
          For each defined dimension on this server check if we have a matching configured dimension.
          If not generate a default one.
          */
-        for (var world : worlds) {
+        for (var world : worldDefinitions) {
 
             var dimensionId = world.dimensionId();
+
+            if (remappedWorlds.contains(dimensionId)) continue;
 
             if (this.config.getDimensions().stream().noneMatch(d -> d.getId().equals(dimensionId))) {
 
@@ -176,6 +188,81 @@ public class ServerConfigManager extends ConfigManager<ServerConfig, LocationSer
                 this.config.getDimensions().add(defaultDimension);
             }
         }
+    }
+
+    /**
+     * Logs warnings for non-fatal remap configuration conflicts.
+     *
+     * @param worlds The loaded world descriptors.
+     */
+    private void validateRemapConfiguration(List<ServerWorldDefinition> worlds) {
+
+        Set<String> dimensionIds = new HashSet<>();
+        for (Dimension dimension : this.config.getDimensions()) {
+            dimensionIds.add(dimension.getId());
+        }
+
+        Set<String> worldIds = new HashSet<>();
+        for (ServerWorldDefinition world : worlds) {
+            worldIds.add(world.dimensionId());
+        }
+
+        Map<String, String> remappedBy = new HashMap<>();
+        for (Dimension dimension : this.config.getDimensions()) {
+            warnForOverlappingRemaps(dimension);
+
+            for (String remappedWorld : dimension.getRemappedWorlds()) {
+                if (dimensionIds.contains(remappedWorld)) {
+                    LOGGER.warn("Dimension {} remaps {}, but that world is already a configured dimension ID. Exact dimension matches take precedence.", dimension.getId(), remappedWorld);
+                }
+
+                if (!worldIds.contains(remappedWorld)) {
+                    LOGGER.warn("Dimension {} remaps {}, but that world is not loaded on the server.", dimension.getId(), remappedWorld);
+                }
+
+                String previousDimension = remappedBy.putIfAbsent(remappedWorld, dimension.getId());
+                if (previousDimension != null && !previousDimension.equals(dimension.getId())) {
+                    LOGGER.warn("World {} is remapped by both dimensions {} and {}. The first configured remap wins.", remappedWorld, previousDimension, dimension.getId());
+                }
+            }
+        }
+    }
+
+    /**
+     * Logs warnings for regional remaps with ambiguous overlapping bounds.
+     *
+     * @param dimension The dimension whose remaps should be checked.
+     */
+    private void warnForOverlappingRemaps(Dimension dimension) {
+
+        List<DimensionRemap> remaps = dimension.getRemaps();
+
+        for (int i = 0; i < remaps.size(); i++) {
+            DimensionRemap first = remaps.get(i);
+
+            for (int j = i + 1; j < remaps.size(); j++) {
+                DimensionRemap second = remaps.get(j);
+
+                if (first.overlaps(second)) {
+                    LOGGER.warn("Dimension {} has overlapping remap regions for {} and {}. The first configured remap wins.", dimension.getId(), first.id(), second.id());
+                }
+            }
+        }
+    }
+
+    /**
+     * Collects all world IDs targeted by dimension remaps.
+     *
+     * @return The configured remapped world IDs.
+     */
+    private Set<String> remappedWorldIds() {
+
+        Set<String> remappedWorlds = new HashSet<>();
+        for (Dimension dimension : this.config.getDimensions()) {
+            remappedWorlds.addAll(dimension.getRemappedWorlds());
+        }
+
+        return remappedWorlds;
     }
 
     /**
