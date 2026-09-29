@@ -175,6 +175,56 @@ class BlueMapCameraTest {
     @Test
     void getBlocksPerPixel_belowIdentityZoom_returnsFractionalBlockCoverage() {
 
+        BlueMapCamera camera = cameraWithNullExploration();
+        camera.setIdentityZoom(2);
+        camera.updateZoom(1);
+        camera.setLodFactor(2.0);
+
+        assertEquals(0.5, camera.getBlocksPerPixel(), 1e-9);
+    }
+
+    /**
+     * Identity-relative scale follows BlueMap's inverted zoom direction.
+     */
+    @Test
+    void identityRelativeScale_aboveIdentityZoom_returnsInverseLodScale() {
+
+        BlueMapCamera camera = cameraWithNullExploration();
+        camera.updateZoom(2);
+
+        assertEquals(0.2, camera.identityRelativeScale(), 1e-9);
+    }
+
+    /**
+     * Minimum identity-relative scale uses the configured BlueMap zoom-out limit when no fit limit is available.
+     */
+    @Test
+    void minIdentityRelativeScale_withoutFitLimit_usesMinimumCameraZoom() {
+
+        BlueMapCamera camera = cameraWithNullExploration();
+
+        assertEquals(Math.pow(5.0, -7.0), camera.minIdentityRelativeScale(), 1e-9);
+    }
+
+    /**
+     * Minimum identity-relative scale uses the floored content-fit zoom when it is more restrictive than the camera minimum.
+     */
+    @Test
+    void minIdentityRelativeScale_withFitLimit_usesFitZoomWhenMoreRestrictive() {
+
+        BlueMapCamera camera = cameraWithNullExploration();
+        camera.computeZoomLevelToFitContentArea(640, 480);
+
+        assertEquals(0.2, camera.minIdentityRelativeScale(), 1e-9);
+    }
+
+    /**
+     * Create a BlueMap camera with null exploration configured.
+     *
+     * @return A BlueMap camera ready for scale-related assertions.
+     */
+    private BlueMapCamera cameraWithNullExploration() {
+
         var config = Mockito.mock(ClientConfig.class);
         var progress = Mockito.mock(ClientProgress.class);
 
@@ -185,10 +235,6 @@ class BlueMapCameraTest {
 
         BlueMapCamera camera = new BlueMapCamera(640, 480, 0, 0);
         camera.setDimension(DIMENSION);
-        camera.setIdentityZoom(2);
-        camera.updateZoom(1);
-        camera.setLodFactor(2.0);
-
-        assertEquals(0.5, camera.getBlocksPerPixel(), 1e-9);
+        return camera;
     }
 }

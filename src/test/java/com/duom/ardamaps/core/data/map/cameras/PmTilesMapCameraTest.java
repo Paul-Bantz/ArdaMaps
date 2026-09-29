@@ -175,6 +175,37 @@ class PmTilesMapCameraTest {
     }
 
     /**
+     * Identity-relative scale is one at identity zoom and halves for each zoom level below identity.
+     */
+    @Test
+    void identityRelativeScale_belowIdentityZoom_returnsPowerOfTwoScale() {
+
+        camera.updateZoom(7);
+
+        assertEquals(0.5, camera.identityRelativeScale(), 1e-9);
+    }
+
+    /**
+     * Minimum identity-relative scale uses the configured minimum camera zoom when no fit limit is available.
+     */
+    @Test
+    void minIdentityRelativeScale_withoutFitLimit_usesMinimumCameraZoom() {
+
+        assertEquals(1.0 / 64.0, camera.minIdentityRelativeScale(), 1e-9);
+    }
+
+    /**
+     * Minimum identity-relative scale uses the content-fit zoom when it is more restrictive than the camera minimum.
+     */
+    @Test
+    void minIdentityRelativeScale_withFitLimit_usesFitZoomWhenMoreRestrictive() {
+
+        camera.computeZoomLevelToFitContentArea(640, 480);
+
+        assertEquals(640.0 / DIMENSION.getWidth(), camera.minIdentityRelativeScale(), 1e-9);
+    }
+
+    /**
      * Verify that the settled-state timer flips from false to true after movement cools down.
      */
     @Test

@@ -138,6 +138,31 @@ public abstract class MapCamera {
     public abstract double renderScale();
 
     /**
+     * Get the current visual scale relative to the identity zoom level.
+     *
+     * @return Current identity-relative scale.
+     */
+    public double identityRelativeScale() {
+
+        return Math.pow(2.0, zoom - identityZoom);
+    }
+
+    /**
+     * Get the smallest visual scale allowed by camera zoom bounds relative to identity zoom.
+     *
+     * @return Minimum identity-relative scale.
+     */
+    public double minIdentityRelativeScale() {
+
+        double minZoom = minCameraZoom;
+        if (!Double.isNaN(zoomLevelToFitContentArea)) {
+            minZoom = Math.max(minZoom, zoomLevelToFitContentArea);
+        }
+
+        return Math.pow(2.0, minZoom - identityZoom);
+    }
+
+    /**
      * Update camera state
      *
      * @param deltaTime    Time elapsed since last update in seconds

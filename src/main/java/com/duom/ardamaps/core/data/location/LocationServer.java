@@ -68,12 +68,24 @@ public class LocationServer extends BasicLocation implements Serializable {
      */
     public static LocationClient toLocationClient(LocationServer server) {
 
+        return toLocationClient(server, server.world);
+    }
+
+    /**
+     * Converts a LocationServer object to a LocationClient object with a specific world ID.
+     *
+     * @param server        The LocationServer instance
+     * @param worldOverride The world ID to expose to the client
+     * @return The corresponding LocationClient instance
+     */
+    public static LocationClient toLocationClient(LocationServer server, String worldOverride) {
+
         LocationClient client = new LocationClient();
 
         // Copy BasicLocation fields
         client.setId(server.getId());
         client.setName(server.name);
-        client.setWorld(server.world);
+        client.setWorld(worldOverride);
         client.setTypes(server.types);
         client.setWarp(server.warp);
         client.setPosition(server.position);

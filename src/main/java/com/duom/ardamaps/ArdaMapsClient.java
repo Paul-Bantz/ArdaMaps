@@ -564,8 +564,8 @@ public class ArdaMapsClient implements ClientModInitializer {
          */
         if (player.age < 100) return;
 
-        // Get the dimension ID the player is currently in.
-        String dimensionId = Client.currentDimensionId();
+        // Get the dimension ID whose map represents the player's current world.
+        String dimensionId = Client.effectiveDimensionId();
         Dimension dimension = Client.currentDimension();
 
         PlayerExploration exploration;
@@ -618,7 +618,7 @@ public class ArdaMapsClient implements ClientModInitializer {
      */
     private static void refreshNearLocations(@org.jetbrains.annotations.NotNull ClientPlayerEntity player) {
 
-        String currentDimensionId = Client.currentDimensionId();
+        String currentDimensionId = Client.effectiveDimensionId();
         long now = System.currentTimeMillis();
 
         boolean dimensionChanged = !Objects.equals(currentDimensionId, lastNearLocationsDimensionId);

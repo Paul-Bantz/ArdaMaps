@@ -122,11 +122,11 @@ public class ToposcopeRenderer {
 
         if (rawMaxToposcopeRenderDistance != ArdaMapsClient.CONFIG.getToposcopeDrawDistance()
                 || maxToposcopeRenderDistanceSquared == 0
-                || !Objects.equals(Client.currentDimensionId(), (cachedDimensionId))) {
+                || !Objects.equals(Client.effectiveDimensionId(), (cachedDimensionId))) {
 
             rawMaxToposcopeRenderDistance = ArdaMapsClient.CONFIG.getToposcopeDrawDistance();
 
-            cachedDimensionId = Client.currentDimensionId();
+            cachedDimensionId = Client.effectiveDimensionId();
 
             var blockToposcopeRenderDistance = ArdaMapsClient.CONFIG.getToposcopeDrawDistanceBlocks(Client.currentDimension());
             maxToposcopeRenderDistanceSquared = blockToposcopeRenderDistance * blockToposcopeRenderDistance;
@@ -134,7 +134,12 @@ public class ToposcopeRenderer {
 
         TextRenderer textRenderer = Client.mc().textRenderer;
 
-        var exploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(Client.currentDimensionId(), false);
+        var dimension = Client.currentDimension();
+        var range = dimension != null && dimension.hasRanges() ? dimension.rangeForY(player.getY()) : null;
+        var exploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(
+                Client.effectiveDimensionId(),
+                range == null ? null : range.index(),
+                false);
 
         if (exploration == null) return;
 
@@ -412,7 +417,7 @@ public class ToposcopeRenderer {
      */
     public static Optional<Waypoint> getLocationActiveWaypoint(LocationClient location) {
 
-        return ArdaMapsClient.CONFIG.getWaypointAtCoordinates(Client.currentDimensionId(), location.getPosition().x, location.getPosition().z, 5);
+        return ArdaMapsClient.CONFIG.getWaypointAtCoordinates(Client.effectiveDimensionId(), location.getPosition().x, location.getPosition().z, 5);
     }
 
     /**

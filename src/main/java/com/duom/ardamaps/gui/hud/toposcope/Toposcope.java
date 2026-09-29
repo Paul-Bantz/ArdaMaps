@@ -231,7 +231,7 @@ public class Toposcope {
                 PlayerTeleportPacket packet = new PlayerTeleportPacket(hoveredLocation.getPosition().x,
                         hoveredLocation.getPosition().y,
                         hoveredLocation.getPosition().z,
-                        Client.currentDimensionId());
+                        Client.effectiveDimensionId());
 
                 PacketRegistry.PLAYER_TELEPORT_REQUEST.send(packet);
             }

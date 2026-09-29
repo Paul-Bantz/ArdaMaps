@@ -25,6 +25,7 @@
 
 package com.duom.ardamaps.core.networking.handlers.server;
 
+import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.core.consumers.networking.ServerPacketHandler;
 import com.duom.ardamaps.core.networking.packets.server.PlayerTeleportPacket;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
@@ -74,13 +75,16 @@ public class PlayerTeleportHandler extends ServerPacketHandler<PlayerTeleportPac
 
             if (packet.worldId() != null) {
 
+                String worldId = ArdaMaps.CONFIG == null
+                        ? packet.worldId()
+                        : ArdaMaps.CONFIG.resolveTeleportWorld(packet.worldId(), packet.x(), packet.z());
                 var worlds = server.getWorlds();
                 ServerWorld serverWorld = null;
 
                 // Search for the world with the matching registry key
                 for (var world : worlds) {
 
-                    if (world.getRegistryKey().getValue().toString().equals(packet.worldId())) {
+                    if (world.getRegistryKey().getValue().toString().equals(worldId)) {
 
                         LOGGER.info("World found: {}", world.getRegistryKey().getValue());
                         serverWorld = world;

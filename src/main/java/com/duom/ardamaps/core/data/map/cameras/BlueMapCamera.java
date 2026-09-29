@@ -115,6 +115,33 @@ public class BlueMapCamera extends TilesMapCamera {
     }
 
     /**
+     * Get the current visual scale relative to the identity zoom level.
+     *
+     * @return Current identity-relative scale.
+     */
+    @Override
+    public double identityRelativeScale() {
+
+        return Math.pow(lodFactor, identityZoom - zoom);
+    }
+
+    /**
+     * Get the smallest visual scale allowed by camera zoom bounds relative to identity zoom.
+     *
+     * @return Minimum identity-relative scale.
+     */
+    @Override
+    public double minIdentityRelativeScale() {
+
+        double minZoom = minCameraZoom;
+        if (!Double.isNaN(zoomLevelToFitContentArea)) {
+            minZoom = Math.min(minZoom, Math.floor(zoomLevelToFitContentArea));
+        }
+
+        return Math.pow(lodFactor, identityZoom - minZoom);
+    }
+
+    /**
      * Get list of visible tiles
      *
      * @return Set of visible TileKeys - tiles coordinates at current zoom level

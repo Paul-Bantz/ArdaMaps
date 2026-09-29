@@ -52,4 +52,61 @@ public class ServerConfig extends Configuration<LocationServer> {
     /** Whether to automatically generate missing dimensions based on server dimension data. */
     @SerializedName("auto_genen_missing_dimensions")
     private boolean autoGenerateMissingDimensions = false;
+
+    /**
+     * Resolves a location world ID to its configured dimension ID.
+     *
+     * @param world The source world ID from server-locations.json.
+     * @return The exact dimension ID, remapped dimension ID, or original world ID.
+     */
+    public String resolveDimensionId(String world) {
+
+        if (world == null || dimensions == null) return world;
+
+        for (Dimension dimension : dimensions) {
+            if (world.equals(dimension.getId())) return dimension.getId();
+        }
+
+        for (Dimension dimension : dimensions) {
+            if (dimension.getRemappedWorlds().contains(world)) return dimension.getId();
+        }
+
+        return world;
+    }
+
+    /**
+     * Resolves a teleport request's destination world, using regional remaps when present.
+     *
+     * @param world The requested world ID.
+     * @param x     The requested X coordinate.
+     * @param z     The requested Z coordinate.
+     * @return The remapped teleport world ID, original world ID, or null.
+     */
+    public String resolveTeleportWorld(String world, double x, double z) {
+
+        if (world == null || dimensions == null) return world;
+
+        Dimension dimension = findDimension(world);
+        if (dimension == null) dimension = findDimension(resolveDimensionId(world));
+        if (dimension == null) return world;
+
+        var remap = dimension.findRemapAt(x, z);
+        return remap == null ? world : remap.id();
+    }
+
+    /**
+     * Finds a configured dimension by exact ID.
+     *
+     * @param id The dimension ID.
+     * @return The matching dimension, or null.
+     */
+    private Dimension findDimension(String id) {
+
+        if (id == null) return null;
+
+        return dimensions.stream()
+                .filter(dimension -> id.equals(dimension.getId()))
+                .findFirst()
+                .orElse(null);
+    }
 }

@@ -27,6 +27,7 @@ package com.duom.ardamaps.core.data.config.client;
 
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.config.Dimension;
+import com.duom.ardamaps.core.data.config.DimensionRemap;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.config.MapLayerSource;
@@ -97,7 +98,8 @@ class ClientProgressTest {
      */
     private static Dimension rangedDimension() {
 
-        Dimension dimension = new Dimension("Test", "test:dimension", 1f, 0, 1000, 0, 1000, false);
+        Dimension dimension = new Dimension("Test", "test:dimension", 1f, 0, 1000, 0, 1000, false, false,
+                List.of(new DimensionRemap("test:remapped")));
         dimension.getMapLayers().add(new MapLayerDefinition("Ranged", MapLayerSource.PMTILES, true, 8, null, 1.0,
                 1, 3, 1, 14, 256, 1.0, "fallback.pmtiles", "fallback.png", List.of(LOW, HIGH)));
         return dimension;
@@ -145,5 +147,23 @@ class ClientProgressTest {
         assertNotNull(low);
         assertSame(low, progress.getExplorationState().get("test:dimension#0"));
         assertEquals(0, low.getRangeIndex());
+    }
+
+    /**
+     * Verifies remapped world IDs use the owner dimension's exploration key.
+     * This prevents fog progress from being orphaned under the raw remapped world ID.
+     */
+    @Test
+    void getExplorationState_remappedDimensionUsesOwnerKey() {
+
+        ClientProgress progress = new ClientProgress();
+
+        var remapped = progress.getExplorationState("test:remapped", 0, true);
+        var canonical = progress.getExplorationState("test:dimension", 0, true);
+
+        assertNotNull(remapped);
+        assertSame(remapped, canonical);
+        assertTrue(progress.getExplorationState().containsKey(ClientProgress.explorationKey("test:dimension", 0)));
+        assertFalse(progress.getExplorationState().containsKey(ClientProgress.explorationKey("test:remapped", 0)));
     }
 }

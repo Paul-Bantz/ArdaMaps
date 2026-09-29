@@ -53,6 +53,9 @@ public class Client {
     /** Cached current dimension to avoid repeated lookups - can be null if not available */
     private static Dimension cachedCurrentDimension = null;
 
+    /** Raw world ID used for the cached current dimension lookup. */
+    private static String cachedCurrentWorldId = null;
+
     /**
      * This method will only return null when the player is not connected to a world or the world is not loaded yet.
      *
@@ -65,6 +68,20 @@ public class Client {
         if (world == null) return null;
 
         return world.getRegistryKey().getValue().toString();
+    }
+
+    /**
+     * Returns the configured map dimension ID for the current world, resolving remapped worlds.
+     *
+     * @return The effective dimension ID, or the raw world ID when no remap is configured.
+     */
+    public static @Nullable String effectiveDimensionId() {
+
+        var dimension = currentDimension();
+
+        if (dimension != null) return dimension.getId();
+
+        return currentDimensionId();
     }
 
     /**
@@ -98,8 +115,10 @@ public class Client {
 
         var dimensionId = world.getRegistryKey().getValue().toString();
 
-        if (cachedCurrentDimension == null || !cachedCurrentDimension.getId().equals(dimensionId))
+        if (!dimensionId.equals(cachedCurrentWorldId)) {
             cachedCurrentDimension = ArdaMapsClient.CONFIG.getDimension(dimensionId);
+            cachedCurrentWorldId = dimensionId;
+        }
 
         return cachedCurrentDimension;
     }
@@ -109,6 +128,7 @@ public class Client {
      */
     public static void invalidateCachedDimension() {
         cachedCurrentDimension = null;
+        cachedCurrentWorldId = null;
     }
 
     /**

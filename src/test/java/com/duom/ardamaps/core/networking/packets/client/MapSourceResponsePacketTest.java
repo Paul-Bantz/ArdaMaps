@@ -26,6 +26,7 @@
 package com.duom.ardamaps.core.networking.packets.client;
 
 import com.duom.ardamaps.core.data.config.Dimension;
+import com.duom.ardamaps.core.data.config.DimensionRemap;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.config.MapLayerSource;
@@ -118,6 +119,34 @@ class MapSourceResponsePacketTest {
     }
 
     /**
+     * Verifies that structured remaps are sent to the client with dimension source data.
+     */
+    @Test
+    void buildRead_roundTripsDimensionRemapsWithRegions() {
+
+        Dimension dimension = new Dimension("Overworld", "minecraft:overworld", 1f,
+                0, 1000, 0, 1000, false, false, List.of(
+                new DimensionRemap("multiworld:freebuild", 0, 0, 10, 10),
+                new DimensionRemap("arda:plot")));
+
+        MapSourceResponsePacket parsed = roundTrip(new MapSourceResponsePacket(false, false, List.of(dimension)));
+
+        assertEquals(List.of("multiworld:freebuild", "arda:plot"), parsed.dimensions().get(0).getRemappedWorlds());
+        assertEquals(dimension.getRemaps(), parsed.dimensions().get(0).getRemaps());
+    }
+
+    /**
+     * Verifies that dimensions without remaps still decode to an empty remap list.
+     */
+    @Test
+    void buildRead_nullDimensionRemaps_roundTripsAsEmpty() {
+
+        MapSourceResponsePacket parsed = roundTrip(new MapSourceResponsePacket(false, false, List.of(dimension())));
+
+        assertTrue(parsed.dimensions().get(0).getRemappedWorlds().isEmpty());
+    }
+
+    /**
      * Unknown layer types from a newer server should not crash the client; only the unknown layer is skipped.
      */
     @Test
@@ -186,6 +215,7 @@ class MapSourceResponsePacketTest {
         buf.writeInt(0);
         buf.writeInt(1000);
         buf.writeBoolean(false);
+        buf.writeInt(0);
     }
 
     /**

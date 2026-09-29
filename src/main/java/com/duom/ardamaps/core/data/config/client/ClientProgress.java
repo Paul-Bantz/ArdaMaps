@@ -219,7 +219,37 @@ public class ClientProgress implements Serializable {
 
         if (dimensionId == null) return null;
 
-        String key = explorationKey(dimensionId, rangeIndex);
-        return createDefault ? explorationState.computeIfAbsent(key, ignored -> PlayerExploration.create(dimensionId, rangeIndex)) : explorationState.get(key);
+        String resolvedDimensionId = resolveDimensionId(dimensionId);
+        String key = explorationKey(resolvedDimensionId, rangeIndex);
+        return createDefault ? explorationState.computeIfAbsent(key, ignored -> createExplorationState(dimensionId, rangeIndex)) : explorationState.get(key);
+    }
+
+    /**
+     * Creates an exploration state when the client configuration can resolve the dimension.
+     *
+     * @param dimensionId The raw or configured dimension ID.
+     * @param rangeIndex  The range index, or null for non-ranged dimensions.
+     * @return The created exploration state, or null when config is unavailable.
+     */
+    private PlayerExploration createExplorationState(String dimensionId, Integer rangeIndex) {
+
+        if (ArdaMapsClient.CONFIG == null) return null;
+
+        return PlayerExploration.create(dimensionId, rangeIndex);
+    }
+
+    /**
+     * Resolves a raw world ID to the configured dimension that owns its exploration state.
+     *
+     * @param dimensionId The raw or configured dimension ID.
+     * @return The configured dimension ID, or the input when config is unavailable.
+     */
+    private String resolveDimensionId(String dimensionId) {
+
+        if (ArdaMapsClient.CONFIG == null) return dimensionId;
+
+        Dimension dimension = ArdaMapsClient.CONFIG.getDimension(dimensionId);
+
+        return dimension == null ? dimensionId : dimension.getId();
     }
 }

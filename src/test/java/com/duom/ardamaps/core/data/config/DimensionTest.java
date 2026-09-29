@@ -27,6 +27,8 @@ package com.duom.ardamaps.core.data.config;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -72,5 +74,44 @@ class DimensionTest {
         assertEquals(first, second);
         assertEquals(first.hashCode(), second.hashCode());
         assertNotEquals(first, other);
+    }
+
+    /**
+     * Structured remaps expose their world IDs in order.
+     */
+    @Test
+    void getRemappedWorlds_withStructuredRemaps_returnsRemapIds() {
+
+        Dimension dimension = new Dimension("Overworld", "minecraft:overworld", 1f, 0, 100, 0, 100, false, false,
+                List.of(new DimensionRemap("multiworld:freebuild"), new DimensionRemap("arda:plot")));
+
+        assertEquals(List.of("multiworld:freebuild", "arda:plot"), dimension.getRemappedWorlds());
+    }
+
+    /**
+     * Missing remap configuration exposes an empty world list.
+     */
+    @Test
+    void getRemappedWorlds_withoutRemaps_returnsEmptyList() {
+
+        Dimension dimension = new Dimension("Overworld", "minecraft:overworld", 1f, 0, 100, 0, 100, false);
+
+        assertTrue(dimension.getRemappedWorlds().isEmpty());
+    }
+
+    /**
+     * Regional remap lookup returns the first matching region.
+     */
+    @Test
+    void findRemapAt_overlappingRemaps_returnsFirstMatch() {
+
+        DimensionRemap first = new DimensionRemap("multiworld:first", 0, 0, 10, 10);
+        DimensionRemap second = new DimensionRemap("multiworld:second", 5, 5, 15, 15);
+        Dimension dimension = new Dimension("Overworld", "minecraft:overworld", 1f, 0, 100, 0, 100,
+                false, false, List.of(first, second));
+
+        assertEquals(first, dimension.findRemapAt(6, 6));
+        assertEquals(second, dimension.findRemapAt(12, 12));
+        assertNull(dimension.findRemapAt(20, 20));
     }
 }

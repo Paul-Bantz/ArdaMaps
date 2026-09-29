@@ -127,11 +127,11 @@ public class CompassRenderer {
 
         if (rawMaxCompassRenderDistance != ArdaMapsClient.CONFIG.getCompassDrawDistance()
                 || maxCompassRenderDistanceSquared == 0
-                || !Objects.equals(Client.currentDimensionId(),(cachedDimensionId))) {
+                || !Objects.equals(Client.effectiveDimensionId(), (cachedDimensionId))) {
 
             rawMaxCompassRenderDistance = ArdaMapsClient.CONFIG.getCompassDrawDistance();
 
-            cachedDimensionId = Client.currentDimensionId();
+            cachedDimensionId = Client.effectiveDimensionId();
 
             var blockCompassRenderDistance = ArdaMapsClient.CONFIG.getCompassDrawDistanceBlocks(Client.currentDimension());
             maxCompassRenderDistanceSquared = blockCompassRenderDistance * blockCompassRenderDistance;
@@ -189,7 +189,12 @@ public class CompassRenderer {
      */
     private static void renderMarkers(DrawContext context, Vec3d playerPos, float playerYaw, int centerX, float globalAlpha) {
 
-        var exploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(Client.currentDimensionId(), false);
+        var dimension = Client.currentDimension();
+        var range = dimension != null && dimension.hasRanges() ? dimension.rangeForY(playerPos.y) : null;
+        var exploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(
+                Client.effectiveDimensionId(),
+                range == null ? null : range.index(),
+                false);
 
         if (exploration == null) return;
 
@@ -229,7 +234,7 @@ public class CompassRenderer {
      */
     private static void renderWaypoint(DrawContext context, Vec3d playerPos, float yaw, int centerX, TextRenderer textRenderer, float globalAlpha) {
 
-        var currentDimensionId = Client.currentDimensionId();
+        var currentDimensionId = Client.effectiveDimensionId();
         var waypointsToRemove = new ArrayList<Waypoint>();
 
         for (var waypoint : ArdaMapsClient.CONFIG.getWaypoints(currentDimensionId)) {

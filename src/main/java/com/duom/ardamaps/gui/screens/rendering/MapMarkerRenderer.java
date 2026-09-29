@@ -63,26 +63,47 @@ public class MapMarkerRenderer {
     /** Rendered map marker scale factor */
     private static final float MARKER_SCALE = .6f;
 
-    /** Rendered map marker size in pixels */
-    private static final int MARKER_BACKGROUND_SIZE = (int) (MarkersManager.get().mapMarkerBackgroundSize() * MARKER_SCALE);
+    /** Minimum fraction of their regular size markers shrink to when fully zoomed out. */
+    private static final float MARKER_MIN_ZOOM_SCALE = .25f;
 
-    /** Precalculated half size of the marker background, used for centering */
-    private static final int HALF_MARKER_SIZE = MARKER_BACKGROUND_SIZE / 2;
+    /** Rendered map marker base size in pixels. */
+    private static final int BASE_MARKER_BACKGROUND_SIZE = (int) (MarkersManager.get().mapMarkerBackgroundSize() * MARKER_SCALE);
 
-    /** Rendered map marker icon size in pixels */
-    private static final int MARKER_ICON_SIZE = (int) (MarkersManager.get().mapMarkerIconSize() * MARKER_SCALE);
+    /** Rendered map marker icon base size in pixels. */
+    private static final int BASE_MARKER_ICON_SIZE = (int) (MarkersManager.get().mapMarkerIconSize() * MARKER_SCALE);
 
     /** Opacity applied to markers outside the currently displayed vertical range. */
     private static final float MARKER_OUT_OF_RANGE_OPACITY = 0.25f;
 
-    /** Precalculated x offset to position the marker icon within the marker background */
-    private static final int MARKER_ICON_X_OFFSET = (int) (MarkersManager.get().mapMarkerIconXOffset() * MARKER_SCALE);
+    /** Base x offset to position the marker icon within the marker background. */
+    private static final int BASE_MARKER_ICON_X_OFFSET = (int) (MarkersManager.get().mapMarkerIconXOffset() * MARKER_SCALE);
 
-    /** Precalculated y offset to position the marker icon within the marker background */
-    private static final int MARKER_ICON_Y_OFFSET = (int) (MarkersManager.get().mapMarkerIconYOffset() * MARKER_SCALE);
+    /** Base y offset to position the marker icon within the marker background. */
+    private static final int BASE_MARKER_ICON_Y_OFFSET = (int) (MarkersManager.get().mapMarkerIconYOffset() * MARKER_SCALE);
+
+    /** Base inset used to fill the marker background interior. */
+    private static final int BASE_MARKER_INSET = 4;
 
     /** Reusable buffer for markers currently under the mouse cursor. */
     private final List<DeferredMarker> mouseOverMarkers = new ArrayList<>();
+
+    /** Current frame marker background size in pixels. */
+    private int markerBackgroundSize = BASE_MARKER_BACKGROUND_SIZE;
+
+    /** Current frame half marker background size in pixels. */
+    private int halfMarkerSize = markerBackgroundSize / 2;
+
+    /** Current frame marker icon size in pixels. */
+    private int markerIconSize = BASE_MARKER_ICON_SIZE;
+
+    /** Current frame marker icon x offset in pixels. */
+    private int markerIconXOffset = BASE_MARKER_ICON_X_OFFSET;
+
+    /** Current frame marker icon y offset in pixels. */
+    private int markerIconYOffset = BASE_MARKER_ICON_Y_OFFSET;
+
+    /** Current frame marker fill inset in pixels. */
+    private int markerInset = BASE_MARKER_INSET;
 
     /** Backing location list used by the cached marker-filter result. Compared by reference identity. */
     private List<LocationClient> cachedMarkerBackingLocations;
@@ -123,6 +144,7 @@ public class MapMarkerRenderer {
 
         mouseOverLocation = null;
         mouseOverWaypoint = null;
+        updateMarkerSizes(mapCamera);
 
         renderMarkers(context, textRenderer, mapCamera, mapFrameRenderer, selectedRange, focusedLocationPosition,
                 selectedTypeKey, mouseOverWidgets, mouseX, mouseY);
@@ -167,13 +189,13 @@ public class MapMarkerRenderer {
             int screenX = (int) landmarkScreenPos.x();
             int screenY = (int) landmarkScreenPos.y();
 
-            if (!mapFrameRenderer.coordinatesInFrame(screenX, screenY, -MARKER_BACKGROUND_SIZE)) continue;
+            if (!mapFrameRenderer.coordinatesInFrame(screenX, screenY, -markerBackgroundSize)) continue;
 
-            var xPos = screenX - HALF_MARKER_SIZE;
-            var yPos = screenY - MARKER_BACKGROUND_SIZE;
+            var xPos = screenX - halfMarkerSize;
+            var yPos = screenY - markerBackgroundSize;
 
-            var isMouseOver = mouseX > xPos && mouseX < xPos + MARKER_BACKGROUND_SIZE
-                    && mouseY > yPos && mouseY < yPos + MARKER_BACKGROUND_SIZE
+            var isMouseOver = mouseX > xPos && mouseX < xPos + markerBackgroundSize
+                    && mouseY > yPos && mouseY < yPos + markerBackgroundSize
                     && !mouseOverWidgets;
 
             var isFocused = Objects.equals(location.getPosition(), focusedLocationPosition);
@@ -287,16 +309,16 @@ public class MapMarkerRenderer {
 
             var waypointScreenPos = mapCamera.worldToScreenCoordinates(waypoint.getPosition());
 
-            int halfIconSize = MARKER_ICON_SIZE / 2;
+            int halfIconSize = BASE_MARKER_ICON_SIZE / 2;
 
             int screenX = (int) waypointScreenPos.x() - halfIconSize;
             int screenY = (int) waypointScreenPos.y() - halfIconSize;
 
             if (mouseOverWaypoint == null
                     && mouseX >= screenX
-                    && mouseX <= screenX + MARKER_ICON_SIZE
+                    && mouseX <= screenX + BASE_MARKER_ICON_SIZE
                     && mouseY >= screenY
-                    && mouseY <= screenY + MARKER_ICON_SIZE) {
+                    && mouseY <= screenY + BASE_MARKER_ICON_SIZE) {
 
                 mouseOverWaypoint = waypoint;
                 context.drawTooltip(textRenderer, Text.literal(waypoint.text()), mouseX, mouseY);
@@ -313,11 +335,19 @@ public class MapMarkerRenderer {
                         && icon.getContents() != null
                         && !Objects.equals(icon.getContents().getId(), MissingSprite.getMissingSpriteId())) {
 
-                    context.drawSprite(screenX, screenY, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, icon);
+                    context.drawSprite(screenX, screenY, 0, BASE_MARKER_ICON_SIZE, BASE_MARKER_ICON_SIZE, icon);
 
                 } else {
 
-                    context.drawTexture(iconIdentifier, screenX, screenY, 0, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE, MARKER_ICON_SIZE);
+                    context.drawTexture(iconIdentifier,
+                            screenX,
+                            screenY,
+                            0,
+                            0,
+                            BASE_MARKER_ICON_SIZE,
+                            BASE_MARKER_ICON_SIZE,
+                            BASE_MARKER_ICON_SIZE,
+                            BASE_MARKER_ICON_SIZE);
                 }
 
                 RenderSystem.setShaderColor(1f, 1f, 1f, 1.0f);
@@ -363,8 +393,8 @@ public class MapMarkerRenderer {
     private void renderMarker(DrawContext context, TextRenderer textRenderer, LocationClient location,
                               int xPos, int yPos, boolean focused, boolean outOfRange) {
 
-        var iconXPos = xPos + MARKER_ICON_X_OFFSET;
-        var iconYPos = yPos + MARKER_ICON_Y_OFFSET;
+        var iconXPos = xPos + markerIconXOffset;
+        var iconYPos = yPos + markerIconYOffset;
 
         Identifier icon = location.getIcon();
         int color = outOfRange ? withOpacity(location.getColor()) : location.getColor();
@@ -377,10 +407,11 @@ public class MapMarkerRenderer {
 
         if (focused) {
 
-            var screenX = xPos + HALF_MARKER_SIZE;
-            var screenY = yPos + MARKER_BACKGROUND_SIZE;
+            var screenX = xPos + halfMarkerSize;
+            var screenY = yPos + markerBackgroundSize;
 
-            context.fill(xPos + 4, yPos + 4, xPos + MARKER_BACKGROUND_SIZE - 4, yPos + MARKER_BACKGROUND_SIZE - 4, highlightColor);
+            context.fill(xPos + markerInset, yPos + markerInset, xPos + markerBackgroundSize - markerInset,
+                    yPos + markerBackgroundSize - markerInset, highlightColor);
 
             var text = location.getName();
             var textX = screenX - textRenderer.getWidth(text) / 2;
@@ -394,20 +425,82 @@ public class MapMarkerRenderer {
 
         } else {
 
-            context.fill(xPos + 4, yPos + 4, xPos + MARKER_BACKGROUND_SIZE - 4, yPos + MARKER_BACKGROUND_SIZE - 4, color);
+            context.fill(xPos + markerInset, yPos + markerInset, xPos + markerBackgroundSize - markerInset,
+                    yPos + markerBackgroundSize - markerInset, color);
         }
 
         RenderSystem.setShaderColor(1f, 1f, 1f, markerOpacity);
 
         if (location.isVisited())
-            context.drawSprite(xPos, yPos, 0, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_VISITED_ICON));
+            context.drawSprite(xPos,
+                    yPos,
+                    0,
+                    markerBackgroundSize,
+                    markerBackgroundSize,
+                    IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_VISITED_ICON));
         else
-            context.drawSprite(xPos, yPos, 0, MARKER_BACKGROUND_SIZE, MARKER_BACKGROUND_SIZE, IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_ICON));
+            context.drawSprite(xPos,
+                    yPos,
+                    0,
+                    markerBackgroundSize,
+                    markerBackgroundSize,
+                    IconSpriteAtlas.retrieveSprite(ModConstants.MAP_MARKER_ICON));
 
-        context.drawSprite(iconXPos, iconYPos, 0, MARKER_ICON_SIZE, MARKER_ICON_SIZE, IconSpriteAtlas.retrieveSprite(icon));
+        context.drawSprite(iconXPos, iconYPos, 0, markerIconSize, markerIconSize, IconSpriteAtlas.retrieveSprite(icon));
 
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         RenderSystem.disableBlend();
+    }
+
+    /**
+     * Update location marker sizes for the current camera zoom.
+     *
+     * @param mapCamera The camera whose zoom state controls marker scaling.
+     */
+    private void updateMarkerSizes(MapCamera mapCamera) {
+
+        float zoomScale = markerZoomScale(mapCamera.identityRelativeScale(), mapCamera.minIdentityRelativeScale());
+        markerBackgroundSize = scaled(BASE_MARKER_BACKGROUND_SIZE, zoomScale);
+        halfMarkerSize = markerBackgroundSize / 2;
+        markerIconSize = scaled(BASE_MARKER_ICON_SIZE, zoomScale);
+        markerIconXOffset = scaled(BASE_MARKER_ICON_X_OFFSET, zoomScale);
+        markerIconYOffset = scaled(BASE_MARKER_ICON_Y_OFFSET, zoomScale);
+        markerInset = scaled(BASE_MARKER_INSET, zoomScale);
+    }
+
+    /**
+     * Scale a base pixel value while keeping it visible.
+     *
+     * @param value The base pixel value.
+     * @param scale The scale multiplier.
+     * @return The scaled pixel value, with a minimum of one pixel.
+     */
+    private static int scaled(int value, float scale) {
+
+        return Math.max(1, Math.round(value * scale));
+    }
+
+    /**
+     * Compute the marker scale for a camera zoom relative to identity and minimum zoom.
+     *
+     * @param identityRelativeScale    The current camera scale relative to identity zoom.
+     * @param minIdentityRelativeScale The minimum camera scale relative to identity zoom.
+     * @return The marker scale for the current zoom.
+     */
+    public static float markerZoomScale(double identityRelativeScale, double minIdentityRelativeScale) {
+
+        if (Double.isNaN(identityRelativeScale) || Double.isNaN(minIdentityRelativeScale)
+                || identityRelativeScale <= 0 || minIdentityRelativeScale <= 0
+                || minIdentityRelativeScale >= 1 || identityRelativeScale >= 1) {
+            return 1f;
+        }
+
+        if (identityRelativeScale <= minIdentityRelativeScale) {
+            return MARKER_MIN_ZOOM_SCALE;
+        }
+
+        double zoomProgress = Math.log(identityRelativeScale) / Math.log(minIdentityRelativeScale);
+        return (float) (1.0 - zoomProgress * (1.0 - MARKER_MIN_ZOOM_SCALE));
     }
 
     /**
