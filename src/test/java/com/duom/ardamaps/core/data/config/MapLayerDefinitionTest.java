@@ -111,6 +111,82 @@ class MapLayerDefinitionTest {
     }
 
     /**
+     * Verifies that ranged layer base paths are joined to relative range paths.
+     */
+    @Test
+    void resolveRangePath_withBaseAndRelativeRangePath_joinsPath() {
+
+        MapLayerDefinition layer = basedRangedLayer("ardamaps-root");
+
+        assertEquals("ardamaps-root/lower.pmtiles", layer.resolveRangePath(LOWER));
+    }
+
+    /**
+     * Creates a ranged layer fixture with a layer-level base path.
+     *
+     * @param basePath The base path or URL to set on the layer.
+     * @return A ranged PMTiles layer definition using the supplied base path.
+     */
+    private static MapLayerDefinition basedRangedLayer(String basePath) {
+
+        return new MapLayerDefinition("Ranged", MapLayerSource.PMTILES, true, 8, null, 1.0,
+                1, 3, 1, 14, 256, 1.0, basePath, "fallback.png", List.of(LOWER, UPPER));
+    }
+
+    /**
+     * Verifies that a trailing separator on the base path does not produce a double slash.
+     */
+    @Test
+    void resolveRangePath_withTrailingSlashBase_joinsOnce() {
+
+        MapLayerDefinition layer = basedRangedLayer("ardamaps-root/");
+
+        assertEquals("ardamaps-root/lower.pmtiles", layer.resolveRangePath(LOWER));
+    }
+
+    /**
+     * Verifies that ranged layers without a base path keep prior raw range-path behavior.
+     */
+    @Test
+    void resolveRangePath_withoutBase_returnsRangePath() {
+
+        assertEquals("lower.pmtiles", rangedLayer().resolveRangePath(LOWER));
+    }
+
+    /**
+     * Verifies that absolute URL range paths are not resolved against the layer base path.
+     */
+    @Test
+    void resolveRangePath_withAbsoluteUrlRangePath_ignoresBase() {
+
+        MapLayerRange range = new MapLayerRange(0, "https://example.test/lower.pmtiles", -64, 0);
+
+        assertEquals("https://example.test/lower.pmtiles", basedRangedLayer("ardamaps-root").resolveRangePath(range));
+    }
+
+    /**
+     * Verifies that absolute file range paths are not resolved against the layer base path.
+     */
+    @Test
+    void resolveRangePath_withAbsoluteFileRangePath_ignoresBase() {
+
+        MapLayerRange range = new MapLayerRange(0, "/srv/maps/lower.pmtiles", -64, 0);
+
+        assertEquals("/srv/maps/lower.pmtiles", basedRangedLayer("ardamaps-root").resolveRangePath(range));
+    }
+
+    /**
+     * Verifies that effective path selection also applies ranged layer base paths.
+     */
+    @Test
+    void effectivePath_withBaseAndRanges_returnsJoinedRangePath() {
+
+        MapLayerDefinition layer = basedRangedLayer("ardamaps-root");
+
+        assertEquals("ardamaps-root/upper.pmtiles", layer.effectivePath(12d));
+    }
+
+    /**
      * Verifies that flat layers always return their own path and icon regardless of the supplied Y coordinate.
      * This guards against ranged-resolution logic leaking into flat-layer behavior.
      */

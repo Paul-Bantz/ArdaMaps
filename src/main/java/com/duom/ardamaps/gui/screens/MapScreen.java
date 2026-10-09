@@ -95,6 +95,9 @@ public class MapScreen extends ArdaMapsScreen {
     /** Padding from the edges of the map frame for map rendering and interactions */
     private static final int MAP_FRAME_PADDING = 10;
 
+    /** Cell radius used when finding the densest revealed area to start on. */
+    private static final int HOTSPOT_RADIUS_CELLS = 3;
+
     /** Renderer for map frame and decorations */
     private final MapFrameRenderer mapFrameRenderer = new MapFrameRenderer();
 
@@ -290,13 +293,16 @@ public class MapScreen extends ArdaMapsScreen {
     private void dimensionSelectionChanged(Dimension newDimension) {
 
         selectedDimension = newDimension;
-        configureMapLayerSelectionDropDown();
+        if (!configureMapLayerSelectionDropDown() && layerSelectionDropdown.getSelected() != null)
+            mapLayerSelectionChanged(layerSelectionDropdown.getSelected());
     }
 
     /**
-     * Configure the map layer selection dropdown
+     * Configure the map layer selection dropdown.
+     *
+     * @return Whether configuring the dropdown triggered a layer reload.
      */
-    private void configureMapLayerSelectionDropDown() {
+    private boolean configureMapLayerSelectionDropDown() {
 
         List<MapLayerDefinition> mapLayers = MapLayerDropdownOptions.forDimension(selectedDimension);
 
@@ -338,10 +344,13 @@ public class MapScreen extends ArdaMapsScreen {
         // Hide if only one layer available, no need to show a dropdown for a single option
         layerSelectionDropdown.visible = mapLayers.size() > 1;
 
-        if (layerSelectionDropdown.getSelected() != null
+        boolean selectionChanged = layerSelectionDropdown.getSelected() != null
                 && (previousSelection == null
-                || !Objects.equals(previousSelection, layerSelectionDropdown.getSelected())))
+                || !Objects.equals(previousSelection, layerSelectionDropdown.getSelected()));
+        if (selectionChanged)
             mapLayerSelectionChanged(layerSelectionDropdown.getSelected());
+
+        return selectionChanged;
     }
 
     /**
@@ -453,11 +462,11 @@ public class MapScreen extends ArdaMapsScreen {
 
         selectedRange = mapLayerDefinition.hasRanges() ? defaultRangeForLayer(mapLayerDefinition) : null;
         refreshRangeSelection();
-        reloadSelectedLayer();
+        reloadSelectedLayer(false);
     }
 
     /**
-     * Selects the range matching the player's current Y, falling back to the first configured range.
+     * Selects the best default range for the active dimension and reveal mode.
      *
      * @param layer The ranged layer to inspect.
      * @return The default range for the layer, or null when the layer has no ranges.
@@ -467,7 +476,42 @@ public class MapScreen extends ArdaMapsScreen {
         if (!layer.hasRanges()) return null;
 
         Double playerY = Client.playerPositionY();
-        return playerY == null ? layer.ranges().get(0) : layer.rangeForY(playerY);
+        MapLayerRange playerRange = playerY == null ? layer.ranges().get(0) : layer.rangeForY(playerY);
+        if (isMapRevealAll()) return playerRange;
+
+        if (selectedDimension == null) return playerRange;
+
+        if (playerRange != null && Objects.equals(selectedDimension, Client.currentDimension())) {
+            PlayerExploration playerRangeExploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(
+                    selectedDimension.getId(),
+                    playerRange.index(),
+                    false);
+            Vec2d playerPosition = Client.playerPosition2d();
+
+            if (playerRangeExploration != null
+                    && playerRangeExploration.isWorldPosExplored(playerPosition.x(), playerPosition.y(), 1)) {
+                return playerRange;
+            }
+        }
+
+        MapLayerRange bestRange = null;
+        int bestScore = -1;
+
+        for (MapLayerRange range : layer.ranges()) {
+            PlayerExploration rangeExploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(
+                    selectedDimension.getId(),
+                    range.index(),
+                    false);
+            if (rangeExploration == null) continue;
+
+            var hotspot = rangeExploration.findRevealedHotspot(HOTSPOT_RADIUS_CELLS);
+            if (hotspot != null && hotspot.revealedNeighbours() > bestScore) {
+                bestRange = range;
+                bestScore = hotspot.revealedNeighbours();
+            }
+        }
+
+        return bestRange == null ? playerRange : bestRange;
     }
 
     /**
@@ -1248,22 +1292,28 @@ public class MapScreen extends ArdaMapsScreen {
     private void rangeSelectionChanged(@NotNull MapLayerRange range) {
 
         selectedRange = range;
-        reloadSelectedLayer();
+        reloadSelectedLayer(true);
     }
 
     /**
      * Reloads the currently selected map layer using the active range selection.
+     *
+     * @param preserveCamera Whether to keep the current camera centre when possible.
      */
-    private void reloadSelectedLayer() {
+    private void reloadSelectedLayer(boolean preserveCamera) {
 
         if (layerSelectionDropdown == null || layerSelectionDropdown.getSelected() == null) return;
 
         final int generation = ++layerLoadGeneration;
 
         // Capture the current visual pixels-per-block so we can match zoom on the new map
-        final double capturedRenderScale = (getCamera() != null) ? getCamera().getVisualPixelsPerBlock() : Double.NaN;
+        MapCamera camera = getCamera();
+        boolean dimensionChanged = camera != null && !Objects.equals(camera.getDimension(), selectedDimension);
+        final double capturedRenderScale = camera == null || dimensionChanged && !isMapRevealAll()
+                ? Double.NaN
+                : camera.getVisualPixelsPerBlock();
         MapLayerDefinition layer = layerSelectionDropdown.getSelected();
-        MapLayerLoader.Input input = buildLayerLoaderInput(layer, capturedRenderScale);
+        MapLayerLoader.Input input = buildLayerLoaderInput(layer, capturedRenderScale, preserveCamera);
 
         CompletableFuture.supplyAsync(() -> mapLayerLoader.load(input), ArdaMaps.IO_EXECUTOR)
                 .whenComplete((result, ex) -> {
@@ -1278,23 +1328,26 @@ public class MapScreen extends ArdaMapsScreen {
 
     /**
      * Captures the screen state needed to build a map layer on the IO executor.
+     *
+     * @param mapLayerDefinition The selected map layer definition.
+     * @param capturedRenderScale The visual pixels-per-block scale to preserve, or NaN to use preferred zoom.
+     * @param preserveCamera Whether to keep the current camera centre when possible.
+     * @return The input data for loading the selected layer.
      */
-    private MapLayerLoader.Input buildLayerLoaderInput(MapLayerDefinition mapLayerDefinition, double capturedRenderScale) {
+    private MapLayerLoader.Input buildLayerLoaderInput(MapLayerDefinition mapLayerDefinition,
+            double capturedRenderScale,
+            boolean preserveCamera) {
 
-        var cameraPosition = Client.playerPosition2d();
         Double playerY = Client.playerPositionY();
+        MapLayerRange explorationRange = MapLayerLoader.resolveExplorationRange(selectedDimension, selectedRange, playerY);
+        PlayerExploration layerExploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(
+                selectedDimension == null ? null : selectedDimension.getId(),
+                explorationRange == null ? null : explorationRange.index(),
+                true);
 
-        if (!Objects.equals(selectedDimension, Client.currentDimension()))
-            cameraPosition = new Vec2d(0, 0);
-
+        Vec2d cameraPosition = resolveStartingPosition(layerExploration, preserveCamera);
         int cx = (int) Math.floor(cameraPosition.x());
         int cy = (int) Math.floor(cameraPosition.y());
-
-        if (getCamera() != null) {
-
-            cx = (int) Math.floor(getCamera().getWorldX());
-            cy = (int) Math.floor(getCamera().getWorldZ());
-        }
 
         return new MapLayerLoader.Input(
                 selectedDimension,
@@ -1306,7 +1359,58 @@ public class MapScreen extends ArdaMapsScreen {
                 cx,
                 cy,
                 playerY,
-                textRenderer);
+                textRenderer,
+                layerExploration);
+    }
+
+    /**
+     * Resolves the initial camera centre for a newly loaded map layer.
+     *
+     * @param exploration The target exploration state, or null when none can be resolved.
+     * @param preserveCamera Whether to keep the current camera centre when possible.
+     * @return The world-space camera centre.
+     */
+    private Vec2d resolveStartingPosition(@Nullable PlayerExploration exploration, boolean preserveCamera) {
+
+        boolean revealAll = isMapRevealAll();
+        MapCamera camera = getCamera();
+
+        if (preserveCamera && camera != null && Objects.equals(camera.getDimension(), selectedDimension))
+            return new Vec2d(camera.getWorldX(), camera.getWorldZ());
+
+        if (camera != null
+                && Objects.equals(camera.getDimension(), selectedDimension)
+                && (revealAll || exploration != null && exploration.isWorldPosExplored(camera.getWorldX(), camera.getWorldZ(), 1))) {
+            return new Vec2d(camera.getWorldX(), camera.getWorldZ());
+        }
+
+        if (Objects.equals(selectedDimension, Client.currentDimension())) {
+            Vec2d playerPosition = Client.playerPosition2d();
+            if (revealAll || exploration != null && exploration.isWorldPosExplored(playerPosition.x(), playerPosition.y(), 1)) {
+                return playerPosition;
+            }
+        }
+
+        if (!revealAll && exploration != null) {
+            Vec2d hotspot = exploration.findRevealedHotspotCenter(HOTSPOT_RADIUS_CELLS);
+            if (hotspot != null) return hotspot;
+        }
+
+        if (selectedDimension == null) return new Vec2d(0, 0);
+
+        return new Vec2d(
+                (selectedDimension.getXMin() + selectedDimension.getXMax()) / 2.0,
+                (selectedDimension.getZMin() + selectedDimension.getZMax()) / 2.0);
+    }
+
+    /**
+     * Returns whether fog-of-war should be ignored for map positioning and rendering.
+     *
+     * @return Whether the full map is revealed.
+     */
+    private boolean isMapRevealAll() {
+
+        return ArdaMapsClient.CONFIG != null && ArdaMapsClient.CONFIG.isMapRevealAll();
     }
 
     /**
@@ -1330,6 +1434,12 @@ public class MapScreen extends ArdaMapsScreen {
             explorationState = mapRenderable.getExploration();
             updateMapButtonPositions();
             coordinatesButton.visible = true;
+        } else if (mapRenderer != null && getCamera() != null && !Objects.equals(getCamera().getDimension(), selectedDimension)) {
+
+            closeMapRenderer();
+            explorationState = null;
+            updateMapButtonPositions();
+            coordinatesButton.visible = false;
         }
     }
 

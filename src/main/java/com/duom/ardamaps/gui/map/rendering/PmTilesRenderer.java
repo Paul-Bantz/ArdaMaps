@@ -183,7 +183,7 @@ public class PmTilesRenderer extends MapRenderable {
 
         if (plan.primaryTiles().isEmpty() && plan.fallbackMap().isEmpty()) {
             tileProvider.protectDrawnTiles(Set.of());
-            super.renderLoadingText(context);
+            if (!tileProvider.getLoadingTiles().isEmpty()) super.renderLoadingText(context);
             return;
         }
 

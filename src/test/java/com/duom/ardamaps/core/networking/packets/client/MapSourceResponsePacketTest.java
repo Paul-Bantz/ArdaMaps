@@ -57,6 +57,7 @@ class MapSourceResponsePacketTest {
         assertTrue(parsed.warpsAvailable());
         assertFalse(parsed.ardaRegionsAvailable());
         assertEquals(1, parsed.dimensions().size());
+        assertEquals(8, parsed.dimensions().get(0).getExplorationCellSize());
         assertEquals(layer(null), parsed.dimensions().get(0).getMapLayers().get(0));
         assertNull(parsed.dimensions().get(0).getMapLayers().get(0).ranges());
     }
@@ -68,7 +69,7 @@ class MapSourceResponsePacketTest {
      */
     private static Dimension dimension() {
 
-        return new Dimension("Test", "test:dimension", 1f, 0, 1000, 0, 1000, false);
+        return new Dimension("Test", "test:dimension", 1f, 0, 1000, 0, 1000, false, false, null, 8);
     }
 
     /**
@@ -104,7 +105,7 @@ class MapSourceResponsePacketTest {
     void buildRead_roundTripsLayerWithRanges() {
 
         List<MapLayerRange> ranges = List.of(
-                new MapLayerRange(0, "low.pmtiles", -64, 0),
+                new MapLayerRange(0, "low.pmtiles", "Lowlands", -64, 0),
                 new MapLayerRange(1, "high.pmtiles", 1, 128));
         Dimension dimension = dimension();
         dimension.getMapLayers().add(layer(ranges));
@@ -114,6 +115,8 @@ class MapSourceResponsePacketTest {
         assertFalse(parsed.warpsAvailable());
         assertTrue(parsed.ardaRegionsAvailable());
         assertEquals(ranges, parsed.dimensions().get(0).getMapLayers().get(0).ranges());
+        assertEquals("Lowlands", parsed.dimensions().get(0).getMapLayers().get(0).ranges().get(0).name());
+        assertNull(parsed.dimensions().get(0).getMapLayers().get(0).ranges().get(1).name());
         assertNull(parsed.dimensions().get(0).getMapLayers().get(0).path());
         assertEquals(layer(ranges), parsed.dimensions().get(0).getMapLayers().get(0));
     }
@@ -214,6 +217,7 @@ class MapSourceResponsePacketTest {
         buf.writeInt(1000);
         buf.writeInt(0);
         buf.writeInt(1000);
+        buf.writeInt(0);
         buf.writeBoolean(false);
         buf.writeInt(0);
     }

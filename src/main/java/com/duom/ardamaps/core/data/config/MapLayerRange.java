@@ -26,18 +26,34 @@
 package com.duom.ardamaps.core.data.config;
 
 import com.google.gson.annotations.SerializedName;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A vertically bounded map image range for a map layer.
  *
  * @param index     Stable range index, used for exploration keying and as the label in the range strip
  * @param path      Path or URL to the map data for this Y band
+ * @param name      Optional display name shown in the range strip tooltip
  * @param rangeMinY Minimum world Y covered by this range, inclusive
  * @param rangeMaxY Maximum world Y covered by this range, inclusive
  */
 public record MapLayerRange(@SerializedName("index") int index, @SerializedName("path") String path,
+                            @SerializedName("name") @Nullable String name,
                             @SerializedName("range_min_y") int rangeMinY,
                             @SerializedName("range_max_y") int rangeMaxY) {
+
+    /**
+     * Creates an unnamed vertically bounded map image range.
+     *
+     * @param index     Stable range index, used for exploration keying and as the label in the range strip.
+     * @param path      Path or URL to the map data for this Y band.
+     * @param rangeMinY Minimum world Y covered by this range, inclusive.
+     * @param rangeMaxY Maximum world Y covered by this range, inclusive.
+     */
+    public MapLayerRange(int index, String path, int rangeMinY, int rangeMaxY) {
+
+        this(index, path, null, rangeMinY, rangeMaxY);
+    }
 
     /**
      * Checks whether the given world Y coordinate is inside this range.

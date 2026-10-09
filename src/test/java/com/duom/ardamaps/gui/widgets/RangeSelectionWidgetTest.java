@@ -67,6 +67,31 @@ class RangeSelectionWidgetTest {
     }
 
     /**
+     * Verifies that unnamed ranges keep the original one-line interval tooltip.
+     */
+    @Test
+    void tooltipLines_withoutName_returnsIntervalOnly() {
+
+        List<Text> lines = RangeSelectionWidget.tooltipLines(new MapLayerRange(0, "0.pmtiles", -500, -128));
+
+        assertEquals(1, lines.size());
+        assertEquals("-500..-128", lines.get(0).getString());
+    }
+
+    /**
+     * Verifies that named ranges show the name first and keep the normalized interval as detail.
+     */
+    @Test
+    void tooltipLines_withName_returnsNameAndInterval() {
+
+        List<Text> lines = RangeSelectionWidget.tooltipLines(new MapLayerRange(0, "0.pmtiles", "4th Deep", -128, -500));
+
+        assertEquals(2, lines.size());
+        assertEquals("4th Deep", lines.get(0).getString());
+        assertEquals("-500..-128", lines.get(1).getString());
+    }
+
+    /**
      * Verifies that the label-area gradient starts fully transparent and ends at the strip background colour.
      * This protects the softened left edge introduced for the fixed label area.
      */

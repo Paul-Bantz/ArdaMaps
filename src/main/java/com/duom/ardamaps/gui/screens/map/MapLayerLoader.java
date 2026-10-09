@@ -25,7 +25,6 @@
 
 package com.duom.ardamaps.gui.screens.map;
 
-import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
@@ -54,14 +53,7 @@ public class MapLayerLoader {
      */
     public @Nullable MapRenderable load(Input input) {
 
-        var explorationRange = resolveExplorationRange(input.selectedDimension(), input.selectedRange(), input.playerY());
-        var progress = ArdaMapsClient.CONFIG.getClientProgress();
-        PlayerExploration layerExploration = progress.getExplorationState(
-                input.selectedDimension() == null ? null : input.selectedDimension().getId(),
-                explorationRange == null ? null : explorationRange.index(),
-                true);
-
-        if (layerExploration == null) return null;
+        if (input.exploration() == null) return null;
 
         MapLayerDefinition resolvedLayer = resolveLayer(input.mapLayerDefinition(), input.selectedRange(), input.playerY());
         MapRenderable mapRenderable = null;
@@ -71,25 +63,25 @@ public class MapLayerLoader {
             case BLUEMAP -> {
                 var camera = new BlueMapCamera(input.viewportWidth(), input.viewportHeight(), input.startingCameraX(), input.startingCameraZ());
                 camera.setDimension(input.selectedDimension());
-                mapRenderable = new BlueMapRenderer(camera, input.textRenderer(), layerExploration);
+                mapRenderable = new BlueMapRenderer(camera, input.textRenderer(), input.exploration());
                 mapRenderable.configure(resolvedLayer, input.capturedRenderScale());
             }
             case PMTILES -> {
                 var camera = new PmTilesMapCamera(input.viewportWidth(), input.viewportHeight(), input.startingCameraX(), input.startingCameraZ());
                 camera.setDimension(input.selectedDimension());
-                mapRenderable = new PmTilesRenderer(camera, input.textRenderer(), layerExploration);
+                mapRenderable = new PmTilesRenderer(camera, input.textRenderer(), input.exploration());
                 mapRenderable.configure(resolvedLayer, input.capturedRenderScale());
             }
             case WEBP -> {
                 var camera = new FlatMapCamera(input.viewportWidth(), input.viewportHeight(), input.startingCameraX(), input.startingCameraZ());
                 camera.setDimension(input.selectedDimension());
-                mapRenderable = new WebpRenderer(camera, input.textRenderer(), layerExploration);
+                mapRenderable = new WebpRenderer(camera, input.textRenderer(), input.exploration());
                 mapRenderable.configure(resolvedLayer, input.capturedRenderScale());
             }
             case GRID -> {
                 var camera = new GridCamera(input.viewportWidth(), input.viewportHeight(), input.startingCameraX(), input.startingCameraZ());
                 camera.setDimension(input.selectedDimension());
-                mapRenderable = new GridRenderer(camera, input.textRenderer(), layerExploration);
+                mapRenderable = new GridRenderer(camera, input.textRenderer(), input.exploration());
                 mapRenderable.configure(resolvedLayer, input.capturedRenderScale());
             }
         }
@@ -105,9 +97,9 @@ public class MapLayerLoader {
      * @param playerY           The player's current Y coordinate, or null to fall back to the first configured range.
      * @return The resolved exploration range, or null when the dimension has no ranges.
      */
-    static @Nullable MapLayerRange resolveExplorationRange(@Nullable Dimension selectedDimension,
-                                                           @Nullable MapLayerRange selectedRange,
-                                                           @Nullable Double playerY) {
+    public static @Nullable MapLayerRange resolveExplorationRange(@Nullable Dimension selectedDimension,
+                                                                  @Nullable MapLayerRange selectedRange,
+                                                                  @Nullable Double playerY) {
 
         if (selectedRange != null) return selectedRange;
 
@@ -143,7 +135,7 @@ public class MapLayerLoader {
                 mapLayerDefinition.maxZoom(),
                 mapLayerDefinition.tileSize(),
                 mapLayerDefinition.scale(),
-                selectedRange != null ? selectedRange.path() : mapLayerDefinition.effectivePath(playerY),
+                selectedRange != null ? mapLayerDefinition.resolveRangePath(selectedRange) : mapLayerDefinition.effectivePath(playerY),
                 mapLayerDefinition.effectiveIcon(playerY),
                 mapLayerDefinition.ranges());
     }
@@ -161,6 +153,7 @@ public class MapLayerLoader {
      * @param startingCameraZ     The initial world Z coordinate for the new camera.
      * @param playerY             The player's current Y coordinate, used for range resolution when no explicit range is selected.
      * @param textRenderer        The text renderer passed to the constructed map renderable.
+     * @param exploration         The already-resolved exploration state for this layer.
      */
     public record Input(
             @Nullable Dimension selectedDimension,
@@ -172,6 +165,7 @@ public class MapLayerLoader {
             int startingCameraX,
             int startingCameraZ,
             @Nullable Double playerY,
-            TextRenderer textRenderer) {
+            TextRenderer textRenderer,
+            @Nullable PlayerExploration exploration) {
     }
 }

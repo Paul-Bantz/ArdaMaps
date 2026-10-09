@@ -26,6 +26,7 @@
 package com.duom.ardamaps.core.data.config.client;
 
 import com.duom.ardamaps.ArdaMapsClient;
+import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.DimensionRemap;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
@@ -45,6 +46,9 @@ import org.mockito.Mockito;
 
 import java.util.List;
 
+import static com.duom.ardamaps.core.data.ExplorationState.HIDDEN;
+import static com.duom.ardamaps.core.data.ExplorationState.REVEALED;
+import static com.duom.ardamaps.core.data.ExplorationState.VISIBLE;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -100,6 +104,20 @@ class ClientProgressTest {
 
         Dimension dimension = new Dimension("Test", "test:dimension", 1f, 0, 1000, 0, 1000, false, false,
                 List.of(new DimensionRemap("test:remapped")));
+        dimension.getMapLayers().add(new MapLayerDefinition("Ranged", MapLayerSource.PMTILES, true, 8, null, 1.0,
+                1, 3, 1, 14, 256, 1.0, "fallback.pmtiles", "fallback.png", List.of(LOW, HIGH)));
+        return dimension;
+    }
+
+    /**
+     * Builds the ranged dimension with an explicit exploration cell size.
+     *
+     * @return A ranged dimension whose grid geometry differs from {@link #rangedDimension()}.
+     */
+    private static Dimension explicitRangedDimension() {
+
+        Dimension dimension = new Dimension("Test", "test:dimension", 1f, 0, 1000, 0, 1000, false, false,
+                List.of(new DimensionRemap("test:remapped")), 8);
         dimension.getMapLayers().add(new MapLayerDefinition("Ranged", MapLayerSource.PMTILES, true, 8, null, 1.0,
                 1, 3, 1, 14, 256, 1.0, "fallback.pmtiles", "fallback.png", List.of(LOW, HIGH)));
         return dimension;
@@ -165,5 +183,51 @@ class ClientProgressTest {
         assertSame(remapped, canonical);
         assertTrue(progress.getExplorationState().containsKey(ClientProgress.explorationKey("test:dimension", 0)));
         assertFalse(progress.getExplorationState().containsKey(ClientProgress.explorationKey("test:remapped", 0)));
+    }
+
+    /**
+     * Grid migration removes only entries whose persisted geometry no longer matches current config.
+     */
+    @Test
+    void migrateGridGeometry_removesMismatchedEntriesAndKeepsMatchingOnes() {
+
+        Dimension oldFlat = new Dimension("Flat", "test:flat", 1f, 0, 1000, 0, 1000, false);
+        Dimension newFlat = new Dimension("Flat", "test:flat", 1f, 0, 1000, 0, 1000, false, false, null, 8);
+        ClientProgress progress = new ClientProgress();
+        progress.getExplorationState().put(ClientProgress.explorationKey("test:flat", null),
+                PlayerExploration.create(oldFlat, null));
+        progress.getExplorationState().put(ClientProgress.explorationKey("test:dimension", 0),
+                PlayerExploration.create(rangedDimension(), 0, null));
+        progress.getExplorationState().put(ClientProgress.explorationKey("test:dimension", 1),
+                PlayerExploration.create(explicitRangedDimension(), 1, null));
+
+        assertTrue(progress.migrateGridGeometry(List.of(newFlat, explicitRangedDimension())));
+
+        assertFalse(progress.getExplorationState().containsKey(ClientProgress.explorationKey("test:flat", null)));
+        assertFalse(progress.getExplorationState().containsKey(ClientProgress.explorationKey("test:dimension", 0)));
+        assertTrue(progress.getExplorationState().containsKey(ClientProgress.explorationKey("test:dimension", 1)));
+    }
+
+    /**
+     * Existing revealed ranged cells are backfilled upward as visible cells without widening the saved area.
+     */
+    @Test
+    void propagateVisibleUpward_existingRevealedCells_marksAboveRangesVisible() {
+
+        Dimension dimension = rangedDimension();
+        ClientProgress progress = new ClientProgress();
+        PlayerExploration low = PlayerExploration.create(dimension, LOW.index(), null);
+        PlayerExploration high = PlayerExploration.create(dimension, HIGH.index(), null);
+        progress.getExplorationState().put(ClientProgress.explorationKey(dimension.getId(), LOW.index()), low);
+        progress.getExplorationState().put(ClientProgress.explorationKey(dimension.getId(), HIGH.index()), high);
+        low.markCell(1, 1, REVEALED);
+        high.markCell(2, 2, REVEALED);
+
+        assertTrue(progress.propagateVisibleUpward(List.of(dimension)));
+
+        assertEquals(VISIBLE, high.stateAt(1, 1));
+        assertEquals(REVEALED, high.stateAt(2, 2));
+        assertEquals(HIDDEN, high.stateAt(0, 1));
+        assertFalse(progress.propagateVisibleUpward(List.of(dimension)));
     }
 }

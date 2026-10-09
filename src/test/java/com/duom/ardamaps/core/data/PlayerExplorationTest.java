@@ -54,6 +54,10 @@ class PlayerExplorationTest {
     private static final Dimension LARGE_DIM =
             new Dimension("Large", "test:large", 1f, 0, 400_001, 0, 400_001, false);
 
+    /** Same bounds as {@link #SMALL_DIM}, but with a smaller explicit exploration cell size. */
+    private static final Dimension SMALL_EXPLICIT_DIM =
+            new Dimension("Small", "test:small", 1f, 0, 64, 0, 64, false, false, null, 8);
+
     /**
      * Offset world: starts at negative coordinates (like the real Arda world).
      * xMin = -1000, xMax = 1001 -> inclusive width = 2002.  zMin = -500, zMax = 501 -> inclusive height = 1002.
@@ -143,6 +147,18 @@ class PlayerExplorationTest {
         assertTrue(pe.getCellSize() >= 128, "cellSize must be at least MIN_CELL_SIZE");
         assertTrue(200_000.0 / pe.getCellSize() <= 420,
                 "Grid must not exceed MAX_CELLS_PER_AXIS=420 on any axis");
+    }
+
+    /**
+     * Persisted exploration geometry should reject a later cell-size configuration change.
+     */
+    @Test
+    void matches_afterCellSizeChange_returnsFalse() {
+
+        PlayerExploration pe = PlayerExploration.create(SMALL_DIM, null);
+
+        assertTrue(pe.matches(SMALL_DIM));
+        assertFalse(pe.matches(SMALL_EXPLICIT_DIM));
     }
 
     /**

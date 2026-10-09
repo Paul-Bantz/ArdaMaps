@@ -161,6 +161,64 @@ class DimensionTypeAdapterTest {
     }
 
     /**
+     * Optional exploration cell size is read from dimension JSON.
+     */
+    @Test
+    void deserialize_withExplorationCellSize_preservesValue() {
+
+        Dimension dimension = ConfigManager.gson().fromJson("""
+                {
+                  "name": "Moria",
+                  "id": "test:moria",
+                  "scale_factor": 1,
+                  "x_min": 0,
+                  "x_max": 2939,
+                  "z_min": 0,
+                  "z_max": 1919,
+                  "exploration_cell_size": 8
+                }
+                """, Dimension.class);
+
+        assertEquals(8, dimension.getExplorationCellSize());
+    }
+
+    /**
+     * Missing exploration cell size remains compatible with existing dimension JSON.
+     */
+    @Test
+    void deserialize_withoutExplorationCellSize_usesAutoMode() {
+
+        Dimension dimension = ConfigManager.gson().fromJson("""
+                {
+                  "name": "Overworld",
+                  "id": "minecraft:overworld",
+                  "scale_factor": 1,
+                  "x_min": 0,
+                  "x_max": 10,
+                  "z_min": 0,
+                  "z_max": 10
+                }
+                """, Dimension.class);
+
+        assertEquals(0, dimension.getExplorationCellSize());
+    }
+
+    /**
+     * Explicit exploration cell size serializes back to dimension JSON.
+     */
+    @Test
+    void serialize_withExplorationCellSize_writesField() {
+
+        Dimension dimension = new Dimension("Moria", "test:moria", 1f,
+                0, 2939, 0, 1919, false, false, null, 8);
+
+        String json = ConfigManager.gson().toJson(dimension, Dimension.class);
+
+        assertTrue(json.contains("\"exploration_cell_size\""));
+        assertEquals(8, ConfigManager.gson().fromJson(json, Dimension.class).getExplorationCellSize());
+    }
+
+    /**
      * Structured remaps serialize to the documented nested region shape.
      */
     @Test

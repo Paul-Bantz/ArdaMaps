@@ -62,6 +62,18 @@ class DimensionTest {
     }
 
     /**
+     * The explicit exploration cell size is a persisted dimension-level setting.
+     */
+    @Test
+    void constructor_explicitExplorationCellSize_preservesValue() {
+
+        Dimension dimension = new Dimension("Test", "test:dimension", 1f, 0, 100, 0, 100,
+                false, false, null, 8);
+
+        assertEquals(8, dimension.getExplorationCellSize());
+    }
+
+    /**
      * Config refreshes create new Dimension instances for the same dimension ID, so equality must not depend on object identity.
      */
     @Test
@@ -113,5 +125,24 @@ class DimensionTest {
         assertEquals(first, dimension.findRemapAt(6, 6));
         assertEquals(second, dimension.findRemapAt(12, 12));
         assertNull(dimension.findRemapAt(20, 20));
+    }
+
+    /**
+     * Ranges above are selected by vertical ordering regardless of declaration order or swapped bounds.
+     */
+    @Test
+    void rangesAbove_unorderedAndSwappedBounds_returnsOnlyHigherRanges() {
+
+        MapLayerRange top = new MapLayerRange(2, "top.pmtiles", 32, 25);
+        MapLayerRange bottom = new MapLayerRange(0, "bottom.pmtiles", 10, 0);
+        MapLayerRange middle = new MapLayerRange(1, "middle.pmtiles", 11, 24);
+        Dimension dimension = new Dimension("Test", "test:dimension", 1f, 0, 100, 0, 100, false);
+        dimension.getMapLayers().add(new MapLayerDefinition("Ranged", MapLayerSource.PMTILES, true, 8,
+                null, 1.0, 1, 3, 1, 14, 256, 1.0, "fallback.pmtiles", "fallback.png",
+                List.of(top, bottom, middle)));
+
+        assertEquals(List.of(top), dimension.rangesAbove(middle));
+        assertEquals(List.of(top, middle), dimension.rangesAbove(bottom));
+        assertTrue(dimension.rangesAbove(top).isEmpty());
     }
 }

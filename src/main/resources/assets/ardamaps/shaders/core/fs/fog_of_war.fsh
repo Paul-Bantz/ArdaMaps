@@ -46,40 +46,5 @@ void main() {
     // Convert to fog darkness: 0.0 (hidden) -> 1.0 (dark), 1.0 (revealed) -> 0.0 (clear)
     float fogDarkness = 1.0 - blendedAlpha;
 
-    fragColor = vec4(fogTex.rgb * fogDarkness, fogDarkness);
-
-    /*vec4 fogTex = texture(FogTex, (texCoord - ZoomCenter) * FogTexScale + ZoomCenter);
-    vec2 texelSize = 1.0 / vec2(textureSize(FogMaskTex, 0));
-
-    // Sample radius in TEXTURE SPACE (not mask pixels)
-    // This means we sample sub-pixel positions in the mask
-    float worldRadius = 2.0; // Controls fade distance in mask texels
-    float sampleStep = 0.25; // Sub-pixel sampling (0.25 = 4 samples per texel)
-
-    float minDist = worldRadius + 1.0;
-    bool foundRevealed = false;
-
-    // Sample in a grid with sub-texel precision
-    for (float y = -worldRadius; y <= worldRadius; y += sampleStep) {
-        for (float x = -worldRadius; x <= worldRadius; x += sampleStep) {
-            vec2 offset = vec2(x, y) * texelSize;
-            float maskValue = texture(FogMaskTex, texCoord + offset).r;
-
-            if (maskValue > 0.5) {
-                float dist = length(vec2(x, y));
-                minDist = min(minDist, dist);
-                foundRevealed = true;
-            }
-        }
-    }
-
-    float alpha;
-    if (foundRevealed) {
-        // Gradient fades within worldRadius
-        alpha = smoothstep(0.0, worldRadius, minDist);
-    } else {
-        alpha = 1;
-    }
-
-    fragColor = vec4(fogTex.rgb * alpha, alpha);*/
+    fragColor = vec4(fogTex.rgb, fogDarkness);
 }

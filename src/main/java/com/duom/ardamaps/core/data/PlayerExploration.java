@@ -334,6 +334,17 @@ public class PlayerExploration implements Serializable {
     }
 
     /**
+     * Checks whether this persisted exploration grid still matches a dimension definition.
+     *
+     * @param dimension Current dimension definition.
+     * @return Whether the persisted geometry matches the current dimension.
+     */
+    public boolean matches(Dimension dimension) {
+
+        return ExplorationGrid.matchesGeometry(dimension, cellSize, nbCellsX, nbCellsY, xMin, zMin);
+    }
+
+    /**
      * @return The pure grid delegate, rebuilding it after JSON deserialization if needed.
      */
     private ExplorationGrid grid() {
@@ -423,6 +434,31 @@ public class PlayerExploration implements Serializable {
     }
 
     /**
+     * Finds the revealed cell with the densest square neighbourhood of revealed cells.
+     *
+     * @param radiusCells Radius in cells around each candidate to score.
+     * @return The best revealed hotspot, or null when no cells are revealed.
+     */
+    public @Nullable ExplorationGrid.RevealedHotspot findRevealedHotspot(int radiusCells) {
+
+        return grid().findRevealedHotspot(radiusCells);
+    }
+
+    /**
+     * Finds the world-space centre of the best revealed hotspot.
+     *
+     * @param radiusCells Radius in cells around each candidate to score.
+     * @return The hotspot centre in world coordinates, or null when no cells are revealed.
+     */
+    public @Nullable Vec2d findRevealedHotspotCenter(int radiusCells) {
+
+        ExplorationGrid.RevealedHotspot hotspot = findRevealedHotspot(radiusCells);
+        if (hotspot == null) return null;
+
+        return new Vec2d(cellCenterX(hotspot.cellX()), cellCenterZ(hotspot.cellY()));
+    }
+
+    /**
      * Sets the exploration state of a single cell.
      *
      * @param cellX Cell X index.
@@ -445,6 +481,25 @@ public class PlayerExploration implements Serializable {
 
         if (dirtyCells == null) dirtyCells = new HashSet<>();
         dirtyCells.addAll(grid().markCell(cellX, cellY, state, range));
+    }
+
+    /**
+     * Raises the exploration state for a cell and all cells within {@code range} cells of it.
+     *
+     * @param cellX Cell X index.
+     * @param cellY Cell Y index.
+     * @param state The minimum state.
+     * @param range Radius in cells; 0 means only the target cell.
+     * @return Whether at least one cell changed.
+     */
+    public boolean markCellAtLeast(int cellX, int cellY, ExplorationState state, int range) {
+
+        if (dirtyCells == null) dirtyCells = new HashSet<>();
+
+        Set<Integer> changedIndices = grid().markCellAtLeast(cellX, cellY, state, range);
+        dirtyCells.addAll(changedIndices);
+
+        return !changedIndices.isEmpty();
     }
 
     /**

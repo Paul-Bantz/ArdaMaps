@@ -34,7 +34,9 @@ import com.duom.ardamaps.core.data.Vec3d;
 import com.duom.ardamaps.core.data.config.ClientConfigManager;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.LocationConfig;
+import com.duom.ardamaps.core.data.config.MapLayerRange;
 import com.duom.ardamaps.core.data.config.client.ClientConfig;
+import com.duom.ardamaps.core.data.config.client.ClientProgress;
 import com.duom.ardamaps.core.data.config.client.ProgressWipe;
 import com.duom.ardamaps.core.data.guide.ArdaMapsChatLinkProcessor;
 import com.duom.ardamaps.core.data.guide.GuideImageCache;
@@ -479,8 +481,10 @@ public class ArdaMapsClient implements ClientModInitializer {
                 Client.invalidateCachedDimension();
 
                 ArdaMapsClient.CONFIG_MANAGER.wipeClientProgress(ProgressWipe.RANGED_MIGRATION, dimensions);
+                ArdaMapsClient.CONFIG_MANAGER.wipeClientProgress(ProgressWipe.GRID_MIGRATION, dimensions);
 
                 ArdaMapsClient.CONFIG.getClientProgress().reset(true);
+                ArdaMapsClient.CONFIG.getClientProgress().propagateVisibleUpward(dimensions);
                 ArdaMapsClient.CONFIG_MANAGER.saveProgress();
                 LOGGER.info("Per-dimension exploration instances initialised ({} dimension(s)).",
                         dimensions.size());
@@ -569,9 +573,10 @@ public class ArdaMapsClient implements ClientModInitializer {
         Dimension dimension = Client.currentDimension();
 
         PlayerExploration exploration;
+        MapLayerRange range = null;
 
         if (dimension != null && dimension.hasRanges()) {
-            var range = dimension.rangeForY(player.getY());
+            range = dimension.rangeForY(player.getY());
             exploration = progress.getExplorationState(dimensionId, range == null ? null : range.index(), true);
         } else {
             exploration = progress.getExplorationState(dimensionId, true);
@@ -592,6 +597,7 @@ public class ArdaMapsClient implements ClientModInitializer {
 
             exploration.markCell(cellX, cellZ, ExplorationState.REVEALED, 2);
             exploration.flushTexture();
+            propagateVisibleUpward(progress, dimensionId, dimension, range, cellX, cellZ);
 
             // After marking cells revealed, mark any locations within that area as explored
             ArdaMapsClient.CONFIG.getLocations(dimensionId, null).stream()
@@ -603,6 +609,30 @@ public class ArdaMapsClient implements ClientModInitializer {
                     .forEach(location -> location.updateExplorationState(ExplorationState.REVEALED));
 
             ArdaMapsClient.CONFIG_MANAGER.saveProgress();
+        }
+    }
+
+    /**
+     * Marks matching cells in ranges above the player's current range as visible.
+     *
+     * @param progress    Client exploration progress.
+     * @param dimensionId Current effective dimension ID.
+     * @param dimension   Current configured dimension.
+     * @param range       Current vertical range.
+     * @param cellX       Player cell X index.
+     * @param cellZ       Player cell Z index.
+     */
+    private void propagateVisibleUpward(ClientProgress progress, String dimensionId, Dimension dimension,
+                                        MapLayerRange range, int cellX, int cellZ) {
+
+        if (dimension == null || !dimension.hasRanges() || range == null) return;
+
+        for (MapLayerRange above : dimension.rangesAbove(range)) {
+            PlayerExploration aboveExploration = progress.getExplorationState(dimensionId, above.index(), true);
+            if (aboveExploration == null) continue;
+
+            aboveExploration.markCellAtLeast(cellX, cellZ, ExplorationState.VISIBLE, 2);
+            aboveExploration.flushTexture();
         }
     }
 

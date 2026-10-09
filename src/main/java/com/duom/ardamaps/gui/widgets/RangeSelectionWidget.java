@@ -36,7 +36,9 @@ import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.client.gui.tooltip.TooltipPositioner;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.text.OrderedText;
+import net.minecraft.text.Style;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2i;
 import org.joml.Vector2ic;
@@ -388,7 +390,7 @@ public class RangeSelectionWidget extends ClickableWidget {
         MapLayerRange range = ranges.get(hoveredIndex);
         int anchorX = clampTooltipAnchorX((int) itemXAt(hoveredIndex) + itemWidth / 2, stripX(), stripX() + viewportWidth());
         int anchorY = getY() - TOOLTIP_GAP;
-        List<OrderedText> tooltip = List.of(Text.literal(tooltipLabel(range)).asOrderedText());
+        List<OrderedText> tooltip = tooltipLines(range).stream().map(Text::asOrderedText).toList();
         context.drawTooltip(textRenderer, tooltip, AboveAnchorTooltipPositioner.INSTANCE, anchorX, anchorY);
     }
 
@@ -688,6 +690,21 @@ public class RangeSelectionWidget extends ClickableWidget {
     }
 
     /**
+     * Builds the tooltip lines for a hovered range.
+     *
+     * @param range The range to label.
+     * @return One interval line, or name plus muted interval when a name is configured.
+     */
+    static List<Text> tooltipLines(MapLayerRange range) {
+
+        if (range.name() == null || range.name().isBlank()) return List.of(Text.literal(tooltipLabel(range)));
+
+        return List.of(
+                Text.literal(range.name()),
+                Text.literal(tooltipLabel(range)).setStyle(Style.EMPTY.withFormatting(Formatting.GRAY)));
+    }
+
+    /**
      * Interpolates two ARGB colours channel-by-channel.
      *
      * @param interpolationFraction The interpolation fraction in the inclusive range [0, 1].
@@ -778,6 +795,7 @@ public class RangeSelectionWidget extends ClickableWidget {
      * @param max   The maximum allowed coordinate.
      * @return The clamped coordinate.
      */
+    @SuppressWarnings("SameParameterValue")
     static int clampToScreen(int value, int min, int max) {
 
         if (max < min) return min;

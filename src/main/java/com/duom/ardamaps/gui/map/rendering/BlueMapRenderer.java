@@ -152,7 +152,8 @@ public class BlueMapRenderer extends MapRenderable {
         }
 
         if (!renderMap(context)) {
-            super.renderLoadingText(context);
+            if (!provider.getLoadingTiles().isEmpty()) super.renderLoadingText(context);
+            renderFogOfWar();
             return;
         }
         renderFogOfWar();

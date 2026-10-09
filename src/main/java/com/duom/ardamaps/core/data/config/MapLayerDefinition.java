@@ -27,6 +27,8 @@ package com.duom.ardamaps.core.data.config;
 
 import com.google.gson.annotations.SerializedName;
 
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -45,8 +47,8 @@ import java.util.Objects;
  *     <li>"max_lod": The maximum Bluemap LOD level allowed</li>
  *     <li>"min_zoom": The minimum zoom level allowed</li>
  *     <li>"max_zoom": The maximum zoom level allowed</li>
- *     <li>"path": The path or URL to the layer data. Optional when "ranges" is present</li>
- *     <li>"ranges": Optional vertical Y bands with their own path data</li>
+ *     <li>"path": The path or URL to the layer data. On a ranged layer, the base path or URL for relative range paths</li>
+ *     <li>"ranges": Optional vertical Y bands with their own path data and optional "name" display label</li>
  * </ul>
  * Example JSON:
  * <pre>
@@ -73,7 +75,7 @@ import java.util.Objects;
  * @param maxZoom       The maximum zoom level allowed
  * @param tileSize      The tile size in pixels (default is 256)
  * @param scale         The scale factor to apply to the layer (default is 1.0)
- * @param path          The path or URL to the layer data. Optional when ranges are present
+ * @param path          The path or URL to the layer data. On a ranged layer, the base path or URL for relative range paths
  * @param icon          The icon to use for the layer (optional)
  * @param ranges        Optional vertical Y bands with their own path data
  */
@@ -176,7 +178,22 @@ public record MapLayerDefinition(@SerializedName("layer") String layer, @Seriali
         if (!hasRanges()) return path();
 
         MapLayerRange range = y == null ? ranges.get(0) : rangeForY(y);
-        return range == null ? path() : range.path();
+        return range == null ? path() : resolveRangePath(range);
+    }
+
+    /**
+     * Resolves a range path against this ranged layer's base path when it is relative.
+     *
+     * @param range The range whose data path should be resolved.
+     * @return The range path, joined to the layer base path when applicable.
+     */
+    public String resolveRangePath(MapLayerRange range) {
+
+        String rangePath = range.path();
+        if (path() == null || path().isBlank()) return rangePath;
+        if (isAbsoluteRangePath(rangePath)) return rangePath;
+
+        return trimTrailingPathSeparators(path()) + "/" + trimLeadingPathSeparators(rangePath);
     }
 
     /**
@@ -184,6 +201,49 @@ public record MapLayerDefinition(@SerializedName("layer") String layer, @Seriali
      */
     public boolean hasRanges() {
         return ranges != null && !ranges.isEmpty();
+    }
+
+    /**
+     * Checks whether a range path should bypass base-path resolution.
+     *
+     * @param path The range path to inspect.
+     * @return True when the range path is an absolute URL or local file path.
+     */
+    private static boolean isAbsoluteRangePath(String path) {
+
+        if (path.contains("://")) return true;
+
+        try {
+            return Path.of(path).isAbsolute();
+        } catch (InvalidPathException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Removes trailing path separators from a base path.
+     *
+     * @param path The base path to trim.
+     * @return The base path without trailing slash or backslash characters.
+     */
+    private static String trimTrailingPathSeparators(String path) {
+
+        int end = path.length();
+        while (end > 0 && (path.charAt(end - 1) == '/' || path.charAt(end - 1) == '\\')) end--;
+        return path.substring(0, end);
+    }
+
+    /**
+     * Removes leading path separators from a relative range path.
+     *
+     * @param path The range path to trim.
+     * @return The range path without leading slash or backslash characters.
+     */
+    private static String trimLeadingPathSeparators(String path) {
+
+        int start = 0;
+        while (start < path.length() && (path.charAt(start) == '/' || path.charAt(start) == '\\')) start++;
+        return path.substring(start);
     }
 
     /**

@@ -236,12 +236,16 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
             return;
         }
 
+        if (reason == ProgressWipe.GRID_MIGRATION && !config.getClientProgress().migrateGridGeometry(dimensions)) {
+            return;
+        }
+
         rotateProgressBackups();
 
         switch (reason) {
             case FULL_RESET -> config.getClientProgress().reset(false);
             case CORRUPT_FILE -> config.setClientProgress(createDefaultProgress());
-            case RANGED_MIGRATION -> {
+            case RANGED_MIGRATION, GRID_MIGRATION -> {
                 // Migration was applied before backing up so stale entries are disposed once.
             }
         }

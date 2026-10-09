@@ -103,7 +103,7 @@ class MapLayerLoaderTest {
                 14,
                 256,
                 1.0,
-                "default.pmtiles",
+                null,
                 "",
                 ranges);
     }
@@ -148,6 +148,35 @@ class MapLayerLoaderTest {
         MapLayerDefinition layer = layer(List.of(low, high));
 
         assertEquals("high.pmtiles", MapLayerLoader.resolveLayer(layer, high, 0.0).path());
+    }
+
+    /**
+     * Verifies that an explicit UI-selected range is resolved against the ranged layer base path.
+     */
+    @Test
+    void resolveLayer_selectedRangeWithBasePath_usesResolvedRangePath() {
+
+        var low = range(0, "low.pmtiles", -64, 63);
+        var high = range(1, "high.pmtiles", 64, 320);
+        MapLayerDefinition layer = layer(List.of(low, high));
+        layer = new MapLayerDefinition(
+                layer.layer(),
+                layer.type(),
+                layer.remote(),
+                layer.identityZoom(),
+                layer.preferredZoom(),
+                layer.lodFactor(),
+                layer.minLod(),
+                layer.maxLod(),
+                layer.minZoom(),
+                layer.maxZoom(),
+                layer.tileSize(),
+                layer.scale(),
+                "ardamaps-root",
+                layer.icon(),
+                layer.ranges());
+
+        assertEquals("ardamaps-root/high.pmtiles", MapLayerLoader.resolveLayer(layer, high, 0.0).path());
     }
 
     /**

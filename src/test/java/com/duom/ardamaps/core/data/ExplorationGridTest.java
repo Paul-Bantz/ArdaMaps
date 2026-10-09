@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 
 import static com.duom.ardamaps.core.data.ExplorationState.HIDDEN;
 import static com.duom.ardamaps.core.data.ExplorationState.REVEALED;
+import static com.duom.ardamaps.core.data.ExplorationState.VISIBLE;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -48,6 +49,10 @@ class ExplorationGridTest {
     /** Offset world starting at negative coordinates. */
     private static final Dimension OFFSET_DIM =
             new Dimension("Offset", "test:offset", 1f, -1000, 1001, -500, 501, false);
+
+    /** Moria-sized world with explicit 8-block exploration cells. */
+    private static final Dimension EXPLICIT_DIM =
+            new Dimension("Moria", "test:moria", 1f, 0, 2939, 0, 1919, false, false, null, 8);
 
     /**
      * Small worlds should use the minimum grid cell size.
@@ -71,6 +76,53 @@ class ExplorationGridTest {
         assertTrue(grid.getCellSize() >= 128);
         assertTrue(grid.getNbCellsX() <= 420);
         assertTrue(grid.getNbCellsY() <= 420);
+    }
+
+    /**
+     * Explicit cell sizes should be honored for modestly sized dimensions.
+     */
+    @Test
+    void computeCellSize_explicitSize_returnsRequestedGrid() {
+
+        ExplorationGrid grid = ExplorationGrid.create(EXPLICIT_DIM, null);
+
+        assertEquals(8, grid.getCellSize());
+        assertEquals(368, grid.getNbCellsX());
+        assertEquals(240, grid.getNbCellsY());
+    }
+
+    /**
+     * A zero explicit size is the documented auto mode.
+     */
+    @Test
+    void computeCellSize_zeroExplicitSize_usesAutoMode() {
+
+        assertEquals(128, ExplorationGrid.computeCellSize(2940, 1920, 0));
+    }
+
+    /**
+     * Tiny explicit cells are raised enough to cap the largest axis.
+     */
+    @Test
+    void computeCellSize_tinyExplicitSize_capsGridAxis() {
+
+        assertEquals(196, ExplorationGrid.computeCellSize(400_002, 400_002, 1));
+    }
+
+    /**
+     * Persisted geometry matches only when all scalar grid fields still match the dimension.
+     */
+    @Test
+    void matchesGeometry_comparesComputedGeometry() {
+
+        ExplorationGrid grid = ExplorationGrid.create(EXPLICIT_DIM, null);
+
+        assertTrue(ExplorationGrid.matchesGeometry(EXPLICIT_DIM, grid.getCellSize(), grid.getNbCellsX(),
+                grid.getNbCellsY(), grid.getXMin(), grid.getZMin()));
+        assertFalse(ExplorationGrid.matchesGeometry(EXPLICIT_DIM, 128, grid.getNbCellsX(),
+                grid.getNbCellsY(), grid.getXMin(), grid.getZMin()));
+        assertFalse(ExplorationGrid.matchesGeometry(EXPLICIT_DIM, grid.getCellSize(), grid.getNbCellsX() + 1,
+                grid.getNbCellsY(), grid.getXMin(), grid.getZMin()));
     }
 
     /**
@@ -112,6 +164,72 @@ class ExplorationGridTest {
     }
 
     /**
+     * Upgrade-only marking raises hidden cells to the requested state.
+     */
+    @Test
+    void markCellAtLeast_hiddenCell_upgradesToVisible() {
+
+        ExplorationGrid grid = ExplorationGrid.create(OFFSET_DIM, null);
+
+        assertEquals(grid.index(1, 1), grid.markCellAtLeast(1, 1, VISIBLE));
+
+        assertEquals(VISIBLE, grid.stateAt(1, 1));
+    }
+
+    /**
+     * Upgrade-only marking preserves stronger states.
+     */
+    @Test
+    void markCellAtLeast_revealedCell_doesNotDowngradeToVisible() {
+
+        ExplorationGrid grid = ExplorationGrid.create(OFFSET_DIM, null);
+        grid.markCell(1, 1, REVEALED);
+
+        assertEquals(-1, grid.markCellAtLeast(1, 1, VISIBLE));
+
+        assertEquals(REVEALED, grid.stateAt(1, 1));
+    }
+
+    /**
+     * Upgrade-only ranged marking returns only cells whose state changed.
+     */
+    @Test
+    void markCellAtLeast_range_returnsOnlyChangedCells() {
+
+        ExplorationGrid grid = ExplorationGrid.create(OFFSET_DIM, null);
+        grid.markCell(1, 1, REVEALED);
+
+        var changed = grid.markCellAtLeast(1, 1, VISIBLE, 1);
+
+        assertEquals(4, changed.size());
+        assertFalse(changed.contains(grid.index(1, 1)));
+        assertTrue(changed.contains(grid.index(0, 1)));
+        assertTrue(changed.contains(grid.index(1, 0)));
+        assertTrue(changed.contains(grid.index(1, 2)));
+        assertTrue(changed.contains(grid.index(2, 1)));
+    }
+
+    /**
+     * Upgrade-only ranged marking respects circular radius and grid bounds.
+     */
+    @Test
+    void markCellAtLeast_edgeRange_respectsRadiusAndBounds() {
+
+        ExplorationGrid grid = ExplorationGrid.create(OFFSET_DIM, null);
+
+        var changed = grid.markCellAtLeast(0, 0, VISIBLE, 2);
+
+        assertEquals(6, changed.size());
+        assertTrue(changed.contains(grid.index(0, 0)));
+        assertTrue(changed.contains(grid.index(1, 0)));
+        assertTrue(changed.contains(grid.index(2, 0)));
+        assertTrue(changed.contains(grid.index(0, 1)));
+        assertTrue(changed.contains(grid.index(1, 1)));
+        assertTrue(changed.contains(grid.index(0, 2)));
+        assertEquals(HIDDEN, grid.stateAt(2, 1));
+    }
+
+    /**
      * Region queries return true when an intersecting cell is visible or revealed.
      */
     @Test
@@ -141,6 +259,85 @@ class ExplorationGridTest {
 
         assertFalse(grid.regionExplored(otherCellTopLeftX, otherCellTopLeftZ, 10, 10, 0));
         assertFalse(grid.regionExplored(OFFSET_DIM.getXMin() - 5000, OFFSET_DIM.getZMin() - 5000, 20, 20, 0));
+    }
+
+    /**
+     * Empty grids do not have a revealed hotspot.
+     */
+    @Test
+    void findRevealedHotspot_emptyGrid_returnsNull() {
+
+        ExplorationGrid grid = ExplorationGrid.create(0, 0, 1, 5, 5, null);
+
+        assertNull(grid.findRevealedHotspot(1));
+    }
+
+    /**
+     * A single revealed cell is selected as the hotspot.
+     */
+    @Test
+    void findRevealedHotspot_singleCell_returnsCell() {
+
+        ExplorationGrid grid = ExplorationGrid.create(0, 0, 1, 5, 5, null);
+        grid.markCell(2, 3, REVEALED);
+
+        var hotspot = grid.findRevealedHotspot(1);
+
+        assertNotNull(hotspot);
+        assertEquals(2, hotspot.cellX());
+        assertEquals(3, hotspot.cellY());
+        assertEquals(1, hotspot.revealedNeighbours());
+    }
+
+    /**
+     * Dense revealed areas beat isolated revealed cells.
+     */
+    @Test
+    void findRevealedHotspot_isolatedCellAndBlock_returnsBlockCenter() {
+
+        ExplorationGrid grid = ExplorationGrid.create(0, 0, 1, 8, 8, null);
+        grid.markCell(0, 0, REVEALED);
+        for (int cellY = 3; cellY <= 5; cellY++) {
+            for (int cellX = 3; cellX <= 5; cellX++) {
+                grid.markCell(cellX, cellY, REVEALED);
+            }
+        }
+
+        var hotspot = grid.findRevealedHotspot(1);
+
+        assertNotNull(hotspot);
+        assertEquals(4, hotspot.cellX());
+        assertEquals(4, hotspot.cellY());
+        assertEquals(9, hotspot.revealedNeighbours());
+    }
+
+    /**
+     * Equal scores preserve scan-order tie breaking.
+     */
+    @Test
+    void findRevealedHotspot_equalScores_returnsFirstInScanOrder() {
+
+        ExplorationGrid grid = ExplorationGrid.create(0, 0, 1, 5, 5, null);
+        grid.markCell(3, 3, REVEALED);
+        grid.markCell(1, 1, REVEALED);
+
+        var hotspot = grid.findRevealedHotspot(0);
+
+        assertNotNull(hotspot);
+        assertEquals(1, hotspot.cellX());
+        assertEquals(1, hotspot.cellY());
+    }
+
+    /**
+     * Visible cells alone are not considered revealed hotspots.
+     */
+    @Test
+    void findRevealedHotspot_visibleOnly_returnsNull() {
+
+        ExplorationGrid grid = ExplorationGrid.create(0, 0, 1, 5, 5, null);
+        grid.markCell(2, 2, VISIBLE);
+
+        assertNull(grid.findRevealedHotspot(1));
     }
 
     /**

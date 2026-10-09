@@ -69,7 +69,7 @@
   "ardamaps.client.map.screen.side.panel.unvisited.description": "<blockquote><em>Not all those who wander are lost...</em></blockquote><p>You have not visited this location yet. To get detailed information, you have to go in-situ. Pack your bag, grab a handful of pipeweed and go exploring</p>",
   "ardamaps.client.map.screen.side.panel.location.in.progress": "Work in progress",
   "ardamaps.client.map.screen.side.panel.location.in.progress.description": "This location is a work in progress, it will be completed in a future update.",
-  "ardamaps.client.map.screen.range.label": "Depth",
+  "ardamaps.client.map.screen.range.label": "Deep",
   "ardamaps.client.map.screen.side.panel.unvisited.location": "Location not visited",
   "ardamaps.client.map.screen.unknown.region": "Unknown Region",
   "ardamaps.client.notification.location.visited": "Location visited, open your map to get more information",

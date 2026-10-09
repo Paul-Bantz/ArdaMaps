@@ -28,6 +28,9 @@ package com.duom.ardamaps.core.data;
 import com.duom.ardamaps.core.data.config.Dimension;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -41,11 +44,17 @@ import java.util.Set;
 @Getter
 public class ExplorationGrid implements Serializable {
 
+    /** Class logger. */
+    private static final Logger LOGGER = LoggerFactory.getLogger(ExplorationGrid.class);
+
     /** Minimum cell size in world units (blocks). */
     private static final int MIN_CELL_SIZE = 128;
 
     /** Maximum number of cells allowed along any single axis. */
     private static final int MAX_CELLS_PER_AXIS = 420;
+
+    /** Maximum number of cells allowed along any single axis for explicit cell sizes. */
+    private static final int MAX_EXPLICIT_CELLS_PER_AXIS = 2048;
 
     @Serial
     private static final long serialVersionUID = 1L;
@@ -77,7 +86,7 @@ public class ExplorationGrid implements Serializable {
      */
     public static ExplorationGrid create(Dimension dimension, byte[] explorationData) {
 
-        int cellSize = computeCellSize(dimension.getWidth(), dimension.getHeight());
+        int cellSize = computeCellSize(dimension.getWidth(), dimension.getHeight(), dimension.getExplorationCellSize());
         int nbCellsX = (int) Math.ceil((double) dimension.getWidth() / cellSize);
         int nbCellsY = (int) Math.ceil((double) dimension.getHeight() / cellSize);
 
@@ -116,17 +125,53 @@ public class ExplorationGrid implements Serializable {
     }
 
     /**
-     * Computes the cell size for the given world dimensions, ensuring neither axis exceeds
-     * {@value #MAX_CELLS_PER_AXIS} cells while staying at or above {@value #MIN_CELL_SIZE}.
+     * Computes the cell size for the given world dimensions and optional requested size.
      *
-     * @param width  World width in blocks.
-     * @param height World height in blocks.
+     * @param width     World width in blocks.
+     * @param height    World height in blocks.
+     * @param requested Requested cell size, or 0 for automatic sizing.
      * @return The resolved cell size in blocks.
      */
-    static int computeCellSize(int width, int height) {
+    static int computeCellSize(int width, int height, int requested) {
+
+        if (requested > 0) {
+            int minimum = (int) Math.ceil((double) Math.max(width, height) / MAX_EXPLICIT_CELLS_PER_AXIS);
+            int resolved = Math.max(requested, minimum);
+
+            if (resolved != requested) {
+                LOGGER.warn("Raised requested exploration cell size from {} to {} to keep the grid under {} cells per axis.",
+                        requested, resolved, MAX_EXPLICIT_CELLS_PER_AXIS);
+            }
+
+            return resolved;
+        }
 
         int needed = (int) Math.ceil((double) Math.max(width, height) / MAX_CELLS_PER_AXIS);
         return Math.max(MIN_CELL_SIZE, needed);
+    }
+
+    /**
+     * Checks whether persisted grid geometry still matches the current dimension configuration.
+     *
+     * @param dimension Current dimension definition.
+     * @param cellSize  Persisted cell size.
+     * @param nbCellsX  Persisted number of X cells.
+     * @param nbCellsY  Persisted number of Z cells.
+     * @param xMin      Persisted minimum X coordinate.
+     * @param zMin      Persisted minimum Z coordinate.
+     * @return Whether the persisted geometry matches the current computed geometry.
+     */
+    static boolean matchesGeometry(Dimension dimension, int cellSize, int nbCellsX, int nbCellsY, int xMin, int zMin) {
+
+        int expectedCellSize = computeCellSize(dimension.getWidth(), dimension.getHeight(), dimension.getExplorationCellSize());
+        int expectedCellsX = (int) Math.ceil((double) dimension.getWidth() / expectedCellSize);
+        int expectedCellsY = (int) Math.ceil((double) dimension.getHeight() / expectedCellSize);
+
+        return cellSize == expectedCellSize
+                && nbCellsX == expectedCellsX
+                && nbCellsY == expectedCellsY
+                && xMin == dimension.getXMin()
+                && zMin == dimension.getZMin();
     }
 
     /**
@@ -289,6 +334,81 @@ public class ExplorationGrid implements Serializable {
     }
 
     /**
+     * Finds the revealed cell with the densest square neighbourhood of revealed cells.
+     *
+     * @param radiusCells Radius in cells around each candidate to score.
+     * @return The best revealed hotspot, or null when no cells are revealed.
+     */
+    public @Nullable RevealedHotspot findRevealedHotspot(int radiusCells) {
+
+        int[] sums = revealedSummedAreaTable();
+        RevealedHotspot best = null;
+
+        for (int cellY = 0; cellY < nbCellsY; cellY++) {
+            for (int cellX = 0; cellX < nbCellsX; cellX++) {
+                if (stateAt(cellX, cellY) != ExplorationState.REVEALED) continue;
+
+                int neighbours = revealedCount(sums,
+                        Math.max(0, cellX - radiusCells),
+                        Math.max(0, cellY - radiusCells),
+                        Math.min(nbCellsX - 1, cellX + radiusCells),
+                        Math.min(nbCellsY - 1, cellY + radiusCells));
+
+                if (best == null || neighbours > best.revealedNeighbours()) {
+                    best = new RevealedHotspot(cellX, cellY, neighbours);
+                }
+            }
+        }
+
+        return best;
+    }
+
+    /**
+     * Builds a summed-area table for revealed cells.
+     *
+     * @return A row-major table with one extra row and column.
+     */
+    private int[] revealedSummedAreaTable() {
+
+        int summedWidth = nbCellsX + 1;
+        int[] sums = new int[summedWidth * (nbCellsY + 1)];
+
+        for (int cellY = 0; cellY < nbCellsY; cellY++) {
+            int rowCount = 0;
+            for (int cellX = 0; cellX < nbCellsX; cellX++) {
+                if (stateAt(cellX, cellY) == ExplorationState.REVEALED) rowCount++;
+
+                int sumIndex = (cellY + 1) * summedWidth + cellX + 1;
+                sums[sumIndex] = sums[sumIndex - summedWidth] + rowCount;
+            }
+        }
+
+        return sums;
+    }
+
+    /**
+     * Counts revealed cells within an inclusive rectangle using a summed-area table.
+     *
+     * @param sums     Summed-area table from {@link #revealedSummedAreaTable()}.
+     * @param minCellX Inclusive minimum cell X.
+     * @param minCellY Inclusive minimum cell Y.
+     * @param maxCellX Inclusive maximum cell X.
+     * @param maxCellY Inclusive maximum cell Y.
+     * @return Number of revealed cells in the rectangle.
+     */
+    private int revealedCount(int[] sums, int minCellX, int minCellY, int maxCellX, int maxCellY) {
+
+        int summedWidth = nbCellsX + 1;
+        int x1 = maxCellX + 1;
+        int y1 = maxCellY + 1;
+
+        return sums[y1 * summedWidth + x1]
+                - sums[minCellY * summedWidth + x1]
+                - sums[y1 * summedWidth + minCellX]
+                + sums[minCellY * summedWidth + minCellX];
+    }
+
+    /**
      * Sets one cell's exploration state.
      *
      * @param cellX Cell X index.
@@ -306,6 +426,22 @@ public class ExplorationGrid implements Serializable {
     }
 
     /**
+     * Raises one cell to at least the given exploration state without downgrading it.
+     *
+     * @param cellX Cell X index.
+     * @param cellY Cell Y index.
+     * @param state Minimum exploration state.
+     * @return The changed row-major index, or -1 when out of bounds or already at least that state.
+     */
+    public int markCellAtLeast(int cellX, int cellY, ExplorationState state) {
+
+        if (!inBounds(cellX, cellY)) return -1;
+        if (stateAt(cellX, cellY).ordinal() >= state.ordinal()) return -1;
+
+        return markCell(cellX, cellY, state);
+    }
+
+    /**
      * Sets the exploration state for a cell and all cells within {@code range} cells of it.
      *
      * @param cellX Cell X index.
@@ -316,12 +452,41 @@ public class ExplorationGrid implements Serializable {
      */
     public Set<Integer> markCell(int cellX, int cellY, ExplorationState state, int range) {
 
+        return markCells(cellX, cellY, state, range, false);
+    }
+
+    /**
+     * Raises the exploration state for a cell and all cells within {@code range} cells of it.
+     *
+     * @param cellX Cell X index.
+     * @param cellY Cell Y index.
+     * @param state Minimum exploration state.
+     * @param range Radius in cells; 0 means only the target cell.
+     * @return The changed row-major indices.
+     */
+    public Set<Integer> markCellAtLeast(int cellX, int cellY, ExplorationState state, int range) {
+
+        return markCells(cellX, cellY, state, range, true);
+    }
+
+    /**
+     * Marks cells in a circular range, optionally applying upgrade-only semantics.
+     *
+     * @param cellX       Cell X index.
+     * @param cellY       Cell Y index.
+     * @param state       New or minimum exploration state.
+     * @param range       Radius in cells; 0 means only the target cell.
+     * @param upgradeOnly Whether already higher states should be preserved.
+     * @return The changed row-major indices.
+     */
+    private Set<Integer> markCells(int cellX, int cellY, ExplorationState state, int range, boolean upgradeOnly) {
+
         Set<Integer> changedIndices = new HashSet<>();
 
         if (!inBounds(cellX, cellY)) return changedIndices;
 
         if (range == 0) {
-            int changedIndex = markCell(cellX, cellY, state);
+            int changedIndex = upgradeOnly ? markCellAtLeast(cellX, cellY, state) : markCell(cellX, cellY, state);
             if (changedIndex >= 0) changedIndices.add(changedIndex);
             return changedIndices;
         }
@@ -331,7 +496,10 @@ public class ExplorationGrid implements Serializable {
                 int neighborX = cellX + dx;
                 int neighborY = cellY + dy;
                 if (dx * dx + dy * dy <= range * range && inBounds(neighborX, neighborY)) {
-                    changedIndices.add(markCell(neighborX, neighborY, state));
+                    int changedIndex = upgradeOnly
+                            ? markCellAtLeast(neighborX, neighborY, state)
+                            : markCell(neighborX, neighborY, state);
+                    if (changedIndex >= 0) changedIndices.add(changedIndex);
                 }
             }
         }
@@ -359,5 +527,15 @@ public class ExplorationGrid implements Serializable {
     public double cellCenterZ(int cellZ) {
 
         return zMin + cellZ * (double) cellSize + cellSize / 2.0;
+    }
+
+    /**
+     * A revealed cell and its local revealed-cell density score.
+     *
+     * @param cellX              Cell X index.
+     * @param cellY              Cell Y index.
+     * @param revealedNeighbours Revealed cells inside the scoring window.
+     */
+    public record RevealedHotspot(int cellX, int cellY, int revealedNeighbours) {
     }
 }

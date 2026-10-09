@@ -26,6 +26,7 @@
 package com.duom.ardamaps.core.networking.handlers.client;
 
 import com.duom.ardamaps.ArdaMapsClient;
+import com.duom.ardamaps.core.Client;
 import com.duom.ardamaps.core.consumers.networking.ServerToClientPacketHandler;
 import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.PlayerExploration;
@@ -36,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Handles incoming {@link PlayerExplorationPacket} packets from the server, updates the client's
@@ -59,6 +61,14 @@ public class PlayerExplorationEventHandler extends ServerToClientPacketHandler<P
 
             // Discard packet if empty or null
             if (packet == null || packet.isEmpty()) return;
+
+            var currentPlayerDim = Client.currentDimensionId();
+
+            if (!Objects.equals(currentPlayerDim, packet.dimensionId())) {
+
+                LOGGER.warn("Received PlayerExplorationPacket for mismatched dimension '{}', ignoring.", packet.dimensionId());
+                return;
+            }
 
             // Resolve the per-dimension exploration instance; skip if unknown dimension.
             PlayerExploration exploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(packet.dimensionId(), false);

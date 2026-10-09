@@ -196,6 +196,106 @@ public class ClientProgress implements Serializable {
     }
 
     /**
+     * Removes exploration entries whose persisted grid geometry no longer matches the current dimensions.
+     *
+     * @param dimensions Incoming dimensions from the server.
+     * @return True when at least one stale grid entry was removed.
+     */
+    public boolean migrateGridGeometry(List<Dimension> dimensions) {
+
+        boolean migrated = false;
+
+        for (Dimension dimension : dimensions) {
+            Iterator<Map.Entry<String, PlayerExploration>> iterator = explorationState.entrySet().iterator();
+
+            while (iterator.hasNext()) {
+                Map.Entry<String, PlayerExploration> entry = iterator.next();
+                if (!isDimensionExplorationKey(entry.getKey(), dimension.getId())) continue;
+
+                PlayerExploration exploration = entry.getValue();
+                if (exploration.matches(dimension)) continue;
+
+                LOGGER.warn("Removing stale exploration grid for dimension key {}", entry.getKey());
+                iterator.remove();
+                exploration.dispose();
+                migrated = true;
+            }
+        }
+
+        return migrated;
+    }
+
+    /**
+     * Propagates revealed ranged exploration upward as visible cells for saves created before that rule existed.
+     *
+     * @param dimensions Incoming dimensions from the server.
+     * @return True when at least one above-range cell changed.
+     */
+    public boolean propagateVisibleUpward(List<Dimension> dimensions) {
+
+        boolean changed = false;
+
+        for (Dimension dimension : dimensions) {
+            if (!dimension.hasRanges()) continue;
+
+            for (var range : dimension.getExplorationRanges()) {
+                PlayerExploration source = getExplorationState(dimension.getId(), range.index(), false);
+                if (source == null) continue;
+
+                List<PlayerExploration> aboveExplorations = dimension.rangesAbove(range).stream()
+                        .map(above -> getExplorationState(dimension.getId(), above.index(), false))
+                        .filter(Objects::nonNull)
+                        .toList();
+                if (aboveExplorations.isEmpty()) continue;
+
+                changed |= propagateVisibleCells(source, aboveExplorations);
+            }
+        }
+
+        return changed;
+    }
+
+    /**
+     * Propagates each revealed source cell to above-range exploration states.
+     *
+     * @param source            The source range exploration.
+     * @param aboveExplorations Exploration states for ranges above the source range.
+     * @return True when at least one target cell changed.
+     */
+    private boolean propagateVisibleCells(PlayerExploration source, List<PlayerExploration> aboveExplorations) {
+
+        boolean changed = false;
+
+        for (int cellY = 0; cellY < source.getNbCellsY(); cellY++) {
+            for (int cellX = 0; cellX < source.getNbCellsX(); cellX++) {
+                if (source.stateAt(cellX, cellY) != ExplorationState.REVEALED) continue;
+
+                for (PlayerExploration aboveExploration : aboveExplorations) {
+                    changed |= aboveExploration.markCellAtLeast(cellX, cellY, ExplorationState.VISIBLE, 0);
+                }
+            }
+        }
+
+        if (changed) {
+            aboveExplorations.forEach(PlayerExploration::flushTexture);
+        }
+
+        return changed;
+    }
+
+    /**
+     * Checks whether an exploration key belongs to a dimension.
+     *
+     * @param key         Saved exploration key.
+     * @param dimensionId Configured dimension ID.
+     * @return Whether the key is the bare dimension or one of its ranged entries.
+     */
+    private boolean isDimensionExplorationKey(String key, String dimensionId) {
+
+        return key.equals(dimensionId) || key.startsWith(dimensionId + "#");
+    }
+
+    /**
      * Retrieves the exploration state for a specific dimension.
      *
      * @param dimensionId   The ID of the dimension to retrieve the exploration state for.
