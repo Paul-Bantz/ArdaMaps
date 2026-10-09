@@ -47,6 +47,8 @@ import org.mockito.Mockito;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.duom.ardamaps.core.data.ExplorationState.REVEALED;
+import static com.duom.ardamaps.core.data.ExplorationState.VISIBLE;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -194,6 +196,40 @@ class ClientProgressTest {
 
         assertTrue(progress.getTrails().isEmpty());
         assertEquals(0d, progress.getMovementStats().getWalkedMetres());
+    }
+
+    /**
+     * Grid migration removes persisted exploration when the configured cell geometry changes.
+     */
+    @Test
+    void migrateGridGeometry_removesMismatchedExploration() {
+
+        ClientProgress progress = new ClientProgress();
+        assertNotNull(progress.getExplorationState("test:dimension", 0, true));
+        Dimension fineGrid = new Dimension("Test", "test:dimension", 1f, 0, 1000, 0, 1000, false, false, null, 8);
+        fineGrid.getMapLayers().add(rangedDimension().getMapLayers().getFirst());
+
+        assertTrue(progress.migrateGridGeometry(List.of(fineGrid)));
+
+        assertFalse(progress.getExplorationState().containsKey("test:dimension#0"));
+    }
+
+    /**
+     * Revealed cells in a lower range are propagated upward as visible cells.
+     */
+    @Test
+    void propagateVisibleUpward_marksAboveRangesVisible() {
+
+        ClientProgress progress = new ClientProgress();
+        var low = progress.getExplorationState("test:dimension", LOW.index(), true);
+        var high = progress.getExplorationState("test:dimension", HIGH.index(), true);
+        assertNotNull(low);
+        assertNotNull(high);
+
+        low.markCell(2, 2, REVEALED);
+
+        assertTrue(progress.propagateVisibleUpward(List.of(rangedDimension())));
+        assertEquals(VISIBLE, high.stateAt(2, 2));
     }
 
     /**

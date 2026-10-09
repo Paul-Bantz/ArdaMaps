@@ -27,6 +27,8 @@ package com.duom.ardamaps.gui.screens.map;
 
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.core.data.PlayerExploration;
+import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
 import com.duom.ardamaps.core.data.config.MapLayerRange;
@@ -420,8 +422,10 @@ public class MapControlBar {
     /**
      * Rebuilds the layer button and registers it with the host.
      * May trigger {@link Host#onLayerSelectionChanged()} if the resolved layer differs from the previous.
+     *
+     * @return Whether the layer selection change triggered a reload.
      */
-    private void configureLayerButton() {
+    private boolean configureLayerButton() {
 
         List<MapLayerDefinition> mapLayers = MapLayerDropdownOptions.forDimension(selectedDimension);
 
@@ -465,7 +469,12 @@ public class MapControlBar {
         host.addControl(layerButton);
 
         selectedLayer = resolved;
-        if (resolved != null && !Objects.equals(previous, resolved)) layerSelectionChanged(resolved);
+        if (resolved != null && !Objects.equals(previous, resolved)) {
+            layerSelectionChanged(resolved);
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -589,7 +598,8 @@ public class MapControlBar {
         selectedDimension = newDimension;
         refreshMarkerFilter(true);
         host.onCloseSidePanel();
-        configureLayerButton();
+        boolean layerChanged = configureLayerButton();
+        if (!layerChanged && selectedLayer != null) layerSelectionChanged(selectedLayer);
     }
 
     /**
@@ -635,7 +645,7 @@ public class MapControlBar {
     }
 
     /**
-     * Selects the range matching the player's current Y, falling back to the first configured range.
+     * Selects the most useful default range for the selected dimension.
      *
      * @param layer The ranged layer to inspect.
      * @return the default range, or {@code null} when the layer has no ranges.
@@ -646,7 +656,40 @@ public class MapControlBar {
         if (!layer.hasRanges()) return null;
 
         Double playerY = Client.playerPositionY();
-        return playerY == null ? layer.ranges().getFirst() : layer.rangeForY(playerY);
+        MapLayerRange playerRange = playerY == null ? layer.ranges().getFirst() : layer.rangeForY(playerY);
+        if (ArdaMapsClient.CONFIG == null || ArdaMapsClient.CONFIG.isMapRevealAll() || selectedDimension == null) return playerRange;
+
+        if (playerRange != null && Objects.equals(selectedDimension, Client.currentDimension()) && Client.player() != null) {
+
+            PlayerExploration playerExploration = ArdaMapsClient.CONFIG.getClientProgress()
+                    .getExplorationState(selectedDimension.getId(), playerRange.index(), false);
+            Vec2d playerPosition = Client.playerPosition2d();
+            if (playerExploration != null && playerExploration.isWorldPosExplored(playerPosition.x(), playerPosition.y(), 0)) {
+                return playerRange;
+            }
+        }
+
+        return layer.ranges().stream()
+                .max(Comparator.comparingInt(this::hotspotScore))
+                .orElse(playerRange);
+    }
+
+    /**
+     * Scores a range by revealed-cell density.
+     *
+     * @param range The range to score.
+     * @return The highest revealed-cell neighbourhood score, or -1 when unexplored.
+     */
+    private int hotspotScore(MapLayerRange range) {
+
+        if (selectedDimension == null || ArdaMapsClient.CONFIG == null) return -1;
+
+        PlayerExploration exploration = ArdaMapsClient.CONFIG.getClientProgress()
+                .getExplorationState(selectedDimension.getId(), range.index(), false);
+        if (exploration == null) return -1;
+
+        var hotspot = exploration.findRevealedHotspot(MapLayerLoader.HOTSPOT_RADIUS_CELLS);
+        return hotspot == null ? -1 : hotspot.revealedNeighbours();
     }
 
     /**

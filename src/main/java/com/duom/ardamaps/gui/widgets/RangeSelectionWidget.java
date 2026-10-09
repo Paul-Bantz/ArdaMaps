@@ -36,6 +36,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
@@ -194,6 +195,22 @@ public class RangeSelectionWidget extends AbstractWidget {
     static String tooltipLabel(MapLayerRange range) {
 
         return Math.min(range.rangeMinY(), range.rangeMaxY()) + ".." + Math.max(range.rangeMinY(), range.rangeMaxY());
+    }
+
+    /**
+     * Builds tooltip lines for a range.
+     *
+     * @param range The range to label.
+     * @return Tooltip components containing name and interval when available.
+     */
+    static List<Component> tooltipLines(MapLayerRange range) {
+
+        Component interval = Component.literal(tooltipLabel(range));
+        String name = range.name();
+
+        if (name == null || name.isBlank()) return List.of(interval);
+
+        return List.of(Component.literal(name), interval.copy().withStyle(ChatFormatting.GRAY));
     }
 
     /**
@@ -502,7 +519,9 @@ public class RangeSelectionWidget extends AbstractWidget {
         MapLayerRange range = ranges.get(hoveredIndex);
         int anchorX = clampTooltipAnchorX((int) itemXAt(hoveredIndex) + itemWidth / 2, stripX(), stripX() + viewportWidth());
         int anchorY = getY() - TOOLTIP_GAP;
-        List<FormattedCharSequence> tooltip = List.of(Component.literal(tooltipLabel(range)).getVisualOrderText());
+        List<FormattedCharSequence> tooltip = tooltipLines(range).stream()
+                .map(Component::getVisualOrderText)
+                .toList();
         context.setTooltipForNextFrame(textRenderer, tooltip, AboveAnchorTooltipPositioner.INSTANCE, anchorX, anchorY, false);
     }
 

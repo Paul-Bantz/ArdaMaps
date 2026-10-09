@@ -245,7 +245,7 @@ public class BlueMapRenderer extends MapRenderable {
 
         if (primaryTiles.isEmpty() && fallbackMap.isEmpty()) {
             provider.protectDrawnTiles(Set.of());
-            super.renderLoadingText(context);
+            if (!provider.getLoadingTiles().isEmpty()) super.renderLoadingText(context);
             return;
         }
 

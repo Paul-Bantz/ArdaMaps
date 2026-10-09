@@ -37,5 +37,8 @@ public enum ProgressWipe {
     CORRUPT_FILE,
 
     /** Stale flat exploration state was removed for ranged dimensions. */
-    RANGED_MIGRATION
+    RANGED_MIGRATION,
+
+    /** Stale exploration state was removed after grid geometry changed. */
+    GRID_MIGRATION
 }

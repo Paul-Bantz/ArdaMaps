@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 
 import static com.duom.ardamaps.core.data.ExplorationState.HIDDEN;
 import static com.duom.ardamaps.core.data.ExplorationState.REVEALED;
+import static com.duom.ardamaps.core.data.ExplorationState.VISIBLE;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -74,6 +75,18 @@ class ExplorationGridTest {
     }
 
     /**
+     * Explicit cell sizes should be honoured when they fit under the larger explicit-grid cap.
+     */
+    @Test
+    void computeCellSize_explicitDimension_usesRequestedCellSize() {
+
+        Dimension dimension = new Dimension("Fine", "test:fine", 1f, 0, 1000, 0, 1000, false, false, null, 8);
+        ExplorationGrid grid = ExplorationGrid.create(dimension, null);
+
+        assertEquals(8, grid.getCellSize());
+    }
+
+    /**
      * World minimum coordinates map to the first cell.
      */
     @Test
@@ -109,6 +122,40 @@ class ExplorationGridTest {
         grid.markCell(0, 1, REVEALED, 2);
 
         assertEquals(HIDDEN, grid.stateAt(grid.getNbCellsX() - 1, 0));
+    }
+
+    /**
+     * Upgrade-only marking must not downgrade cells that are already more revealed.
+     */
+    @Test
+    void markCellAtLeast_preservesHigherState() {
+
+        ExplorationGrid grid = ExplorationGrid.create(OFFSET_DIM, null);
+
+        grid.markCell(1, 1, REVEALED);
+        grid.markCellAtLeast(1, 1, VISIBLE);
+
+        assertEquals(REVEALED, grid.stateAt(1, 1));
+    }
+
+    /**
+     * Hotspot selection should prefer the revealed cell with the densest local revealed neighbourhood.
+     */
+    @Test
+    void findRevealedHotspot_returnsDensestRevealedCell() {
+
+        ExplorationGrid grid = ExplorationGrid.create(OFFSET_DIM, null);
+        grid.markCell(1, 1, REVEALED);
+        grid.markCell(4, 4, REVEALED);
+        grid.markCell(5, 4, REVEALED);
+        grid.markCell(4, 5, REVEALED);
+
+        ExplorationGrid.RevealedHotspot hotspot = grid.findRevealedHotspot(1);
+
+        assertNotNull(hotspot);
+        assertEquals(4, hotspot.cellX());
+        assertEquals(4, hotspot.cellY());
+        assertEquals(3, hotspot.revealedNeighbours());
     }
 
     /**

@@ -26,6 +26,7 @@
 package com.duom.ardamaps.gui.widgets;
 
 import com.duom.ardamaps.core.data.config.MapLayerRange;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.network.chat.Component;
@@ -120,6 +121,31 @@ class RangeSelectionWidgetTest {
 
         assertEquals("-500..-128", RangeSelectionWidget.tooltipLabel(new MapLayerRange(0, "0.pmtiles", -500, -128)));
         assertEquals("-500..-128", RangeSelectionWidget.tooltipLabel(new MapLayerRange(0, "0.pmtiles", -128, -500)));
+    }
+
+    /**
+     * Named ranges show the display name first and the numeric interval as secondary text.
+     */
+    @Test
+    void tooltipLines_namedRange_includesNameAndGrayInterval() {
+
+        List<Component> lines = RangeSelectionWidget.tooltipLines(new MapLayerRange(0, "0.pmtiles", "Deep Roads", -500, -128));
+
+        assertEquals("Deep Roads", lines.getFirst().getString());
+        assertEquals("-500..-128", lines.get(1).getString());
+        assertEquals(ChatFormatting.GRAY.getColor(), lines.get(1).getStyle().getColor().getValue());
+    }
+
+    /**
+     * Unnamed ranges keep the compact one-line interval tooltip.
+     */
+    @Test
+    void tooltipLines_unnamedRange_usesIntervalOnly() {
+
+        List<Component> lines = RangeSelectionWidget.tooltipLines(new MapLayerRange(0, "0.pmtiles", -500, -128));
+
+        assertEquals(1, lines.size());
+        assertEquals("-500..-128", lines.getFirst().getString());
     }
 
     /**

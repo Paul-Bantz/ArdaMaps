@@ -101,4 +101,22 @@ class DimensionTest {
         assertEquals(freebuild, dimension.findRemapAt(20, 30));
         assertNull(dimension.findRemapAt(9, 30));
     }
+
+    /**
+     * Ranged exploration propagation needs all bands strictly above the source band.
+     */
+    @Test
+    void rangesAbove_returnsOnlyHigherBands() {
+
+        MapLayerRange low = new MapLayerRange(0, "low.pmtiles", -64, 0);
+        MapLayerRange middle = new MapLayerRange(1, "middle.pmtiles", 1, 64);
+        MapLayerRange high = new MapLayerRange(2, "high.pmtiles", 65, 128);
+        Dimension dimension = new Dimension("Test", "test:dimension", 1f, 0, 100, 0, 100, false);
+        dimension.getMapLayers().add(new MapLayerDefinition("Ranged", MapLayerSource.PMTILES, true, 8, null, 1.0,
+                1, 3, 1, 14, 256, 1.0, "base", "", List.of(low, middle, high)));
+
+        assertEquals(List.of(middle, high), dimension.rangesAbove(low));
+        assertEquals(List.of(high), dimension.rangesAbove(middle));
+        assertEquals(List.of(), dimension.rangesAbove(high));
+    }
 }

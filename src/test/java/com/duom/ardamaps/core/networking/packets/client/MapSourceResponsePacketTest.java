@@ -105,15 +105,16 @@ class MapSourceResponsePacketTest {
     void buildRead_roundTripsLayerWithRanges() {
 
         List<MapLayerRange> ranges = List.of(
-                new MapLayerRange(0, "low.pmtiles", -64, 0),
-                new MapLayerRange(1, "high.pmtiles", 1, 128));
-        Dimension dimension = dimension();
+                new MapLayerRange(0, "low.pmtiles", "Low", -64, 0),
+                new MapLayerRange(1, "high.pmtiles", "High", 1, 128));
+        Dimension dimension = new Dimension("Test", "test:dimension", 1f, 0, 1000, 0, 1000, false, false, null, 8);
         dimension.getMapLayers().add(layer(ranges));
 
         MapSourceResponsePacket parsed = roundTrip(new MapSourceResponsePacket(false, true, List.of(dimension)));
 
         assertFalse(parsed.warpsAvailable());
         assertTrue(parsed.ardaRegionsAvailable());
+        assertEquals(8, parsed.dimensions().getFirst().getExplorationCellSize());
         assertEquals(ranges, parsed.dimensions().getFirst().getMapLayers().getFirst().ranges());
         assertNull(parsed.dimensions().getFirst().getMapLayers().getFirst().path());
         assertEquals(layer(ranges), parsed.dimensions().getFirst().getMapLayers().getFirst());
@@ -171,6 +172,7 @@ class MapSourceResponsePacketTest {
         buf.writeInt(1000);
         buf.writeInt(0);
         buf.writeInt(1000);
+        buf.writeInt(0);
         buf.writeBoolean(false);
         buf.writeInt(0);
     }

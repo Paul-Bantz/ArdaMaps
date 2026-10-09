@@ -124,6 +124,31 @@ class MapLayerDefinitionTest {
     }
 
     /**
+     * Relative range paths are resolved against the ranged layer base path.
+     */
+    @Test
+    void resolveRangePath_relativePath_joinsBasePath() {
+
+        MapLayerDefinition layer = new MapLayerDefinition("Ranged", MapLayerSource.PMTILES, true, 8, null, 1.0,
+                1, 3, 1, 14, 256, 1.0, "https://maps.example/base/", "", List.of(LOWER));
+
+        assertEquals("https://maps.example/base/lower.pmtiles", layer.resolveRangePath(LOWER));
+    }
+
+    /**
+     * Absolute range paths are not joined to the base path.
+     */
+    @Test
+    void resolveRangePath_absolutePath_keepsRangePath() {
+
+        MapLayerRange absolute = new MapLayerRange(2, "https://cdn.example/high.pmtiles", 129, 256);
+        MapLayerDefinition layer = new MapLayerDefinition("Ranged", MapLayerSource.PMTILES, true, 8, null, 1.0,
+                1, 3, 1, 14, 256, 1.0, "https://maps.example/base", "", List.of(absolute));
+
+        assertEquals("https://cdn.example/high.pmtiles", layer.resolveRangePath(absolute));
+    }
+
+    /**
      * Verifies that equality and hash code account for the range list.
      * This matters because two otherwise identical layers must compare differently when they represent different vertical data slices.
      */

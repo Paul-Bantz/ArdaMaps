@@ -147,7 +147,7 @@ class MapLayerLoaderTest {
         var high = range(1, "high.pmtiles", 64, 320);
         MapLayerDefinition layer = layer(List.of(low, high));
 
-        assertEquals("high.pmtiles", MapLayerLoader.resolveLayer(layer, high, 0.0).path());
+        assertEquals("default.pmtiles/high.pmtiles", MapLayerLoader.resolveLayer(layer, high, 0.0).path());
     }
 
     /**
@@ -161,6 +161,6 @@ class MapLayerLoaderTest {
         var high = range(1, "high.pmtiles", 64, 320);
         MapLayerDefinition layer = layer(List.of(low, high));
 
-        assertEquals("high.pmtiles", MapLayerLoader.resolveLayer(layer, null, 100.0).path());
+        assertEquals("default.pmtiles/high.pmtiles", MapLayerLoader.resolveLayer(layer, null, 100.0).path());
     }
 }

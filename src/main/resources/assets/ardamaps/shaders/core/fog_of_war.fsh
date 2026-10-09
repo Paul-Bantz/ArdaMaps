@@ -37,5 +37,5 @@ void main() {
     float blendedAlpha = weightedAlpha / totalWeight;
     float fogDarkness = 1.0 - blendedAlpha;
 
-    fragColor = vec4(fogTex.rgb * fogDarkness, fogDarkness);
+    fragColor = vec4(fogTex.rgb, fogDarkness);
 }

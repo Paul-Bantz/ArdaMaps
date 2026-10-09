@@ -27,6 +27,7 @@ package com.duom.ardamaps.gui.screens;
 
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.Client;
+import com.duom.ardamaps.core.data.PlayerExploration;
 import com.duom.ardamaps.core.data.Vec2d;
 import com.duom.ardamaps.core.data.config.Dimension;
 import com.duom.ardamaps.core.data.config.MapLayerDefinition;
@@ -185,7 +186,7 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
         locationPanel.restorePanel(previousPanel);
 
         if (layerSession.getRenderable() == null && layerSession.generation() == generationBeforeWidgets)
-            triggerReload();
+            triggerReload(false);
     }
 
     /**
@@ -201,8 +202,10 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
 
     /**
      * Builds the layer loader input and submits a reload to the session.
+     *
+     * @param preserveCamera Whether to preserve the current camera when reloading the same dimension.
      */
-    private void triggerReload() {
+    private void triggerReload(boolean preserveCamera) {
 
         MapLayerDefinition layer = controlBar.selectedLayer();
         if (layer == null) return;
@@ -210,22 +213,33 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
         Dimension selectedDimension = controlBar.selectedDimension();
         if (selectedDimension == null) return;
 
+        var explorationRange = MapLayerLoader.resolveExplorationRange(selectedDimension, controlBar.selectedRange(), Client.playerPositionY());
+        PlayerExploration exploration = ArdaMapsClient.CONFIG.getClientProgress().getExplorationState(
+                selectedDimension.getId(),
+                explorationRange == null ? null : explorationRange.index(),
+                true);
+        if (exploration == null) return;
+
         MapCamera camera = layerSession.getCamera();
-        Vec2d cameraPosition = reloadStartingPosition(selectedDimension, camera);
+        Vec2d cameraPosition = resolveStartingPosition(selectedDimension, camera, exploration, preserveCamera);
         int cx = (int) Math.floor(cameraPosition.x());
         int cy = (int) Math.floor(cameraPosition.y());
+        double renderScale = !Objects.equals(loadedDimension, selectedDimension) && !isMapRevealAll()
+                ? Double.NaN
+                : layerSession.capturedRenderScale();
 
         MapLayerLoader.Input input = new MapLayerLoader.Input(
                 selectedDimension,
                 controlBar.selectedRange(),
                 layer,
-                layerSession.capturedRenderScale(),
+                renderScale,
                 width,
                 height,
                 cx,
                 cy,
                 Client.playerPositionY(),
-                font);
+                font,
+                exploration);
 
         layerSession.reload(input, () -> {
 
@@ -253,15 +267,33 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
      *
      * @param selectedDimension The dimension being loaded.
      * @param camera            The current camera, or {@code null} on first load.
+     * @param exploration       The exploration state for the target dimension/range.
+     * @param preserveCamera    Whether to preserve same-dimension camera position unconditionally.
      * @return The world position for the new camera.
      */
-    private Vec2d reloadStartingPosition(Dimension selectedDimension, @Nullable MapCamera camera) {
+    private Vec2d resolveStartingPosition(Dimension selectedDimension, @Nullable MapCamera camera,
+                                          PlayerExploration exploration, boolean preserveCamera) {
 
-        if (camera != null && Objects.equals(selectedDimension, loadedDimension))
+        boolean sameDimension = camera != null && Objects.equals(selectedDimension, loadedDimension);
+        if (sameDimension && preserveCamera)
             return new Vec2d(camera.getWorldX(), camera.getWorldZ());
 
-        if (Objects.equals(selectedDimension, Client.currentDimension()) && Client.player() != null)
-            return Client.playerPosition2d();
+        if (sameDimension && (isMapRevealAll() || exploration.isWorldPosExplored(camera.getWorldX(), camera.getWorldZ(), 0)))
+            return new Vec2d(camera.getWorldX(), camera.getWorldZ());
+
+        if (Objects.equals(selectedDimension, Client.currentDimension()) && Client.player() != null) {
+
+            Vec2d playerPosition = Client.playerPosition2d();
+            if (isMapRevealAll() || exploration.isWorldPosExplored(playerPosition.x(), playerPosition.y(), 0)) {
+                return playerPosition;
+            }
+        }
+
+        if (!isMapRevealAll()) {
+
+            Vec2d hotspot = exploration.findRevealedHotspotCenter(MapLayerLoader.HOTSPOT_RADIUS_CELLS);
+            if (hotspot != null) return hotspot;
+        }
 
         return new Vec2d(selectedDimension.getCenterX(), selectedDimension.getCenterZ());
     }
@@ -309,14 +341,14 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
     public void onLayerSelectionChanged() {
 
         locationPanel.reset();
-        triggerReload();
+        triggerReload(false);
     }
 
     /** {@inheritDoc} */
     @Override
     public void onRangeChanged() {
 
-        triggerReload();
+        triggerReload(true);
     }
 
     /** {@inheritDoc} */
@@ -678,10 +710,20 @@ public class MapScreen extends ArdaMapsScreen implements MapControlBar.Host {
      */
     private boolean isOutsideExploredArea(double worldX, double worldZ) {
 
-        if (ArdaMapsClient.CONFIG.isMapRevealAll()) return false;
+        if (isMapRevealAll()) return false;
 
         var exploration = layerSession.getExploration();
         return exploration != null && !exploration.isWorldPosExplored(worldX, worldZ, 0);
+    }
+
+    /**
+     * Returns whether fog-of-war restrictions are disabled.
+     *
+     * @return True when all map content should be treated as revealed.
+     */
+    private boolean isMapRevealAll() {
+
+        return ArdaMapsClient.CONFIG.isMapRevealAll();
     }
 
     /**

@@ -146,7 +146,7 @@ public class MapLayerSession {
                         return;
                     }
 
-                    Minecraft.getInstance().execute(() -> applyResult(generation, result, onLoaded));
+                    Minecraft.getInstance().execute(() -> applyResult(generation, input, result, onLoaded));
                 });
     }
 
@@ -154,10 +154,11 @@ public class MapLayerSession {
      * Applies a completed load result on the main thread, discarding stale results.
      *
      * @param generation The generation token this result was launched with.
+     * @param input      The immutable inputs this result was launched with.
      * @param result     The loaded renderable, or {@code null} when loading failed.
      * @param onLoaded   Callback to invoke after a successful swap.
      */
-    private void applyResult(int generation, @Nullable MapRenderable result, Runnable onLoaded) {
+    private void applyResult(int generation, MapLayerLoader.Input input, @Nullable MapRenderable result, Runnable onLoaded) {
 
         LOGGER.info("Map layer loaded: {}", result != null ? "success" : "failed");
 
@@ -173,6 +174,10 @@ public class MapLayerSession {
             closeRenderable();
             mapRenderable = result;
             onLoaded.run();
+        } else if (mapRenderable != null && mapRenderable.getCamera() != null
+                && !java.util.Objects.equals(mapRenderable.getCamera().getDimension(), input.selectedDimension())) {
+
+            closeRenderable();
         }
     }
 
