@@ -297,7 +297,7 @@ public class ArdaMapsClient implements ClientModInitializer {
         Client.invalidateCachedDimension();
         PacketRegistry.clearPendingResponses();
 
-        if (CONFIG_MANAGER != null) CONFIG_MANAGER.saveProgressNow();
+        if (CONFIG_MANAGER != null) CONFIG_MANAGER.endProgressSession();
         if (CONFIG != null) CONFIG.clearSessionState();
     }
 

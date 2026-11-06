@@ -25,6 +25,7 @@
 
 package com.duom.ardamaps.core.data.config;
 
+import com.duom.ardamaps.ArdaMaps;
 import com.duom.ardamaps.ArdaMapsClient;
 import com.duom.ardamaps.core.data.ExplorationState;
 import com.duom.ardamaps.core.data.config.client.ProgressWipe;
@@ -47,6 +48,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -120,6 +122,48 @@ class ClientConfigManagerTest {
         assertTrue(reloadedProgress.getExplorationState().containsKey("test:dimension"));
         assertTrue(reloadedProgress.getVisitedLocationIds().contains("visited-location"));
         assertEquals(ExplorationState.REVEALED, reloadedProgress.getExplorationState("test:dimension", false).stateAt(0, 0));
+    }
+
+    /**
+     * Verifies that saves after a session ends cannot replace persisted progress with cleared session state.
+     *
+     * @throws Exception when reading the progress file fails.
+     */
+    @Test
+    void saveProgress_afterEndProgressSessionDoesNotOverwriteFile() throws Exception {
+
+        ClientConfigManager manager = createManager();
+        seedProgress(manager);
+        manager.saveProgressNow();
+        assertTrue(manager.reloadClientProgress());
+
+        manager.endProgressSession();
+        manager.getConfig().getClientProgress().clearSessionState();
+        manager.saveProgressNow();
+
+        assertTrue(Files.readString(progressFile()).contains("test:dimension"));
+        assertTrue(manager.reloadClientProgress());
+        assertTrue(manager.getConfig().getClientProgress().getVisitedLocationIds().contains("visited-location"));
+    }
+
+    /**
+     * Verifies that reloading progress enables persistence for the next session.
+     *
+     * @throws Exception when reading the progress file fails.
+     */
+    @Test
+    void saveProgress_writesAgainAfterReload() throws Exception {
+
+        ClientConfigManager manager = createManager();
+        manager.endProgressSession();
+
+        manager.reloadClientProgress();
+        seedProgress(manager);
+        manager.saveProgressNow();
+
+        String savedProgress = Files.readString(progressFile());
+        assertTrue(savedProgress.contains("test:dimension"));
+        assertTrue(savedProgress.contains("visited-location"));
     }
 
     /**
@@ -231,6 +275,9 @@ class ClientConfigManagerTest {
                 tempDir.resolve("locations.json").toString(),
                 tempDir.resolve("regions.json").toString(),
                 progressFile().toString());
+        CompletableFuture.runAsync(() -> {
+        }, ArdaMaps.IO_EXECUTOR).join();
+        manager.reloadClientProgress();
         ArdaMapsClient.CONFIG_MANAGER = manager;
         ArdaMapsClient.CONFIG = manager.getConfig();
         return manager;
