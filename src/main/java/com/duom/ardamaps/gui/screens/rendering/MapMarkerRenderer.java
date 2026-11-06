@@ -35,7 +35,6 @@ import com.duom.ardamaps.core.data.map.cameras.MapCamera;
 import com.duom.ardamaps.core.data.map.markers.MarkersManager;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
-import com.duom.ardamaps.gui.map.PlayerIcon;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -59,6 +58,9 @@ public class MapMarkerRenderer {
 
     /** Rendered player marker scale factor */
     private static final float PLAYER_MARKER_SCALE = .25f;
+
+    /** Source player icon size in pixels. */
+    private static final int PLAYER_ICON_SIZE = 48;
 
     /** Rendered map marker scale factor */
     private static final float MARKER_SCALE = .6f;
@@ -253,13 +255,15 @@ public class MapMarkerRenderer {
 
         if (!Objects.equals(mapCamera.getDimension(), Client.currentDimension())) return;
 
-        var iconImage = PlayerIcon.getPlayerIcon();
-        if (iconImage == null) return;
+        var player = Client.player();
+        if (player == null) return;
+
+        Identifier skin = player.getSkinTexture();
 
         var clientPos = Client.playerPosition2d();
         var clientScreenPos = mapCamera.worldToScreenCoordinates(clientPos);
 
-        var iconSize = (int) (PlayerIcon.ICON_SIZE * PLAYER_MARKER_SCALE);
+        var iconSize = (int) (PLAYER_ICON_SIZE * PLAYER_MARKER_SCALE);
         int halfIconSize = iconSize / 2;
 
         int screenX = (int) clientScreenPos.x() - halfIconSize;
@@ -278,14 +282,17 @@ public class MapMarkerRenderer {
         context.fill(screenX, screenZ, screenX + iconSize, screenZ + iconSize, markerBackgroundColor);
 
         if (outOfRange) RenderSystem.setShaderColor(1f, 1f, 1f, MARKER_OUT_OF_RANGE_OPACITY);
-        context.drawTexture(iconImage,
-                screenX,
-                screenZ,
-                iconSize, iconSize,
-                PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE,
-                PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE,
-                PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE
-        );
+
+        int inset = iconSize / 12;
+        int innerSize = iconSize - 2 * inset;
+        context.drawTexture(skin, screenX + inset, screenZ + inset, innerSize, innerSize,
+                8, 8, 8, 8, 64, 64);
+
+        RenderSystem.enableBlend();
+        context.drawTexture(skin, screenX, screenZ, iconSize, iconSize,
+                40, 8, 8, 8, 64, 64);
+        RenderSystem.disableBlend();
+
         if (outOfRange) RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
     }
 
