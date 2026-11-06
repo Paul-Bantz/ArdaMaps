@@ -120,6 +120,48 @@ class ClientConfigManagerTest {
     }
 
     /**
+     * Verifies that saves after a session ends cannot replace persisted progress with cleared session state.
+     *
+     * @throws Exception when reading the progress file fails.
+     */
+    @Test
+    void saveProgress_afterEndProgressSessionDoesNotOverwriteFile() throws Exception {
+
+        ClientConfigManager manager = createManager();
+        seedProgress(manager);
+        manager.saveProgressNow();
+        assertTrue(manager.reloadClientProgress());
+
+        manager.endProgressSession();
+        manager.getConfig().getClientProgress().clearSessionState();
+        manager.saveProgressNow();
+
+        assertTrue(Files.readString(progressFile()).contains("test:dimension"));
+        assertTrue(manager.reloadClientProgress());
+        assertTrue(manager.getConfig().getClientProgress().getVisitedLocationIds().contains("visited-location"));
+    }
+
+    /**
+     * Verifies that reloading progress enables persistence for the next session.
+     *
+     * @throws Exception when reading the progress file fails.
+     */
+    @Test
+    void saveProgress_writesAgainAfterReload() throws Exception {
+
+        ClientConfigManager manager = createManager();
+        manager.endProgressSession();
+
+        manager.reloadClientProgress();
+        seedProgress(manager);
+        manager.saveProgressNow();
+
+        String savedProgress = Files.readString(progressFile());
+        assertTrue(savedProgress.contains("test:dimension"));
+        assertTrue(savedProgress.contains("visited-location"));
+    }
+
+    /**
      * Verifies that a full reset writes a timestamped backup before saving empty progress.
      *
      * @throws Exception when test file operations fail.
@@ -259,6 +301,9 @@ class ClientConfigManagerTest {
                 tempDir.resolve("locations.json").toString(),
                 tempDir.resolve("regions.json").toString(),
                 progressFile().toString());
+        CompletableFuture.runAsync(() -> {
+        }, ArdaMaps.IO_EXECUTOR).join();
+        manager.reloadClientProgress();
         ArdaMapsClient.CONFIG_MANAGER = manager;
         ArdaMapsClient.CONFIG = manager.getConfig();
         return manager;

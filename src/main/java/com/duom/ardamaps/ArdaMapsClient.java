@@ -60,7 +60,6 @@ import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.hud.compass.Compass;
 import com.duom.ardamaps.gui.hud.toposcope.Toposcope;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
-import com.duom.ardamaps.gui.map.PlayerIcon;
 import com.duom.ardamaps.gui.screens.ConfigurationScreen;
 import com.duom.ardamaps.gui.screens.GuideScreen;
 import com.duom.ardamaps.gui.screens.MapScreen;
@@ -413,12 +412,10 @@ public class ArdaMapsClient implements ClientModInitializer {
 
         Client.invalidateCachedDimension();
         PacketRegistry.clearPendingResponses();
-        // The disconnect event may run on Netty's IO thread; callees defer GL teardown.
-        PlayerIcon.clear();
 
         breakActiveTrail();
 
-        if (CONFIG_MANAGER != null) CONFIG_MANAGER.saveProgressNow();
+        if (CONFIG_MANAGER != null) CONFIG_MANAGER.endProgressSession();
 
         if (CONFIG != null) CONFIG.clearSessionState();
     }
@@ -1160,7 +1157,6 @@ public class ArdaMapsClient implements ClientModInitializer {
         protected void apply(Void value, @NonNull SharedState state) {
 
             GuideImageCache.clear();
-            PlayerIcon.clear();
         }
     }
 }

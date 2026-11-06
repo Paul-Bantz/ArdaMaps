@@ -73,6 +73,9 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
     /** Stores the client's exploration progress */
     private final Path clientProgressFile;
 
+    /** Whether exploration progress is loaded for an active play session. */
+    private volatile boolean progressLoaded;
+
     /**
      * Constructor for ConfigManager.
      *
@@ -87,6 +90,7 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
 
         clientProgressFile = Path.of(clientProgressPath);
         reloadClientProgress();
+        progressLoaded = false;
     }
 
     /**
@@ -105,18 +109,21 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
 
                 ClientProgress progress = Objects.requireNonNullElse(GSON.fromJson(reader, ClientProgress.class), defaultProgress);
                 config.setClientProgress(progress);
+                progressLoaded = true;
                 synchronizeLocationExplorationProgress();
                 loaded = true;
 
             } catch (JsonIOException | JsonSyntaxException | IOException e) {
 
                 LOGGER.error("Failed to load exploration progress", e);
+                progressLoaded = true;
                 wipeClientProgress(ProgressWipe.CORRUPT_FILE);
 
             }
         } else {
 
             config.setClientProgress(defaultProgress);
+            progressLoaded = true;
             saveProgress();
         }
 
@@ -167,6 +174,11 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
      */
     public CompletableFuture<Void> saveProgress() {
 
+        if (!progressLoaded) {
+            LOGGER.debug("Skipping exploration progress save outside an active play session");
+            return CompletableFuture.completedFuture(null);
+        }
+
         ClientProgress snapshot = config.getClientProgress().snapshot();
         final String json;
         try {
@@ -213,6 +225,15 @@ public class ClientConfigManager extends ConfigManager<ClientConfig, LocationCli
         } catch (ExecutionException | TimeoutException e) {
             LOGGER.error("Failed to synchronously save exploration progress file", e);
         }
+    }
+
+    /**
+     * Saves exploration progress and prevents further writes until the next session loads.
+     */
+    public void endProgressSession() {
+
+        saveProgressNow();
+        progressLoaded = false;
     }
 
     /**

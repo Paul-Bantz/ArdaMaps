@@ -36,11 +36,11 @@ import com.duom.ardamaps.core.data.map.markers.MarkersManager;
 import com.duom.ardamaps.gui.GuiTextures;
 import com.duom.ardamaps.gui.ModConstants;
 import com.duom.ardamaps.gui.icons.IconSpriteAtlas;
-import com.duom.ardamaps.gui.map.PlayerIcon;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.PlayerFaceExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
 import net.minecraft.network.chat.Component;
@@ -57,6 +57,9 @@ public class MapMarkerRenderer {
 
     /** Rendered player marker scale factor */
     private static final float PLAYER_MARKER_SCALE = .25f;
+
+    /** Source player icon size in pixels. */
+    private static final int PLAYER_ICON_SIZE = 48;
 
     /** Rendered map marker scale factor */
     private static final float MARKER_SCALE = .6f;
@@ -262,13 +265,15 @@ public class MapMarkerRenderer {
 
         if (!Objects.equals(mapCamera.getDimension(), Client.currentDimension())) return;
 
-        var iconImage = PlayerIcon.getPlayerIcon();
-        if (iconImage == null) return;
+        var player = Client.player();
+        if (player == null) return;
+
+        Identifier skin = player.getSkin().body().texturePath();
 
         var clientPos = Client.playerPosition2d();
         var clientScreenPos = mapCamera.worldToScreenCoordinates(clientPos);
 
-        var iconSize = (int) (PlayerIcon.ICON_SIZE * PLAYER_MARKER_SCALE);
+        var iconSize = (int) (PLAYER_ICON_SIZE * PLAYER_MARKER_SCALE);
         int halfIconSize = iconSize / 2;
 
         int screenX = (int) clientScreenPos.x() - halfIconSize;
@@ -286,15 +291,20 @@ public class MapMarkerRenderer {
 
         context.fill(screenX, screenZ, screenX + iconSize, screenZ + iconSize, markerBackgroundColor);
 
-        context.blit(RenderPipelines.GUI_TEXTURED, iconImage,
-                screenX,
-                screenZ,
-                0, 0,
-                iconSize, iconSize,
-                PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE,
-                PlayerIcon.ICON_SIZE, PlayerIcon.ICON_SIZE,
-                outOfRange ? GuiTextures.withAlpha(ModConstants.COLOR_WHITE, MARKER_OUT_OF_RANGE_OPACITY) : ModConstants.COLOR_WHITE
-        );
+        int color = outOfRange
+                ? GuiTextures.withAlpha(ModConstants.COLOR_WHITE, MARKER_OUT_OF_RANGE_OPACITY)
+                : ModConstants.COLOR_WHITE;
+        int inset = iconSize / 12;
+        int innerSize = iconSize - 2 * inset;
+
+        context.blit(RenderPipelines.GUI_TEXTURED, skin, screenX + inset, screenZ + inset,
+                PlayerFaceExtractor.SKIN_HEAD_U, PlayerFaceExtractor.SKIN_HEAD_V, innerSize, innerSize,
+                PlayerFaceExtractor.SKIN_HEAD_WIDTH, PlayerFaceExtractor.SKIN_HEAD_HEIGHT,
+                PlayerFaceExtractor.SKIN_TEX_WIDTH, PlayerFaceExtractor.SKIN_TEX_HEIGHT, color);
+        context.blit(RenderPipelines.GUI_TEXTURED, skin, screenX, screenZ,
+                PlayerFaceExtractor.SKIN_HAT_U, PlayerFaceExtractor.SKIN_HAT_V, iconSize, iconSize,
+                PlayerFaceExtractor.SKIN_HAT_WIDTH, PlayerFaceExtractor.SKIN_HAT_HEIGHT,
+                PlayerFaceExtractor.SKIN_TEX_WIDTH, PlayerFaceExtractor.SKIN_TEX_HEIGHT, color);
     }
 
     /**
